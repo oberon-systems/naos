@@ -1,0 +1,124 @@
+# The commit-msg hooks below only ever run once git has a commit-msg hook
+# script, which `pre-commit install` writes only when asked for that type.
+default_install_hook_types: [pre-commit, commit-msg]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-ast
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-toml
+      - id: check-vcs-permalinks
+      - id: check-yaml
+        files: .*\.(yaml|yml)$
+      - id: detect-aws-credentials
+        args: [--allow-missing-credentials]
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: forbid-new-submodules
+      - id: mixed-line-ending
+      - id: requirements-txt-fixer
+      - id: trailing-whitespace
+
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.5
+    hooks:
+      - id: forbid-crlf
+      - id: remove-crlf
+      - id: forbid-tabs
+        files: \.(py|rs|sh|md|ya?ml|toml|hcl|html)$
+      - id: remove-tabs
+        args: [--whitespaces-count, '2']
+        files: \.(py|rs|sh|md|ya?ml|toml|hcl|html)$
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.7
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.3.1
+    hooks:
+      - id: mypy
+        additional_dependencies: [pydantic==2.13.5]
+
+  - repo: https://github.com/djlint/djLint
+    rev: v1.46.1
+    hooks:
+      - id: djlint-reformat-jinja
+        files: ^packages/web/.*\.html$
+      - id: djlint-jinja
+        files: ^packages/web/.*\.html$
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt
+        entry: cargo fmt --all
+        language: system
+        types: [rust]
+        pass_filenames: false
+      - id: cargo-clippy
+        name: cargo clippy
+        entry: cargo clippy --workspace --all-targets -- -D warnings
+        language: system
+        types: [rust]
+        pass_filenames: false
+      - id: packer-fmt
+        name: packer fmt
+        entry: packer fmt -recursive packer
+        language: system
+        files: ^packer/.*\.pkr\.hcl$
+        pass_filenames: false
+
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.44.0
+    hooks:
+      - id: markdownlint
+
+  - repo: https://github.com/jumanjihouse/pre-commit-hooks
+    rev: 3.0.0
+    hooks:
+      - id: forbid-binary
+      - id: require-ascii
+        exclude: .*\.md$
+      - id: shellcheck
+        args: [-e, SC2086]
+      # -i 4 overrides shfmt's tab indentation, which the forbid-tabs hook
+      # above rejects in *.sh. Without it the two hooks fight over every edit.
+      - id: shfmt
+        args: [-w, -i, '4']
+
+  # `cz check` validates the message against the provider's schema_pattern(),
+  # so the hook environment needs the provider itself: pre-commit builds it in
+  # isolation and .cz.yaml names wyld_cz. Without the extra dependency the hook
+  # fails with "The committer has not been found in the system".
+  #
+  # The three versions move together. wyld-cz 0.2.x requires commitizen >=4.9,<5
+  # and 0.2.1 is the first release implementing schema_pattern(); on 0.1.0 the
+  # hook raises NotImplementedError on every commit. Keep this rev, the pin in
+  # requirements.txt and the provider release in step.
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.18.0
+    hooks:
+      - id: commitizen
+        additional_dependencies: [wyld-cz==0.2.2]
+      - id: commitizen-branch
+        additional_dependencies: [wyld-cz==0.2.2]
+        stages: [pre-push]
+
+  - repo: meta
+    hooks:
+      - id: check-useless-excludes

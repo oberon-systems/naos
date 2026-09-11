@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "enggraph": {
+      "httpUrl": "http://localhost:3000/mcp/naos",
+      "type": "http",
+      "trust": true
+    }
+  }
+}
