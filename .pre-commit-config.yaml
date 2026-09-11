@@ -47,7 +47,13 @@ repos:
     rev: v2.3.1
     hooks:
       - id: mypy
-        additional_dependencies: [pydantic==2.13.5]
+        additional_dependencies:
+          - fastapi==0.141.1
+          - httpx==0.28.1
+          - pydantic==2.13.5
+          - pydantic-settings==2.15.0
+          - pytest==9.1.1
+          - sqlmodel==0.0.42
 
   - repo: https://github.com/djlint/djLint
     rev: v1.46.1

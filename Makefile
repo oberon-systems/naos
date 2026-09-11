@@ -8,7 +8,7 @@ PIP     := $(VENV)/bin/pip
 export PRE_COMMIT_HOME := $(CURDIR)/.pre-commit
 
 .DEFAULT_GOAL := shell
-.PHONY: install shell test lint
+.PHONY: install shell test lint run-api
 
 
 install:
@@ -18,10 +18,14 @@ install:
 	$(VENV)/bin/pre-commit install
 
 test:
-	$(VENV)/bin/pytest packages -q
+	$(VENV)/bin/pytest -q
+	cargo test --workspace
 
 lint:
 	$(VENV)/bin/pre-commit run --all-files
+
+run-api:
+	$(VENV)/bin/uvicorn --factory naos_api.app:create_app --host 127.0.0.1
 
 shell:
 	@rc="$$(mktemp)"; \
