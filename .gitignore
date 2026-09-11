@@ -1,0 +1,20 @@
+# Agents Related
+.mcp.json
+CLAUDE.local.md
+.gemini/skills
+
+# Local environments
+.venv
+.pre-commit
+.env
+
+# Build and tool caches
+__pycache__/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+target/
+packer_cache/
+
+# ide
+.idea
