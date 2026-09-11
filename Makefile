@@ -11,22 +11,34 @@ export PRE_COMMIT_HOME := $(CURDIR)/.pre-commit
 .PHONY: install shell test lint run-api
 
 
+# common targets
 install:
 	python3 -m venv --prompt $(PROJECT) $(VENV)
 	$(PIP) install --upgrade pip
 	$(PIP) install -r requirements.txt
 	$(VENV)/bin/pre-commit install
 
+
+# tests
 test:
 	$(VENV)/bin/pytest -q
 	cargo test --workspace
 
+test-api:
+	$(VENV)/bin/pytest -q packages/api
+
+
+# linters
 lint:
 	$(VENV)/bin/pre-commit run --all-files
 
+
+# uns
 run-api:
 	$(VENV)/bin/uvicorn --factory naos_api.app:create_app --host 127.0.0.1
 
+
+# defaults
 shell:
 	@rc="$$(mktemp)"; \
 	trap 'rm -f "$$rc"' EXIT; \

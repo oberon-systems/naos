@@ -26,11 +26,24 @@ GET /api/v1/runs/{run_id}/console
 GET /api/v1/runs/{run_id}/events
 GET /api/v1/runs/{run_id}/diff
 POST /api/v1/runs/{run_id}/merge
+POST /api/v1/policy-snapshots
+GET /api/v1/policy-snapshots/{snapshot_id}
 ```
 
 Do not allow clients to arbitrarily set Run status. Validate legal transitions centrally.
 
 Use transactions for atomic transitions and design mutations to be idempotent.
+
+## Idempotency
+
+- `POST /runs` requires an `Idempotency-Key` header. The same key with the same
+  spec returns the existing Run with 200; with another spec it returns 409.
+- `POST /runs/{run_id}/stop` returns the current Run when there is nothing to
+  stop.
+- `POST /policy-snapshots` deduplicates by content: the same document returns
+  the existing snapshot with 200.
+- Transitions are compare-and-swap on the expected status. A repeated
+  transition that already happened is a no-op.
 
 Secrets must never be returned accidentally.
 

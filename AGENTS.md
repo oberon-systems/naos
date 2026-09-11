@@ -40,7 +40,8 @@ Use distinct identifiers where applicable:
 Expected lifecycle:
 PENDING -> STARTING -> STARTED -> STOPPING -> COLLECTING -> WAITING_MERGE -> COMPLETED
 
-Failures may transition to FAILED.
+Failures may transition to FAILED. Stopping a PENDING Run moves it to
+CANCELLED. COMPLETED, FAILED and CANCELLED are terminal.
 
 ## Architecture
 

@@ -41,30 +41,52 @@ Agent, AgentImage, RuntimeProfile, SecurityPolicy, MountProfile, Run, Runner, Le
 ## RunSpec
 
 ```yaml
-run_id: run_01ABC
 image:
-  id: image_123
+  id: image_alpha
   digest: sha256:...
 runtime:
   cpu: 4
-  memory: 8192
-  disk: 30G
+  memory_mib: 8192
+  disk_gib: 30
 mounts:
-  - host_path: /data/project
-    guest_path: /workspace
-    mode: rw
+  policy_snapshot: mntpol_...
 network:
-  policy_snapshot: netpol_42
+  policy_snapshot: netpol_...
 shell:
-  policy_snapshot: shellpol_10
+  policy_snapshot: shellpol_...
 mcp:
-  policy_snapshot: mcppol_7
+  policy_snapshot: mcppol_...
 merge:
   policy: ask
 timeout: 7200
 ```
 
-Security policy is snapshotted for the Run. Runtime settings may be mutable only where explicitly supported.
+The API assigns `run_id`; the client never sends it or a status. A missing
+policy reference grants nothing. The spec and every referenced snapshot are
+immutable from creation, enforced by database triggers. Changing the security
+boundary requires a new Run.
+
+## Mount policy
+
+Mounts are a policy snapshot like network, shell and MCP. The client sends
+host paths; the API resolves the guest paths, so the runner never invents
+them.
+
+```yaml
+workspace:
+  host_path: /srv/projects/alpha
+  mode: rw
+home:
+  - host_path: /srv/agent-home/claude
+    guest_path: .claude
+    mode: ro
+```
+
+The workspace mounts at `/naos/<basename>`, here `/naos/alpha`, and is the
+agent working directory. Home entries mount under `/home/naos`, the home of the
+default VM user `naos`; this is where agent settings and credentials go. Host
+paths must be absolute, normalized and inside `NAOS_ALLOWED_MOUNT_ROOTS`; the
+default is empty, which denies every mount.
 
 ## Acceptance criteria
 
