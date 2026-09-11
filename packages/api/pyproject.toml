@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "naos-api"
+version = "0.0.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi",
+  "naos-common",
+  "pydantic-settings",
+  "sqlmodel",
+]
+
+[tool.setuptools.package-data]
+naos_api = ["py.typed"]

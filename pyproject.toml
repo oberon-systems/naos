@@ -13,7 +13,16 @@ select = ["E", "F", "I", "B", "UP", "S", "SIM"]
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S101"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["naos_api", "naos_common"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
+mypy_path = "packages/common/src:packages/api/src"
+explicit_package_bases = true
+
+[tool.pytest.ini_options]
+testpaths = ["packages"]
+addopts = "--import-mode=importlib"
