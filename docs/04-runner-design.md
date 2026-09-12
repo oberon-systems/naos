@@ -54,6 +54,10 @@ without them.
 | `NAOS_AGENT_CAPACITY` | Runs this runner accepts, 0 to 64, default 1 |
 | `NAOS_AGENT_STATE_DIR` | Holds `credentials.json`, mode 0600 |
 | `NAOS_AGENT_ENROLLMENT_TOKEN_FILE` | Enrollment token, mode 0600 |
+| `NAOS_AGENT_ENV_FILE` | Optional `.env` file loaded before the variables above |
+
+The agent never looks for a `.env` file on its own. A file dropped into the
+working directory could otherwise redirect the API URL the agent trusts.
 
 Credential and enrollment files readable by group or others, or reached
 through a symlink, are refused. The HTTP client follows no redirects.
