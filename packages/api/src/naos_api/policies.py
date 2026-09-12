@@ -1,7 +1,6 @@
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from naos_api.errors import NotFoundError, PolicyError
@@ -39,7 +38,7 @@ def _store(
     session.add(snapshot)
     try:
         session.commit()
-    except IntegrityError:
+    except Exception:
         session.rollback()
         existing = _find(session, kind, digest)
         if existing is None:

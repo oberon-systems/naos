@@ -1,6 +1,5 @@
 import hashlib
 from collections.abc import Callable
-from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -142,7 +141,7 @@ def test_revoked_token_is_rejected(
     client: TestClient,
     register: Register,
     session: Session,
-    clock: Callable[[], datetime],
+    clock: Callable[[], int],
 ) -> None:
     runner = register()
     session.exec(

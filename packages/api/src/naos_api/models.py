@@ -1,44 +1,10 @@
-from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import (
-    JSON,
-    Column,
-    Connection,
-    DateTime,
-    Dialect,
-    Engine,
-    Index,
-    Table,
-    TypeDecorator,
-    UniqueConstraint,
-    event,
-    text,
-)
-from sqlmodel import Field, SQLModel
+from sqlmodel import JSON, Column, Field, SQLModel, UniqueConstraint
 
+from naos_api.clock import now_ts
 from naos_api.lifecycle import RunStatus
 from naos_api.spec import PolicyKind
-
-
-def utcnow() -> datetime:
-    return datetime.now(UTC)
-
-
-class UtcDateTime(TypeDecorator[datetime]):
-    # SQLite drops tzinfo, so values are stored as naive UTC and read back as aware UTC.
-    impl = DateTime
-    cache_ok = True
-
-    def process_bind_param(self, value: datetime | None, dialect: Dialect) -> datetime | None:
-        if value is None:
-            return None
-        if value.tzinfo is None:
-            raise ValueError("naive datetimes are not accepted")
-        return value.astimezone(UTC).replace(tzinfo=None)
-
-    def process_result_value(self, value: datetime | None, dialect: Dialect) -> datetime | None:
-        return None if value is None else value.replace(tzinfo=UTC)
 
 
 class PolicySnapshot(SQLModel, table=True):
@@ -49,7 +15,7 @@ class PolicySnapshot(SQLModel, table=True):
     kind: PolicyKind
     digest: str
     document: dict[str, Any] = Field(sa_column=Column(JSON, nullable=False))
-    created_at: datetime = Field(default_factory=utcnow)
+    created_at: int = Field(default_factory=now_ts)
 
 
 class Runner(SQLModel, table=True):
@@ -58,36 +24,32 @@ class Runner(SQLModel, table=True):
     id: str = Field(primary_key=True)
     name: str
     token_hash: str = Field(unique=True)
-    token_expires_at: datetime = Field(sa_type=UtcDateTime)
+    token_expires_at: int
     prev_token_hash: str | None = Field(default=None, unique=True)
-    prev_token_expires_at: datetime | None = Field(default=None, sa_type=UtcDateTime)
-    created_at: datetime = Field(default_factory=utcnow, sa_type=UtcDateTime)
-    last_heartbeat_at: datetime | None = Field(default=None, sa_type=UtcDateTime)
-    revoked_at: datetime | None = Field(default=None, sa_type=UtcDateTime)
+    prev_token_expires_at: int | None = None
+    created_at: int = Field(default_factory=now_ts)
+    last_heartbeat_at: int | None = None
+    revoked_at: int | None = None
 
 
 class Lease(SQLModel, table=True):
     __tablename__ = "lease"
-    __table_args__ = (
-        Index(
-            "lease_one_live_per_runner",
-            "runner_id",
-            unique=True,
-            sqlite_where=text("expired_at IS NULL"),
-        ),
-    )
 
     id: str = Field(primary_key=True)
     runner_id: str = Field(foreign_key="runner.id", ondelete="RESTRICT")
-    acquired_at: datetime = Field(sa_type=UtcDateTime)
-    expires_at: datetime = Field(sa_type=UtcDateTime)
-    expired_at: datetime | None = Field(default=None, sa_type=UtcDateTime)
+    # Carries runner_id while the lease is live and NULL once it expires. A plain UNIQUE
+    # over it is the portable form of "one live lease per runner": NULLs never collide.
+    live_runner_id: str | None = Field(default=None, unique=True)
+    acquired_at: int
+    expires_at: int
+    expired_at: int | None = None
 
 
 class Run(SQLModel, table=True):
     __tablename__ = "run"
 
     id: str = Field(primary_key=True)
+    seq: int = Field(unique=True)
     status: RunStatus = Field(default=RunStatus.PENDING, index=True)
     status_reason: str | None = None
     spec: dict[str, Any] = Field(sa_column=Column(JSON, nullable=False))
@@ -108,35 +70,55 @@ class Run(SQLModel, table=True):
     )
     idempotency_key: str = Field(unique=True)
     request_digest: str
-    created_at: datetime = Field(default_factory=utcnow)
-    updated_at: datetime = Field(default_factory=utcnow)
+    created_at: int = Field(default_factory=now_ts)
+    updated_at: int = Field(default_factory=now_ts)
 
 
-# Enforced in the database so neither ORM bulk updates nor raw SQL can change a Run's boundary.
-_IMMUTABILITY_TRIGGERS = {
-    "run": [
-        "CREATE TRIGGER run_spec_immutable BEFORE UPDATE OF id, spec, mount_policy_id,"
-        " network_policy_id, shell_policy_id, mcp_policy_id, idempotency_key,"
-        " request_digest, created_at ON run"
+# Triggers keep ORM bulk updates and raw SQL off a Run's boundary. MySQL has no UPDATE OF,
+# so there the guard compares values and a no-op write of the same value passes.
+IMMUTABILITY_DDL: dict[str, list[str]] = {
+    "sqlite": [
+        "CREATE TRIGGER IF NOT EXISTS run_spec_immutable"
+        " BEFORE UPDATE OF id, seq, spec, mount_policy_id, network_policy_id, shell_policy_id,"
+        " mcp_policy_id, idempotency_key, request_digest, created_at ON run"
         " BEGIN SELECT RAISE(ABORT, 'run spec is immutable'); END",
+        "CREATE TRIGGER IF NOT EXISTS policy_snapshot_no_update"
+        " BEFORE UPDATE ON policy_snapshot"
+        " BEGIN SELECT RAISE(ABORT, 'policy snapshot is immutable'); END",
+        "CREATE TRIGGER IF NOT EXISTS policy_snapshot_no_delete"
+        " BEFORE DELETE ON policy_snapshot"
+        " BEGIN SELECT RAISE(ABORT, 'policy snapshot is immutable'); END",
     ],
-    "policy_snapshot": [
-        "CREATE TRIGGER policy_snapshot_no_update BEFORE UPDATE ON policy_snapshot"
-        " BEGIN SELECT RAISE(ABORT, 'policy snapshot is immutable'); END",
-        "CREATE TRIGGER policy_snapshot_no_delete BEFORE DELETE ON policy_snapshot"
-        " BEGIN SELECT RAISE(ABORT, 'policy snapshot is immutable'); END",
+    "postgresql": [
+        "CREATE OR REPLACE FUNCTION run_spec_immutable() RETURNS trigger AS $$"
+        " BEGIN RAISE EXCEPTION 'run spec is immutable'; END; $$ LANGUAGE plpgsql",
+        "CREATE OR REPLACE TRIGGER run_spec_immutable"
+        " BEFORE UPDATE OF id, seq, spec, mount_policy_id, network_policy_id, shell_policy_id,"
+        " mcp_policy_id, idempotency_key, request_digest, created_at ON run"
+        " FOR EACH ROW EXECUTE FUNCTION run_spec_immutable()",
+        "CREATE OR REPLACE FUNCTION policy_snapshot_immutable() RETURNS trigger AS $$"
+        " BEGIN RAISE EXCEPTION 'policy snapshot is immutable'; END; $$ LANGUAGE plpgsql",
+        "CREATE OR REPLACE TRIGGER policy_snapshot_no_update BEFORE UPDATE ON policy_snapshot"
+        " FOR EACH ROW EXECUTE FUNCTION policy_snapshot_immutable()",
+        "CREATE OR REPLACE TRIGGER policy_snapshot_no_delete BEFORE DELETE ON policy_snapshot"
+        " FOR EACH ROW EXECUTE FUNCTION policy_snapshot_immutable()",
+    ],
+    "mysql": [
+        "CREATE TRIGGER IF NOT EXISTS run_spec_immutable BEFORE UPDATE ON run FOR EACH ROW"
+        " BEGIN IF NOT (NEW.id <=> OLD.id) OR NOT (NEW.seq <=> OLD.seq)"
+        " OR NOT (NEW.spec <=> OLD.spec) OR NOT (NEW.mount_policy_id <=> OLD.mount_policy_id)"
+        " OR NOT (NEW.network_policy_id <=> OLD.network_policy_id)"
+        " OR NOT (NEW.shell_policy_id <=> OLD.shell_policy_id)"
+        " OR NOT (NEW.mcp_policy_id <=> OLD.mcp_policy_id)"
+        " OR NOT (NEW.idempotency_key <=> OLD.idempotency_key)"
+        " OR NOT (NEW.request_digest <=> OLD.request_digest)"
+        " OR NOT (NEW.created_at <=> OLD.created_at)"
+        " THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'run spec is immutable'; END IF; END",
+        "CREATE TRIGGER IF NOT EXISTS policy_snapshot_no_update"
+        " BEFORE UPDATE ON policy_snapshot FOR EACH ROW"
+        " BEGIN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'policy snapshot is immutable'; END",
+        "CREATE TRIGGER IF NOT EXISTS policy_snapshot_no_delete"
+        " BEFORE DELETE ON policy_snapshot FOR EACH ROW"
+        " BEGIN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'policy snapshot is immutable'; END",
     ],
 }
-
-
-def _create_triggers(target: Table, connection: Connection, **_: Any) -> None:
-    for statement in _IMMUTABILITY_TRIGGERS[target.name]:
-        connection.exec_driver_sql(statement)
-
-
-for _table in _IMMUTABILITY_TRIGGERS:
-    event.listen(SQLModel.metadata.tables[_table], "after_create", _create_triggers)
-
-
-def create_schema(engine: Engine) -> None:
-    SQLModel.metadata.create_all(engine)

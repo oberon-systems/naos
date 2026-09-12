@@ -1,7 +1,6 @@
 from typing import Any
 
 import pytest
-from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, col, delete, update
 
 from naos_api import runs
@@ -12,15 +11,18 @@ from naos_api.policies import create_mount_snapshot
 from naos_api.settings import Settings
 from naos_api.spec import RunSpec
 
-GUARDED = [
-    "spec",
-    "mount_policy_id",
-    "network_policy_id",
-    "shell_policy_id",
-    "mcp_policy_id",
-    "idempotency_key",
-    "request_digest",
-]
+# Every value differs from what the started Run holds, so the guard has to refuse the write
+# under both trigger forms: BEFORE UPDATE OF on sqlite/postgres, value comparison on mysql.
+GUARDED: dict[str, Any] = {
+    "spec": {"timeout": 60},
+    "mount_policy_id": None,
+    "network_policy_id": "mntpol_other",
+    "shell_policy_id": "shellpol_other",
+    "mcp_policy_id": "mcppol_other",
+    "idempotency_key": "key-other",
+    "request_digest": "sha256:" + "b" * 64,
+    "seq": 999,
+}
 
 
 @pytest.fixture
@@ -36,21 +38,23 @@ def started(
     return runs.get_run(session, run.id), snapshot
 
 
-@pytest.mark.parametrize("column", GUARDED)
+@pytest.mark.parametrize(("column", "value"), GUARDED.items())
 def test_bulk_update_of_run_boundary_fails(
-    session: Session, started: tuple[Run, PolicySnapshot], column: str
+    session: Session, started: tuple[Run, PolicySnapshot], column: str, value: Any
 ) -> None:
     run, _ = started
 
-    with pytest.raises(IntegrityError, match="immutable"):
-        session.exec(update(Run).where(col(Run.id) == run.id).values({column: None}))
+    with pytest.raises(Exception, match="immutable"):
+        session.exec(update(Run).where(col(Run.id) == run.id).values({column: value}))
     session.rollback()
 
 
+@pytest.mark.sqlite_only
 def test_raw_sql_cannot_swap_policy(session: Session, started: tuple[Run, PolicySnapshot]) -> None:
+    # The ? placeholder is SQLite paramstyle; the point is that raw SQL cannot get past the trigger.
     run, _ = started
 
-    with pytest.raises(IntegrityError, match="immutable"):
+    with pytest.raises(Exception, match="immutable"):
         session.connection().exec_driver_sql(
             "UPDATE run SET network_policy_id = NULL, mount_policy_id = NULL WHERE id = ?",
             (run.id,),
@@ -65,7 +69,7 @@ def test_orm_update_of_spec_fails(session: Session, started: tuple[Run, PolicySn
     run.spec = run.spec | {"timeout": 60}
     session.add(run)
 
-    with pytest.raises(IntegrityError, match="immutable"):
+    with pytest.raises(Exception, match="immutable"):
         session.commit()
     session.rollback()
 
@@ -85,7 +89,7 @@ def test_policy_snapshot_cannot_be_updated(
     snapshot.document = {"workdir": "/", "mounts": []}
     session.add(snapshot)
 
-    with pytest.raises(IntegrityError, match="immutable"):
+    with pytest.raises(Exception, match="immutable"):
         session.commit()
     session.rollback()
 
@@ -95,6 +99,6 @@ def test_policy_snapshot_cannot_be_deleted(
 ) -> None:
     _, snapshot = started
 
-    with pytest.raises(IntegrityError, match="immutable"):
+    with pytest.raises(Exception, match="immutable"):
         session.exec(delete(PolicySnapshot).where(col(PolicySnapshot.id) == snapshot.id))
     session.rollback()

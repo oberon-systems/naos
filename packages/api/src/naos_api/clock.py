@@ -1,13 +1,16 @@
-from datetime import datetime
+import time
 from typing import Annotated
 
 from fastapi import Depends
 
-from naos_api.models import utcnow
+
+def now_ts() -> int:
+    """Seconds since the Unix epoch, UTC. The only time source in the API."""
+    return int(time.time())
 
 
-def get_now() -> datetime:
-    return utcnow()
+def get_now() -> int:
+    return now_ts()
 
 
-NowDep = Annotated[datetime, Depends(get_now)]
+NowDep = Annotated[int, Depends(get_now)]
