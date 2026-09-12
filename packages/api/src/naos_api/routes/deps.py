@@ -7,6 +7,8 @@ from sqlmodel import Session
 from naos_api.db import get_session
 from naos_api.errors import (
     IdempotencyConflictError,
+    ImageConflictError,
+    ImageError,
     InvalidTransitionError,
     LeaseError,
     NotFoundError,
@@ -23,7 +25,9 @@ _ERROR_STATUS: dict[type[Exception], int] = {
     InvalidTransitionError: 409,
     IdempotencyConflictError: 409,
     LeaseError: 409,
+    ImageConflictError: 409,
     PolicyError: 422,
+    ImageError: 422,
 }
 
 

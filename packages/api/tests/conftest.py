@@ -13,9 +13,16 @@ from naos_api.app import create_app
 from naos_api.auth import require_principal
 from naos_api.clock import get_now
 from naos_api.db import Database
+from naos_api.lifecycle import ImageStatus
+from naos_api.models import Image
 from naos_api.settings import Settings
 
 MOUNT_ROOTS = ["/srv/projects", "/srv/agent-home"]
+IMAGE_DIGEST = "sha256:" + "a" * 64
+IMAGE_SOURCE = (
+    "https://images.example.com/releases/download/packer_{version}/naos-agents-{version}.qcow2"
+)
+IMAGE_MAX_BYTES = 1024 * 1024
 ENROLLMENT_TOKEN = "enroll-alpha-" + "0" * 32
 LEASE_TTL = 60
 TOKEN_TTL = 3600
@@ -44,6 +51,10 @@ def settings(tmp_path: Path) -> Iterator[Settings]:
         runner_enrollment_token_sha256=hashlib.sha256(ENROLLMENT_TOKEN.encode()).hexdigest(),
         lease_ttl_seconds=LEASE_TTL,
         runner_token_ttl_seconds=TOKEN_TTL,
+        image_store_path=str(tmp_path / "images"),
+        image_source_url=IMAGE_SOURCE,
+        image_source_allowed_hosts=["objects.example.com"],
+        image_max_bytes=IMAGE_MAX_BYTES,
     )
     if EXTERNAL_DATABASE_URL:
         external = Database(EXTERNAL_DATABASE_URL)
@@ -132,9 +143,19 @@ def create_run(client: TestClient, spec_body: dict[str, Any]) -> Callable[[str],
 
 
 @pytest.fixture
-def spec_body() -> dict[str, Any]:
+def spec_body(session: Session) -> dict[str, Any]:
+    session.add(
+        Image(
+            id="image_alpha",
+            version="1.0.0",
+            digest=IMAGE_DIGEST,
+            status=ImageStatus.READY,
+            size_bytes=0,
+        )
+    )
+    session.commit()
     return {
-        "image": {"id": "image_alpha", "digest": "sha256:" + "a" * 64},
+        "image": {"id": "image_alpha", "digest": IMAGE_DIGEST},
         "runtime": {"cpu": 2, "memory_mib": 2048, "disk_gib": 10},
         "timeout": 3600,
     }

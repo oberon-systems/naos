@@ -9,10 +9,10 @@ from sqlmodel import Session, col, func, or_, select, update
 
 from naos_api import runs
 from naos_api.errors import InvalidTransitionError, LeaseError, NotFoundError
-from naos_api.lifecycle import TERMINAL, RunStatus
-from naos_api.models import Lease, PolicySnapshot, Run, Runner
+from naos_api.lifecycle import TERMINAL, ImageStatus, RunStatus
+from naos_api.models import Image, Lease, PolicySnapshot, Run, Runner
 from naos_api.settings import Settings
-from naos_api.spec import PolicyKind
+from naos_api.spec import PolicyKind, RunSpec
 
 S = RunStatus
 LEASE_EXPIRED_REASON = "runner lease expired"
@@ -287,6 +287,21 @@ def desired_state(session: Session, runner_id: str, now: int) -> tuple[str, list
     )
     assigned = session.exec(statement).all()
     return lease.id, [DesiredRun(run=run, policies=_policies(session, run)) for run in assigned]
+
+
+def image_for_runner(session: Session, runner_id: str, digest: str, now: int) -> Image:
+    expire_leases(session, now)
+    lease = _live_lease(session, runner_id)
+    ready = col(Image.status) == ImageStatus.READY
+    image = session.exec(select(Image).where(col(Image.digest) == digest, ready)).first()
+    if lease is not None and image is not None:
+        held = select(Run).where(col(Run.lease_id) == lease.id, col(Run.status).not_in(TERMINAL))
+        if any(
+            RunSpec.model_validate(run.spec).image.digest == digest
+            for run in session.exec(held).all()
+        ):
+            return image
+    raise NotFoundError(f"image {digest} does not exist")
 
 
 def transition(

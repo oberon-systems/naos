@@ -19,11 +19,13 @@ class PolicyKind(StrEnum):
 
 
 SnapshotId = Annotated[str, Field(pattern=r"^[a-z]+_[0-9a-f]{32}$")]
+ImageId = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")]
+Digest = Annotated[str, Field(pattern=r"^sha256:[0-9a-f]{64}$")]
 
 
 class ImageRef(StrictModel):
-    id: Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")]
-    digest: Annotated[str, Field(pattern=r"^sha256:[0-9a-f]{64}$")]
+    id: ImageId
+    digest: Digest
 
 
 class RuntimeSpec(StrictModel):

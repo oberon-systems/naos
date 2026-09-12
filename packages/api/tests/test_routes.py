@@ -21,6 +21,8 @@ def test_runs_api_denies_without_principal(settings: Settings, spec_body: dict[s
     assert client.post("/api/v1/runs", json=spec_body, headers=KEY).status_code == 401
     assert client.get("/api/v1/runs").status_code == 401
     assert client.post("/api/v1/policy-snapshots", json={}).status_code == 401
+    assert client.post("/api/v1/images", json={}).status_code == 401
+    assert client.get("/api/v1/images").status_code == 401
 
 
 def test_create_and_replay(client: TestClient, spec_body: dict[str, Any]) -> None:
