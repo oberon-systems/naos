@@ -1,21 +1,46 @@
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 
+use sha2::{Digest, Sha256};
+
 use crate::libs::api::{
-    Api, DesiredRun, DesiredState, HeartbeatReply, IssuedToken, LeaseGrant, Registration,
-    RunStatus, Transition,
+    Api, DesiredRun, DesiredState, HeartbeatReply, ImageRef, IssuedToken, LeaseGrant, Registration,
+    RunSpec, RunStatus, RuntimeSpec, Transition,
 };
 use crate::libs::credentials::Credentials;
 use crate::libs::error::AgentError;
+use crate::libs::ids::hex;
+use crate::libs::image::{BoxFuture, ImageSource};
 use crate::libs::runtime::{LocalVm, Runtime};
 
 pub const LEASE_ID: &str = "lease_alpha";
+
+pub fn digest_of(bytes: &[u8]) -> String {
+    format!("sha256:{}", hex(&Sha256::digest(bytes)))
+}
+
+pub fn spec() -> RunSpec {
+    RunSpec {
+        image: ImageRef {
+            id: "image_alpha".into(),
+            digest: format!("sha256:{}", "a".repeat(64)),
+        },
+        runtime: RuntimeSpec {
+            cpu: 1,
+            memory_mib: 512,
+            disk_gib: 1,
+        },
+    }
+}
 
 pub fn desired_run(id: &str, status: RunStatus) -> DesiredRun {
     DesiredRun {
         id: id.into(),
         status,
+        spec: spec(),
+        policies: BTreeMap::new(),
     }
 }
 
@@ -30,6 +55,14 @@ pub fn vm(run_id: &str) -> LocalVm {
     LocalVm {
         vm_id: format!("vm_{run_id}"),
         run_id: run_id.into(),
+        running: true,
+    }
+}
+
+pub fn dead_vm(run_id: &str) -> LocalVm {
+    LocalVm {
+        running: false,
+        ..vm(run_id)
     }
 }
 
@@ -43,6 +76,7 @@ pub struct FakeApi {
     transitions: Mutex<Vec<(String, RunStatus, RunStatus)>>,
     capacities: Mutex<Vec<u32>>,
     desired: Mutex<Option<DesiredState>>,
+    images: Mutex<HashMap<String, Vec<u8>>>,
     rotated_token: Mutex<Option<String>>,
     reject_heartbeats: AtomicUsize,
     pub registrations: AtomicUsize,
@@ -62,6 +96,10 @@ impl FakeApi {
 
     pub fn serve(&self, state: DesiredState) {
         *lock(&self.desired) = Some(state);
+    }
+
+    pub fn serve_image(&self, digest: &str, bytes: &[u8]) {
+        lock(&self.images).insert(digest.into(), bytes.to_vec());
     }
 
     pub fn rotate_to(&self, token: &str) {
@@ -131,6 +169,63 @@ impl Api for FakeApi {
         lock(&self.transitions).push((run_id.into(), transition.expected, transition.target));
         Ok(())
     }
+
+    async fn download_image(
+        &self,
+        _: &Credentials,
+        digest: &str,
+        sink: &mut (dyn Write + Send),
+        limit: u64,
+    ) -> Result<u64, AgentError> {
+        let bytes = lock(&self.images)
+            .get(digest)
+            .cloned()
+            .ok_or_else(|| AgentError::Api {
+                status: 404,
+                detail: "no such image".into(),
+            })?;
+        if bytes.len() as u64 > limit {
+            return Err(AgentError::Image("image exceeds the limit".into()));
+        }
+        sink.write_all(&bytes)?;
+        Ok(bytes.len() as u64)
+    }
+}
+
+pub struct FakeSource {
+    bytes: Vec<u8>,
+    calls: AtomicUsize,
+}
+
+impl FakeSource {
+    pub fn new(bytes: impl Into<Vec<u8>>) -> Self {
+        Self {
+            bytes: bytes.into(),
+            calls: AtomicUsize::new(0),
+        }
+    }
+
+    pub fn calls(&self) -> usize {
+        self.calls.load(Ordering::SeqCst)
+    }
+}
+
+impl ImageSource for FakeSource {
+    fn fetch<'a>(
+        &'a self,
+        _: &'a str,
+        sink: &'a mut (dyn Write + Send),
+        limit: u64,
+    ) -> BoxFuture<'a, Result<u64, AgentError>> {
+        Box::pin(async move {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            if self.bytes.len() as u64 > limit {
+                return Err(AgentError::Image("image exceeds the limit".into()));
+            }
+            sink.write_all(&self.bytes)?;
+            Ok(self.bytes.len() as u64)
+        })
+    }
 }
 
 #[derive(Default)]
@@ -168,12 +263,12 @@ impl FakeRuntime {
 impl Runtime for FakeRuntime {
     async fn list(&self) -> Result<Vec<LocalVm>, AgentError> {
         if self.unavailable.load(Ordering::SeqCst) {
-            return Err(AgentError::Unimplemented("fake runtime"));
+            return Err(AgentError::Runtime("fake runtime is unavailable".into()));
         }
         Ok(self.vms())
     }
 
-    async fn ensure(&self, run: &DesiredRun) -> Result<LocalVm, AgentError> {
+    async fn ensure(&self, run: &DesiredRun, _: &dyn ImageSource) -> Result<LocalVm, AgentError> {
         if self.fail_ensure.load(Ordering::SeqCst) {
             return Err(AgentError::Runtime("boot failed".into()));
         }

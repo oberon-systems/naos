@@ -1,9 +1,11 @@
 use std::collections::{BTreeMap, HashSet};
+use std::io::Write;
 
 use crate::libs::api::{Api, DesiredRun, DesiredState, RunStatus, Transition};
 use crate::libs::audit;
 use crate::libs::credentials::Credentials;
 use crate::libs::error::AgentError;
+use crate::libs::image::{BoxFuture, ImageSource};
 use crate::libs::runtime::{LocalVm, Runtime};
 
 pub const VM_LOST: &str = "vm lost";
@@ -37,22 +39,34 @@ pub fn plan(desired: &[DesiredRun], actual: &[LocalVm]) -> Vec<Action> {
 
     let mut seen = HashSet::new();
     for run in desired.iter().filter(|run| seen.insert(run.id.as_str())) {
-        let vm = vms.remove(run.id.as_str());
+        let (live, dead) = match vms.remove(run.id.as_str()).cloned() {
+            Some(vm) if vm.running => (Some(vm), None),
+            other => (None, other),
+        };
         let run_id = run.id.clone();
-        match (run.status, vm) {
-            (RunStatus::Pending, _) => actions.push(Action::Claim(run_id)),
-            (RunStatus::Starting, _) => actions.push(Action::Start(run_id)),
-            (RunStatus::Started, None) => actions.push(Action::Fail {
+        match run.status {
+            RunStatus::Pending => {
+                actions.extend(dead.map(Action::DestroyOrphan));
+                actions.push(Action::Claim(run_id));
+            }
+            RunStatus::Starting => {
+                actions.extend(dead.map(Action::DestroyOrphan));
+                actions.push(Action::Start(run_id));
+            }
+            RunStatus::Started if live.is_none() => {
+                actions.push(Action::Fail {
+                    run_id,
+                    reason: VM_LOST,
+                });
+                actions.extend(dead.map(Action::DestroyOrphan));
+            }
+            RunStatus::Stopping => actions.push(Action::Stop {
                 run_id,
-                reason: VM_LOST,
+                vm: live.or(dead),
             }),
-            (RunStatus::Stopping, vm) => actions.push(Action::Stop {
-                run_id,
-                vm: vm.cloned(),
-            }),
-            (RunStatus::Started | RunStatus::Collecting | RunStatus::WaitingMerge, _) => {}
-            (RunStatus::Completed | RunStatus::Failed | RunStatus::Cancelled, vm) => {
-                actions.extend(vm.cloned().map(Action::DestroyOrphan));
+            RunStatus::Started | RunStatus::Collecting | RunStatus::WaitingMerge => {}
+            RunStatus::Completed | RunStatus::Failed | RunStatus::Cancelled => {
+                actions.extend(live.or(dead).map(Action::DestroyOrphan));
             }
         }
     }
@@ -61,7 +75,7 @@ pub fn plan(desired: &[DesiredRun], actual: &[LocalVm]) -> Vec<Action> {
     actions
 }
 
-pub async fn reconcile<A: Api, R: Runtime>(
+pub async fn reconcile<A: Api + Sync, R: Runtime>(
     api: &A,
     runtime: &R,
     credentials: &Credentials,
@@ -84,6 +98,25 @@ pub async fn reconcile<A: Api, R: Runtime>(
     failures
 }
 
+struct ApiImages<'a, A> {
+    api: &'a A,
+    credentials: &'a Credentials,
+}
+
+impl<A: Api + Sync> ImageSource for ApiImages<'_, A> {
+    fn fetch<'b>(
+        &'b self,
+        digest: &'b str,
+        sink: &'b mut (dyn Write + Send),
+        limit: u64,
+    ) -> BoxFuture<'b, Result<u64, AgentError>> {
+        Box::pin(
+            self.api
+                .download_image(self.credentials, digest, sink, limit),
+        )
+    }
+}
+
 struct Executor<'a, A, R> {
     api: &'a A,
     runtime: &'a R,
@@ -91,7 +124,7 @@ struct Executor<'a, A, R> {
     desired: &'a DesiredState,
 }
 
-impl<A: Api, R: Runtime> Executor<'_, A, R> {
+impl<A: Api + Sync, R: Runtime> Executor<'_, A, R> {
     async fn apply(&self, action: &Action) -> Result<(), AgentError> {
         match action {
             Action::Claim(run_id) => {
@@ -129,7 +162,11 @@ impl<A: Api, R: Runtime> Executor<'_, A, R> {
             .iter()
             .find(|run| run.id == run_id)
             .ok_or_else(|| AgentError::Runtime(format!("run {run_id} is not desired")))?;
-        match self.runtime.ensure(run).await {
+        let images = ApiImages {
+            api: self.api,
+            credentials: self.credentials,
+        };
+        match self.runtime.ensure(run, &images).await {
             Ok(_) => {
                 self.advance(run_id, RunStatus::Starting, RunStatus::Started, None)
                     .await

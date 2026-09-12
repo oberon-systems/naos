@@ -1,4 +1,5 @@
 use std::io::Write;
+use std::os::unix::fs::symlink;
 
 use serial_test::serial;
 use tempfile::NamedTempFile;
@@ -29,13 +30,102 @@ fn full_env(env: &mut EnvSetter) {
     env.del("NAOS_AGENT_ENV_FILE");
 }
 
+fn runtime() -> RuntimeConfig {
+    RuntimeConfig::resolve(
+        RawRuntimeConfig::default(),
+        &UserDirs {
+            home: Some("/home/alpha".into()),
+            ..UserDirs::default()
+        },
+    )
+    .expect("runtime config")
+}
+
 #[test]
 fn full_config_parses_with_default_capacity() {
-    let config = Config::try_from(raw()).expect("valid config");
+    let config = Config::parse(raw(), || Ok(runtime())).expect("valid config");
 
     assert_eq!(config.api_url.as_str(), "https://api.example.com/naos/");
     assert_eq!(config.capacity, DEFAULT_CAPACITY);
     assert_eq!(config.state_dir, PathBuf::from(STATE_DIR));
+}
+
+#[test]
+fn runtime_dirs_default_to_xdg_locations() {
+    let dirs = UserDirs {
+        home: Some("/home/alpha".into()),
+        data_home: None,
+        state_home: Some("/srv/state/alpha".into()),
+    };
+
+    let config = RuntimeConfig::resolve(RawRuntimeConfig::default(), &dirs).expect("resolved");
+
+    assert_eq!(
+        config.image_dir,
+        PathBuf::from("/home/alpha/.local/share/naos/vms")
+    );
+    assert_eq!(config.vm_dir, PathBuf::from("/srv/state/alpha/naos/runs"));
+    assert_eq!(config.qemu_binary, PathBuf::from(DEFAULT_QEMU_BINARY));
+    assert_eq!(config.image_max_bytes, DEFAULT_IMAGE_MAX_BYTES);
+}
+
+#[test]
+fn runtime_dirs_need_a_home_or_an_explicit_path() {
+    assert!(RuntimeConfig::resolve(RawRuntimeConfig::default(), &UserDirs::default()).is_err());
+
+    let explicit = RawRuntimeConfig {
+        image_dir: Some("/srv/naos/vms".into()),
+        vm_dir: Some("/srv/naos/runs".into()),
+        ..RawRuntimeConfig::default()
+    };
+    assert!(RuntimeConfig::resolve(explicit, &UserDirs::default()).is_ok());
+}
+
+#[test]
+fn paths_that_would_break_qemu_options_are_refused() {
+    for bad in [
+        "/srv/naos/runs,readonly=off",
+        "relative/runs",
+        "/srv/naos/\nruns",
+    ] {
+        let raw = RawRuntimeConfig {
+            vm_dir: Some(bad.into()),
+            ..RawRuntimeConfig::default()
+        };
+        let dirs = UserDirs {
+            home: Some("/home/alpha".into()),
+            ..UserDirs::default()
+        };
+        assert!(RuntimeConfig::resolve(raw, &dirs).is_err(), "{bad}");
+    }
+    let zero = RawRuntimeConfig {
+        image_max_bytes: Some(0),
+        image_dir: Some("/srv/naos/vms".into()),
+        vm_dir: Some("/srv/naos/runs".into()),
+        ..RawRuntimeConfig::default()
+    };
+    assert!(RuntimeConfig::resolve(zero, &UserDirs::default()).is_err());
+}
+
+#[test]
+fn private_dirs_are_created_and_shared_ones_refused() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let fresh = dir.path().join("naos/vms");
+
+    prepare_private_dir(&fresh).expect("created");
+    assert_eq!(
+        fs::metadata(&fresh).expect("meta").permissions().mode() & 0o777,
+        0o700
+    );
+
+    let shared = dir.path().join("shared");
+    fs::create_dir(&shared).expect("mkdir");
+    fs::set_permissions(&shared, fs::Permissions::from_mode(0o777)).expect("chmod");
+    assert!(prepare_private_dir(&shared).is_err());
+
+    let link = dir.path().join("link");
+    symlink(&fresh, &link).expect("symlink");
+    assert!(prepare_private_dir(&link).is_err());
 }
 
 #[test]

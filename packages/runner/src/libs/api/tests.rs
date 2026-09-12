@@ -149,6 +149,126 @@ async fn unknown_run_status_fails_closed() {
     assert!(matches!(outcome, Err(AgentError::Transport(_))));
 }
 
+fn digest() -> String {
+    format!("sha256:{}", "a".repeat(64))
+}
+
+#[tokio::test]
+async fn image_download_streams_into_the_sink() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path(format!("{RUNNER}/images/{}", digest())))
+        .and(header("authorization", "Bearer token-alpha"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(b"image-alpha".to_vec()))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let mut sink = Vec::new();
+
+    let written = api(&server)
+        .download_image(&credentials(), &digest(), &mut sink, 1024)
+        .await
+        .expect("downloaded");
+
+    assert_eq!(written, 11);
+    assert_eq!(sink, b"image-alpha");
+}
+
+#[tokio::test]
+async fn image_download_enforces_the_limit_and_status() {
+    let server = MockServer::start().await;
+    Mock::given(path(format!("{RUNNER}/images/{}", digest())))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![0u8; 64]))
+        .mount(&server)
+        .await;
+    let other = format!("sha256:{}", "b".repeat(64));
+    Mock::given(path(format!("{RUNNER}/images/{other}")))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&server)
+        .await;
+    let api = api(&server);
+
+    let oversized = api
+        .download_image(&credentials(), &digest(), &mut Vec::new(), 16)
+        .await;
+    let missing = api
+        .download_image(&credentials(), &other, &mut Vec::new(), 1024)
+        .await;
+
+    assert!(matches!(oversized, Err(AgentError::Image(_))));
+    assert!(matches!(missing, Err(AgentError::Api { status: 404, .. })));
+}
+
+#[tokio::test]
+async fn unsafe_digests_never_reach_the_network() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(0)
+        .mount(&server)
+        .await;
+
+    for forged in ["sha256:../../register", "md5:abc", "sha256:AAAA"] {
+        let outcome = api(&server)
+            .download_image(&credentials(), forged, &mut Vec::new(), 1024)
+            .await;
+        assert!(matches!(outcome, Err(AgentError::Image(_))), "{forged}");
+    }
+}
+
+#[tokio::test]
+async fn desired_runs_carry_spec_and_policies() {
+    let server = MockServer::start().await;
+    Mock::given(path(format!("{RUNNER}/runs")))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "lease_id": "lease_alpha",
+            "runs": [{
+                "id": "run_a",
+                "status": "PENDING",
+                "spec": {
+                    "image": { "id": "image_alpha", "digest": digest() },
+                    "runtime": { "cpu": 2, "memory_mib": 1024, "disk_gib": 4 },
+                    "timeout": 3600,
+                    "mounts": { "policy_snapshot": null },
+                },
+                "policies": { "mount": { "workdir": "/naos/alpha" }, "network": null },
+            }],
+        })))
+        .mount(&server)
+        .await;
+
+    let state = api(&server).desired(&credentials()).await.expect("desired");
+
+    let [run] = state.runs.as_slice() else {
+        panic!("one run expected");
+    };
+    assert_eq!(run.spec.runtime.disk_gib, 4);
+    assert_eq!(run.granted_policies(), vec!["mount"]);
+}
+
+#[tokio::test]
+async fn unknown_runtime_fields_fail_closed() {
+    let server = MockServer::start().await;
+    Mock::given(path(format!("{RUNNER}/runs")))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "lease_id": "lease_alpha",
+            "runs": [{
+                "id": "run_a",
+                "status": "PENDING",
+                "spec": {
+                    "image": { "id": "image_alpha", "digest": digest() },
+                    "runtime": { "cpu": 2, "memory_mib": 1024, "disk_gib": 4, "gpu": 1 },
+                },
+            }],
+        })))
+        .mount(&server)
+        .await;
+
+    let outcome = api(&server).desired(&credentials()).await;
+
+    assert!(matches!(outcome, Err(AgentError::Transport(_))));
+}
+
 #[tokio::test]
 async fn unsafe_path_segments_never_reach_the_network() {
     let server = MockServer::start().await;

@@ -6,7 +6,7 @@ use tempfile::TempDir;
 
 use super::*;
 use crate::libs::api::RunStatus;
-use crate::libs::config::parse_api_url;
+use crate::libs::config::{parse_api_url, RuntimeConfig};
 use crate::libs::testing::{desired, desired_run, vm, FakeApi, FakeRuntime};
 
 fn setup(runtime: FakeRuntime) -> (TempDir, Agent<FakeApi, FakeRuntime>) {
@@ -20,6 +20,13 @@ fn setup(runtime: FakeRuntime) -> (TempDir, Agent<FakeApi, FakeRuntime>) {
         capacity: 2,
         state_dir: dir.path().to_path_buf(),
         enrollment_token_file: enrollment,
+        runtime: RuntimeConfig {
+            image_dir: dir.path().join("images"),
+            vm_dir: dir.path().join("runs"),
+            qemu_binary: "/bin/false".into(),
+            qemu_img: "/bin/false".into(),
+            image_max_bytes: 1024,
+        },
     };
     let agent = Agent::new(&config, FakeApi::default(), runtime);
     (dir, agent)
@@ -96,10 +103,7 @@ async fn unavailable_runtime_offers_no_capacity() {
     let (_dir, mut agent) = setup(runtime);
     agent.api.serve(desired(vec![]));
 
-    assert!(matches!(
-        agent.cycle().await,
-        Err(AgentError::Unimplemented(_))
-    ));
+    assert!(matches!(agent.cycle().await, Err(AgentError::Runtime(_))));
 
     assert_eq!(agent.api.capacities(), vec![0]);
     assert!(agent.api.transitions().is_empty());
