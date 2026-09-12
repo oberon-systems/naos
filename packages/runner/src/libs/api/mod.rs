@@ -6,8 +6,8 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::credentials::Credentials;
-use crate::error::AgentError;
+use crate::libs::credentials::Credentials;
+use crate::libs::error::AgentError;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_DETAIL: usize = 200;
@@ -33,7 +33,6 @@ pub struct IssuedToken {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct LeaseGrant {
-    pub id: String,
     pub ttl_seconds: u64,
 }
 
@@ -54,8 +53,6 @@ pub struct HeartbeatReply {
 pub struct DesiredRun {
     pub id: String,
     pub status: RunStatus,
-    pub spec: serde_json::Value,
-    pub policies: serde_json::Value,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -209,3 +206,6 @@ impl Api for HttpApi {
         Self::send::<serde_json::Value>(request).await.map(|_| ())
     }
 }
+
+#[cfg(test)]
+mod tests;

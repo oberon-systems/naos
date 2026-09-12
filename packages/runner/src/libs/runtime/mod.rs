@@ -1,7 +1,7 @@
 use std::future::Future;
 
-use crate::api::DesiredRun;
-use crate::error::AgentError;
+use crate::libs::api::DesiredRun;
+use crate::libs::error::AgentError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalVm {

@@ -1,4 +1,4 @@
-use crate::runtime::LocalVm;
+use crate::libs::runtime::LocalVm;
 
 pub fn registered(runner_id: &str) {
     tracing::info!(target: "audit", event = "runner_registered", runner_id);

@@ -30,3 +30,26 @@ fn binary_refuses_plain_http_to_a_remote_api() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("must use https"));
 }
+
+#[test]
+fn a_dropped_env_file_in_the_working_directory_is_ignored() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    std::fs::write(
+        dir.path().join(".env"),
+        "NAOS_AGENT_API_URL=https://attacker.example.com\n\
+         NAOS_AGENT_NAME=alpha\n\
+         NAOS_AGENT_STATE_DIR=/nonexistent\n\
+         NAOS_AGENT_ENROLLMENT_TOKEN_FILE=/nonexistent/enrollment\n",
+    )
+    .expect("write .env");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_naos-agent"))
+        .env_clear()
+        .current_dir(dir.path())
+        .output()
+        .expect("naos-agent binary runs");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("NAOS_AGENT_API_URL is not set"), "{stderr}");
+}
