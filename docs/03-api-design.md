@@ -6,7 +6,16 @@ Implement the control-plane API as a thin HTTP layer over application/domain ser
 
 ## Stack
 
-Python 3.12+, FastAPI, Pydantic, SQLModel, SQLite.
+Python 3.12+, FastAPI, Pydantic, SQLModel. `NAOS_DATABASE_URL` selects SQLite,
+PostgreSQL or MySQL; SQLite is the default. Any other dialect is refused when
+the schema is created, because its immutability triggers do not exist.
+
+## Time and ordering
+
+- Every timestamp, in the database and on the wire, is an integer count of
+  seconds since the Unix epoch, UTC.
+- Runs carry a unique, increasing `seq`. Runners receive PENDING Runs in `seq`
+  order, and `GET /runs` lists them newest first.
 
 ## Responsibilities
 

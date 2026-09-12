@@ -6,7 +6,8 @@ Implement Naos around a Run abstraction.
 
 ## Stack
 
-- Python 3.12+, FastAPI, Pydantic, SQLModel, SQLite initially.
+- Python 3.12+, FastAPI, Pydantic, SQLModel on SQLite, PostgreSQL or MySQL;
+  SQLite by default.
 - HTMX web UI.
 - Rust runner.
 - QEMU.
