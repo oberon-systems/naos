@@ -1,17 +1,17 @@
 from collections.abc import Sequence
 from uuid import uuid4
 
-from sqlalchemy import ColumnElement
-from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session, col, select, update
+from sqlmodel import Session, col, func, select, update
 
+from naos_api.clock import now_ts
 from naos_api.errors import IdempotencyConflictError, InvalidTransitionError, NotFoundError
 from naos_api.lifecycle import RunStatus, ensure_transition
-from naos_api.models import Run, utcnow
+from naos_api.models import Lease, Run
 from naos_api.policies import check_refs
 from naos_api.spec import PolicyKind, RunSpec, digest_of
 
 MAX_REASON_LENGTH = 500
+CREATE_ATTEMPTS = 3
 
 _STOP_TARGETS = {
     RunStatus.PENDING: RunStatus.CANCELLED,
@@ -39,26 +39,31 @@ def create_run(session: Session, spec: RunSpec, idempotency_key: str) -> tuple[R
 
     check_refs(session, spec)
     refs = spec.policy_refs()
-    run = Run(
-        id=f"run_{uuid4().hex}",
-        spec=document,
-        mount_policy_id=refs[PolicyKind.MOUNT],
-        network_policy_id=refs[PolicyKind.NETWORK],
-        shell_policy_id=refs[PolicyKind.SHELL],
-        mcp_policy_id=refs[PolicyKind.MCP],
-        idempotency_key=idempotency_key,
-        request_digest=request_digest,
-    )
-    session.add(run)
-    try:
-        session.commit()
-    except IntegrityError:
-        session.rollback()
-        existing = _by_key(session, idempotency_key)
-        if existing is None:
-            raise
-        return _replay(existing, request_digest), False
-    return run, True
+    for attempt in range(CREATE_ATTEMPTS):
+        run = Run(
+            id=f"run_{uuid4().hex}",
+            seq=session.exec(select(func.coalesce(func.max(Run.seq), 0))).one() + 1,
+            spec=document,
+            mount_policy_id=refs[PolicyKind.MOUNT],
+            network_policy_id=refs[PolicyKind.NETWORK],
+            shell_policy_id=refs[PolicyKind.SHELL],
+            mcp_policy_id=refs[PolicyKind.MCP],
+            idempotency_key=idempotency_key,
+            request_digest=request_digest,
+        )
+        session.add(run)
+        try:
+            session.commit()
+        except Exception:
+            session.rollback()
+            existing = _by_key(session, idempotency_key)
+            if existing is not None:
+                return _replay(existing, request_digest), False
+            if attempt == CREATE_ATTEMPTS - 1:
+                raise
+            continue
+        return run, True
+    raise AssertionError("unreachable")
 
 
 def get_run(session: Session, run_id: str) -> Run:
@@ -74,11 +79,7 @@ def list_runs(
     statement = select(Run)
     if status is not None:
         statement = statement.where(Run.status == status)
-    statement = (
-        statement.order_by(col(Run.created_at).desc(), col(Run.id).desc())
-        .offset(offset)
-        .limit(limit)
-    )
+    statement = statement.order_by(col(Run.seq).desc()).offset(offset).limit(limit)
     return session.exec(statement).all()
 
 
@@ -89,17 +90,17 @@ def transition_run(
     target: RunStatus,
     reason: str | None = None,
     *,
-    where: Sequence[ColumnElement[bool]] = (),
+    lease_id: str | None = None,
 ) -> Run:
     ensure_transition(expected, target)
     if target is RunStatus.FAILED and not (reason and len(reason) <= MAX_REASON_LENGTH):
         raise ValueError(f"FAILED requires a reason of 1..{MAX_REASON_LENGTH} characters")
 
-    statement = (
-        update(Run)
-        .where(col(Run.id) == run_id, col(Run.status) == expected, *where)
-        .values(status=target, status_reason=reason, updated_at=utcnow())
-    )
+    statement = update(Run).where(col(Run.id) == run_id, col(Run.status) == expected)
+    if lease_id is not None:
+        live = select(Lease.id).where(col(Lease.id) == lease_id, col(Lease.expired_at).is_(None))
+        statement = statement.where(col(Run.lease_id) == lease_id, live.exists())
+    statement = statement.values(status=target, status_reason=reason, updated_at=now_ts())
     result = session.exec(statement)
     session.commit()
 

@@ -1,10 +1,10 @@
 from typing import Any
 
 import pytest
-from sqlalchemy import Engine
 from sqlmodel import Session
 
 from naos_api import runs
+from naos_api.db import Database
 from naos_api.errors import (
     IdempotencyConflictError,
     InvalidTransitionError,
@@ -71,7 +71,7 @@ def test_key_reuse_with_other_spec_conflicts(session: Session, spec_body: dict[s
 
 
 def test_concurrent_duplicate_create_returns_winner(
-    session: Session, engine: Engine, spec_body: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    session: Session, db: Database, spec_body: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     winner, _ = runs.create_run(session, _spec(spec_body), "key-1")
     real_lookup = runs._by_key
@@ -82,7 +82,7 @@ def test_concurrent_duplicate_create_returns_winner(
         return None if len(lookups) == 1 else real_lookup(s, key)
 
     monkeypatch.setattr(runs, "_by_key", stale_first_lookup)
-    with Session(engine) as other:
+    with Session(db.engine) as other:
         loser, created = runs.create_run(other, _spec(spec_body), "key-1")
 
     assert not created

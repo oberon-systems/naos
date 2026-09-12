@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Annotated, Any, Self
 
 from fastapi import APIRouter, Depends
@@ -11,7 +10,7 @@ from naos_api.clock import NowDep
 from naos_api.db import get_session
 from naos_api.lifecycle import RunStatus
 from naos_api.models import Lease
-from naos_api.routes import RunRead
+from naos_api.routes.runs import RunRead
 from naos_api.runners import IssuedToken, RunnerPrincipal
 from naos_api.runs import MAX_REASON_LENGTH
 from naos_api.settings import Settings, get_settings
@@ -49,7 +48,7 @@ class TransitionIn(StrictModel):
 
 class TokenOut(BaseModel):
     value: str
-    expires_at: datetime
+    expires_at: int
 
     @classmethod
     def of(cls, token: IssuedToken) -> Self:
@@ -58,13 +57,12 @@ class TokenOut(BaseModel):
 
 class LeaseOut(BaseModel):
     id: str
-    expires_at: datetime
+    expires_at: int
     ttl_seconds: int
 
     @classmethod
-    def of(cls, lease: Lease, now: datetime) -> Self:
-        ttl = int((lease.expires_at - now).total_seconds())
-        return cls(id=lease.id, expires_at=lease.expires_at, ttl_seconds=ttl)
+    def of(cls, lease: Lease, now: int) -> Self:
+        return cls(id=lease.id, expires_at=lease.expires_at, ttl_seconds=lease.expires_at - now)
 
 
 class RegisterOut(BaseModel):

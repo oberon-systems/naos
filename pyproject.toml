@@ -26,3 +26,4 @@ explicit_package_bases = true
 [tool.pytest.ini_options]
 testpaths = ["packages"]
 addopts = "--import-mode=importlib"
+markers = ["sqlite_only: asserts through SQLite-specific SQL and is skipped on other dialects"]

@@ -1,22 +1,22 @@
 class DomainError(Exception):
-    pass
+    """Base for every error the domain raises instead of an HTTP status."""
 
 
 class NotFoundError(DomainError):
-    pass
+    """The addressed entity does not exist."""
 
 
 class InvalidTransitionError(DomainError):
-    pass
+    """The requested lifecycle move is not allowed from the current status."""
 
 
 class IdempotencyConflictError(DomainError):
-    pass
+    """The idempotency key was reused with a different request body."""
 
 
 class PolicyError(DomainError):
-    pass
+    """The submitted policy is invalid or does not resolve to a snapshot."""
 
 
 class LeaseError(DomainError):
-    pass
+    """The runner lease is missing, expired, or belongs to another runner."""

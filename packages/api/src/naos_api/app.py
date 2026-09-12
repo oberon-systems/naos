@@ -4,16 +4,13 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import APIRouter, Depends, FastAPI
-from sqlalchemy import Engine
 from sqlmodel import Session
 
 from naos_api.auth import require_principal
-from naos_api.db import make_engine
+from naos_api.clock import now_ts
+from naos_api.db import Database
 from naos_api.errors import DomainError
-from naos_api.models import create_schema, utcnow
-from naos_api.routes import domain_error_handler
-from naos_api.routes import router as api_router
-from naos_api.runner_routes import router as runner_router
+from naos_api.routes import api_router, domain_error_handler, runner_router
 from naos_api.runners import expire_leases
 from naos_api.settings import Settings
 
@@ -27,15 +24,15 @@ def build_v1_router(*routers: APIRouter) -> APIRouter:
     return v1
 
 
-def sweep_leases(engine: Engine) -> list[str]:
-    with Session(engine) as session:
-        return expire_leases(session, utcnow())
+def sweep_leases(db: Database) -> list[str]:
+    with Session(db.engine) as session:
+        return expire_leases(session, now_ts())
 
 
-async def _sweep_forever(engine: Engine, interval: int) -> None:
+async def _sweep_forever(db: Database, interval: int) -> None:
     while True:
         try:
-            expired = await asyncio.to_thread(sweep_leases, engine)
+            expired = await asyncio.to_thread(sweep_leases, db)
         except Exception:
             log.exception("lease sweep failed")
         else:
@@ -47,9 +44,7 @@ async def _sweep_forever(engine: Engine, interval: int) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings: Settings = app.state.settings
-    task = asyncio.create_task(
-        _sweep_forever(app.state.engine, settings.lease_sweep_interval_seconds)
-    )
+    task = asyncio.create_task(_sweep_forever(app.state.db, settings.lease_sweep_interval_seconds))
     try:
         yield
     finally:
@@ -62,8 +57,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     app = FastAPI(title="naos", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.state.settings = settings
-    app.state.engine = make_engine(settings)
-    create_schema(app.state.engine)
+    app.state.db = Database(settings.database_url)
+    app.state.db.create_schema()
     app.add_exception_handler(DomainError, domain_error_handler)
 
     @app.get("/healthz")

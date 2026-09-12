@@ -1,15 +1,14 @@
 from collections.abc import Callable, Sequence
-from datetime import datetime
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 from httpx import Response
-from sqlalchemy import Engine
 from sqlmodel import Session
 
 from naos_api import runners, runs
 from naos_api.app import create_app, sweep_leases
+from naos_api.db import Database
 from naos_api.lifecycle import RunStatus
 from naos_api.models import Run
 from naos_api.settings import Settings
@@ -89,7 +88,7 @@ def _run(session: Session, run_id: str) -> Run:
 
 
 def test_heartbeat_extends_the_live_lease(
-    client: TestClient, register: Register, advance: Advance
+    client: TestClient, register: Register, advance: Advance, clock: Callable[[], int]
 ) -> None:
     runner = register()
     first = runner["lease_id"]
@@ -97,7 +96,7 @@ def test_heartbeat_extends_the_live_lease(
     advance(LEASE_TTL - 20)
     assert _heartbeat(client, runner)["lease"] == {
         "id": first,
-        "expires_at": "2026-01-01T00:01:40Z",
+        "expires_at": clock() + LEASE_TTL,
         "ttl_seconds": LEASE_TTL,
     }
     advance(LEASE_TTL - 20)
@@ -109,7 +108,7 @@ def test_expired_lease_fails_active_runs_and_releases_pending(
     register: Register,
     create_run: CreateRun,
     session: Session,
-    clock: Callable[[], datetime],
+    clock: Callable[[], int],
     advance: Advance,
 ) -> None:
     started, pending = create_run("key-1"), create_run("key-2")
@@ -165,7 +164,7 @@ def test_expiry_leaves_waiting_merge_runs_alone(
     register: Register,
     create_run: CreateRun,
     session: Session,
-    clock: Callable[[], datetime],
+    clock: Callable[[], int],
     advance: Advance,
 ) -> None:
     run_id = create_run("key-1")
@@ -185,12 +184,12 @@ def test_lifespan_sweep_starts_and_stops(settings: Settings) -> None:
         assert client.get("/healthz").status_code == 200
 
 
-def test_sweep_leases_expires_past_leases(register: Register, engine: Engine) -> None:
+def test_sweep_leases_expires_past_leases(register: Register, db: Database) -> None:
     runner = register()
 
     # The fixture clock sits in the past, so the wall clock has already outlived the lease.
-    assert sweep_leases(engine) == [runner["lease_id"]]
-    assert sweep_leases(engine) == []
+    assert sweep_leases(db) == [runner["lease_id"]]
+    assert sweep_leases(db) == []
 
 
 def test_capacity_bounds_assignment(
