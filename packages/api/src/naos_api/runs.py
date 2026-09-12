@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 from uuid import uuid4
 
+from sqlalchemy import ColumnElement
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, col, select, update
 
@@ -87,6 +88,8 @@ def transition_run(
     expected: RunStatus,
     target: RunStatus,
     reason: str | None = None,
+    *,
+    where: Sequence[ColumnElement[bool]] = (),
 ) -> Run:
     ensure_transition(expected, target)
     if target is RunStatus.FAILED and not (reason and len(reason) <= MAX_REASON_LENGTH):
@@ -94,7 +97,7 @@ def transition_run(
 
     statement = (
         update(Run)
-        .where(col(Run.id) == run_id, col(Run.status) == expected)
+        .where(col(Run.id) == run_id, col(Run.status) == expected, *where)
         .values(status=target, status_reason=reason, updated_at=utcnow())
     )
     result = session.exec(statement)
