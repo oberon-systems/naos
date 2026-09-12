@@ -5,6 +5,7 @@ from sqlmodel import Session, col, func, select, update
 
 from naos_api.clock import now_ts
 from naos_api.errors import IdempotencyConflictError, InvalidTransitionError, NotFoundError
+from naos_api.images.service import check_image
 from naos_api.lifecycle import RunStatus, ensure_transition
 from naos_api.models import Lease, Run
 from naos_api.policies import check_refs
@@ -38,6 +39,7 @@ def create_run(session: Session, spec: RunSpec, idempotency_key: str) -> tuple[R
         return _replay(existing, request_digest), False
 
     check_refs(session, spec)
+    check_image(session, spec.image)
     refs = spec.policy_refs()
     for attempt in range(CREATE_ATTEMPTS):
         run = Run(

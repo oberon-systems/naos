@@ -4,8 +4,8 @@ import pytest
 from sqlmodel import Session, col, delete, update
 
 from naos_api import runs
-from naos_api.lifecycle import RunStatus
-from naos_api.models import PolicySnapshot, Run
+from naos_api.lifecycle import ImageStatus, RunStatus
+from naos_api.models import Image, PolicySnapshot, Run
 from naos_api.mounts import MountPolicyIn
 from naos_api.policies import create_mount_snapshot
 from naos_api.settings import Settings
@@ -102,3 +102,33 @@ def test_policy_snapshot_cannot_be_deleted(
     with pytest.raises(Exception, match="immutable"):
         session.exec(delete(PolicySnapshot).where(col(PolicySnapshot.id) == snapshot.id))
     session.rollback()
+
+
+@pytest.mark.parametrize(
+    ("column", "value"),
+    [("id", "image_other"), ("version", "9.9.9"), ("digest", "sha256:" + "c" * 64)],
+)
+def test_image_identity_cannot_change(
+    session: Session, spec_body: dict[str, Any], column: str, value: str
+) -> None:
+    with pytest.raises(Exception, match="immutable"):
+        session.exec(update(Image).where(col(Image.id) == "image_alpha").values({column: value}))
+    session.rollback()
+
+
+def test_image_cannot_be_deleted(session: Session, spec_body: dict[str, Any]) -> None:
+    with pytest.raises(Exception, match="immutable"):
+        session.exec(delete(Image).where(col(Image.id) == "image_alpha"))
+    session.rollback()
+
+
+def test_image_status_stays_mutable(session: Session, spec_body: dict[str, Any]) -> None:
+    session.exec(
+        update(Image).where(col(Image.id) == "image_alpha").values(status=ImageStatus.FAILED)
+    )
+    session.commit()
+
+    image = session.get(Image, "image_alpha")
+    assert image is not None
+    session.refresh(image)
+    assert image.status is ImageStatus.FAILED

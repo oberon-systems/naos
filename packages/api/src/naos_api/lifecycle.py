@@ -15,6 +15,12 @@ class RunStatus(StrEnum):
     CANCELLED = "CANCELLED"
 
 
+class ImageStatus(StrEnum):
+    IMPORTING = "IMPORTING"
+    READY = "READY"
+    FAILED = "FAILED"
+
+
 TRANSITIONS: dict[RunStatus, frozenset[RunStatus]] = {
     RunStatus.PENDING: frozenset({RunStatus.STARTING, RunStatus.CANCELLED, RunStatus.FAILED}),
     RunStatus.STARTING: frozenset({RunStatus.STARTED, RunStatus.STOPPING, RunStatus.FAILED}),

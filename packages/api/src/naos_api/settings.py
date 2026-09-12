@@ -1,8 +1,15 @@
-from typing import Annotated
+import os
+from pathlib import Path
+from typing import Annotated, Literal
 
 from fastapi import Request
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _default_image_store_path() -> str:
+    data_home = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
+    return str(Path(data_home) / "naos" / "images")
 
 
 class Settings(BaseSettings):
@@ -14,6 +21,12 @@ class Settings(BaseSettings):
     lease_ttl_seconds: Annotated[int, Field(ge=5, le=3600)] = 60
     runner_token_ttl_seconds: Annotated[int, Field(ge=60, le=604800)] = 86400
     lease_sweep_interval_seconds: Annotated[int, Field(ge=1, le=3600)] = 15
+    image_store: Literal["fs"] = "fs"
+    image_store_path: str = Field(default_factory=_default_image_store_path)
+    image_source_url: str | None = None
+    image_source_allowed_hosts: list[str] = []
+    image_max_bytes: Annotated[int, Field(ge=1)] = 8 * 1024**3
+    image_download_timeout_seconds: Annotated[int, Field(ge=1, le=3600)] = 30
 
 
 def get_settings(request: Request) -> Settings:
