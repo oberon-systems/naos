@@ -2,13 +2,13 @@ use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 
-use crate::api::{
+use crate::libs::api::{
     Api, DesiredRun, DesiredState, HeartbeatReply, IssuedToken, LeaseGrant, Registration,
     RunStatus, Transition,
 };
-use crate::credentials::Credentials;
-use crate::error::AgentError;
-use crate::runtime::{LocalVm, Runtime};
+use crate::libs::credentials::Credentials;
+use crate::libs::error::AgentError;
+use crate::libs::runtime::{LocalVm, Runtime};
 
 pub const LEASE_ID: &str = "lease_alpha";
 
@@ -16,8 +16,6 @@ pub fn desired_run(id: &str, status: RunStatus) -> DesiredRun {
     DesiredRun {
         id: id.into(),
         status,
-        spec: serde_json::json!({}),
-        policies: serde_json::json!({}),
     }
 }
 
@@ -36,10 +34,7 @@ pub fn vm(run_id: &str) -> LocalVm {
 }
 
 fn lease() -> LeaseGrant {
-    LeaseGrant {
-        id: LEASE_ID.into(),
-        ttl_seconds: 60,
-    }
+    LeaseGrant { ttl_seconds: 60 }
 }
 
 #[derive(Default)]

@@ -1,7 +1,7 @@
-use naos_agent::api::{Api, HttpApi, RunStatus, Transition};
-use naos_agent::config::parse_api_url;
-use naos_agent::credentials::Credentials;
-use naos_agent::AgentError;
+use crate::libs::api::{Api, HttpApi, RunStatus, Transition};
+use crate::libs::config::parse_api_url;
+use crate::libs::credentials::Credentials;
+use crate::libs::error::AgentError;
 use serde_json::json;
 use wiremock::matchers::{body_json, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -28,8 +28,8 @@ async fn register_sends_the_enrollment_bearer() {
         .and(body_json(json!({ "name": "alpha" })))
         .respond_with(ResponseTemplate::new(201).set_body_json(json!({
             "runner_id": "rnr_alpha",
-            "token": { "value": "token-alpha", "expires_at": "2026-01-02T00:00:00Z" },
-            "lease": { "id": "lease_alpha", "expires_at": "2026-01-01T00:01:00Z", "ttl_seconds": 60 },
+            "token": { "value": "token-alpha", "expires_at": 1767312000 },
+            "lease": { "id": "lease_alpha", "expires_at": 1767225660, "ttl_seconds": 60 },
         })))
         .expect(1)
         .mount(&server)
@@ -53,7 +53,7 @@ async fn heartbeat_and_transition_use_the_runner_token() {
         .and(header("authorization", "Bearer token-alpha"))
         .and(body_json(json!({ "capacity": 2 })))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "lease": { "id": "lease_alpha", "expires_at": "2026-01-01T00:01:00Z", "ttl_seconds": 60 },
+            "lease": { "id": "lease_alpha", "expires_at": 1767225660, "ttl_seconds": 60 },
             "token": null,
         })))
         .expect(1)
