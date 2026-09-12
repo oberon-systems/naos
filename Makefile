@@ -8,7 +8,17 @@ PIP     := $(VENV)/bin/pip
 export PRE_COMMIT_HOME := $(CURDIR)/.pre-commit
 
 .DEFAULT_GOAL := shell
-.PHONY: install shell test lint run-api
+.PHONY: install shell test test-api test-qemu smoke lint run-api packer
+
+# `make packer <target>` reads as a subcommand: everything after `packer` is
+# handed to packer/Makefile and turned into a no-op here.
+ROOT_GOALS := install shell test test-api test-qemu smoke lint run-api packer
+ifeq ($(firstword $(MAKECMDGOALS)),packer)
+PACKER_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+ifneq ($(strip $(filter-out $(ROOT_GOALS),$(PACKER_ARGS))),)
+$(eval $(filter-out $(ROOT_GOALS),$(PACKER_ARGS)):;@:)
+endif
+endif
 
 # temporary dir
 TEMP_DIR := $(shell mktemp -dut naos-XXXXX$$(date +%s))
@@ -30,6 +40,11 @@ test:
 test-api:
 	$(VENV)/bin/pytest -q packages/api
 
+# Boots real VMs from a built agents image: make test-qemu IMAGE=build/agents/<image>.qcow2
+test-qemu:
+	@test -n "$(IMAGE)" || { echo "IMAGE=<path to a naos-agents qcow2> is required" >&2; exit 1; }
+	NAOS_TEST_IMAGE="$(abspath $(IMAGE))" cargo test -p naos-agent -- --ignored real_image
+
 smoke:
 	@echo "starting smoke test, working dir: $(TEMP_DIR)"
 	@mkdir -p $(TEMP_DIR)
@@ -39,6 +54,7 @@ smoke:
 	@echo "starting api..."
 	@$(MAKE) NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256="$$(sha256sum "$(TEMP_DIR)/enrollment" | cut -d' ' -f1)" \
 		NAOS_DATABASE_URL="sqlite:///$(TEMP_DIR)/naos.db" \
+		NAOS_IMAGE_STORE_PATH="$(TEMP_DIR)/images" \
 		run-api > "$(TEMP_DIR)/api.log" 2>&1 \
 		& echo $$$! > "$(TEMP_DIR)/api.pin"
 
@@ -51,6 +67,8 @@ smoke:
 		NAOS_AGENT_NAME=alpha \
 		NAOS_AGENT_STATE_DIR="$(TEMP_DIR)/state" \
 		NAOS_AGENT_ENROLLMENT_TOKEN_FILE="$(TEMP_DIR)/enrollment" \
+		NAOS_AGENT_IMAGE_DIR="$(TEMP_DIR)/vms" \
+		NAOS_AGENT_VM_DIR="$(TEMP_DIR)/runs" \
 		cargo run -p naos-agent > "$(TEMP_DIR)/agent.log" 2>&1
 
 	@kill $$(cat "$(TEMP_DIR)/tail.pin") 2>/dev/null || true
@@ -66,6 +84,9 @@ lint:
 # runs
 run-api:
 	$(VENV)/bin/uvicorn --factory naos_api.app:create_app --host 127.0.0.1
+
+packer:
+	@$(MAKE) --no-print-directory -C packer $(PACKER_ARGS)
 
 
 # defaults

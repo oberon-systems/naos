@@ -1,0 +1,39 @@
+#!/sbin/openrc-run
+# shellcheck shell=sh
+# shellcheck disable=SC2034  # openrc reads $description itself
+#
+# Starts the agent of this Run inside tmux as naos. The runner passes the agent
+# name through fw_cfg; anything it does not recognise falls back to claude.
+
+description="Start the agent session of this Run"
+
+session_config=/sys/firmware/qemu_fw_cfg/by_name/opt/naos/session/raw
+
+depend() {
+    need localmount
+    after modules naos-probe
+}
+
+agent_command() {
+    agent=""
+    if [ -r "$session_config" ]; then
+        agent=$(sed -n 's/.*"agent": *"\([a-z]*\)".*/\1/p' "$session_config")
+    fi
+    case "$agent" in
+        gemini) echo gemini ;;
+        *) echo claude ;;
+    esac
+}
+
+start() {
+    ebegin "Starting the agent session"
+    command=$(agent_command)
+    su -l naos -s /bin/sh -c "tmux new-session -d -s agent '$command; exec bash -l'"
+    eend $?
+}
+
+stop() {
+    ebegin "Stopping the agent session"
+    su -l naos -s /bin/sh -c "tmux kill-server" 2> /dev/null
+    eend 0
+}
