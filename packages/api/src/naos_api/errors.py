@@ -16,3 +16,7 @@ class IdempotencyConflictError(DomainError):
 
 class PolicyError(DomainError):
     pass
+
+
+class LeaseError(DomainError):
+    pass

@@ -11,6 +11,7 @@ from naos_api.db import get_session
 from naos_api.errors import (
     IdempotencyConflictError,
     InvalidTransitionError,
+    LeaseError,
     NotFoundError,
     PolicyError,
 )
@@ -28,6 +29,7 @@ _ERROR_STATUS: dict[type[Exception], int] = {
     NotFoundError: 404,
     InvalidTransitionError: 409,
     IdempotencyConflictError: 409,
+    LeaseError: 409,
     PolicyError: 422,
 }
 
