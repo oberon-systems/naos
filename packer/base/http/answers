@@ -1,0 +1,33 @@
+# setup-alpine answer file for the naos base image.
+# Consumed non-interactively via `setup-alpine -e -f http://<packer>/answers`.
+# Every setup-* step must be answered here, or the installer blocks on a prompt.
+
+KEYMAPOPTS="us us"
+HOSTNAMEOPTS="naos"
+DEVDOPTS=mdev
+
+# eth0 exists only while packer builds; a Run has no network device at all.
+INTERFACESOPTS="auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet dhcp
+"
+
+DNSOPTS="-n 1.1.1.1 8.8.8.8"
+TIMEZONEOPTS="UTC"
+PROXYOPTS=none
+APKREPOSOPTS="-1 -c"
+NTPOPTS="-c busybox"
+
+# naos is the unprivileged account the agent runs as: no wheel, no key, and -u
+# only so setup-user does not prompt. The agents image locks it again.
+USEROPTS="-u -k none naos"
+
+SSHDOPTS=openssh
+LBUOPTS=none
+APKCACHEOPTS=none
+DISKOPTS="-m sys /dev/vda"
+
+export ERASE_DISKS="/dev/vda"
+export SWAP_SIZE=0

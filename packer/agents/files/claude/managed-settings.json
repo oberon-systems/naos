@@ -1,0 +1,6 @@
+{
+  "env": {
+    "USE_BUILTIN_RIPGREP": "0",
+    "DISABLE_AUTOUPDATER": "1"
+  }
+}

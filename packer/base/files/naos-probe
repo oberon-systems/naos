@@ -1,0 +1,45 @@
+#!/sbin/openrc-run
+# shellcheck shell=sh
+# shellcheck disable=SC2034  # openrc reads $description itself
+#
+# Reports what the guest can see to ttyS1, which the runner writes to boot.log.
+# The runner's boot test reads these lines; they are evidence, not enforcement.
+
+description="Report guest isolation probes to the runner"
+
+depend() {
+    need localmount
+    after modules
+}
+
+report() {
+    echo "$1" > /dev/ttyS1 2> /dev/null || true
+}
+
+start() {
+    ebegin "Running naos probes"
+    report naos-ready
+
+    failures=""
+    disks=0
+    for disk in /sys/block/vd*; do
+        [ -e "$disk" ] && disks=$((disks + 1))
+    done
+    [ "$disks" -eq 1 ] || failures="$failures disks=$disks"
+
+    if grep -Eq ' (9p|virtiofs) ' /proc/mounts; then
+        failures="$failures host-mounts"
+    fi
+
+    for link in /sys/class/net/*; do
+        name=${link##*/}
+        [ "$name" = lo ] || failures="$failures interface=$name"
+    done
+
+    if [ -z "$failures" ]; then
+        report "naos-probe ok"
+    else
+        report "naos-probe fail:$failures"
+    fi
+    eend 0
+}
