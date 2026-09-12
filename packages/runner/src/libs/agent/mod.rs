@@ -25,7 +25,7 @@ pub struct Agent<A, R> {
     lease: LeaseClock,
 }
 
-impl<A: Api, R: Runtime> Agent<A, R> {
+impl<A: Api + Sync, R: Runtime> Agent<A, R> {
     pub fn new(config: &Config, api: A, runtime: R) -> Self {
         Self {
             api,

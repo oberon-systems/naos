@@ -8,8 +8,11 @@ use tracing_subscriber::EnvFilter;
 use libs::agent::Agent;
 use libs::api::HttpApi;
 use libs::config::{self, Config};
+use libs::console;
 use libs::error::AgentError;
-use libs::runtime::UnavailableRuntime;
+use libs::runtime::QemuRuntime;
+
+const USAGE: &str = "usage: naos-agent [console <run_id>]";
 
 fn main() -> ExitCode {
     tracing_subscriber::fmt()
@@ -30,16 +33,27 @@ fn main() -> ExitCode {
 }
 
 fn run() -> Result<(), AgentError> {
-    let config = config::load()?;
-    tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()?
-        .block_on(serve(config))
+    let mut args = std::env::args().skip(1);
+    match args.next().as_deref() {
+        None => {
+            let config = config::load()?;
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()?
+                .block_on(serve(config))
+        }
+        Some("console") => match (args.next(), args.next()) {
+            (Some(run_id), None) => console::attach(&config::load_runtime()?.vm_dir, &run_id),
+            _ => Err(AgentError::Config(USAGE.into())),
+        },
+        Some(_) => Err(AgentError::Config(USAGE.into())),
+    }
 }
 
 async fn serve(config: Config) -> Result<(), AgentError> {
     let api = HttpApi::new(config.api_url.clone())?;
-    let mut agent = Agent::new(&config, api, UnavailableRuntime);
+    let runtime = QemuRuntime::new(&config.runtime)?;
+    let mut agent = Agent::new(&config, api, runtime);
     let mut terminate = signal(SignalKind::terminate())?;
     tracing::info!(name = %config.name, capacity = config.capacity, "naos-agent started");
 

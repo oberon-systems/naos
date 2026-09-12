@@ -1,5 +1,5 @@
 use super::*;
-use crate::libs::testing::{desired, desired_run, vm, FakeApi, FakeRuntime};
+use crate::libs::testing::{dead_vm, desired, desired_run, vm, FakeApi, FakeRuntime};
 
 fn claim(id: &str) -> Action {
     Action::Claim(id.into())
@@ -42,6 +42,7 @@ fn plan_destroys_unknown_and_duplicate_vms() {
     let twin = LocalVm {
         vm_id: "vm_twin".into(),
         run_id: "run_a".into(),
+        running: true,
     };
 
     let actions = plan(&runs, &[vm("run_a"), twin.clone(), vm("run_x")]);
@@ -63,6 +64,67 @@ fn plan_ignores_duplicate_desired_entries() {
     ];
 
     assert_eq!(plan(&runs, &[]), vec![claim("run_a")]);
+}
+
+#[test]
+fn dead_vms_are_replaced_reported_or_kept_for_collection() {
+    let runs = [
+        desired_run("run_a", RunStatus::Pending),
+        desired_run("run_b", RunStatus::Starting),
+        desired_run("run_c", RunStatus::Started),
+        desired_run("run_d", RunStatus::Collecting),
+        desired_run("run_e", RunStatus::Stopping),
+    ];
+    let vms = [
+        dead_vm("run_a"),
+        dead_vm("run_b"),
+        dead_vm("run_c"),
+        dead_vm("run_d"),
+        dead_vm("run_e"),
+    ];
+
+    assert_eq!(
+        plan(&runs, &vms),
+        vec![
+            Action::DestroyOrphan(dead_vm("run_a")),
+            claim("run_a"),
+            Action::DestroyOrphan(dead_vm("run_b")),
+            Action::Start("run_b".into()),
+            Action::Fail {
+                run_id: "run_c".into(),
+                reason: VM_LOST
+            },
+            Action::DestroyOrphan(dead_vm("run_c")),
+            Action::Stop {
+                run_id: "run_e".into(),
+                vm: Some(dead_vm("run_e"))
+            },
+        ]
+    );
+}
+
+#[tokio::test]
+async fn start_fetches_the_image_through_the_api() {
+    let api = FakeApi::default();
+    let runtime = FakeRuntime::default();
+    let state = desired(vec![desired_run("run_a", RunStatus::Starting)]);
+    let images = ApiImages {
+        api: &api,
+        credentials: &api.credentials(),
+    };
+    let digest = state.runs[0].spec.image.digest.clone();
+    api.serve_image(&digest, b"qcow2-alpha");
+
+    let mut sink = Vec::new();
+    let written = images
+        .fetch(&digest, &mut sink, 1024)
+        .await
+        .expect("fetched");
+    let failures = reconcile(&api, &runtime, &api.credentials(), &state, &[]).await;
+
+    assert_eq!(written, 11);
+    assert_eq!(sink, b"qcow2-alpha");
+    assert_eq!(failures, 0);
 }
 
 #[test]

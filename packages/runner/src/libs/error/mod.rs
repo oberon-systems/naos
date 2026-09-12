@@ -2,8 +2,6 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum AgentError {
-    #[error("{0} is not implemented")]
-    Unimplemented(&'static str),
     #[error("configuration: {0}")]
     Config(String),
     #[error("credentials: {0}")]
@@ -18,6 +16,8 @@ pub enum AgentError {
     Transport(String),
     #[error("runtime: {0}")]
     Runtime(String),
+    #[error("image: {0}")]
+    Image(String),
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
 }
