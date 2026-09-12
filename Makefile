@@ -38,6 +38,7 @@ smoke:
 
 	@echo "starting api..."
 	@$(MAKE) NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256="$$(sha256sum "$(TEMP_DIR)/enrollment" | cut -d' ' -f1)" \
+		NAOS_DATABASE_URL="sqlite:///$(TEMP_DIR)/naos.db" \
 		run-api > "$(TEMP_DIR)/api.log" 2>&1 \
 		& echo $$$! > "$(TEMP_DIR)/api.pin"
 
