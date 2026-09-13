@@ -61,7 +61,7 @@ The test passes when both VMs boot, `boot.log` shows `naos-ready` and `naos-prob
 
 ## Publish a release
 
-The image version lives only in `packer/.cz.yaml`; Alpine and the agents are pinned in `packer/.env`, packer itself in `packer/Makefile` and in the workflow's container tag; change them by hand. Bump the image version with [commitizen](https://commitizen-tools.github.io/commitizen/), which rewrites the file and creates the `image-<version>` tag. Push the tag: the workflow checks it against `.cz.yaml`, builds both images in the `hashicorp/packer` container of the pinned version with `/dev/kvm` and creates a GitHub release holding `naos-agents-<version>.qcow2` and its `SHA256SUMS`.
+The image version lives only in `packer/.cz.yaml`; Alpine and the agents are pinned in `packer/.env`, packer itself in `packer/Makefile` and in the workflow's container tag; change them by hand. Bump the image version with [commitizen](https://commitizen-tools.github.io/commitizen/), which rewrites the file, adds the release to `packer/CHANGELOG.md` from the commits that touch `packer/` only, and creates the `image-<version>` tag. Bump on a clean tree: the bump commit takes every modified file. Push the tag: the workflow checks it against `.cz.yaml`, builds both images in the `hashicorp/packer` container of the pinned version with `/dev/kvm` and creates a GitHub release holding `naos-agents-<version>.qcow2` and its `SHA256SUMS`.
 
 ```bash
 cz --config packer/.cz.yaml bump
