@@ -3,7 +3,7 @@
 // removes every way in except the runner's console.
 
 packer {
-  required_version = ">= 1.11.0"
+  required_version = ">= 1.16.0"
 
   required_plugins {
     qemu = {
@@ -13,47 +13,22 @@ packer {
   }
 }
 
-variable "version" {
-  type    = string
-  default = "0.0.0-dev"
-}
-
-variable "base_image" {
-  type        = string
-  default     = ""
-  description = "Base qcow2 to derive from. Empty locates build/base for the same version."
-}
-
 variable "build_password" {
   type      = string
   sensitive = true
 }
 
 variable "claude_code_version" {
-  type        = string
-  default     = "2.1.269"
-  description = "@anthropic-ai/claude-code release installed from npm."
+  type = string
 }
 
 variable "gemini_cli_version" {
-  type        = string
-  default     = "0.59.0"
-  description = "@google/gemini-cli release installed from npm."
-}
-
-variable "image_name" {
-  type    = string
-  default = "naos-agents"
-}
-
-variable "output_directory" {
-  type    = string
-  default = "build/agents"
+  type = string
 }
 
 variable "disk_size" {
   type    = string
-  default = "8G"
+  default = "2G"
 }
 
 variable "memory" {
@@ -66,18 +41,10 @@ variable "cpus" {
   default = 2
 }
 
-variable "accelerator" {
-  type    = string
-  default = "kvm"
-}
-
-variable "headless" {
-  type    = bool
-  default = true
-}
-
 locals {
-  base_image = var.base_image != "" ? var.base_image : abspath("${path.root}/../../build/base/naos-base-${var.version}.qcow2")
+  version          = yamldecode(file("${path.root}/../.cz.yaml")).commitizen.version
+  base_image       = abspath("${path.root}/../../build/base/naos-base-${local.version}.qcow2")
+  output_directory = abspath("${path.root}/../../build/agents")
 }
 
 source "qemu" "agents" {
@@ -86,8 +53,8 @@ source "qemu" "agents" {
   disk_image       = true
   use_backing_file = false
 
-  vm_name          = "${var.image_name}-${var.version}.qcow2"
-  output_directory = var.output_directory
+  vm_name          = "naos-agents-${local.version}.qcow2"
+  output_directory = local.output_directory
   format           = "qcow2"
   disk_compression = true
 
@@ -97,8 +64,8 @@ source "qemu" "agents" {
 
   memory      = var.memory
   cpus        = var.cpus
-  accelerator = var.accelerator
-  headless    = var.headless
+  accelerator = "kvm"
+  headless    = true
 
   communicator = "ssh"
   ssh_username = "root"
@@ -136,7 +103,7 @@ build {
   }
 
   post-processor "manifest" {
-    output     = "${var.output_directory}/manifest.json"
+    output     = "${local.output_directory}/manifest.json"
     strip_path = true
   }
 }
