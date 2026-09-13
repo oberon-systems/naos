@@ -292,6 +292,7 @@ def test_desired_state_resolves_policy_documents(
     [run] = desired["tasks"]
     assert run["status"] == "PENDING"
     assert run["spec"]["mounts"]["policy"] == policy["id"]
+    assert run["image_url"].startswith("https://images.example.com/")
     assert run["policies"]["mount"] == policy["document"]
     assert run["policies"]["network"] is None
 

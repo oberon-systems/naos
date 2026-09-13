@@ -17,12 +17,6 @@ class TaskStatus(StrEnum):
     CANCELLED = "CANCELLED"
 
 
-class ImageStatus(StrEnum):
-    IMPORTING = "IMPORTING"
-    READY = "READY"
-    FAILED = "FAILED"
-
-
 S = TaskStatus
 
 LIFECYCLE = Machine(

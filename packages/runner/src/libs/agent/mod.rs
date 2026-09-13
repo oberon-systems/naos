@@ -6,6 +6,7 @@ use crate::libs::audit;
 use crate::libs::config::Config;
 use crate::libs::credentials::{read_secret_file, CredentialStore, Credentials};
 use crate::libs::error::AgentError;
+use crate::libs::image::ImageSource;
 use crate::libs::lease::LeaseClock;
 use crate::libs::reconciler::reconcile;
 use crate::libs::runtime::Runtime;
@@ -17,6 +18,7 @@ const MIN_INTERVAL: Duration = Duration::from_secs(1);
 pub struct Agent<A, R> {
     api: A,
     runtime: R,
+    images: Box<dyn ImageSource>,
     name: String,
     capacity: u32,
     store: CredentialStore,
@@ -26,10 +28,11 @@ pub struct Agent<A, R> {
 }
 
 impl<A: Api + Sync, R: Runtime> Agent<A, R> {
-    pub fn new(config: &Config, api: A, runtime: R) -> Self {
+    pub fn new(config: &Config, api: A, runtime: R, images: Box<dyn ImageSource>) -> Self {
         Self {
             api,
             runtime,
+            images,
             name: config.name.clone(),
             capacity: config.capacity,
             store: CredentialStore::new(&config.state_dir),
@@ -74,7 +77,15 @@ impl<A: Api + Sync, R: Runtime> Agent<A, R> {
 
         let actual = actual?;
         let desired = self.api.desired(&credentials).await?;
-        Ok(reconcile(&self.api, &self.runtime, &credentials, &desired, &actual).await)
+        Ok(reconcile(
+            &self.api,
+            &self.runtime,
+            self.images.as_ref(),
+            &credentials,
+            &desired,
+            &actual,
+        )
+        .await)
     }
 
     async fn credentials(&mut self) -> Result<Credentials, AgentError> {

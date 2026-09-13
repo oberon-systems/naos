@@ -1,14 +1,11 @@
-from collections.abc import Iterator
-from typing import Annotated, Any, BinaryIO, Self
+from typing import Annotated, Any, Self
 
-from fastapi import APIRouter, Depends, Path, Request
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field, StrictInt, model_validator
 
 from naos_api import runners
 from naos_api.auth import require_enrollment, require_runner
 from naos_api.clock import NowDep
-from naos_api.images.store import ImageStore
 from naos_api.lifecycle import TaskStatus
 from naos_api.models import Lease
 from naos_api.routes.deps import LeaseTtlDep, SessionDep, TokenTtlDep
@@ -22,8 +19,6 @@ PrincipalDep = Annotated[RunnerPrincipal, Depends(require_runner)]
 RunnerName = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")]
 Capacity = Annotated[StrictInt, Field(ge=0, le=64)]
 Reason = Annotated[str, Field(min_length=1, max_length=MAX_REASON_LENGTH)]
-DigestPath = Annotated[str, Path(pattern=r"^sha256:[0-9a-f]{64}$")]
-CHUNK_BYTES = 1024 * 1024
 
 
 class RegisterIn(StrictModel):
@@ -81,6 +76,7 @@ class DesiredTaskOut(BaseModel):
     id: str
     status: TaskStatus
     spec: RunSpec
+    image_url: str
     policies: dict[PolicyKind, dict[str, Any] | None]
 
 
@@ -130,30 +126,11 @@ def desired_tasks(principal: PrincipalDep, session: SessionDep, now: NowDep) -> 
                 id=item.task.id,
                 status=item.task.status,
                 spec=RunSpec.model_validate(item.task.spec),
+                image_url=item.image_url,
                 policies=item.policies,
             )
             for item in desired
         ],
-    )
-
-
-def _chunks(handle: BinaryIO) -> Iterator[bytes]:
-    with handle:
-        while chunk := handle.read(CHUNK_BYTES):
-            yield chunk
-
-
-@router.get("/{runner_id}/images/{digest}")
-def download_image(
-    digest: DigestPath, principal: PrincipalDep, session: SessionDep, request: Request, now: NowDep
-) -> StreamingResponse:
-    image = runners.image_for_runner(session, principal.runner_id, digest, now)
-    store: ImageStore = request.app.state.image_store
-    handle, size = store.open_read(image.digest)
-    return StreamingResponse(
-        _chunks(handle),
-        media_type="application/octet-stream",
-        headers={"Content-Length": str(size)},
     )
 
 

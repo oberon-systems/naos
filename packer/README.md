@@ -1,6 +1,6 @@
 # Packer images
 
-The VM images a Naos Run boots. [Packer](https://www.packer.io) builds them with the QEMU builder into `qcow2`, a [GitHub Actions](https://docs.github.com/actions) workflow publishes them on an `image-<version>` tag, and the API imports a published image by its digest.
+The VM images a Naos Run boots. [Packer](https://www.packer.io) builds them with the QEMU builder into `qcow2`, a [GitHub Actions](https://docs.github.com/actions) workflow publishes them on an `image-<version>` tag, and the runner downloads a published image the API has registered by its url and digest.
 
 - [Why](#why)
 - [How it is built](#how-it-is-built)
@@ -72,26 +72,22 @@ The `image-*` tags never collide with the commitizen version tags, which carry n
 
 ## Use an image in Naos
 
-The API downloads images; the runner only ever fetches them from the API. Point the API at the release, with `{version}` where the version goes. GitHub redirects release downloads to a separate host, and the API follows a redirect only to a host you allow:
+The API keeps only the catalog entry; the runner downloads the image from the release itself and checks it against the digest. Take the digest from the release's `SHA256SUMS`:
 
 ```bash
-curl -sI https://github.com/<owner>/<repo>/releases/download/image-0.1.0/naos-agents-0.1.0.qcow2 | grep -i '^location'
+curl -fsSL https://github.com/<owner>/<repo>/releases/download/image-0.1.0/SHA256SUMS
 ```
 
-```text
-NAOS_IMAGE_SOURCE_URL=https://github.com/<owner>/<repo>/releases/download/image-{version}/naos-agents-{version}.qcow2
-NAOS_IMAGE_SOURCE_ALLOWED_HOSTS=["<host from the location header>"]
-```
-
-Register the image with the digest from the release's `SHA256SUMS`. The API answers `202`, downloads the file and checks it; the image is usable once `GET /api/v1/images/<id>` reports `READY`.
+Register the release file with that digest and the operator token, see [03 - API Design](../docs/03-api-design.md#operator-credentials). The API answers `201`:
 
 ```bash
 curl -X POST https://api.example.com/api/v1/images \
+  -H 'Authorization: Bearer <operator token>' \
   -H 'Content-Type: application/json' \
-  -d '{"id": "naos-agents", "version": "0.1.0", "digest": "sha256:<hex from SHA256SUMS>"}'
+  -d '{"id": "naos-agents", "version": "0.1.0", "digest": "sha256:<hex from SHA256SUMS>", "url": "https://github.com/<owner>/<repo>/releases/download/image-0.1.0/naos-agents-0.1.0.qcow2"}'
 ```
 
-Operator endpoints refuse every request until operator authentication exists, see [03 - API Design](../docs/03-api-design.md). A Run then names the image by `id` and `digest` in its spec; [05 - VM and QEMU](../docs/05-vm-and-qemu.md) covers what happens next.
+A Run then names the image by `id` and `digest` in its spec; [05 - VM and QEMU](../docs/05-vm-and-qemu.md) covers what happens next. `make smoke` walks the whole path in a temporary directory for the version in `packer/.cz.yaml`, which must already be released.
 
 ## Images
 

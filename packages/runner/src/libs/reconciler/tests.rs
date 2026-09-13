@@ -1,5 +1,7 @@
 use super::*;
-use crate::libs::testing::{dead_vm, desired, desired_run, vm, FakeApi, FakeRuntime};
+use crate::libs::testing::{dead_vm, desired, desired_run, vm, FakeApi, FakeRuntime, FakeSource};
+
+const IMAGE: &[u8] = b"qcow2-alpha";
 
 fn claim(id: &str) -> Action {
     Action::Claim(id.into())
@@ -103,30 +105,6 @@ fn dead_vms_are_replaced_reported_or_kept_for_collection() {
     );
 }
 
-#[tokio::test]
-async fn start_fetches_the_image_through_the_api() {
-    let api = FakeApi::default();
-    let runtime = FakeRuntime::default();
-    let state = desired(vec![desired_run("run_a", RunStatus::Starting)]);
-    let images = ApiImages {
-        api: &api,
-        credentials: &api.credentials(),
-    };
-    let digest = state.runs[0].spec.image.digest.clone();
-    api.serve_image(&digest, b"qcow2-alpha");
-
-    let mut sink = Vec::new();
-    let written = images
-        .fetch(&digest, &mut sink, 1024)
-        .await
-        .expect("fetched");
-    let failures = reconcile(&api, &runtime, &api.credentials(), &state, &[]).await;
-
-    assert_eq!(written, 11);
-    assert_eq!(sink, b"qcow2-alpha");
-    assert_eq!(failures, 0);
-}
-
 #[test]
 fn restart_with_live_vm_needs_no_action() {
     let runs = [desired_run("run_a", RunStatus::Started)];
@@ -140,8 +118,9 @@ async fn claim_conflict_creates_no_vm() {
     api.conflict_on("run_a", RunStatus::Starting);
     let runtime = FakeRuntime::default();
     let state = desired(vec![desired_run("run_a", RunStatus::Pending)]);
+    let images = FakeSource::new(IMAGE);
 
-    let failures = reconcile(&api, &runtime, &api.credentials(), &state, &[]).await;
+    let failures = reconcile(&api, &runtime, &images, &api.credentials(), &state, &[]).await;
 
     assert_eq!(failures, 1);
     assert!(runtime.vms().is_empty());
@@ -152,10 +131,11 @@ async fn duplicate_delivery_creates_one_vm() {
     let api = FakeApi::default();
     let runtime = FakeRuntime::default();
     let state = desired(vec![desired_run("run_a", RunStatus::Pending)]);
+    let images = FakeSource::new(IMAGE);
 
     for _ in 0..2 {
         let actual = runtime.vms();
-        reconcile(&api, &runtime, &api.credentials(), &state, &actual).await;
+        reconcile(&api, &runtime, &images, &api.credentials(), &state, &actual).await;
     }
 
     assert_eq!(runtime.vms().len(), 1);
@@ -175,8 +155,17 @@ async fn starting_run_is_recovered_without_a_second_vm() {
     let api = FakeApi::default();
     let runtime = FakeRuntime::with_vms(vec![vm("run_a")]);
     let state = desired(vec![desired_run("run_a", RunStatus::Starting)]);
+    let images = FakeSource::new(IMAGE);
 
-    let failures = reconcile(&api, &runtime, &api.credentials(), &state, &runtime.vms()).await;
+    let failures = reconcile(
+        &api,
+        &runtime,
+        &images,
+        &api.credentials(),
+        &state,
+        &runtime.vms(),
+    )
+    .await;
 
     assert_eq!(failures, 0);
     assert_eq!(runtime.vms(), vec![vm("run_a")]);
@@ -192,8 +181,9 @@ async fn failed_start_is_reported() {
     let runtime = FakeRuntime::default();
     runtime.fail_ensure();
     let state = desired(vec![desired_run("run_a", RunStatus::Pending)]);
+    let images = FakeSource::new(IMAGE);
 
-    let failures = reconcile(&api, &runtime, &api.credentials(), &state, &[]).await;
+    let failures = reconcile(&api, &runtime, &images, &api.credentials(), &state, &[]).await;
 
     assert_eq!(failures, 1);
     assert_eq!(
@@ -207,8 +197,17 @@ async fn orphans_are_destroyed_and_stops_collected() {
     let api = FakeApi::default();
     let runtime = FakeRuntime::with_vms(vec![vm("run_a"), vm("run_x")]);
     let state = desired(vec![desired_run("run_a", RunStatus::Stopping)]);
+    let images = FakeSource::new(IMAGE);
 
-    reconcile(&api, &runtime, &api.credentials(), &state, &runtime.vms()).await;
+    reconcile(
+        &api,
+        &runtime,
+        &images,
+        &api.credentials(),
+        &state,
+        &runtime.vms(),
+    )
+    .await;
 
     assert_eq!(runtime.stopped(), vec![vm("run_a")]);
     assert_eq!(runtime.vms(), vec![vm("run_a")]);

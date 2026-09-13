@@ -1,11 +1,10 @@
 use std::collections::{BTreeMap, HashSet};
-use std::io::Write;
 
 use crate::libs::api::{Api, DesiredRun, DesiredState, RunStatus, Transition};
 use crate::libs::audit;
 use crate::libs::credentials::Credentials;
 use crate::libs::error::AgentError;
-use crate::libs::image::{BoxFuture, ImageSource};
+use crate::libs::image::ImageSource;
 use crate::libs::runtime::{LocalVm, Runtime};
 
 pub const VM_LOST: &str = "vm lost";
@@ -78,6 +77,7 @@ pub fn plan(desired: &[DesiredRun], actual: &[LocalVm]) -> Vec<Action> {
 pub async fn reconcile<A: Api + Sync, R: Runtime>(
     api: &A,
     runtime: &R,
+    images: &dyn ImageSource,
     credentials: &Credentials,
     desired: &DesiredState,
     actual: &[LocalVm],
@@ -85,6 +85,7 @@ pub async fn reconcile<A: Api + Sync, R: Runtime>(
     let executor = Executor {
         api,
         runtime,
+        images,
         credentials,
         desired,
     };
@@ -98,28 +99,10 @@ pub async fn reconcile<A: Api + Sync, R: Runtime>(
     failures
 }
 
-struct ApiImages<'a, A> {
-    api: &'a A,
-    credentials: &'a Credentials,
-}
-
-impl<A: Api + Sync> ImageSource for ApiImages<'_, A> {
-    fn fetch<'b>(
-        &'b self,
-        digest: &'b str,
-        sink: &'b mut (dyn Write + Send),
-        limit: u64,
-    ) -> BoxFuture<'b, Result<u64, AgentError>> {
-        Box::pin(
-            self.api
-                .download_image(self.credentials, digest, sink, limit),
-        )
-    }
-}
-
 struct Executor<'a, A, R> {
     api: &'a A,
     runtime: &'a R,
+    images: &'a dyn ImageSource,
     credentials: &'a Credentials,
     desired: &'a DesiredState,
 }
@@ -162,11 +145,7 @@ impl<A: Api + Sync, R: Runtime> Executor<'_, A, R> {
             .iter()
             .find(|run| run.id == run_id)
             .ok_or_else(|| AgentError::Runtime(format!("run {run_id} is not desired")))?;
-        let images = ApiImages {
-            api: self.api,
-            credentials: self.credentials,
-        };
-        match self.runtime.ensure(run, &images).await {
+        match self.runtime.ensure(run, self.images).await {
             Ok(_) => {
                 self.advance(run_id, RunStatus::Starting, RunStatus::Started, None)
                     .await

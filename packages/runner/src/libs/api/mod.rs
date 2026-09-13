@@ -1,9 +1,8 @@
 use std::collections::BTreeMap;
 use std::future::Future;
-use std::io::Write;
 use std::time::Duration;
 
-use reqwest::{redirect, Client, ClientBuilder, RequestBuilder, Response, StatusCode};
+use reqwest::{redirect, Client, RequestBuilder, Response, StatusCode};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -12,8 +11,6 @@ use crate::libs::credentials::Credentials;
 use crate::libs::error::AgentError;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
-const READ_TIMEOUT: Duration = Duration::from_secs(60);
 const MAX_DETAIL: usize = 200;
 pub const DIGEST_PREFIX: &str = "sha256:";
 
@@ -86,6 +83,7 @@ pub struct DesiredRun {
     pub id: String,
     pub status: RunStatus,
     pub spec: RunSpec,
+    pub image_url: String,
     #[serde(default)]
     pub policies: BTreeMap<String, Option<serde_json::Value>>,
 }
@@ -140,20 +138,10 @@ pub trait Api {
         run_id: &str,
         transition: &Transition<'_>,
     ) -> impl Future<Output = Result<(), AgentError>> + Send;
-
-    /// Streams the image into `sink` and fails once more than `limit` bytes arrive.
-    fn download_image(
-        &self,
-        credentials: &Credentials,
-        digest: &str,
-        sink: &mut (dyn Write + Send),
-        limit: u64,
-    ) -> impl Future<Output = Result<u64, AgentError>> + Send;
 }
 
 pub struct HttpApi {
     client: Client,
-    download: Client,
     base: Url,
 }
 
@@ -161,33 +149,16 @@ fn transport(err: reqwest::Error) -> AgentError {
     AgentError::Transport(err.without_url().to_string())
 }
 
-fn too_large(limit: u64) -> AgentError {
-    AgentError::Image(format!("image exceeds {limit} bytes"))
-}
-
 impl HttpApi {
     pub fn new(base: Url) -> Result<Self, AgentError> {
-        let client = Self::builder(&base)
-            .timeout(REQUEST_TIMEOUT)
-            .build()
-            .map_err(|err| AgentError::Transport(err.to_string()))?;
-        let download = Self::builder(&base)
-            .connect_timeout(CONNECT_TIMEOUT)
-            .read_timeout(READ_TIMEOUT)
-            .build()
-            .map_err(|err| AgentError::Transport(err.to_string()))?;
-        Ok(Self {
-            client,
-            download,
-            base,
-        })
-    }
-
-    fn builder(base: &Url) -> ClientBuilder {
-        Client::builder()
+        let client = Client::builder()
             .redirect(redirect::Policy::none())
             .https_only(base.scheme() == "https")
             .user_agent(concat!("naos-agent/", env!("CARGO_PKG_VERSION")))
+            .timeout(REQUEST_TIMEOUT)
+            .build()
+            .map_err(|err| AgentError::Transport(err.to_string()))?;
+        Ok(Self { client, base })
     }
 
     fn url(&self, segments: &[&str]) -> Result<Url, AgentError> {
@@ -279,49 +250,6 @@ impl Api for HttpApi {
             .bearer_auth(&credentials.token)
             .json(transition);
         Self::send::<serde_json::Value>(request).await.map(|_| ())
-    }
-
-    async fn download_image(
-        &self,
-        credentials: &Credentials,
-        digest: &str,
-        sink: &mut (dyn Write + Send),
-        limit: u64,
-    ) -> Result<u64, AgentError> {
-        if !is_digest(digest) {
-            return Err(AgentError::Image(format!(
-                "refusing unsafe digest {digest:?}"
-            )));
-        }
-        let mut url = self.url(&[&credentials.runner_id, "images"])?;
-        url.path_segments_mut()
-            .map_err(|()| AgentError::Config("api url cannot carry a path".into()))?
-            .push(digest);
-        let mut response = self
-            .download
-            .get(url)
-            .bearer_auth(&credentials.token)
-            .send()
-            .await
-            .map_err(transport)?;
-        if !response.status().is_success() {
-            return Err(Self::failure(response).await);
-        }
-        if response
-            .content_length()
-            .is_some_and(|length| length > limit)
-        {
-            return Err(too_large(limit));
-        }
-        let mut written: u64 = 0;
-        while let Some(chunk) = response.chunk().await.map_err(transport)? {
-            written += chunk.len() as u64;
-            if written > limit {
-                return Err(too_large(limit));
-            }
-            sink.write_all(&chunk)?;
-        }
-        Ok(written)
     }
 }
 

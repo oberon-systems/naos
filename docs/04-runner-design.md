@@ -114,10 +114,11 @@ steps, and any failure stops it and removes the VM directory:
 
 1. refuse the Run when any policy is set: mounts, network, shell and
    MCP are not enforced by this runtime yet, so they fail closed;
-2. fetch the image from the API into the cache unless a file already has its
-   name: the download goes to a 0600 temporary file, is hashed while it
-   streams, and is renamed to `sha256-<hex>.qcow2` with mode 0444 only when
-   the digest matches;
+2. download the image from the `image_url` the API returned into the cache
+   unless a file already has its name: the agent follows at most five
+   redirects and never sends its runner token there, the download goes to a
+   0600 temporary file, is hashed while it streams, and is renamed to
+   `sha256-<hex>.qcow2` with mode 0444 only when the digest matches;
 3. open the cached image, refuse a symlink or a group or others writable file,
    and hash it again through the open descriptor on every start; a mismatch
    removes the file;
