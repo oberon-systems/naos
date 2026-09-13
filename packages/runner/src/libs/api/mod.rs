@@ -103,6 +103,7 @@ impl DesiredRun {
 #[derive(Debug, Clone, Deserialize)]
 pub struct DesiredState {
     pub lease_id: String,
+    #[serde(rename = "tasks")]
     pub runs: Vec<DesiredRun>,
 }
 
@@ -261,7 +262,7 @@ impl Api for HttpApi {
     async fn desired(&self, credentials: &Credentials) -> Result<DesiredState, AgentError> {
         let request = self
             .client
-            .get(self.url(&[&credentials.runner_id, "runs"])?)
+            .get(self.url(&[&credentials.runner_id, "tasks"])?)
             .bearer_auth(&credentials.token);
         Self::send(request).await
     }
@@ -274,7 +275,7 @@ impl Api for HttpApi {
     ) -> Result<(), AgentError> {
         let request = self
             .client
-            .post(self.url(&[&credentials.runner_id, "runs", run_id, "transition"])?)
+            .post(self.url(&[&credentials.runner_id, "tasks", run_id, "transition"])?)
             .bearer_auth(&credentials.token)
             .json(transition);
         Self::send::<serde_json::Value>(request).await.map(|_| ())
