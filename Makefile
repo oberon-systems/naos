@@ -7,18 +7,12 @@ PIP     := $(VENV)/bin/pip
 # Hook environments live in the repository, not in ~/.cache/pre-commit.
 export PRE_COMMIT_HOME := $(CURDIR)/.pre-commit
 
-.DEFAULT_GOAL := shell
-.PHONY: install shell test test-api test-qemu smoke lint run-api packer
+# The packer pinned in packer/Makefile, installed by `make install`.
+export PATH := $(CURDIR)/.packer/bin:$(PATH)
+export PACKER_PLUGIN_PATH := $(CURDIR)/.packer/plugins
 
-# `make packer <target>` reads as a subcommand: everything after `packer` is
-# handed to packer/Makefile and turned into a no-op here.
-ROOT_GOALS := install shell test test-api test-qemu smoke lint run-api packer
-ifeq ($(firstword $(MAKECMDGOALS)),packer)
-PACKER_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
-ifneq ($(strip $(filter-out $(ROOT_GOALS),$(PACKER_ARGS))),)
-$(eval $(filter-out $(ROOT_GOALS),$(PACKER_ARGS)):;@:)
-endif
-endif
+.DEFAULT_GOAL := shell
+.PHONY: install shell test test-api test-qemu smoke lint run-api
 
 # temporary dir
 TEMP_DIR := $(shell mktemp -dut naos-XXXXX$$(date +%s))
@@ -30,6 +24,7 @@ install:
 	$(PIP) install --upgrade pip
 	$(PIP) install -r requirements.txt
 	$(VENV)/bin/pre-commit install
+	$(MAKE) -C packer install
 
 
 # tests
@@ -41,7 +36,7 @@ test-api:
 	$(VENV)/bin/pytest -q packages/api
 
 # Boots real VMs from a built agents image: make test-qemu IMAGE=build/agents/<image>.qcow2
-test-qemu:
+test-image:
 	@test -n "$(IMAGE)" || { echo "IMAGE=<path to a naos-agents qcow2> is required" >&2; exit 1; }
 	NAOS_TEST_IMAGE="$(abspath $(IMAGE))" cargo test -p naos-agent -- --ignored real_image
 
@@ -85,9 +80,6 @@ lint:
 run-api:
 	$(VENV)/bin/uvicorn --factory naos_api.app:create_app --host 127.0.0.1
 
-packer:
-	@$(MAKE) --no-print-directory -C packer $(PACKER_ARGS)
-
 
 # defaults
 shell:
@@ -95,5 +87,7 @@ shell:
 	trap 'rm -f "$$rc"' EXIT; \
 	cat ~/.bashrc 2> /dev/null > "$$rc" || true; \
 	echo 'export PRE_COMMIT_HOME="$(PRE_COMMIT_HOME)"' >> "$$rc"; \
+	echo 'export PATH="$(CURDIR)/.packer/bin:$$PATH"' >> "$$rc"; \
+	echo 'export PACKER_PLUGIN_PATH="$(PACKER_PLUGIN_PATH)"' >> "$$rc"; \
 	echo 'source $(CURDIR)/$(VENV)/bin/activate' >> "$$rc"; \
 	bash --rcfile "$$rc" -i

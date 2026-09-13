@@ -3,7 +3,7 @@
 // never shipped on its own.
 
 packer {
-  required_version = ">= 1.11.0"
+  required_version = ">= 1.16.0"
 
   required_plugins {
     qemu = {
@@ -14,6 +14,9 @@ packer {
 }
 
 locals {
+  version          = yamldecode(file("${path.root}/../.cz.yaml")).commitizen.version
+  output_directory = abspath("${path.root}/../../build/base")
+
   iso_url = join("", [
     "https://dl-cdn.alpinelinux.org/alpine/",
     var.alpine_branch,
@@ -27,8 +30,8 @@ source "qemu" "alpine" {
   iso_url      = local.iso_url
   iso_checksum = var.iso_checksum
 
-  vm_name          = "${var.image_name}-${var.version}.qcow2"
-  output_directory = var.output_directory
+  vm_name          = "naos-base-${local.version}.qcow2"
+  output_directory = local.output_directory
   format           = "qcow2"
 
   disk_size      = var.disk_size
@@ -37,8 +40,8 @@ source "qemu" "alpine" {
 
   memory      = var.memory
   cpus        = var.cpus
-  accelerator = var.accelerator
-  headless    = var.headless
+  accelerator = "kvm"
+  headless    = true
 
   http_directory = "${path.root}/http"
 
@@ -93,7 +96,7 @@ build {
   }
 
   post-processor "manifest" {
-    output     = "${var.output_directory}/manifest.json"
+    output     = "${local.output_directory}/manifest.json"
     strip_path = true
   }
 }

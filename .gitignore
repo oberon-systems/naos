@@ -8,6 +8,9 @@ CLAUDE.local.md
 .pre-commit
 .env
 
+# Exclude packer build environment
+!packer/.env
+
 # Build and tool caches
 __pycache__/
 .ruff_cache/

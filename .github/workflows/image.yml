@@ -1,0 +1,78 @@
+name: image
+
+on:
+  pull_request:
+    paths:
+      - packer/**
+      - .github/workflows/image.yml
+  push:
+    tags:
+      - image-*
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    container: hashicorp/packer:1.16.0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Load versions
+        run: cat packer/.env >> "$GITHUB_ENV"
+      - name: Validate templates
+        run: |
+          for image in base agents; do
+            packer init "packer/$image"
+            packer fmt -check "packer/$image"
+            packer validate -var build_password=validate-only "packer/$image"
+          done
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/image-')
+    runs-on: ubuntu-24.04
+    container:
+      image: hashicorp/packer:1.16.0
+      options: --device /dev/kvm
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the tag against .cz.yaml
+        run: |
+          test "$GITHUB_REF_NAME" = "image-$(sed -n 's/^  version: //p' packer/.cz.yaml)"
+      - name: Load versions
+        run: cat packer/.env >> "$GITHUB_ENV"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: |
+            ~/.config/packer/plugins
+            packer_cache
+          key: image-${{ hashFiles('packer/.env') }}
+          restore-keys: image-
+      - name: Install QEMU and gh
+        run: apk add --no-cache qemu-system-x86_64 qemu-img github-cli
+      - name: Build images
+        run: |
+          export PKR_VAR_build_password="$(head -c 32 /dev/urandom | sha256sum | cut -c 1-32)"
+          for image in base agents; do
+            packer init "packer/$image"
+            packer build -force "packer/$image"
+          done
+      - name: Checksums
+        working-directory: build/agents
+        run: sha256sum naos-agents-*.qcow2 > SHA256SUMS
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            build/agents/naos-agents-*.qcow2 build/agents/SHA256SUMS \
+            --title "$GITHUB_REF_NAME" \
+            --notes "Agents image ${GITHUB_REF_NAME#image-}. Import its sha256 from SHA256SUMS."
