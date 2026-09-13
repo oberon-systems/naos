@@ -112,7 +112,7 @@ The boot test `real_image_boots_probes_and_is_cleaned_up` covers the first four
 with a real image, together with the unit tests of the runner:
 
 ```bash
-make test-qemu IMAGE=build/agents/naos-agents-0.1.0.qcow2
+make test-image
 ```
 
 ## Hardening backlog
