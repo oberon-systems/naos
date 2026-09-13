@@ -26,9 +26,8 @@ jobs:
       - name: Validate templates
         run: |
           for image in base agents; do
-            packer init "packer/$image"
-            packer fmt -check "packer/$image"
-            packer validate -var build_password=validate-only "packer/$image"
+            (cd "packer/$image" && packer init . && packer fmt -check . \
+              && packer validate -var build_password=validate-only .) || exit 1
           done
 
   release:
@@ -52,7 +51,7 @@ jobs:
         with:
           path: |
             ~/.config/packer/plugins
-            packer_cache
+            packer/base/packer_cache
           key: image-${{ hashFiles('packer/.env') }}
           restore-keys: image-
       - name: Install QEMU and gh
@@ -61,8 +60,7 @@ jobs:
         run: |
           export PKR_VAR_build_password="$(head -c 32 /dev/urandom | sha256sum | cut -c 1-32)"
           for image in base agents; do
-            packer init "packer/$image"
-            packer build -force "packer/$image"
+            (cd "packer/$image" && packer init . && packer build -force .) || exit 1
           done
       - name: Checksums
         working-directory: build/agents
