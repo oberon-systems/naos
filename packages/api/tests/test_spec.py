@@ -31,8 +31,8 @@ def test_minimal_spec_grants_no_policies(spec_body: dict[str, Any]) -> None:
         (("image", "digest"), "md5:" + "a" * 32),
         (("image", "id"), "../alpha"),
         (("merge",), {"policy": "auto"}),
-        (("mounts",), {"policy_snapshot": "../../etc"}),
-        (("network",), {"policy_snapshot": "netpol_1", "allow": ["*"]}),
+        (("mounts",), {"policy": "../../etc"}),
+        (("network",), {"policy": "netpol_1", "allow": ["*"]}),
     ],
 )
 def test_invalid_spec_is_rejected(

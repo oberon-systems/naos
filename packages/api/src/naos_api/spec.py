@@ -18,7 +18,7 @@ class PolicyKind(StrEnum):
     MCP = "mcp"
 
 
-SnapshotId = Annotated[str, Field(pattern=r"^[a-z]+_[0-9a-f]{32}$")]
+PolicyId = Annotated[str, Field(pattern=r"^[a-z]+_[0-9a-f]{32}$")]
 ImageId = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")]
 Digest = Annotated[str, Field(pattern=r"^sha256:[0-9a-f]{64}$")]
 
@@ -35,7 +35,7 @@ class RuntimeSpec(StrictModel):
 
 
 class PolicyRef(StrictModel):
-    policy_snapshot: SnapshotId | None = None
+    policy: PolicyId | None = None
 
 
 class MergeSpec(StrictModel):
@@ -54,10 +54,10 @@ class RunSpec(StrictModel):
 
     def policy_refs(self) -> dict[PolicyKind, str | None]:
         return {
-            PolicyKind.MOUNT: self.mounts.policy_snapshot,
-            PolicyKind.NETWORK: self.network.policy_snapshot,
-            PolicyKind.SHELL: self.shell.policy_snapshot,
-            PolicyKind.MCP: self.mcp.policy_snapshot,
+            PolicyKind.MOUNT: self.mounts.policy,
+            PolicyKind.NETWORK: self.network.policy,
+            PolicyKind.SHELL: self.shell.policy,
+            PolicyKind.MCP: self.mcp.policy,
         }
 
 

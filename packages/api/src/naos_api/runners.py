@@ -7,14 +7,13 @@ from uuid import uuid4
 
 from sqlmodel import Session, col, func, or_, select, update
 
-from naos_api import runs
+from naos_api import tasks
 from naos_api.errors import InvalidTransitionError, LeaseError, NotFoundError
-from naos_api.lifecycle import TERMINAL, ImageStatus, RunStatus
-from naos_api.models import Image, Lease, PolicySnapshot, Run, Runner
-from naos_api.settings import Settings
+from naos_api.lifecycle import TERMINAL, ImageStatus, TaskStatus
+from naos_api.models import Image, Lease, Policy, Runner, Task
 from naos_api.spec import PolicyKind, RunSpec
 
-S = RunStatus
+S = TaskStatus
 LEASE_EXPIRED_REASON = "runner lease expired"
 LEASE_BOUND = frozenset({S.STARTING, S.STARTED, S.STOPPING, S.COLLECTING})
 RUNNER_TRANSITIONS = frozenset(
@@ -62,8 +61,8 @@ class Heartbeat:
 
 
 @dataclass(frozen=True)
-class DesiredRun:
-    run: Run
+class DesiredTask:
+    task: Task
     policies: dict[PolicyKind, dict[str, Any] | None]
 
 
@@ -75,9 +74,9 @@ def _live_lease(session: Session, runner_id: str) -> Lease | None:
 
 
 def register_runner(
-    session: Session, settings: Settings, name: str, now: int
+    session: Session, name: str, now: int, token_ttl: int, lease_ttl: int
 ) -> tuple[Runner, IssuedToken, Lease]:
-    token = IssuedToken.new(now + settings.runner_token_ttl_seconds)
+    token = IssuedToken.new(now + token_ttl)
     runner = Runner(
         id=f"rnr_{uuid4().hex}",
         name=name,
@@ -92,7 +91,7 @@ def register_runner(
         runner_id=runner.id,
         live_runner_id=runner.id,
         acquired_at=now,
-        expires_at=now + settings.lease_ttl_seconds,
+        expires_at=now + lease_ttl,
     )
     session.add(lease)
     session.commit()
@@ -123,36 +122,30 @@ def authenticate(session: Session, token: str, now: int) -> RunnerPrincipal | No
 
 def expire_leases(session: Session, now: int) -> list[str]:
     lapsed = (col(Lease.expired_at).is_(None), col(Lease.expires_at) <= now)
-    release = {"expired_at": now, "live_runner_id": None}
-    # MySQL has no UPDATE ... RETURNING, so there the ids are read before the write.
-    if session.get_bind().dialect.update_returning:
-        expired = list(
-            session.exec(update(Lease).where(*lapsed).values(**release).returning(col(Lease.id)))
-            .scalars()
-            .all()
-        )
-    else:
-        expired = list(session.exec(select(Lease.id).where(*lapsed)).all())
-        if expired:
-            session.exec(update(Lease).where(col(Lease.id).in_(expired)).values(**release))
+    expired = list(session.exec(select(Lease.id).where(*lapsed)).all())
     if expired:
-        bound = col(Run.lease_id).in_(expired)
         session.exec(
-            update(Run)
-            .where(bound, col(Run.status) == S.PENDING)
+            update(Lease)
+            .where(col(Lease.id).in_(expired), *lapsed)
+            .values(expired_at=now, live_runner_id=None)
+        )
+        bound = col(Task.lease_id).in_(expired)
+        session.exec(
+            update(Task)
+            .where(bound, col(Task.status) == S.PENDING)
             .values(lease_id=None, updated_at=now)
         )
         session.exec(
-            update(Run)
-            .where(bound, col(Run.status).in_(LEASE_BOUND))
+            update(Task)
+            .where(bound, col(Task.status).in_(LEASE_BOUND))
             .values(status=S.FAILED, status_reason=LEASE_EXPIRED_REASON, updated_at=now)
         )
     session.commit()
     return expired
 
 
-def _renew_lease(session: Session, runner_id: str, settings: Settings, now: int) -> str:
-    expires_at = now + settings.lease_ttl_seconds
+def _renew_lease(session: Session, runner_id: str, now: int, lease_ttl: int) -> str:
+    expires_at = now + lease_ttl
     for _ in range(3):
         lease = _live_lease(session, runner_id)
         if lease is None:
@@ -186,13 +179,12 @@ def _renew_lease(session: Session, runner_id: str, settings: Settings, now: int)
 
 
 def _rotate_token(
-    session: Session, principal: RunnerPrincipal, settings: Settings, now: int
+    session: Session, principal: RunnerPrincipal, now: int, token_ttl: int
 ) -> IssuedToken | None:
-    ttl = settings.runner_token_ttl_seconds
-    if not principal.via_previous_token and principal.token_expires_at - ttl // 2 > now:
+    if not principal.via_previous_token and principal.token_expires_at - token_ttl // 2 > now:
         return None
 
-    token = IssuedToken.new(now + ttl)
+    token = IssuedToken.new(now + token_ttl)
     values: dict[str, Any] = {"token_hash": token.digest, "token_expires_at": token.expires_at}
     if not principal.via_previous_token:
         values |= {
@@ -214,9 +206,9 @@ def _rotate_token(
 
 def _candidates(session: Session, limit: int) -> Sequence[str]:
     statement = (
-        select(Run.id)
-        .where(col(Run.status) == S.PENDING, col(Run.lease_id).is_(None))
-        .order_by(col(Run.seq))
+        select(Task.id)
+        .where(col(Task.status) == S.PENDING, col(Task.lease_id).is_(None))
+        .order_by(col(Task.seq))
         .limit(limit)
     )
     return session.exec(statement).all()
@@ -225,16 +217,18 @@ def _candidates(session: Session, limit: int) -> Sequence[str]:
 def _assign(session: Session, lease_id: str, capacity: int, now: int) -> None:
     held = session.exec(
         select(func.count())
-        .select_from(Run)
-        .where(col(Run.lease_id) == lease_id, col(Run.status).not_in(TERMINAL))
+        .select_from(Task)
+        .where(col(Task.lease_id) == lease_id, col(Task.status).not_in(TERMINAL))
     ).one()
     free = capacity - held
     if free <= 0:
         return
-    for run_id in _candidates(session, free):
+    for task_id in _candidates(session, free):
         session.exec(
-            update(Run)
-            .where(col(Run.id) == run_id, col(Run.status) == S.PENDING, col(Run.lease_id).is_(None))
+            update(Task)
+            .where(
+                col(Task.id) == task_id, col(Task.status) == S.PENDING, col(Task.lease_id).is_(None)
+            )
             .values(lease_id=lease_id, updated_at=now)
         )
     session.commit()
@@ -242,14 +236,15 @@ def _assign(session: Session, lease_id: str, capacity: int, now: int) -> None:
 
 def heartbeat(
     session: Session,
-    settings: Settings,
     principal: RunnerPrincipal,
     capacity: int,
     now: int,
+    lease_ttl: int,
+    token_ttl: int,
 ) -> Heartbeat:
     expire_leases(session, now)
-    lease_id = _renew_lease(session, principal.runner_id, settings, now)
-    token = _rotate_token(session, principal, settings, now)
+    lease_id = _renew_lease(session, principal.runner_id, now, lease_ttl)
+    token = _rotate_token(session, principal, now, token_ttl)
     session.exec(
         update(Runner).where(col(Runner.id) == principal.runner_id).values(last_heartbeat_at=now)
     )
@@ -261,32 +256,34 @@ def heartbeat(
     return Heartbeat(lease=lease, token=token)
 
 
-def _policies(session: Session, run: Run) -> dict[PolicyKind, dict[str, Any] | None]:
+def _policies(session: Session, task: Task) -> dict[PolicyKind, dict[str, Any] | None]:
     refs = {
-        PolicyKind.MOUNT: run.mount_policy_id,
-        PolicyKind.NETWORK: run.network_policy_id,
-        PolicyKind.SHELL: run.shell_policy_id,
-        PolicyKind.MCP: run.mcp_policy_id,
+        PolicyKind.MOUNT: task.mount_policy_id,
+        PolicyKind.NETWORK: task.network_policy_id,
+        PolicyKind.SHELL: task.shell_policy_id,
+        PolicyKind.MCP: task.mcp_policy_id,
     }
     policies: dict[PolicyKind, dict[str, Any] | None] = {}
-    for kind, snapshot_id in refs.items():
-        snapshot = session.get(PolicySnapshot, snapshot_id) if snapshot_id else None
-        policies[kind] = snapshot.document if snapshot else None
+    for kind, policy_id in refs.items():
+        policy = session.get(Policy, policy_id) if policy_id else None
+        policies[kind] = policy.document if policy else None
     return policies
 
 
-def desired_state(session: Session, runner_id: str, now: int) -> tuple[str, list[DesiredRun]]:
+def desired_state(session: Session, runner_id: str, now: int) -> tuple[str, list[DesiredTask]]:
     expire_leases(session, now)
     lease = _live_lease(session, runner_id)
     if lease is None:
         raise LeaseError(f"runner {runner_id} holds no live lease")
     statement = (
-        select(Run)
-        .where(col(Run.lease_id) == lease.id, col(Run.status).not_in(TERMINAL))
-        .order_by(col(Run.seq))
+        select(Task)
+        .where(col(Task.lease_id) == lease.id, col(Task.status).not_in(TERMINAL))
+        .order_by(col(Task.seq))
     )
     assigned = session.exec(statement).all()
-    return lease.id, [DesiredRun(run=run, policies=_policies(session, run)) for run in assigned]
+    return lease.id, [
+        DesiredTask(task=task, policies=_policies(session, task)) for task in assigned
+    ]
 
 
 def image_for_runner(session: Session, runner_id: str, digest: str, now: int) -> Image:
@@ -295,10 +292,10 @@ def image_for_runner(session: Session, runner_id: str, digest: str, now: int) ->
     ready = col(Image.status) == ImageStatus.READY
     image = session.exec(select(Image).where(col(Image.digest) == digest, ready)).first()
     if lease is not None and image is not None:
-        held = select(Run).where(col(Run.lease_id) == lease.id, col(Run.status).not_in(TERMINAL))
+        held = select(Task).where(col(Task.lease_id) == lease.id, col(Task.status).not_in(TERMINAL))
         if any(
-            RunSpec.model_validate(run.spec).image.digest == digest
-            for run in session.exec(held).all()
+            RunSpec.model_validate(task.spec).image.digest == digest
+            for task in session.exec(held).all()
         ):
             return image
     raise NotFoundError(f"image {digest} does not exist")
@@ -307,22 +304,22 @@ def image_for_runner(session: Session, runner_id: str, digest: str, now: int) ->
 def transition(
     session: Session,
     runner_id: str,
-    run_id: str,
+    task_id: str,
     lease_id: str,
-    expected: RunStatus,
-    target: RunStatus,
+    expected: TaskStatus,
+    target: TaskStatus,
     reason: str | None,
     now: int,
-) -> Run:
+) -> Task:
     if (expected, target) not in RUNNER_TRANSITIONS:
-        raise InvalidTransitionError(f"a runner may not move a run {expected} -> {target}")
+        raise InvalidTransitionError(f"a runner may not move a task {expected} -> {target}")
     expire_leases(session, now)
 
-    run = session.get(Run, run_id)
-    owner = session.get(Lease, run.lease_id) if run is not None and run.lease_id else None
-    if run is None or owner is None or owner.runner_id != runner_id:
-        raise NotFoundError(f"run {run_id} does not exist")
-    if run.lease_id != lease_id or owner.expired_at is not None:
-        raise LeaseError(f"lease {lease_id} does not hold run {run_id}")
+    task = session.get(Task, task_id)
+    owner = session.get(Lease, task.lease_id) if task is not None and task.lease_id else None
+    if task is None or owner is None or owner.runner_id != runner_id:
+        raise NotFoundError(f"task {task_id} does not exist")
+    if task.lease_id != lease_id or owner.expired_at is not None:
+        raise LeaseError(f"lease {lease_id} does not hold task {task_id}")
 
-    return runs.transition_run(session, run_id, expected, target, reason, lease_id=lease_id)
+    return tasks.transition_task(session, task_id, expected, target, reason, lease_id=lease_id)

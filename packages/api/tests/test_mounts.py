@@ -5,7 +5,7 @@ from sqlmodel import Session
 
 from naos_api.errors import PolicyError
 from naos_api.mounts import MountPolicyIn, resolve_mount_policy
-from naos_api.policies import create_mount_snapshot
+from naos_api.policies import create_mount_policy
 from naos_api.settings import Settings
 from naos_api.spec import PolicyKind
 
@@ -93,13 +93,13 @@ def test_missing_or_unsafe_roots_deny_every_mount(roots: list[str]) -> None:
         resolve_mount_policy(_policy("/srv/projects/alpha"), roots)
 
 
-def test_mount_snapshot_is_resolved_and_deduplicated(
+def test_mount_policy_is_resolved_and_deduplicated(
     session: Session, settings: Settings, mount_body: dict[str, Any]
 ) -> None:
     policy = MountPolicyIn.model_validate(mount_body)
 
-    first, first_created = create_mount_snapshot(session, settings, policy)
-    again, again_created = create_mount_snapshot(session, settings, policy)
+    first, first_created = create_mount_policy(session, policy, ROOTS)
+    again, again_created = create_mount_policy(session, policy, ROOTS)
 
     assert first_created and not again_created
     assert again.id == first.id
@@ -108,8 +108,8 @@ def test_mount_snapshot_is_resolved_and_deduplicated(
     assert first.document["workdir"] == "/naos/alpha"
 
 
-def test_different_mounts_get_different_snapshots(session: Session, settings: Settings) -> None:
-    alpha, _ = create_mount_snapshot(session, settings, _policy("/srv/projects/alpha"))
-    beta, _ = create_mount_snapshot(session, settings, _policy("/srv/projects/beta"))
+def test_different_mounts_get_different_policies(session: Session, settings: Settings) -> None:
+    alpha, _ = create_mount_policy(session, _policy("/srv/projects/alpha"), ROOTS)
+    beta, _ = create_mount_policy(session, _policy("/srv/projects/beta"), ROOTS)
 
     assert alpha.id != beta.id

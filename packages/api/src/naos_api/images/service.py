@@ -1,5 +1,4 @@
 import hashlib
-import ipaddress
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 
@@ -12,7 +11,6 @@ from naos_api.errors import ImageConflictError, ImageError, NotFoundError, Polic
 from naos_api.images.store import ImageStore
 from naos_api.lifecycle import ImageStatus
 from naos_api.models import Image
-from naos_api.settings import Settings
 from naos_api.spec import ImageRef
 
 MAX_REASON_LENGTH = 500
@@ -25,6 +23,14 @@ class ImportRequest:
     image: Image
     created: bool
     scheduled: bool
+
+
+@dataclass(frozen=True)
+class ImageSource:
+    url: str | None
+    allowed_hosts: frozenset[str]
+    max_bytes: int
+    timeout_seconds: int
 
 
 class _Verified:
@@ -46,31 +52,22 @@ class _Verified:
             raise ImageError("image digest does not match")
 
 
-def _is_loopback(host: str) -> bool:
-    if host == "localhost":
-        return True
-    try:
-        return ipaddress.ip_address(host).is_loopback
-    except ValueError:
-        return False
-
-
 def _checked(url: httpx.URL, hosts: frozenset[str]) -> httpx.URL:
     if url.userinfo or url.host not in hosts:
         raise ImageError(f"image source host {url.host!r} is not allowed")
-    if url.scheme != "https" and not (url.scheme == "http" and _is_loopback(url.host)):
-        raise ImageError("image source must use https unless it points to loopback")
+    if url.scheme != "https":
+        raise ImageError("image source must use https")
     return url
 
 
-def source_url(settings: Settings, version: str) -> tuple[httpx.URL, frozenset[str]]:
-    if settings.image_source_url is None:
+def source_url(source: ImageSource, version: str) -> tuple[httpx.URL, frozenset[str]]:
+    if source.url is None:
         raise ImageError("image import is not configured: NAOS_IMAGE_SOURCE_URL is not set")
     try:
-        url = httpx.URL(settings.image_source_url.replace("{version}", version))
+        url = httpx.URL(source.url.replace("{version}", version))
     except httpx.InvalidURL as err:
         raise ImageError("NAOS_IMAGE_SOURCE_URL is not a valid URL") from err
-    hosts = frozenset({url.host, *settings.image_source_allowed_hosts})
+    hosts = frozenset({url.host, *source.allowed_hosts})
     return _checked(url, hosts), hosts
 
 
@@ -99,9 +96,9 @@ def _replay(
 
 
 def request_import(
-    session: Session, settings: Settings, image_id: str, version: str, digest: str
+    session: Session, source: ImageSource, image_id: str, version: str, digest: str
 ) -> ImportRequest:
-    source_url(settings, version)
+    source_url(source, version)
     existing = _find(session, image_id, digest)
     if existing is not None:
         return _replay(session, existing, image_id, version, digest)
@@ -120,14 +117,14 @@ def request_import(
 
 
 def _download(
-    settings: Settings,
+    source: ImageSource,
     store: ImageStore,
     version: str,
     digest: str,
     transport: httpx.BaseTransport | None,
 ) -> int:
-    url, hosts = source_url(settings, version)
-    timeout = httpx.Timeout(settings.image_download_timeout_seconds)
+    url, hosts = source_url(source, version)
+    timeout = httpx.Timeout(source.timeout_seconds)
     with httpx.Client(timeout=timeout, follow_redirects=False, transport=transport) as client:
         for _ in range(MAX_REDIRECTS + 1):
             with client.stream("GET", url) as response:
@@ -137,9 +134,9 @@ def _download(
                 if response.status_code != 200:
                     raise ImageError(f"image source returned {response.status_code}")
                 declared = response.headers.get("content-length", "")
-                if declared.isdigit() and int(declared) > settings.image_max_bytes:
-                    raise ImageError(f"image exceeds {settings.image_max_bytes} bytes")
-                verified = _Verified(response.iter_bytes(), digest, settings.image_max_bytes)
+                if declared.isdigit() and int(declared) > source.max_bytes:
+                    raise ImageError(f"image exceeds {source.max_bytes} bytes")
+                verified = _Verified(response.iter_bytes(), digest, source.max_bytes)
                 store.write_atomic(digest, verified)
                 return verified.size
     raise ImageError("image source redirected too many times")
@@ -158,7 +155,7 @@ def _finish(
 
 def import_image(
     session: Session,
-    settings: Settings,
+    source: ImageSource,
     store: ImageStore,
     image_id: str,
     transport: httpx.BaseTransport | None = None,
@@ -167,7 +164,7 @@ def import_image(
     if image is None or image.status is not ImageStatus.IMPORTING:
         return None
     try:
-        size = _download(settings, store, image.version, image.digest, transport)
+        size = _download(source, store, image.version, image.digest, transport)
     except (ImageError, httpx.HTTPError, OSError) as err:
         reason = (str(err) or type(err).__name__)[:MAX_REASON_LENGTH]
         _finish(session, image_id, ImageStatus.FAILED, reason, None)
@@ -178,13 +175,13 @@ def import_image(
 
 def run_import(
     db: Database,
-    settings: Settings,
+    source: ImageSource,
     store: ImageStore,
     image_id: str,
     transport: httpx.BaseTransport | None = None,
 ) -> None:
     with Session(db.engine) as session:
-        import_image(session, settings, store, image_id, transport)
+        import_image(session, source, store, image_id, transport)
 
 
 def fail_interrupted(session: Session, now: int) -> None:

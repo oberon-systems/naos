@@ -15,7 +15,7 @@ class IdempotencyConflictError(DomainError):
 
 
 class PolicyError(DomainError):
-    """The submitted policy is invalid or does not resolve to a snapshot."""
+    """The submitted policy is invalid or does not resolve to a policy."""
 
 
 class LeaseError(DomainError):

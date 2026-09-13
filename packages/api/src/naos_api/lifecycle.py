@@ -1,9 +1,11 @@
 from enum import StrEnum
 
+from transitions import Machine
+
 from naos_api.errors import InvalidTransitionError
 
 
-class RunStatus(StrEnum):
+class TaskStatus(StrEnum):
     PENDING = "PENDING"
     STARTING = "STARTING"
     STARTED = "STARTED"
@@ -21,22 +23,42 @@ class ImageStatus(StrEnum):
     FAILED = "FAILED"
 
 
-TRANSITIONS: dict[RunStatus, frozenset[RunStatus]] = {
-    RunStatus.PENDING: frozenset({RunStatus.STARTING, RunStatus.CANCELLED, RunStatus.FAILED}),
-    RunStatus.STARTING: frozenset({RunStatus.STARTED, RunStatus.STOPPING, RunStatus.FAILED}),
-    RunStatus.STARTED: frozenset({RunStatus.STOPPING, RunStatus.FAILED}),
-    RunStatus.STOPPING: frozenset({RunStatus.COLLECTING, RunStatus.FAILED}),
-    RunStatus.COLLECTING: frozenset({RunStatus.WAITING_MERGE, RunStatus.FAILED}),
-    RunStatus.WAITING_MERGE: frozenset({RunStatus.COMPLETED, RunStatus.FAILED}),
-    RunStatus.COMPLETED: frozenset(),
-    RunStatus.FAILED: frozenset(),
-    RunStatus.CANCELLED: frozenset(),
-}
+S = TaskStatus
 
-TERMINAL = frozenset(status for status, targets in TRANSITIONS.items() if not targets)
-ACTIVE = frozenset(RunStatus) - TERMINAL - {RunStatus.PENDING}
+LIFECYCLE = Machine(
+    model=None,
+    states=TaskStatus,
+    initial=S.PENDING,
+    auto_transitions=False,
+    transitions=[
+        {"trigger": "start", "source": S.PENDING, "dest": S.STARTING},
+        {"trigger": "cancel", "source": S.PENDING, "dest": S.CANCELLED},
+        {"trigger": "boot", "source": S.STARTING, "dest": S.STARTED},
+        {"trigger": "stop", "source": [S.STARTING, S.STARTED], "dest": S.STOPPING},
+        {"trigger": "collect", "source": S.STOPPING, "dest": S.COLLECTING},
+        {"trigger": "await_merge", "source": S.COLLECTING, "dest": S.WAITING_MERGE},
+        {"trigger": "complete", "source": S.WAITING_MERGE, "dest": S.COMPLETED},
+        {
+            "trigger": "fail",
+            "source": [S.PENDING, S.STARTING, S.STARTED, S.STOPPING, S.COLLECTING, S.WAITING_MERGE],
+            "dest": S.FAILED,
+        },
+    ],
+)
 
 
-def ensure_transition(current: RunStatus, target: RunStatus) -> None:
-    if target not in TRANSITIONS[current]:
+def targets(current: TaskStatus) -> frozenset[TaskStatus]:
+    return frozenset(
+        TaskStatus(transition.dest)
+        for transition in LIFECYCLE.get_transitions(source=current.name)
+        if transition.dest is not None
+    )
+
+
+TERMINAL = frozenset(status for status in TaskStatus if not targets(status))
+ACTIVE = frozenset(TaskStatus) - TERMINAL - {TaskStatus.PENDING}
+
+
+def ensure_transition(current: TaskStatus, target: TaskStatus) -> None:
+    if target not in targets(current):
         raise InvalidTransitionError(f"transition {current} -> {target} is not allowed")

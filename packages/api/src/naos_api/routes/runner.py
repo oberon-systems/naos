@@ -4,23 +4,19 @@ from typing import Annotated, Any, BinaryIO, Self
 from fastapi import APIRouter, Depends, Path, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, StrictInt, model_validator
-from sqlmodel import Session
 
 from naos_api import runners
 from naos_api.auth import require_enrollment, require_runner
 from naos_api.clock import NowDep
-from naos_api.db import get_session
 from naos_api.images.store import ImageStore
-from naos_api.lifecycle import RunStatus
+from naos_api.lifecycle import TaskStatus
 from naos_api.models import Lease
-from naos_api.routes.runs import RunRead
+from naos_api.routes.deps import LeaseTtlDep, SessionDep, TokenTtlDep
+from naos_api.routes.tasks import TaskRead
 from naos_api.runners import IssuedToken, RunnerPrincipal
-from naos_api.runs import MAX_REASON_LENGTH
-from naos_api.settings import Settings, get_settings
 from naos_api.spec import PolicyKind, RunSpec, StrictModel
+from naos_api.tasks import MAX_REASON_LENGTH
 
-SessionDep = Annotated[Session, Depends(get_session)]
-SettingsDep = Annotated[Settings, Depends(get_settings)]
 PrincipalDep = Annotated[RunnerPrincipal, Depends(require_runner)]
 
 RunnerName = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")]
@@ -40,13 +36,13 @@ class HeartbeatIn(StrictModel):
 
 class TransitionIn(StrictModel):
     lease_id: Annotated[str, Field(max_length=64)]
-    expected: RunStatus
-    target: RunStatus
+    expected: TaskStatus
+    target: TaskStatus
     reason: Reason | None = None
 
     @model_validator(mode="after")
     def _failure_needs_reason(self) -> Self:
-        if self.target is RunStatus.FAILED and self.reason is None:
+        if self.target is TaskStatus.FAILED and self.reason is None:
             raise ValueError("a FAILED transition requires a reason")
         return self
 
@@ -81,16 +77,16 @@ class HeartbeatOut(BaseModel):
     token: TokenOut | None
 
 
-class DesiredRunOut(BaseModel):
+class DesiredTaskOut(BaseModel):
     id: str
-    status: RunStatus
+    status: TaskStatus
     spec: RunSpec
     policies: dict[PolicyKind, dict[str, Any] | None]
 
 
 class DesiredStateOut(BaseModel):
     lease_id: str
-    runs: list[DesiredRunOut]
+    tasks: list[DesiredTaskOut]
 
 
 router = APIRouter(prefix="/runners")
@@ -98,9 +94,13 @@ router = APIRouter(prefix="/runners")
 
 @router.post("/register", status_code=201, dependencies=[Depends(require_enrollment)])
 def register(
-    body: RegisterIn, session: SessionDep, settings: SettingsDep, now: NowDep
+    body: RegisterIn,
+    session: SessionDep,
+    token_ttl: TokenTtlDep,
+    lease_ttl: LeaseTtlDep,
+    now: NowDep,
 ) -> RegisterOut:
-    runner, token, lease = runners.register_runner(session, settings, body.name, now)
+    runner, token, lease = runners.register_runner(session, body.name, now, token_ttl, lease_ttl)
     return RegisterOut(runner_id=runner.id, token=TokenOut.of(token), lease=LeaseOut.of(lease, now))
 
 
@@ -109,26 +109,27 @@ def heartbeat(
     body: HeartbeatIn,
     principal: PrincipalDep,
     session: SessionDep,
-    settings: SettingsDep,
+    lease_ttl: LeaseTtlDep,
+    token_ttl: TokenTtlDep,
     now: NowDep,
 ) -> HeartbeatOut:
-    beat = runners.heartbeat(session, settings, principal, body.capacity, now)
+    beat = runners.heartbeat(session, principal, body.capacity, now, lease_ttl, token_ttl)
     return HeartbeatOut(
         lease=LeaseOut.of(beat.lease, now),
         token=TokenOut.of(beat.token) if beat.token else None,
     )
 
 
-@router.get("/{runner_id}/runs")
-def desired_runs(principal: PrincipalDep, session: SessionDep, now: NowDep) -> DesiredStateOut:
+@router.get("/{runner_id}/tasks")
+def desired_tasks(principal: PrincipalDep, session: SessionDep, now: NowDep) -> DesiredStateOut:
     lease_id, desired = runners.desired_state(session, principal.runner_id, now)
     return DesiredStateOut(
         lease_id=lease_id,
-        runs=[
-            DesiredRunOut(
-                id=item.run.id,
-                status=item.run.status,
-                spec=RunSpec.model_validate(item.run.spec),
+        tasks=[
+            DesiredTaskOut(
+                id=item.task.id,
+                status=item.task.status,
+                spec=RunSpec.model_validate(item.task.spec),
                 policies=item.policies,
             )
             for item in desired
@@ -156,18 +157,18 @@ def download_image(
     )
 
 
-@router.post("/{runner_id}/runs/{run_id}/transition")
+@router.post("/{runner_id}/tasks/{task_id}/transition")
 def transition(
-    run_id: str, body: TransitionIn, principal: PrincipalDep, session: SessionDep, now: NowDep
-) -> RunRead:
-    run = runners.transition(
+    task_id: str, body: TransitionIn, principal: PrincipalDep, session: SessionDep, now: NowDep
+) -> TaskRead:
+    task = runners.transition(
         session,
         principal.runner_id,
-        run_id,
+        task_id,
         body.lease_id,
         body.expected,
         body.target,
         body.reason,
         now,
     )
-    return RunRead.of(run)
+    return TaskRead.of(task)
