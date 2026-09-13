@@ -63,5 +63,5 @@ uvicorn==0.52.4
 virtualenv==21.7.9
 wcwidth==0.8.3
 wrapt==2.4.1
-wyld-cz==0.2.2
+wyld-cz==0.3.0
 zipp==4.1.0
