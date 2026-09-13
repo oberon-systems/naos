@@ -3,7 +3,7 @@ from typing import Any
 from sqlmodel import JSON, Column, Field, SQLModel, UniqueConstraint
 
 from naos_api.clock import now_ts
-from naos_api.lifecycle import ImageStatus, TaskStatus
+from naos_api.lifecycle import TaskStatus
 from naos_api.spec import PolicyKind
 
 
@@ -70,8 +70,5 @@ class Image(SQLModel, table=True):
     id: str = Field(primary_key=True)
     version: str
     digest: str = Field(unique=True)
-    status: ImageStatus = Field(default=ImageStatus.IMPORTING, index=True)
-    status_reason: str | None = None
-    size_bytes: int | None = None
+    url: str
     created_at: int = Field(default_factory=now_ts)
-    updated_at: int = Field(default_factory=now_ts)

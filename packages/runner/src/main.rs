@@ -10,6 +10,7 @@ use libs::api::HttpApi;
 use libs::config::{self, Config};
 use libs::console;
 use libs::error::AgentError;
+use libs::image::HttpImages;
 use libs::runtime::QemuRuntime;
 
 const USAGE: &str = "usage: naos-agent [console <run_id>]";
@@ -53,7 +54,7 @@ fn run() -> Result<(), AgentError> {
 async fn serve(config: Config) -> Result<(), AgentError> {
     let api = HttpApi::new(config.api_url.clone())?;
     let runtime = QemuRuntime::new(&config.runtime)?;
-    let mut agent = Agent::new(&config, api, runtime);
+    let mut agent = Agent::new(&config, api, runtime, Box::new(HttpImages::new()?));
     let mut terminate = signal(SignalKind::terminate())?;
     tracing::info!(name = %config.name, capacity = config.capacity, "naos-agent started");
 

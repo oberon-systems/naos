@@ -28,16 +28,18 @@ process. List values are JSON. Every route depends only on the values it uses.
 |---|---|---|
 | `NAOS_DATABASE_URL` | required | Database URL, for example `postgresql+psycopg://naos@db.example.com/naos` |
 | `NAOS_ALLOWED_MOUNT_ROOTS` | `[]` | Host directories a mount policy may name |
+| `NAOS_OPERATOR_TOKEN_SHA256` | unset | SHA-256 of the operator token; unset closes every operator route |
 | `NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256` | unset | SHA-256 of the enrollment token; unset closes registration |
 | `NAOS_RUNNER_TOKEN_TTL_SECONDS` | `86400` | Runner token lifetime, 60 to 604800 |
 | `NAOS_LEASE_TTL_SECONDS` | `60` | Lease extension per heartbeat, 5 to 3600 |
 | `NAOS_LEASE_SWEEP_INTERVAL_SECONDS` | `15` | Background lease sweep period, 1 to 3600 |
-| `NAOS_IMAGE_STORE` | `fs` | Image store backend; `fs` is the only one |
-| `NAOS_IMAGE_STORE_PATH` | `$XDG_DATA_HOME/naos/images`, else `~/.local/share/naos/images` | Directory of the `fs` store |
-| `NAOS_IMAGE_SOURCE_URL` | unset | Download URL template with `{version}`; unset disables import |
-| `NAOS_IMAGE_SOURCE_ALLOWED_HOSTS` | `[]` | Hosts an image download may be redirected to |
-| `NAOS_IMAGE_MAX_BYTES` | `8589934592` | Largest image accepted |
-| `NAOS_IMAGE_DOWNLOAD_TIMEOUT_SECONDS` | `30` | Connect and read timeout of an image download, 1 to 3600 |
+
+## Operator credentials
+
+Every route under `/api/v1` outside `/api/v1/runners` takes the operator
+token as a Bearer credential. The API holds only its SHA-256 in
+`NAOS_OPERATOR_TOKEN_SHA256`; while that is unset, or the token does not
+match, every such route answers 401 before its handler runs.
 
 ## Responsibilities
 
@@ -78,36 +80,26 @@ Use transactions for atomic transitions and design mutations to be idempotent.
   the existing policy with 200.
 - Transitions are compare-and-swap on the expected status. A repeated
   transition that already happened is a no-op.
-- `POST /images` with the same `id`, `version` and `digest` returns the
-  current image with 200, or restarts a FAILED import with 202. The same `id`
-  or `digest` with other values returns 409.
+- `POST /images` with the same `id`, `version`, `digest` and `url` returns the
+  existing image with 200. The same `id` or `digest` with other values
+  returns 409.
 
 ## Images
 
-The API owns the images a Run may boot; the runner never downloads from
-anywhere else. The images are built as described in
-[packer/README.md](../packer/README.md).
+The API keeps the catalog of images a Run may boot: what to boot and where to
+download it from. It stores no image bytes; the runner downloads the file
+itself and trusts the digest, not the host. The images are built as described
+in [packer/README.md](../packer/README.md).
 
 - An operator registers an image with `POST /api/v1/images` and a body of
-  `id`, `version` and `digest`. The API answers 202 with status IMPORTING and
-  downloads the file in the background.
-- The download URL comes only from `NAOS_IMAGE_SOURCE_URL` with `{version}`
-  filled in; a request cannot name a URL. The URL and every redirect must use
-  https, and at most five redirects are followed, each only to the source host
-  or a host in `NAOS_IMAGE_SOURCE_ALLOWED_HOSTS`.
-- The body is hashed while it streams into a temporary file inside the store.
-  A digest mismatch, a body over `NAOS_IMAGE_MAX_BYTES`, a non-200 answer or a
-  refused redirect makes the image FAILED with a reason and leaves nothing in
-  the store. A matching file is renamed to `sha256-<hex>.qcow2`, mode 0444,
-  and the image becomes READY.
-- An import cut off by an API restart is marked FAILED when the API starts
-  again, so it can be retried.
-- `id`, `version` and `digest` are immutable and image rows are never deleted:
-  no endpoint or service writes them, like the Run spec.
-- `POST /tasks` requires the named image to be READY with the same `id` and
-  `digest`, otherwise it returns 422.
-- The store is an interface. `fs`, one directory with mode 0700, is the only
-  backend; object storage can be added behind the same interface.
+  `id`, `version`, `digest` and `url`. The API answers 201 and never contacts
+  the url.
+- The url must use https and must not carry credentials; any other url gets
+  422.
+- `id`, `version`, `digest` and `url` are immutable and image rows are never
+  deleted: no endpoint or service writes them, like the Run spec.
+- `POST /tasks` requires a registered image with the same `id` and `digest`,
+  otherwise it returns 422.
 
 ## Runner interface
 
@@ -119,7 +111,6 @@ POST /api/v1/runners/register                                enrollment token
 POST /api/v1/runners/{runner_id}/heartbeat                   runner token
 GET  /api/v1/runners/{runner_id}/tasks                       runner token
 POST /api/v1/runners/{runner_id}/tasks/{task_id}/transition  runner token
-GET  /api/v1/runners/{runner_id}/images/{digest}             runner token
 ```
 
 ### Runner credentials
@@ -147,7 +138,8 @@ GET  /api/v1/runners/{runner_id}/images/{digest}             runner token
   reports. Each assignment is compare-and-swap, so a Run never lands on two
   leases.
 - `GET .../tasks` returns the desired state: every non-terminal Run on the
-  live lease, with its spec and the resolved policy documents.
+  live lease, with its spec, the `image_url` of its image and the resolved
+  policy documents.
 
 ### Runner transitions
 
@@ -164,12 +156,6 @@ A runner may only make these transitions; any other pair gets 409.
 Every transition names the lease and is compare-and-swap on both the status
 and the lease. A stale lease gets 409, a Run held by another runner gets 404,
 and repeating a transition that already happened is a no-op.
-
-### Runner images
-
-`GET .../images/{digest}` streams a READY image from the store. It answers
-only when the digest belongs to a non-terminal Run on the runner's live lease;
-any other digest gets 404, the same answer as an image missing from the store.
 
 Secrets must never be returned accidentally.
 

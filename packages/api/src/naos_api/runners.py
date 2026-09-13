@@ -9,8 +9,9 @@ from sqlmodel import Session, col, func, or_, select, update
 
 from naos_api import tasks
 from naos_api.errors import InvalidTransitionError, LeaseError, NotFoundError
-from naos_api.lifecycle import TERMINAL, ImageStatus, TaskStatus
-from naos_api.models import Image, Lease, Policy, Runner, Task
+from naos_api.images.service import check_image
+from naos_api.lifecycle import TERMINAL, TaskStatus
+from naos_api.models import Lease, Policy, Runner, Task
 from naos_api.spec import PolicyKind, RunSpec
 
 S = TaskStatus
@@ -63,6 +64,7 @@ class Heartbeat:
 @dataclass(frozen=True)
 class DesiredTask:
     task: Task
+    image_url: str
     policies: dict[PolicyKind, dict[str, Any] | None]
 
 
@@ -282,23 +284,13 @@ def desired_state(session: Session, runner_id: str, now: int) -> tuple[str, list
     )
     assigned = session.exec(statement).all()
     return lease.id, [
-        DesiredTask(task=task, policies=_policies(session, task)) for task in assigned
+        DesiredTask(
+            task=task,
+            image_url=check_image(session, RunSpec.model_validate(task.spec).image).url,
+            policies=_policies(session, task),
+        )
+        for task in assigned
     ]
-
-
-def image_for_runner(session: Session, runner_id: str, digest: str, now: int) -> Image:
-    expire_leases(session, now)
-    lease = _live_lease(session, runner_id)
-    ready = col(Image.status) == ImageStatus.READY
-    image = session.exec(select(Image).where(col(Image.digest) == digest, ready)).first()
-    if lease is not None and image is not None:
-        held = select(Task).where(col(Task.lease_id) == lease.id, col(Task.status).not_in(TERMINAL))
-        if any(
-            RunSpec.model_validate(task.spec).image.digest == digest
-            for task in session.exec(held).all()
-        ):
-            return image
-    raise NotFoundError(f"image {digest} does not exist")
 
 
 def transition(

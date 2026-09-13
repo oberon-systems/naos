@@ -2,7 +2,6 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI
 from sqlmodel import Session
@@ -11,8 +10,6 @@ from naos_api.auth import require_principal
 from naos_api.clock import now_ts
 from naos_api.db import Database
 from naos_api.errors import DomainError
-from naos_api.images.service import fail_interrupted
-from naos_api.images.store import FsImageStore
 from naos_api.routes import api_router, domain_error_handler, runner_router
 from naos_api.runners import expire_leases
 from naos_api.settings import get_settings
@@ -61,10 +58,6 @@ def create_app() -> FastAPI:
     app = FastAPI(title="naos", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.state.db = Database(settings.database_url)
     app.state.db.create_schema()
-    app.state.image_store = FsImageStore(Path(settings.image_store_path).expanduser())
-    app.state.image_transport = None
-    with Session(app.state.db.engine) as session:
-        fail_interrupted(session, now_ts())
     app.add_exception_handler(DomainError, domain_error_handler)
 
     @app.get("/healthz")

@@ -4,7 +4,9 @@ use std::io::{self, Read, Write};
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
+use std::time::Duration;
 
+use reqwest::{redirect, Client};
 use sha2::{Digest, Sha256};
 
 use crate::libs::api::{is_digest, DIGEST_PREFIX};
@@ -15,16 +17,81 @@ use crate::libs::ids::{hex, random_hex};
 const CACHED_MODE: u32 = 0o444;
 const PARTIAL_MODE: u32 = 0o600;
 const HASH_BUFFER: usize = 1024 * 1024;
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const READ_TIMEOUT: Duration = Duration::from_secs(60);
+const MAX_REDIRECTS: usize = 5;
 
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 pub trait ImageSource: Send + Sync {
+    /// Streams the image at `url` into `sink` and fails once more than `limit` bytes arrive.
     fn fetch<'a>(
         &'a self,
-        digest: &'a str,
+        url: &'a str,
         sink: &'a mut (dyn Write + Send),
         limit: u64,
     ) -> BoxFuture<'a, Result<u64, AgentError>>;
+}
+
+/// Downloads from wherever the API points; the digest, not the host, is what gets trusted.
+pub struct HttpImages {
+    client: Client,
+}
+
+impl HttpImages {
+    pub fn new() -> Result<Self, AgentError> {
+        let client = Client::builder()
+            .redirect(redirect::Policy::limited(MAX_REDIRECTS))
+            .connect_timeout(CONNECT_TIMEOUT)
+            .read_timeout(READ_TIMEOUT)
+            .user_agent(concat!("naos-agent/", env!("CARGO_PKG_VERSION")))
+            .build()
+            .map_err(|err| AgentError::Transport(err.to_string()))?;
+        Ok(Self { client })
+    }
+
+    async fn download(
+        &self,
+        url: &str,
+        sink: &mut (dyn Write + Send),
+        limit: u64,
+    ) -> Result<u64, AgentError> {
+        let transport = |err: reqwest::Error| AgentError::Transport(err.without_url().to_string());
+        let too_large = || AgentError::Image(format!("image exceeds {limit} bytes"));
+        let mut response = self.client.get(url).send().await.map_err(transport)?;
+        if !response.status().is_success() {
+            return Err(AgentError::Image(format!(
+                "image source answered {}",
+                response.status()
+            )));
+        }
+        if response
+            .content_length()
+            .is_some_and(|length| length > limit)
+        {
+            return Err(too_large());
+        }
+        let mut written: u64 = 0;
+        while let Some(chunk) = response.chunk().await.map_err(transport)? {
+            written += chunk.len() as u64;
+            if written > limit {
+                return Err(too_large());
+            }
+            sink.write_all(&chunk)?;
+        }
+        Ok(written)
+    }
+}
+
+impl ImageSource for HttpImages {
+    fn fetch<'a>(
+        &'a self,
+        url: &'a str,
+        sink: &'a mut (dyn Write + Send),
+        limit: u64,
+    ) -> BoxFuture<'a, Result<u64, AgentError>> {
+        Box::pin(self.download(url, sink, limit))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -64,7 +131,12 @@ impl ImageCache {
     }
 
     /// Downloads the image unless a file already sits under its name; `open_verified` judges it.
-    pub async fn fetch(&self, source: &dyn ImageSource, digest: &str) -> Result<(), AgentError> {
+    pub async fn fetch(
+        &self,
+        source: &dyn ImageSource,
+        url: &str,
+        digest: &str,
+    ) -> Result<(), AgentError> {
         let target = self.path(digest)?;
         if fs::symlink_metadata(&target).is_ok() {
             return Ok(());
@@ -80,7 +152,7 @@ impl ImageCache {
             hasher: Sha256::new(),
         };
         let outcome = source
-            .fetch(digest, &mut writer, self.max_bytes)
+            .fetch(url, &mut writer, self.max_bytes)
             .await
             .and_then(|_| finish(writer, &partial, &target, digest));
         if outcome.is_err() {

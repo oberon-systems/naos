@@ -231,7 +231,7 @@ impl Runtime for QemuRuntime {
         }
 
         let digest = run.spec.image.digest.clone();
-        self.images.fetch(images, &digest).await?;
+        self.images.fetch(images, &run.image_url, &digest).await?;
         let cache = self.images.clone();
         let base = tokio::task::spawn_blocking(move || cache.open_verified(&digest))
             .await

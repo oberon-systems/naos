@@ -17,16 +17,16 @@ hand-over.
 
 ```text
 image-<version> tag -> GitHub release
-  -> POST /api/v1/images (API downloads, checks sha256, stores)
-  -> Run spec names image id and digest (image must be READY)
-  -> runner downloads through the API (checks sha256, caches read-only)
+  -> POST /api/v1/images (id, version, digest, url; the API keeps the entry)
+  -> Run spec names image id and digest (image must be registered)
+  -> runner downloads from the url (checks sha256, caches read-only)
   -> every VM start hashes the cached file through the descriptor QEMU opens
   -> read-only base + disposable qcow2 overlay
 ```
 
 - The build and release are described in
   [packer/README.md](../packer/README.md).
-- The API side, including the store and the settings, is in
+- The API side, the image catalog, is in
   [03 - API Design](03-api-design.md#images).
 - The runner side, the cache and the start sequence, is in
   [04 - Runner Design](04-runner-design.md#runtime).

@@ -22,9 +22,5 @@ class LeaseError(DomainError):
     """The runner lease is missing, expired, or belongs to another runner."""
 
 
-class ImageError(DomainError):
-    """The image cannot be imported, verified or referenced."""
-
-
 class ImageConflictError(DomainError):
     """The image id or digest is already registered with other values."""

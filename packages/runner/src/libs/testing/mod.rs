@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
@@ -40,6 +40,7 @@ pub fn desired_run(id: &str, status: RunStatus) -> DesiredRun {
         id: id.into(),
         status,
         spec: spec(),
+        image_url: "https://images.example.com/naos-agents-1.0.0.qcow2".into(),
         policies: BTreeMap::new(),
     }
 }
@@ -76,7 +77,6 @@ pub struct FakeApi {
     transitions: Mutex<Vec<(String, RunStatus, RunStatus)>>,
     capacities: Mutex<Vec<u32>>,
     desired: Mutex<Option<DesiredState>>,
-    images: Mutex<HashMap<String, Vec<u8>>>,
     rotated_token: Mutex<Option<String>>,
     reject_heartbeats: AtomicUsize,
     pub registrations: AtomicUsize,
@@ -96,10 +96,6 @@ impl FakeApi {
 
     pub fn serve(&self, state: DesiredState) {
         *lock(&self.desired) = Some(state);
-    }
-
-    pub fn serve_image(&self, digest: &str, bytes: &[u8]) {
-        lock(&self.images).insert(digest.into(), bytes.to_vec());
     }
 
     pub fn rotate_to(&self, token: &str) {
@@ -168,27 +164,6 @@ impl Api for FakeApi {
         }
         lock(&self.transitions).push((run_id.into(), transition.expected, transition.target));
         Ok(())
-    }
-
-    async fn download_image(
-        &self,
-        _: &Credentials,
-        digest: &str,
-        sink: &mut (dyn Write + Send),
-        limit: u64,
-    ) -> Result<u64, AgentError> {
-        let bytes = lock(&self.images)
-            .get(digest)
-            .cloned()
-            .ok_or_else(|| AgentError::Api {
-                status: 404,
-                detail: "no such image".into(),
-            })?;
-        if bytes.len() as u64 > limit {
-            return Err(AgentError::Image("image exceeds the limit".into()));
-        }
-        sink.write_all(&bytes)?;
-        Ok(bytes.len() as u64)
     }
 }
 

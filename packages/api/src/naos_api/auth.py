@@ -1,5 +1,5 @@
 import hmac
-from typing import Annotated, NoReturn
+from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -23,8 +23,23 @@ def _unauthorized(detail: str) -> HTTPException:
     )
 
 
-def require_principal() -> NoReturn:
-    raise _unauthorized("authentication is not configured")
+def _matches(credentials: HTTPAuthorizationCredentials | None, expected: str | None) -> bool:
+    return (
+        credentials is not None
+        and expected is not None
+        and hmac.compare_digest(hash_token(credentials.credentials), expected)
+    )
+
+
+def _operator_hash() -> str | None:
+    return get_settings().operator_token_sha256
+
+
+def require_principal(
+    credentials: BearerDep, expected: Annotated[str | None, Depends(_operator_hash)]
+) -> None:
+    if not _matches(credentials, expected):
+        raise _unauthorized("operator is not authorized")
 
 
 def _enrollment_hash() -> str | None:
@@ -34,11 +49,7 @@ def _enrollment_hash() -> str | None:
 def require_enrollment(
     credentials: BearerDep, expected: Annotated[str | None, Depends(_enrollment_hash)]
 ) -> None:
-    if (
-        credentials is None
-        or expected is None
-        or not hmac.compare_digest(hash_token(credentials.credentials), expected)
-    ):
+    if not _matches(credentials, expected):
         raise _unauthorized("runner enrollment is not authorized")
 
 

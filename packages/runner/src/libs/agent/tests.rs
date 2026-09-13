@@ -7,7 +7,7 @@ use tempfile::TempDir;
 use super::*;
 use crate::libs::api::RunStatus;
 use crate::libs::config::{parse_api_url, RuntimeConfig};
-use crate::libs::testing::{desired, desired_run, vm, FakeApi, FakeRuntime};
+use crate::libs::testing::{desired, desired_run, vm, FakeApi, FakeRuntime, FakeSource};
 
 fn setup(runtime: FakeRuntime) -> (TempDir, Agent<FakeApi, FakeRuntime>) {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -28,7 +28,8 @@ fn setup(runtime: FakeRuntime) -> (TempDir, Agent<FakeApi, FakeRuntime>) {
             image_max_bytes: 1024,
         },
     };
-    let agent = Agent::new(&config, FakeApi::default(), runtime);
+    let images = Box::new(FakeSource::new(b"qcow2-alpha"));
+    let agent = Agent::new(&config, FakeApi::default(), runtime, images);
     (dir, agent)
 }
 
