@@ -111,6 +111,28 @@ async fn unavailable_runtime_offers_no_capacity() {
 }
 
 #[tokio::test]
+async fn slow_start_keeps_the_lease_alive() {
+    let runtime = FakeRuntime::default();
+    runtime.delay_ensure(Duration::from_millis(2500));
+    let (_dir, mut agent) = setup(runtime);
+    agent.api.grant_lease_ttl(3);
+    agent
+        .api
+        .serve(desired(vec![desired_run("run_a", RunStatus::Pending)]));
+
+    assert_eq!(agent.cycle().await.expect("cycle"), 0);
+
+    assert!(agent.api.capacities().len() >= 2);
+    assert_eq!(
+        agent.api.transitions(),
+        vec![
+            ("run_a".into(), RunStatus::Pending, RunStatus::Starting),
+            ("run_a".into(), RunStatus::Starting, RunStatus::Started),
+        ]
+    );
+}
+
+#[tokio::test]
 async fn expired_lease_fences_every_vm() {
     let (_dir, mut agent) = setup(FakeRuntime::with_vms(vec![vm("run_a"), vm("run_b")]));
     agent.lease = LeaseClock::starting(Instant::now(), Duration::ZERO);
