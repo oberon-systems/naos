@@ -112,7 +112,7 @@ reuse.
 The QEMU runtime turns one desired Run into one VM. Starting a Run takes these
 steps, and any failure stops it and removes the VM directory:
 
-1. refuse the Run when any policy snapshot is set: mounts, network, shell and
+1. refuse the Run when any policy is set: mounts, network, shell and
    MCP are not enforced by this runtime yet, so they fail closed;
 2. fetch the image from the API into the cache unless a file already has its
    name: the download goes to a 0600 temporary file, is hashed while it

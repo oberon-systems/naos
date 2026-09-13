@@ -35,7 +35,7 @@ Use distinct identifiers where applicable:
 - vm_id
 - runner_id
 - lease_id
-- policy_snapshot_id
+- policy_id
 
 Expected lifecycle:
 PENDING -> STARTING -> STARTED -> STOPPING -> COLLECTING -> WAITING_MERGE -> COMPLETED

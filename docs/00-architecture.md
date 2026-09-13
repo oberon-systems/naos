@@ -6,8 +6,8 @@ Implement Naos around a Run abstraction.
 
 ## Stack
 
-- Python 3.12+, FastAPI, Pydantic, SQLModel on SQLite, PostgreSQL or MySQL;
-  SQLite by default.
+- Python 3.12+, FastAPI, Pydantic, SQLModel on any database SQLAlchemy
+  supports; plain tables, no triggers, procedures or foreign keys.
 - HTMX web UI.
 - Rust runner.
 - QEMU.
@@ -50,26 +50,26 @@ runtime:
   memory_mib: 8192
   disk_gib: 30
 mounts:
-  policy_snapshot: mntpol_...
+  policy: mntpol_...
 network:
-  policy_snapshot: netpol_...
+  policy: netpol_...
 shell:
-  policy_snapshot: shellpol_...
+  policy: shellpol_...
 mcp:
-  policy_snapshot: mcppol_...
+  policy: mcppol_...
 merge:
   policy: ask
 timeout: 7200
 ```
 
 The API assigns `run_id`; the client never sends it or a status. A missing
-policy reference grants nothing. The spec and every referenced snapshot are
-immutable from creation, enforced by database triggers. Changing the security
-boundary requires a new Run.
+policy reference grants nothing. The spec and every referenced policy are
+immutable from creation: no endpoint or service writes them after the insert.
+Changing the security boundary requires a new Run.
 
 ## Mount policy
 
-Mounts are a policy snapshot like network, shell and MCP. The client sends
+Mounts are a policy like network, shell and MCP. The client sends
 host paths; the API resolves the guest paths, so the runner never invents
 them.
 
