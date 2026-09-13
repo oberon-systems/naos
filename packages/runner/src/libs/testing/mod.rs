@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
+use std::time::Duration;
 
 use sha2::{Digest, Sha256};
 
@@ -67,12 +68,9 @@ pub fn dead_vm(run_id: &str) -> LocalVm {
     }
 }
 
-fn lease() -> LeaseGrant {
-    LeaseGrant { ttl_seconds: 60 }
-}
-
 #[derive(Default)]
 pub struct FakeApi {
+    lease_ttl: Mutex<Option<u64>>,
     conflicts: Mutex<HashSet<(String, RunStatus)>>,
     transitions: Mutex<Vec<(String, RunStatus, RunStatus)>>,
     capacities: Mutex<Vec<u32>>,
@@ -87,6 +85,16 @@ impl FakeApi {
         Credentials {
             runner_id: "rnr_alpha".into(),
             token: "token-alpha".into(),
+        }
+    }
+
+    pub fn grant_lease_ttl(&self, seconds: u64) {
+        *lock(&self.lease_ttl) = Some(seconds);
+    }
+
+    fn lease(&self) -> LeaseGrant {
+        LeaseGrant {
+            ttl_seconds: lock(&self.lease_ttl).unwrap_or(60),
         }
     }
 
@@ -123,7 +131,7 @@ impl Api for FakeApi {
             token: IssuedToken {
                 value: format!("token-{count}"),
             },
-            lease: lease(),
+            lease: self.lease(),
         })
     }
 
@@ -140,7 +148,7 @@ impl Api for FakeApi {
             return Err(AgentError::Unauthorized);
         }
         Ok(HeartbeatReply {
-            lease: lease(),
+            lease: self.lease(),
             token: lock(&self.rotated_token)
                 .take()
                 .map(|value| IssuedToken { value }),
@@ -209,6 +217,7 @@ pub struct FakeRuntime {
     stopped: Mutex<Vec<LocalVm>>,
     unavailable: AtomicBool,
     fail_ensure: AtomicBool,
+    ensure_delay: Mutex<Duration>,
 }
 
 impl FakeRuntime {
@@ -233,6 +242,10 @@ impl FakeRuntime {
     pub fn fail_ensure(&self) {
         self.fail_ensure.store(true, Ordering::SeqCst);
     }
+
+    pub fn delay_ensure(&self, delay: Duration) {
+        *lock(&self.ensure_delay) = delay;
+    }
 }
 
 impl Runtime for FakeRuntime {
@@ -244,6 +257,8 @@ impl Runtime for FakeRuntime {
     }
 
     async fn ensure(&self, run: &DesiredRun, _: &dyn ImageSource) -> Result<LocalVm, AgentError> {
+        let delay = *lock(&self.ensure_delay);
+        tokio::time::sleep(delay).await;
         if self.fail_ensure.load(Ordering::SeqCst) {
             return Err(AgentError::Runtime("boot failed".into()));
         }

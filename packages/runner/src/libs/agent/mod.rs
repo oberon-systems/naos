@@ -57,35 +57,56 @@ impl<A: Api + Sync, R: Runtime> Agent<A, R> {
 
         let actual = self.runtime.list().await;
         let capacity = if actual.is_ok() { self.capacity } else { 0 };
-        let sent_at = Instant::now();
-        let reply = match self.api.heartbeat(&credentials, capacity).await {
+        let beat = heartbeat(
+            &self.api,
+            &mut self.lease,
+            &self.store,
+            &mut self.credentials,
+            &credentials,
+            capacity,
+        )
+        .await;
+        let credentials = match beat {
             Err(AgentError::Unauthorized) => {
                 self.drop_credentials(&credentials)?;
                 return Err(AgentError::Unauthorized);
             }
             other => other?,
         };
-        self.lease
-            .renewed(sent_at, Duration::from_secs(reply.lease.ttl_seconds));
-        let credentials = match reply.token {
-            Some(token) => self.remember(Credentials {
-                runner_id: credentials.runner_id,
-                token: token.value,
-            })?,
-            None => credentials,
-        };
 
         let actual = actual?;
         let desired = self.api.desired(&credentials).await?;
-        Ok(reconcile(
+        let interval = self.interval();
+        let mut reconciling = std::pin::pin!(reconcile(
             &self.api,
             &self.runtime,
             self.images.as_ref(),
             &credentials,
             &desired,
             &actual,
-        )
-        .await)
+        ));
+        // Image downloads and VM boots outlast the lease, so it is renewed while they run.
+        let mut current = credentials.clone();
+        loop {
+            tokio::select! {
+                failures = &mut reconciling => return Ok(failures),
+                () = tokio::time::sleep(interval) => {
+                    let beat = heartbeat(
+                        &self.api,
+                        &mut self.lease,
+                        &self.store,
+                        &mut self.credentials,
+                        &current,
+                        self.capacity,
+                    )
+                    .await;
+                    match beat {
+                        Ok(renewed) => current = renewed,
+                        Err(err) => tracing::warn!(error = %err, "heartbeat during reconcile failed"),
+                    }
+                }
+            }
+        }
     }
 
     async fn credentials(&mut self) -> Result<Credentials, AgentError> {
@@ -103,16 +124,14 @@ impl<A: Api + Sync, R: Runtime> Agent<A, R> {
         self.lease
             .renewed(sent_at, Duration::from_secs(registration.lease.ttl_seconds));
         audit::registered(&registration.runner_id);
-        self.remember(Credentials {
-            runner_id: registration.runner_id,
-            token: registration.token.value,
-        })
-    }
-
-    fn remember(&mut self, credentials: Credentials) -> Result<Credentials, AgentError> {
-        self.store.save(&credentials)?;
-        self.credentials = Some(credentials.clone());
-        Ok(credentials)
+        remember(
+            &self.store,
+            &mut self.credentials,
+            Credentials {
+                runner_id: registration.runner_id,
+                token: registration.token.value,
+            },
+        )
     }
 
     fn drop_credentials(&mut self, credentials: &Credentials) -> Result<(), AgentError> {
@@ -140,6 +159,40 @@ impl<A: Api + Sync, R: Runtime> Agent<A, R> {
         }
         audit::lease_fenced(vms.len());
     }
+}
+
+async fn heartbeat<A: Api>(
+    api: &A,
+    lease: &mut LeaseClock,
+    store: &CredentialStore,
+    cached: &mut Option<Credentials>,
+    credentials: &Credentials,
+    capacity: u32,
+) -> Result<Credentials, AgentError> {
+    let sent_at = Instant::now();
+    let reply = api.heartbeat(credentials, capacity).await?;
+    lease.renewed(sent_at, Duration::from_secs(reply.lease.ttl_seconds));
+    match reply.token {
+        Some(token) => remember(
+            store,
+            cached,
+            Credentials {
+                runner_id: credentials.runner_id.clone(),
+                token: token.value,
+            },
+        ),
+        None => Ok(credentials.clone()),
+    }
+}
+
+fn remember(
+    store: &CredentialStore,
+    cached: &mut Option<Credentials>,
+    credentials: Credentials,
+) -> Result<Credentials, AgentError> {
+    store.save(&credentials)?;
+    *cached = Some(credentials.clone());
+    Ok(credentials)
 }
 
 #[cfg(test)]
