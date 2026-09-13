@@ -1,6 +1,5 @@
 import hashlib
 from collections.abc import Callable
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,6 +12,7 @@ from naos_api.settings import Settings
 
 TOKEN_TTL = 3600
 Register = Callable[..., dict[str, str]]
+Configure = Callable[..., Settings]
 
 
 def _bearer(token: str) -> dict[str, str]:
@@ -26,9 +26,11 @@ def _heartbeat(client: TestClient, runner_id: str, token: str) -> Response:
     return response
 
 
-def test_registration_is_disabled_without_enrollment_hash(tmp_path: Path) -> None:
-    settings = Settings(database_url=f"sqlite:///{tmp_path / 'off.db'}")
-    client = TestClient(create_app(settings))
+def test_registration_is_disabled_without_enrollment_hash(
+    settings: Settings, configure: Configure
+) -> None:
+    configure(runner_enrollment_token_sha256=None)
+    client = TestClient(create_app())
 
     response = client.post(
         "/api/v1/runners/register", json={"name": "alpha"}, headers=_bearer("anything")
@@ -88,7 +90,7 @@ def test_runner_token_opens_only_its_own_runner(client: TestClient, register: Re
     assert _heartbeat(client, beta["runner_id"], alpha["token"]).status_code == 403
     assert (
         client.get(
-            f"/api/v1/runners/{beta['runner_id']}/runs", headers=_bearer(alpha["token"])
+            f"/api/v1/runners/{beta['runner_id']}/tasks", headers=_bearer(alpha["token"])
         ).status_code
         == 403
     )
@@ -124,8 +126,8 @@ def test_runner_token_is_not_an_operator_principal(
 ) -> None:
     token = register()["token"]
 
-    assert raw_client.get("/api/v1/runs", headers=_bearer(token)).status_code == 401
-    assert raw_client.post("/api/v1/runs/run_x/stop", headers=_bearer(token)).status_code == 401
+    assert raw_client.get("/api/v1/tasks", headers=_bearer(token)).status_code == 401
+    assert raw_client.post("/api/v1/tasks/run_x/stop", headers=_bearer(token)).status_code == 401
 
 
 def test_expired_token_is_rejected(

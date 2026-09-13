@@ -22,14 +22,15 @@ PAYLOAD = b"naos-image-beta" * 4096
 DIGEST = "sha256:" + hashlib.sha256(PAYLOAD).hexdigest()
 OTHER_DIGEST = "sha256:" + "b" * 64
 SEEDED_DIGEST = "sha256:" + "a" * 64
-SOURCE = "https://images.example.com/releases/download/packer_1.0.0/naos-agents-1.0.0.qcow2"
+SOURCE = "https://images.example.com/releases/download/image-1.0.0/naos-agents-1.0.0.qcow2"
 BODY = {"id": "image_beta", "version": "1.0.0", "digest": DIGEST}
 KEY = {"Idempotency-Key": "key-1"}
 
 Handler = Callable[[httpx.Request], httpx.Response]
 Install = Callable[[Handler], list[httpx.Request]]
 Register = Callable[..., dict[str, str]]
-CreateRun = Callable[[str], str]
+CreateTask = Callable[[str], str]
+Configure = Callable[..., Settings]
 
 
 @pytest.fixture
@@ -200,23 +201,22 @@ def test_bad_import_body_is_unprocessable(client: TestClient, overrides: dict[st
 
 
 @pytest.mark.parametrize(
-    "url", [None, "http://images.example.com/{version}", "ftp://images.example.com/{version}"]
+    "url",
+    [
+        None,
+        "http://images.example.com/{version}",
+        "http://127.0.0.1:8000/{version}",
+        "ftp://images.example.com/{version}",
+    ],
 )
-def test_import_needs_a_safe_source(settings: Settings, url: str | None) -> None:
-    app = create_app(settings.model_copy(update={"image_source_url": url}))
+def test_import_needs_a_safe_source(
+    settings: Settings, configure: Configure, url: str | None
+) -> None:
+    configure(image_source_url=url)
+    app = create_app()
     app.dependency_overrides[require_principal] = lambda: None
 
     assert TestClient(app).post("/api/v1/images", json=BODY).status_code == 422
-
-
-def test_loopback_source_may_use_plain_http(settings: Settings) -> None:
-    local = settings.model_copy(
-        update={"image_source_url": "http://127.0.0.1:8000/{version}.qcow2"}
-    )
-
-    url, _ = images.source_url(local, "1.0.0")
-
-    assert str(url) == "http://127.0.0.1:8000/1.0.0.qcow2"
 
 
 def test_unknown_image_is_not_found(client: TestClient) -> None:
@@ -227,7 +227,7 @@ def test_restart_fails_interrupted_imports(session: Session, settings: Settings)
     session.add(Image(id="image_beta", version="1.0.0", digest=DIGEST))
     session.commit()
 
-    create_app(settings)
+    create_app()
 
     session.expire_all()
     image = session.get(Image, "image_beta")
@@ -244,7 +244,7 @@ def test_run_needs_a_ready_image(
     session.commit()
     spec_body["image"] = {"id": "image_beta", "digest": DIGEST}
 
-    assert client.post("/api/v1/runs", json=spec_body, headers=KEY).status_code == 422
+    assert client.post("/api/v1/tasks", json=spec_body, headers=KEY).status_code == 422
 
 
 @pytest.mark.parametrize(
@@ -259,14 +259,14 @@ def test_run_needs_a_registered_image(
 ) -> None:
     spec_body["image"] = image
 
-    assert client.post("/api/v1/runs", json=spec_body, headers=KEY).status_code == 422
+    assert client.post("/api/v1/tasks", json=spec_body, headers=KEY).status_code == 422
 
 
 def test_runner_downloads_only_the_image_of_its_own_run(
-    client: TestClient, register: Register, create_run: CreateRun, settings: Settings
+    client: TestClient, register: Register, create_task: CreateTask, settings: Settings
 ) -> None:
     FsImageStore(Path(settings.image_store_path)).write_atomic(SEEDED_DIGEST, [PAYLOAD])
-    create_run("key-1")
+    create_task("key-1")
     alpha, beta = register("alpha"), register("beta")
     _heartbeat(client, alpha, capacity=1)
     _heartbeat(client, beta, capacity=1)
@@ -283,22 +283,22 @@ def test_runner_downloads_only_the_image_of_its_own_run(
 
 
 def test_runner_cannot_download_after_the_run_ends(
-    client: TestClient, register: Register, create_run: CreateRun, settings: Settings
+    client: TestClient, register: Register, create_task: CreateTask, settings: Settings
 ) -> None:
     FsImageStore(Path(settings.image_store_path)).write_atomic(SEEDED_DIGEST, [PAYLOAD])
-    run_id = create_run("key-1")
+    run_id = create_task("key-1")
     runner = register()
     _heartbeat(client, runner, capacity=1)
 
-    client.post(f"/api/v1/runs/{run_id}/stop")
+    client.post(f"/api/v1/tasks/{run_id}/stop")
 
     assert client.get(_image_path(runner), headers=_bearer(runner)).status_code == 404
 
 
 def test_image_missing_from_the_store_is_not_found(
-    client: TestClient, register: Register, create_run: CreateRun
+    client: TestClient, register: Register, create_task: CreateTask
 ) -> None:
-    create_run("key-1")
+    create_task("key-1")
     runner = register()
     _heartbeat(client, runner, capacity=1)
 

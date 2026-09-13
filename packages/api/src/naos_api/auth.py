@@ -9,7 +9,7 @@ from naos_api import runners
 from naos_api.clock import NowDep
 from naos_api.db import get_session
 from naos_api.runners import RunnerPrincipal, hash_token
-from naos_api.settings import Settings, get_settings
+from naos_api.settings import get_settings
 
 _bearer = HTTPBearer(auto_error=False)
 BearerDep = Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)]
@@ -27,10 +27,13 @@ def require_principal() -> NoReturn:
     raise _unauthorized("authentication is not configured")
 
 
+def _enrollment_hash() -> str | None:
+    return get_settings().runner_enrollment_token_sha256
+
+
 def require_enrollment(
-    credentials: BearerDep, settings: Annotated[Settings, Depends(get_settings)]
+    credentials: BearerDep, expected: Annotated[str | None, Depends(_enrollment_hash)]
 ) -> None:
-    expected = settings.runner_enrollment_token_sha256
     if (
         credentials is None
         or expected is None

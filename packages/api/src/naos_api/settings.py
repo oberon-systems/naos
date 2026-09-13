@@ -1,8 +1,8 @@
 import os
+from functools import cache
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import Request
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -15,7 +15,7 @@ def _default_image_store_path() -> str:
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="NAOS_")
 
-    database_url: str = "sqlite:///./naos.db"
+    database_url: str
     allowed_mount_roots: list[str] = []
     runner_enrollment_token_sha256: Annotated[str | None, Field(pattern=r"^[0-9a-f]{64}$")] = None
     lease_ttl_seconds: Annotated[int, Field(ge=5, le=3600)] = 60
@@ -29,6 +29,6 @@ class Settings(BaseSettings):
     image_download_timeout_seconds: Annotated[int, Field(ge=1, le=3600)] = 30
 
 
-def get_settings(request: Request) -> Settings:
-    settings: Settings = request.app.state.settings
-    return settings
+@cache
+def get_settings() -> Settings:
+    return Settings()

@@ -1,12 +1,12 @@
+from collections.abc import Sequence
 from typing import Any
 from uuid import uuid4
 
 from sqlmodel import Session, select
 
 from naos_api.errors import NotFoundError, PolicyError
-from naos_api.models import PolicySnapshot
+from naos_api.models import Policy
 from naos_api.mounts import MountPolicyIn, resolve_mount_policy
-from naos_api.settings import Settings
 from naos_api.spec import PolicyKind, RunSpec, digest_of
 
 ID_PREFIX = {
@@ -17,25 +17,21 @@ ID_PREFIX = {
 }
 
 
-def _find(session: Session, kind: PolicyKind, digest: str) -> PolicySnapshot | None:
-    statement = select(PolicySnapshot).where(
-        PolicySnapshot.kind == kind, PolicySnapshot.digest == digest
-    )
+def _find(session: Session, kind: PolicyKind, digest: str) -> Policy | None:
+    statement = select(Policy).where(Policy.kind == kind, Policy.digest == digest)
     return session.exec(statement).first()
 
 
-def _store(
-    session: Session, kind: PolicyKind, document: dict[str, Any]
-) -> tuple[PolicySnapshot, bool]:
+def _store(session: Session, kind: PolicyKind, document: dict[str, Any]) -> tuple[Policy, bool]:
     digest = digest_of(document)
     existing = _find(session, kind, digest)
     if existing is not None:
         return existing, False
 
-    snapshot = PolicySnapshot(
+    policy = Policy(
         id=f"{ID_PREFIX[kind]}_{uuid4().hex}", kind=kind, digest=digest, document=document
     )
-    session.add(snapshot)
+    session.add(policy)
     try:
         session.commit()
     except Exception:
@@ -44,27 +40,27 @@ def _store(
         if existing is None:
             raise
         return existing, False
-    return snapshot, True
+    return policy, True
 
 
-def create_mount_snapshot(
-    session: Session, settings: Settings, policy: MountPolicyIn
-) -> tuple[PolicySnapshot, bool]:
-    resolved = resolve_mount_policy(policy, settings.allowed_mount_roots)
+def create_mount_policy(
+    session: Session, policy: MountPolicyIn, allowed_roots: Sequence[str]
+) -> tuple[Policy, bool]:
+    resolved = resolve_mount_policy(policy, allowed_roots)
     return _store(session, PolicyKind.MOUNT, resolved.model_dump(mode="json"))
 
 
-def get_snapshot(session: Session, snapshot_id: str) -> PolicySnapshot:
-    snapshot = session.get(PolicySnapshot, snapshot_id)
-    if snapshot is None:
-        raise NotFoundError(f"policy snapshot {snapshot_id} does not exist")
-    return snapshot
+def get_policy(session: Session, policy_id: str) -> Policy:
+    policy = session.get(Policy, policy_id)
+    if policy is None:
+        raise NotFoundError(f"policy {policy_id} does not exist")
+    return policy
 
 
 def check_refs(session: Session, spec: RunSpec) -> None:
-    for kind, snapshot_id in spec.policy_refs().items():
-        if snapshot_id is None:
+    for kind, policy_id in spec.policy_refs().items():
+        if policy_id is None:
             continue
-        snapshot = session.get(PolicySnapshot, snapshot_id)
-        if snapshot is None or snapshot.kind != kind:
-            raise PolicyError(f"{kind} policy snapshot {snapshot_id} does not exist")
+        policy = session.get(Policy, policy_id)
+        if policy is None or policy.kind != kind:
+            raise PolicyError(f"{kind} policy {policy_id} does not exist")

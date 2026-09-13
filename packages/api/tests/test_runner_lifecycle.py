@@ -6,17 +6,17 @@ from fastapi.testclient import TestClient
 from httpx import Response
 from sqlmodel import Session
 
-from naos_api import runners, runs
+from naos_api import runners, tasks
 from naos_api.app import create_app, sweep_leases
 from naos_api.db import Database
-from naos_api.lifecycle import RunStatus
-from naos_api.models import Run
+from naos_api.lifecycle import TaskStatus
+from naos_api.models import Task
 from naos_api.settings import Settings
 
-S = RunStatus
+S = TaskStatus
 LEASE_TTL = 60
 Register = Callable[..., dict[str, str]]
-CreateRun = Callable[[str], str]
+CreateTask = Callable[[str], str]
 Advance = Callable[[float], None]
 
 
@@ -38,21 +38,21 @@ def _heartbeat(client: TestClient, runner: dict[str, str], capacity: int = 0) ->
 
 def _desired(client: TestClient, runner: dict[str, str]) -> Response:
     response: Response = client.get(
-        f"/api/v1/runners/{runner['runner_id']}/runs", headers=_bearer(runner)
+        f"/api/v1/runners/{runner['runner_id']}/tasks", headers=_bearer(runner)
     )
     return response
 
 
 def _desired_ids(client: TestClient, runner: dict[str, str]) -> list[str]:
-    return [run["id"] for run in _desired(client, runner).json()["runs"]]
+    return [run["id"] for run in _desired(client, runner).json()["tasks"]]
 
 
 def _move(
     client: TestClient,
     runner: dict[str, str],
     run_id: str,
-    expected: RunStatus,
-    target: RunStatus,
+    expected: TaskStatus,
+    target: TaskStatus,
     *,
     lease_id: str | None = None,
     reason: str | None = None,
@@ -65,7 +65,7 @@ def _move(
     if reason is not None:
         body["reason"] = reason
     response: Response = client.post(
-        f"/api/v1/runners/{runner['runner_id']}/runs/{run_id}/transition",
+        f"/api/v1/runners/{runner['runner_id']}/tasks/{run_id}/transition",
         json=body,
         headers=_bearer(runner),
     )
@@ -73,16 +73,16 @@ def _move(
 
 
 def _walk(
-    client: TestClient, runner: dict[str, str], run_id: str, path: Sequence[RunStatus]
+    client: TestClient, runner: dict[str, str], run_id: str, path: Sequence[TaskStatus]
 ) -> None:
     for expected, target in zip(path, path[1:], strict=False):
         response = _move(client, runner, run_id, expected, target)
         assert response.status_code == 200, response.text
 
 
-def _run(session: Session, run_id: str) -> Run:
+def _run(session: Session, run_id: str) -> Task:
     session.expire_all()
-    run = session.get(Run, run_id)
+    run = session.get(Task, run_id)
     assert run is not None
     return run
 
@@ -106,12 +106,12 @@ def test_heartbeat_extends_the_live_lease(
 def test_expired_lease_fails_active_runs_and_releases_pending(
     client: TestClient,
     register: Register,
-    create_run: CreateRun,
+    create_task: CreateTask,
     session: Session,
     clock: Callable[[], int],
     advance: Advance,
 ) -> None:
-    started, pending = create_run("key-1"), create_run("key-2")
+    started, pending = create_task("key-1"), create_task("key-2")
     runner = register()
     _heartbeat(client, runner, capacity=2)
     _walk(client, runner, started, [S.PENDING, S.STARTING, S.STARTED])
@@ -124,13 +124,13 @@ def test_expired_lease_fails_active_runs_and_releases_pending(
     assert _run(session, started).status_reason == runners.LEASE_EXPIRED_REASON
     assert _run(session, pending).status is S.PENDING
     assert _run(session, pending).lease_id is None
-    assert client.get(f"/api/v1/runs/{started}").json()["status"] == "FAILED"
+    assert client.get(f"/api/v1/tasks/{started}").json()["status"] == "FAILED"
 
 
 def test_lease_expiry_is_detected_on_the_next_runner_call(
-    client: TestClient, register: Register, create_run: CreateRun, advance: Advance
+    client: TestClient, register: Register, create_task: CreateTask, advance: Advance
 ) -> None:
-    run_id = create_run("key-1")
+    run_id = create_task("key-1")
     runner = register()
     _heartbeat(client, runner, capacity=1)
     _walk(client, runner, run_id, [S.PENDING, S.STARTING])
@@ -138,13 +138,13 @@ def test_lease_expiry_is_detected_on_the_next_runner_call(
     advance(LEASE_TTL)
 
     assert _desired(client, runner).status_code == 409
-    assert client.get(f"/api/v1/runs/{run_id}").json()["status"] == "FAILED"
+    assert client.get(f"/api/v1/tasks/{run_id}").json()["status"] == "FAILED"
 
 
 def test_new_lease_after_expiry_fences_the_old_one(
-    client: TestClient, register: Register, create_run: CreateRun, advance: Advance
+    client: TestClient, register: Register, create_task: CreateTask, advance: Advance
 ) -> None:
-    run_id = create_run("key-1")
+    run_id = create_task("key-1")
     runner = register()
     _heartbeat(client, runner, capacity=1)
     old_lease = runner["lease_id"]
@@ -162,16 +162,16 @@ def test_new_lease_after_expiry_fences_the_old_one(
 def test_expiry_leaves_waiting_merge_runs_alone(
     client: TestClient,
     register: Register,
-    create_run: CreateRun,
+    create_task: CreateTask,
     session: Session,
     clock: Callable[[], int],
     advance: Advance,
 ) -> None:
-    run_id = create_run("key-1")
+    run_id = create_task("key-1")
     runner = register()
     _heartbeat(client, runner, capacity=1)
     _walk(client, runner, run_id, [S.PENDING, S.STARTING, S.STARTED, S.STOPPING, S.COLLECTING])
-    runs.transition_run(session, run_id, S.COLLECTING, S.WAITING_MERGE)
+    tasks.transition_task(session, run_id, S.COLLECTING, S.WAITING_MERGE)
 
     advance(LEASE_TTL)
     runners.expire_leases(session, clock())
@@ -180,7 +180,7 @@ def test_expiry_leaves_waiting_merge_runs_alone(
 
 
 def test_lifespan_sweep_starts_and_stops(settings: Settings) -> None:
-    with TestClient(create_app(settings)) as client:
+    with TestClient(create_app()) as client:
         assert client.get("/healthz").status_code == 200
 
 
@@ -193,9 +193,9 @@ def test_sweep_leases_expires_past_leases(register: Register, db: Database) -> N
 
 
 def test_capacity_bounds_assignment(
-    client: TestClient, register: Register, create_run: CreateRun
+    client: TestClient, register: Register, create_task: CreateTask
 ) -> None:
-    run_ids = [create_run(f"key-{i}") for i in range(3)]
+    run_ids = [create_task(f"key-{i}") for i in range(3)]
     runner = register()
 
     _heartbeat(client, runner, capacity=2)
@@ -207,9 +207,9 @@ def test_capacity_bounds_assignment(
 
 
 def test_zero_capacity_assigns_nothing(
-    client: TestClient, register: Register, create_run: CreateRun
+    client: TestClient, register: Register, create_task: CreateTask
 ) -> None:
-    create_run("key-1")
+    create_task("key-1")
     runner = register()
     _heartbeat(client, runner, capacity=0)
 
@@ -232,9 +232,9 @@ def test_heartbeat_rejects_bad_capacity(
 
 
 def test_run_is_assigned_to_one_runner_only(
-    client: TestClient, register: Register, create_run: CreateRun
+    client: TestClient, register: Register, create_task: CreateTask
 ) -> None:
-    run_ids = [create_run("key-1"), create_run("key-2")]
+    run_ids = [create_task("key-1"), create_task("key-2")]
     alpha, beta = register("alpha"), register("beta")
 
     _heartbeat(client, alpha, capacity=5)
@@ -247,11 +247,11 @@ def test_run_is_assigned_to_one_runner_only(
 def test_stale_candidate_is_not_reassigned(
     client: TestClient,
     register: Register,
-    create_run: CreateRun,
+    create_task: CreateTask,
     session: Session,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    run_id = create_run("key-1")
+    run_id = create_task("key-1")
     alpha, beta = register("alpha"), register("beta")
     _heartbeat(client, alpha, capacity=1)
     monkeypatch.setattr(runners, "_candidates", lambda s, limit: [run_id])
@@ -263,10 +263,10 @@ def test_stale_candidate_is_not_reassigned(
 
 
 def test_terminal_runs_are_not_assigned(
-    client: TestClient, register: Register, create_run: CreateRun
+    client: TestClient, register: Register, create_task: CreateTask
 ) -> None:
-    run_id = create_run("key-1")
-    client.post(f"/api/v1/runs/{run_id}/stop")
+    run_id = create_task("key-1")
+    client.post(f"/api/v1/tasks/{run_id}/stop")
     runner = register()
 
     _heartbeat(client, runner, capacity=1)
@@ -280,48 +280,46 @@ def test_desired_state_resolves_policy_documents(
     spec_body: dict[str, Any],
     mount_body: dict[str, Any],
 ) -> None:
-    snapshot = client.post(
-        "/api/v1/policy-snapshots", json={"kind": "mount", "document": mount_body}
-    ).json()
-    spec_body["mounts"] = {"policy_snapshot": snapshot["id"]}
-    client.post("/api/v1/runs", json=spec_body, headers={"Idempotency-Key": "key-1"})
+    policy = client.post("/api/v1/policies", json={"kind": "mount", "document": mount_body}).json()
+    spec_body["mounts"] = {"policy": policy["id"]}
+    client.post("/api/v1/tasks", json=spec_body, headers={"Idempotency-Key": "key-1"})
     runner = register()
     _heartbeat(client, runner, capacity=1)
 
     desired = _desired(client, runner).json()
 
     assert desired["lease_id"] == runner["lease_id"]
-    [run] = desired["runs"]
+    [run] = desired["tasks"]
     assert run["status"] == "PENDING"
-    assert run["spec"]["mounts"]["policy_snapshot"] == snapshot["id"]
-    assert run["policies"]["mount"] == snapshot["document"]
+    assert run["spec"]["mounts"]["policy"] == policy["id"]
+    assert run["policies"]["mount"] == policy["document"]
     assert run["policies"]["network"] is None
 
 
 def test_operator_stop_reaches_the_runner(
-    client: TestClient, register: Register, create_run: CreateRun
+    client: TestClient, register: Register, create_task: CreateTask
 ) -> None:
-    run_id = create_run("key-1")
+    run_id = create_task("key-1")
     runner = register()
     _heartbeat(client, runner, capacity=1)
     _walk(client, runner, run_id, [S.PENDING, S.STARTING, S.STARTED])
 
-    client.post(f"/api/v1/runs/{run_id}/stop")
+    client.post(f"/api/v1/tasks/{run_id}/stop")
 
-    assert _desired(client, runner).json()["runs"][0]["status"] == "STOPPING"
+    assert _desired(client, runner).json()["tasks"][0]["status"] == "STOPPING"
     assert _move(client, runner, run_id, S.STOPPING, S.COLLECTING).status_code == 200
 
 
 def test_runner_drives_the_allowed_path(
-    client: TestClient, register: Register, create_run: CreateRun
+    client: TestClient, register: Register, create_task: CreateTask
 ) -> None:
-    run_id = create_run("key-1")
+    run_id = create_task("key-1")
     runner = register()
     _heartbeat(client, runner, capacity=1)
 
     _walk(client, runner, run_id, [S.PENDING, S.STARTING, S.STARTED, S.STOPPING, S.COLLECTING])
 
-    assert client.get(f"/api/v1/runs/{run_id}").json()["status"] == "COLLECTING"
+    assert client.get(f"/api/v1/tasks/{run_id}").json()["status"] == "COLLECTING"
 
 
 @pytest.mark.parametrize(
@@ -337,24 +335,24 @@ def test_runner_drives_the_allowed_path(
 def test_runner_cannot_make_forbidden_transitions(
     client: TestClient,
     register: Register,
-    create_run: CreateRun,
-    expected: RunStatus,
-    target: RunStatus,
+    create_task: CreateTask,
+    expected: TaskStatus,
+    target: TaskStatus,
 ) -> None:
-    run_id = create_run("key-1")
+    run_id = create_task("key-1")
     runner = register()
     _heartbeat(client, runner, capacity=1)
 
     response = _move(client, runner, run_id, expected, target, reason="boom")
 
     assert response.status_code == 409
-    assert client.get(f"/api/v1/runs/{run_id}").json()["status"] == "PENDING"
+    assert client.get(f"/api/v1/tasks/{run_id}").json()["status"] == "PENDING"
 
 
 def test_duplicate_claim_is_a_noop(
-    client: TestClient, register: Register, create_run: CreateRun
+    client: TestClient, register: Register, create_task: CreateTask
 ) -> None:
-    run_id = create_run("key-1")
+    run_id = create_task("key-1")
     runner = register()
     _heartbeat(client, runner, capacity=1)
 
@@ -366,9 +364,9 @@ def test_duplicate_claim_is_a_noop(
 
 
 def test_stale_expected_status_conflicts(
-    client: TestClient, register: Register, create_run: CreateRun
+    client: TestClient, register: Register, create_task: CreateTask
 ) -> None:
-    run_id = create_run("key-1")
+    run_id = create_task("key-1")
     runner = register()
     _heartbeat(client, runner, capacity=1)
     _walk(client, runner, run_id, [S.PENDING, S.STARTING, S.STARTED])
@@ -376,13 +374,13 @@ def test_stale_expected_status_conflicts(
     response = _move(client, runner, run_id, S.STARTING, S.FAILED, reason="vm lost")
 
     assert response.status_code == 409
-    assert client.get(f"/api/v1/runs/{run_id}").json()["status"] == "STARTED"
+    assert client.get(f"/api/v1/tasks/{run_id}").json()["status"] == "STARTED"
 
 
 def test_failure_requires_and_records_a_reason(
-    client: TestClient, register: Register, create_run: CreateRun
+    client: TestClient, register: Register, create_task: CreateTask
 ) -> None:
-    run_id = create_run("key-1")
+    run_id = create_task("key-1")
     runner = register()
     _heartbeat(client, runner, capacity=1)
     _walk(client, runner, run_id, [S.PENDING, S.STARTING])
@@ -395,9 +393,9 @@ def test_failure_requires_and_records_a_reason(
 
 
 def test_foreign_and_unassigned_runs_are_not_found(
-    client: TestClient, register: Register, create_run: CreateRun
+    client: TestClient, register: Register, create_task: CreateTask
 ) -> None:
-    owned, unassigned = create_run("key-1"), create_run("key-2")
+    owned, unassigned = create_task("key-1"), create_task("key-2")
     alpha, beta = register("alpha"), register("beta")
     _heartbeat(client, alpha, capacity=1)
     _heartbeat(client, beta, capacity=0)
@@ -409,4 +407,4 @@ def test_foreign_and_unassigned_runs_are_not_found(
         _move(client, beta, owned, S.PENDING, S.STARTING, lease_id=alpha["lease_id"]).status_code
         == 404
     )
-    assert client.get(f"/api/v1/runs/{owned}").json()["status"] == "PENDING"
+    assert client.get(f"/api/v1/tasks/{owned}").json()["status"] == "PENDING"

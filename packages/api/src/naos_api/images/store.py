@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import BinaryIO, Protocol
 
 from naos_api.errors import ImageError, NotFoundError
-from naos_api.settings import Settings
 
 _DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 
@@ -78,7 +77,3 @@ class FsImageStore:
     def delete(self, digest: str) -> None:
         with suppress(FileNotFoundError):
             self._path(digest).unlink()
-
-
-def make_store(settings: Settings) -> ImageStore:
-    return FsImageStore(Path(settings.image_store_path).expanduser())

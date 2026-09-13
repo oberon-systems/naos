@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from naos_api.images import service as images
 from naos_api.lifecycle import ImageStatus
 from naos_api.models import Image
-from naos_api.routes.deps import SessionDep, SettingsDep
+from naos_api.routes.deps import ImageSourceDep, SessionDep
 from naos_api.spec import Digest, ImageId, StrictModel
 
 Version = Annotated[str, Field(pattern=r"^[0-9A-Za-z][0-9A-Za-z._+-]{0,63}$")]
@@ -49,17 +49,17 @@ router = APIRouter()
 def create_image(
     body: ImageCreate,
     session: SessionDep,
-    settings: SettingsDep,
+    source: ImageSourceDep,
     request: Request,
     response: Response,
     background: BackgroundTasks,
 ) -> ImageRead:
-    result = images.request_import(session, settings, body.id, body.version, body.digest)
+    result = images.request_import(session, source, body.id, body.version, body.digest)
     if result.scheduled:
         background.add_task(
             images.run_import,
             request.app.state.db,
-            settings,
+            source,
             request.app.state.image_store,
             result.image.id,
             request.app.state.image_transport,

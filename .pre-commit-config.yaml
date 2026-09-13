@@ -54,6 +54,7 @@ repos:
           - pydantic-settings==2.15.0
           - pytest==9.1.1
           - sqlmodel==0.0.42
+          - transitions==0.9.3
 
   - repo: https://github.com/djlint/djLint
     rev: v1.46.1
