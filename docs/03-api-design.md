@@ -6,24 +6,27 @@ Implement the control-plane API as a thin HTTP layer over application/domain ser
 
 ## Stack
 
-Python 3.12+, FastAPI, Pydantic, SQLModel. `NAOS_DATABASE_URL` selects SQLite,
-PostgreSQL or MySQL; SQLite is the default. Any other dialect is refused when
-the schema is created, because its immutability triggers do not exist.
+Python 3.12+, FastAPI, Pydantic, SQLModel. `NAOS_DATABASE_URL` names any
+database SQLAlchemy supports. The schema is plain tables with no triggers,
+stored procedures or foreign keys, so the same SQL runs everywhere. The task
+lifecycle is a [transitions](https://github.com/pytransitions/transitions)
+state machine.
 
 ## Time and ordering
 
 - Every timestamp, in the database and on the wire, is an integer count of
   seconds since the Unix epoch, UTC.
-- Runs carry a unique, increasing `seq`. Runners receive PENDING Runs in `seq`
-  order, and `GET /runs` lists them newest first.
+- Tasks carry a unique, increasing `seq`. Runners receive PENDING tasks in
+  `seq` order, and `GET /tasks` lists them newest first.
 
 ## Settings
 
-The API reads its settings from `NAOS_*` environment variables. List values are JSON.
+The API reads its settings from `NAOS_*` environment variables once per
+process. List values are JSON. Every route depends only on the values it uses.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `NAOS_DATABASE_URL` | `sqlite:///./naos.db` | Database URL: SQLite, PostgreSQL or MySQL |
+| `NAOS_DATABASE_URL` | required | Database URL, for example `postgresql+psycopg://naos@db.example.com/naos` |
 | `NAOS_ALLOWED_MOUNT_ROOTS` | `[]` | Host directories a mount policy may name |
 | `NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256` | unset | SHA-256 of the enrollment token; unset closes registration |
 | `NAOS_RUNNER_TOKEN_TTL_SECONDS` | `86400` | Runner token lifetime, 60 to 604800 |
@@ -43,19 +46,19 @@ Own Agents, Images, Profiles, Policies, Runs, Runners, Leases, audit records, an
 ## Suggested endpoints
 
 ```text
-POST /api/v1/runs
-GET /api/v1/runs
-GET /api/v1/runs/{run_id}
-POST /api/v1/runs/{run_id}/stop
+POST /api/v1/tasks
+GET /api/v1/tasks
+GET /api/v1/tasks/{task_id}
+POST /api/v1/tasks/{task_id}/stop
 POST /api/v1/runners/register
 POST /api/v1/runners/{runner_id}/heartbeat
-GET /api/v1/runners/{runner_id}/runs
-GET /api/v1/runs/{run_id}/console
-GET /api/v1/runs/{run_id}/events
-GET /api/v1/runs/{run_id}/diff
-POST /api/v1/runs/{run_id}/merge
-POST /api/v1/policy-snapshots
-GET /api/v1/policy-snapshots/{snapshot_id}
+GET /api/v1/runners/{runner_id}/tasks
+GET /api/v1/tasks/{task_id}/console
+GET /api/v1/tasks/{task_id}/events
+GET /api/v1/tasks/{task_id}/diff
+POST /api/v1/tasks/{task_id}/merge
+POST /api/v1/policies
+GET /api/v1/policies/{policy_id}
 POST /api/v1/images
 GET /api/v1/images
 GET /api/v1/images/{image_id}
@@ -67,12 +70,12 @@ Use transactions for atomic transitions and design mutations to be idempotent.
 
 ## Idempotency
 
-- `POST /runs` requires an `Idempotency-Key` header. The same key with the same
+- `POST /tasks` requires an `Idempotency-Key` header. The same key with the same
   spec returns the existing Run with 200; with another spec it returns 409.
-- `POST /runs/{run_id}/stop` returns the current Run when there is nothing to
+- `POST /tasks/{task_id}/stop` returns the current Run when there is nothing to
   stop.
-- `POST /policy-snapshots` deduplicates by content: the same document returns
-  the existing snapshot with 200.
+- `POST /policies` deduplicates by content: the same document returns
+  the existing policy with 200.
 - Transitions are compare-and-swap on the expected status. A repeated
   transition that already happened is a no-op.
 - `POST /images` with the same `id`, `version` and `digest` returns the
@@ -89,9 +92,9 @@ anywhere else. The images are built as described in
   `id`, `version` and `digest`. The API answers 202 with status IMPORTING and
   downloads the file in the background.
 - The download URL comes only from `NAOS_IMAGE_SOURCE_URL` with `{version}`
-  filled in; a request cannot name a URL. The URL must use https, or http to
-  loopback, and at most five redirects are followed, each only to the source
-  host or a host in `NAOS_IMAGE_SOURCE_ALLOWED_HOSTS`.
+  filled in; a request cannot name a URL. The URL and every redirect must use
+  https, and at most five redirects are followed, each only to the source host
+  or a host in `NAOS_IMAGE_SOURCE_ALLOWED_HOSTS`.
 - The body is hashed while it streams into a temporary file inside the store.
   A digest mismatch, a body over `NAOS_IMAGE_MAX_BYTES`, a non-200 answer or a
   refused redirect makes the image FAILED with a reason and leaves nothing in
@@ -99,9 +102,9 @@ anywhere else. The images are built as described in
   and the image becomes READY.
 - An import cut off by an API restart is marked FAILED when the API starts
   again, so it can be retried.
-- `id`, `version` and `digest` are immutable and image rows cannot be deleted;
-  database triggers enforce both, like the Run spec.
-- `POST /runs` requires the named image to be READY with the same `id` and
+- `id`, `version` and `digest` are immutable and image rows are never deleted:
+  no endpoint or service writes them, like the Run spec.
+- `POST /tasks` requires the named image to be READY with the same `id` and
   `digest`, otherwise it returns 422.
 - The store is an interface. `fs`, one directory with mode 0700, is the only
   backend; object storage can be added behind the same interface.
@@ -112,11 +115,11 @@ Runners use the same API under `/api/v1/runners`. A runner token is not an
 operator principal and opens nothing outside its own runner.
 
 ```text
-POST /api/v1/runners/register                              enrollment token
-POST /api/v1/runners/{runner_id}/heartbeat                 runner token
-GET  /api/v1/runners/{runner_id}/runs                      runner token
-POST /api/v1/runners/{runner_id}/runs/{run_id}/transition  runner token
-GET  /api/v1/runners/{runner_id}/images/{digest}           runner token
+POST /api/v1/runners/register                                enrollment token
+POST /api/v1/runners/{runner_id}/heartbeat                   runner token
+GET  /api/v1/runners/{runner_id}/tasks                       runner token
+POST /api/v1/runners/{runner_id}/tasks/{task_id}/transition  runner token
+GET  /api/v1/runners/{runner_id}/images/{digest}             runner token
 ```
 
 ### Runner credentials
@@ -143,8 +146,8 @@ GET  /api/v1/runners/{runner_id}/images/{digest}           runner token
 - A heartbeat assigns unassigned PENDING Runs up to the capacity the runner
   reports. Each assignment is compare-and-swap, so a Run never lands on two
   leases.
-- `GET .../runs` returns the desired state: every non-terminal Run on the
-  live lease, with its spec and the resolved policy snapshot documents.
+- `GET .../tasks` returns the desired state: every non-terminal Run on the
+  live lease, with its spec and the resolved policy documents.
 
 ### Runner transitions
 

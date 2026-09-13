@@ -16,7 +16,7 @@ An image reaches a VM through three owners, and its digest is checked at each
 hand-over.
 
 ```text
-packer_<version> tag -> GitHub release
+image-<version> tag -> GitHub release
   -> POST /api/v1/images (API downloads, checks sha256, stores)
   -> Run spec names image id and digest (image must be READY)
   -> runner downloads through the API (checks sha256, caches read-only)
