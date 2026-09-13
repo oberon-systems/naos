@@ -51,10 +51,10 @@ Boot a throwaway copy the way the runner does: no network, the console on this t
 make -C packer run
 ```
 
-Run the runner's boot test against the image:
+Run the runner's boot test against every built image of the version in `packer/.cz.yaml`:
 
 ```bash
-make test-qemu IMAGE=build/agents/naos-agents-0.1.0.qcow2
+make test-image
 ```
 
 The test passes when both VMs boot, `boot.log` shows `naos-ready` and `naos-probe ok`, a VM killed from outside is reported as not running, and the cached base image still matches its digest after the guests wrote to their disks.
