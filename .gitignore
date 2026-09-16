@@ -28,3 +28,4 @@ build/
 
 # ide
 .idea
+.codex/

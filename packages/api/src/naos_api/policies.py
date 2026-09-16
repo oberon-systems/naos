@@ -7,6 +7,7 @@ from sqlmodel import Session, select
 from naos_api.errors import NotFoundError, PolicyError
 from naos_api.models import Policy
 from naos_api.mounts import MountPolicyIn, resolve_mount_policy
+from naos_api.network import NetworkPolicyIn, resolve_network_policy
 from naos_api.spec import PolicyKind, RunSpec, digest_of
 
 ID_PREFIX = {
@@ -48,6 +49,11 @@ def create_mount_policy(
 ) -> tuple[Policy, bool]:
     resolved = resolve_mount_policy(policy, allowed_roots)
     return _store(session, PolicyKind.MOUNT, resolved.model_dump(mode="json"))
+
+
+def create_network_policy(session: Session, policy: NetworkPolicyIn) -> tuple[Policy, bool]:
+    resolved = resolve_network_policy(policy)
+    return _store(session, PolicyKind.NETWORK, resolved.model_dump(mode="json"))
 
 
 def get_policy(session: Session, policy_id: str) -> Policy:

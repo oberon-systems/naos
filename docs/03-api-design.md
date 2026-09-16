@@ -84,6 +84,24 @@ Use transactions for atomic transitions and design mutations to be idempotent.
   existing image with 200. The same `id` or `digest` with other values
   returns 409.
 
+## Policies
+
+One endpoint creates every kind of policy. `kind` discriminates the body, and
+`document` is validated against that kind:
+
+```bash
+curl -fsS "$api/api/v1/policies" -d '{"kind": "network", "document": {"allow": [{"protocol": "https", "host": "example.com"}]}}'
+```
+
+The API resolves the document into its canonical form before storing it, so
+equivalent documents share one digest and therefore one id. Ids carry the kind:
+`mntpol_`, `netpol_`, `shellpol_`, `mcppol_`.
+
+A Run names a policy per kind under `spec.mounts`, `spec.network`, `spec.shell`
+and `spec.mcp`, and the reference is immutable once the Run starts. The runner
+receives the resolved document as a snapshot rather than the id. The network
+document is described in [06](06-network-gate.md).
+
 ## Images
 
 The API keeps the catalog of images a Run may boot: what to boot and where to

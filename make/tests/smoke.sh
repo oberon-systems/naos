@@ -85,9 +85,14 @@ echo "registering the image and creating a task..."
 curl -fsS "${auth[@]}" "$api/api/v1/images" -o /dev/null -d @- <<EOF
 {"id": "naos-agents", "version": "$version", "digest": "$digest", "url": "$release/$image"}
 EOF
+network_policy="$(
+    curl -fsS "${auth[@]}" "$api/api/v1/policies" -d @- <<EOF | field id
+{"kind": "network", "document": {"allow": [{"protocol": "https", "host": "example.com"}]}}
+EOF
+)"
 task="$(
     curl -fsS "${auth[@]}" -H "Idempotency-Key: smoke" "$api/api/v1/tasks" -d @- <<EOF | field id
-{"image": {"id": "naos-agents", "digest": "$digest"}, "runtime": {"cpu": 2, "memory_mib": 2048, "disk_gib": 8}, "timeout": 3600}
+{"image": {"id": "naos-agents", "digest": "$digest"}, "runtime": {"cpu": 2, "memory_mib": 2048, "disk_gib": 8}, "network": {"policy": "$network_policy"}, "timeout": 3600}
 EOF
 )"
 
@@ -102,6 +107,10 @@ NAOS_AGENT_API_URL="$api" \
 agent=$!
 
 wait_for 900 booted
+grep -qs 'event":"network_policy_configured"' "$TEMP_DIR/agent.log" || {
+    echo "network policy was not configured" >&2
+    exit 1
+}
 echo "task $task booted, stopping it..."
 curl -fsS "${auth[@]}" -X POST "$api/api/v1/tasks/$task/stop" -o /dev/null
 wait_for 120 collected

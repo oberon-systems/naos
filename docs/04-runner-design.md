@@ -14,6 +14,7 @@ run-manager
 qemu-manager
 overlay-manager
 mount-manager
+network-gate
 gate-manager
 console-server
 diff-manager
@@ -112,8 +113,9 @@ reuse.
 The QEMU runtime turns one desired Run into one VM. Starting a Run takes these
 steps, and any failure stops it and removes the VM directory:
 
-1. refuse the Run when any policy is set: mounts, network, shell and
-   MCP are not enforced by this runtime yet, so they fail closed;
+1. build the network gate from the policy snapshot and register it against the
+   Run, then refuse the Run when a mount, shell or MCP policy is set: those are
+   not enforced by this runtime yet, so they fail closed;
 2. download the image from the `image_url` the API returned into the cache
    unless a file already has its name: the agent follows at most five
    redirects and never sends its runner token there, the download goes to a
@@ -145,9 +147,13 @@ $NAOS_AGENT_VM_DIR/vm_<32 hex>/
   qemu.log       QEMU stderr, mode 0600
 ```
 
+The network gate lives as long as the VM and is dropped when it is destroyed.
+It is the host-side egress described in [06](06-network-gate.md); the VM itself
+has no network device.
+
 The runtime writes audit events `image_cached`, `image_rejected`,
-`vm_created`, `vm_stopped` and `vm_destroyed`, each with its `run_id`, `vm_id`
-or digest.
+`vm_created`, `vm_stopped`, `vm_destroyed` and `network_policy_configured`,
+each with its `run_id`, `vm_id` or digest.
 
 ## Console
 

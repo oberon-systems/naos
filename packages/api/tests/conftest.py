@@ -165,3 +165,11 @@ def mount_body() -> dict[str, Any]:
         "workspace": {"host_path": "/srv/projects/alpha"},
         "home": [{"host_path": "/srv/agent-home/claude", "guest_path": ".claude"}],
     }
+
+
+@pytest.fixture
+def network_body() -> dict[str, Any]:
+    return {
+        "allow": [{"protocol": "https", "host": "example.com"}],
+        "deny": [{"host": "private.example.com"}],
+    }

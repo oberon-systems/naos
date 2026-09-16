@@ -67,6 +67,41 @@ async fn granted_capabilities_are_refused_before_anything_happens() {
 }
 
 #[tokio::test]
+async fn malformed_network_policy_is_refused_before_anything_happens() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let runtime =
+        QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
+    let source = FakeSource::new(IMAGE);
+    let mut run = run_of(IMAGE);
+    run.policies
+        .insert("network".into(), Some(json!({ "allow": "all" })));
+
+    let outcome = runtime.ensure(&run, &source).await;
+
+    assert!(
+        matches!(outcome, Err(AgentError::Runtime(message)) if message.contains("invalid network policy"))
+    );
+    assert_eq!(source.calls(), 0);
+    assert!(vm_dirs(&dir).is_empty());
+}
+
+#[tokio::test]
+async fn a_failed_start_leaves_no_gate_behind() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let runtime =
+        QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
+    let mut run = run_of(IMAGE);
+    run.policies.insert(
+        "network".into(),
+        Some(json!({ "allow": [{ "host": "example.com" }] })),
+    );
+
+    assert!(runtime.ensure(&run, &FakeSource::new(IMAGE)).await.is_err());
+
+    assert!(runtime.gate(&run.id).is_none());
+}
+
+#[tokio::test]
 async fn failed_qemu_start_leaves_no_vm_behind() {
     let dir = tempfile::tempdir().expect("tempdir");
     let runtime =

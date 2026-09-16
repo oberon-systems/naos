@@ -47,3 +47,16 @@ pub fn vm_destroyed(vm_id: &str, run_id: &str) {
 pub fn console_attached(vm_id: &str, run_id: &str) {
     tracing::warn!(target: "audit", event = "console_attached", vm_id, run_id);
 }
+
+pub fn network_policy_configured(run_id: &str) {
+    tracing::info!(target: "audit", event = "network_policy_configured", run_id);
+}
+
+pub fn network_allowed(run_id: &str, protocol: &str, host: &str, rule: &str) {
+    tracing::info!(target: "audit", event = "network_allowed", run_id, protocol, host, rule);
+}
+
+// The host and scheme are the destination: a full URL can carry userinfo, which is a credential.
+pub fn network_denied(run_id: &str, protocol: &str, host: &str, rule: &str, reason: &str) {
+    tracing::warn!(target: "audit", event = "network_denied", run_id, protocol, host, rule, reason);
+}

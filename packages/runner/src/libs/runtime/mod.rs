@@ -8,6 +8,7 @@ use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt};
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use nix::errno::Errno;
@@ -23,6 +24,7 @@ use crate::libs::config::{prepare_private_dir, RuntimeConfig};
 use crate::libs::error::AgentError;
 use crate::libs::ids::random_hex;
 use crate::libs::image::{ImageCache, ImageSource};
+use crate::libs::network::NetworkGate;
 use crate::libs::qemu::{self, VmPaths, PROCESS_PREFIX};
 
 const READY_TIMEOUT: Duration = Duration::from_secs(30);
@@ -68,6 +70,7 @@ pub struct QemuRuntime {
     images: ImageCache,
     qemu_binary: PathBuf,
     qemu_img: PathBuf,
+    gates: Mutex<HashMap<String, Arc<NetworkGate>>>,
 }
 
 impl QemuRuntime {
@@ -79,7 +82,14 @@ impl QemuRuntime {
             images: ImageCache::new(config.image_dir.clone(), config.image_max_bytes),
             qemu_binary: config.qemu_binary.clone(),
             qemu_img: config.qemu_img.clone(),
+            gates: Mutex::new(HashMap::new()),
         })
+    }
+
+    /// The egress gate of a running Run, for the MCP broker of prompt 06 to borrow.
+    #[allow(dead_code)]
+    pub fn gate(&self, run_id: &str) -> Option<Arc<NetworkGate>> {
+        self.gates.lock().expect("gates").get(run_id).cloned()
     }
 
     fn paths(&self, vm_id: &str) -> Result<VmPaths, AgentError> {
@@ -215,7 +225,14 @@ impl Runtime for QemuRuntime {
         run: &DesiredRun,
         images: &dyn ImageSource,
     ) -> Result<LocalVm, AgentError> {
-        let granted = run.granted_policies();
+        // Admission check: an unusable policy fails the run before an image is ever fetched.
+        let network = run.policies.get("network").and_then(Option::as_ref);
+        let gate = NetworkGate::from_snapshot(&run.id, network)?;
+        let granted: Vec<&str> = run
+            .granted_policies()
+            .into_iter()
+            .filter(|kind| *kind != "network")
+            .collect();
         if !granted.is_empty() {
             return Err(AgentError::Runtime(format!(
                 "run {} grants {} which this runtime cannot enforce yet",
@@ -223,6 +240,13 @@ impl Runtime for QemuRuntime {
                 granted.join(", ")
             )));
         }
+        // The policy is immutable for the life of the Run, so a reconcile keeps the gate it
+        // registered: rebuilding it would hand the Run a fresh request budget every tick.
+        self.gates
+            .lock()
+            .expect("gates")
+            .entry(run.id.clone())
+            .or_insert_with(|| Arc::new(gate));
         if let Some(existing) = scan(&self.vm_dir)?
             .into_iter()
             .find(|vm| vm.run_id == run.id && vm.running)
@@ -254,6 +278,9 @@ impl Runtime for QemuRuntime {
         drop(base);
         match launched {
             Ok(()) => {
+                if network.is_some() {
+                    audit::network_policy_configured(&vm.run_id);
+                }
                 audit::vm_created(&vm.vm_id, &vm.run_id);
                 Ok(vm)
             }
@@ -286,6 +313,7 @@ impl Runtime for QemuRuntime {
             Err(err) if err.kind() != ErrorKind::NotFound => return Err(err.into()),
             _ => {}
         }
+        self.gates.lock().expect("gates").remove(&vm.run_id);
         audit::vm_destroyed(&vm.vm_id, &vm.run_id);
         Ok(())
     }

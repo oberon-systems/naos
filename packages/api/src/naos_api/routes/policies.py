@@ -1,11 +1,12 @@
-from typing import Any, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from fastapi import APIRouter, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from naos_api import policies
 from naos_api.models import Policy
 from naos_api.mounts import MountPolicyIn
+from naos_api.network import NetworkPolicyIn
 from naos_api.routes.deps import MountRootsDep, SessionDep
 from naos_api.spec import PolicyKind, StrictModel
 
@@ -13,6 +14,14 @@ from naos_api.spec import PolicyKind, StrictModel
 class MountPolicyCreate(StrictModel):
     kind: Literal["mount"]
     document: MountPolicyIn
+
+
+class NetworkPolicyCreate(StrictModel):
+    kind: Literal["network"]
+    document: NetworkPolicyIn
+
+
+PolicyCreate = Annotated[MountPolicyCreate | NetworkPolicyCreate, Field(discriminator="kind")]
 
 
 class PolicyRead(BaseModel):
@@ -38,9 +47,12 @@ router = APIRouter()
 
 @router.post("/policies", status_code=201)
 def create_policy(
-    body: MountPolicyCreate, session: SessionDep, roots: MountRootsDep, response: Response
+    body: PolicyCreate, session: SessionDep, roots: MountRootsDep, response: Response
 ) -> PolicyRead:
-    policy, created = policies.create_mount_policy(session, body.document, roots)
+    if isinstance(body, MountPolicyCreate):
+        policy, created = policies.create_mount_policy(session, body.document, roots)
+    else:
+        policy, created = policies.create_network_policy(session, body.document)
     if not created:
         response.status_code = 200
     return PolicyRead.of(policy)
