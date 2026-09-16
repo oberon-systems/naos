@@ -12,5 +12,6 @@ pub mod network;
 pub mod qemu;
 pub mod reconciler;
 pub mod runtime;
+pub mod shell;
 #[cfg(test)]
 pub mod testing;

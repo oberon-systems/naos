@@ -173,3 +173,8 @@ def network_body() -> dict[str, Any]:
         "allow": [{"protocol": "https", "host": "example.com"}],
         "deny": [{"host": "private.example.com"}],
     }
+
+
+@pytest.fixture
+def shell_body() -> dict[str, Any]:
+    return {"allow": ["read_file", "list_dir", "grep"]}

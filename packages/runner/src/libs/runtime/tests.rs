@@ -19,6 +19,7 @@ fn config(dir: &TempDir, qemu_binary: &str, qemu_img: PathBuf) -> RuntimeConfig 
         vm_dir: dir.path().join("runs"),
         qemu_binary: qemu_binary.into(),
         qemu_img,
+        git_binary: "/usr/bin/git".into(),
         image_max_bytes: 1024 * 1024,
     }
 }
@@ -57,11 +58,11 @@ async fn granted_capabilities_are_refused_before_anything_happens() {
     let source = FakeSource::new(IMAGE);
     let mut run = run_of(IMAGE);
     run.policies
-        .insert("mount".into(), Some(json!({ "workdir": "/naos/alpha" })));
+        .insert("mcp".into(), Some(json!({ "allow": [] })));
 
     let outcome = runtime.ensure(&run, &source).await;
 
-    assert!(matches!(outcome, Err(AgentError::Runtime(message)) if message.contains("mount")));
+    assert!(matches!(outcome, Err(AgentError::Runtime(message)) if message.contains("mcp")));
     assert_eq!(source.calls(), 0);
     assert!(vm_dirs(&dir).is_empty());
 }
@@ -98,7 +99,26 @@ async fn a_failed_start_leaves_no_gate_behind() {
 
     assert!(runtime.ensure(&run, &FakeSource::new(IMAGE)).await.is_err());
 
-    assert!(runtime.gate(&run.id).is_none());
+    assert!(runtime.gates(&run.id).is_none());
+}
+
+#[tokio::test]
+async fn malformed_mount_policy_is_refused_before_anything_happens() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let runtime =
+        QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
+    let source = FakeSource::new(IMAGE);
+    let mut run = run_of(IMAGE);
+    run.policies
+        .insert("mount".into(), Some(json!({ "workdir": "/naos/alpha" })));
+
+    let outcome = runtime.ensure(&run, &source).await;
+
+    assert!(
+        matches!(outcome, Err(AgentError::Runtime(message)) if message.contains("invalid mount policy"))
+    );
+    assert_eq!(source.calls(), 0);
+    assert!(vm_dirs(&dir).is_empty());
 }
 
 #[tokio::test]

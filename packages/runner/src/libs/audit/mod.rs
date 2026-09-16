@@ -60,3 +60,16 @@ pub fn network_allowed(run_id: &str, protocol: &str, host: &str, rule: &str) {
 pub fn network_denied(run_id: &str, protocol: &str, host: &str, rule: &str, reason: &str) {
     tracing::warn!(target: "audit", event = "network_denied", run_id, protocol, host, rule, reason);
 }
+
+pub fn shell_policy_configured(run_id: &str) {
+    tracing::info!(target: "audit", event = "shell_policy_configured", run_id);
+}
+
+// The guest path is what the agent asked for; the host path behind it is the host's layout.
+pub fn shell_allowed(run_id: &str, capability: &str, path: &str) {
+    tracing::info!(target: "audit", event = "shell_allowed", run_id, capability, path);
+}
+
+pub fn shell_denied(run_id: &str, capability: &str, path: &str, reason: &str) {
+    tracing::warn!(target: "audit", event = "shell_denied", run_id, capability, path, reason);
+}

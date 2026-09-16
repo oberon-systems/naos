@@ -8,6 +8,7 @@ from naos_api.errors import NotFoundError, PolicyError
 from naos_api.models import Policy
 from naos_api.mounts import MountPolicyIn, resolve_mount_policy
 from naos_api.network import NetworkPolicyIn, resolve_network_policy
+from naos_api.shell import ShellPolicyIn, resolve_shell_policy
 from naos_api.spec import PolicyKind, RunSpec, digest_of
 
 ID_PREFIX = {
@@ -54,6 +55,11 @@ def create_mount_policy(
 def create_network_policy(session: Session, policy: NetworkPolicyIn) -> tuple[Policy, bool]:
     resolved = resolve_network_policy(policy)
     return _store(session, PolicyKind.NETWORK, resolved.model_dump(mode="json"))
+
+
+def create_shell_policy(session: Session, policy: ShellPolicyIn) -> tuple[Policy, bool]:
+    resolved = resolve_shell_policy(policy)
+    return _store(session, PolicyKind.SHELL, resolved.model_dump(mode="json"))
 
 
 def get_policy(session: Session, policy_id: str) -> Policy:

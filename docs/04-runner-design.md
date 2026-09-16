@@ -15,6 +15,7 @@ qemu-manager
 overlay-manager
 mount-manager
 network-gate
+shell-gate
 gate-manager
 console-server
 diff-manager
@@ -60,6 +61,7 @@ without them.
 | `NAOS_AGENT_VM_DIR` | One directory per VM; default `$XDG_STATE_HOME/naos/runs`, else `~/.local/state/naos/runs` |
 | `NAOS_AGENT_QEMU_BINARY` | QEMU system emulator, default `/usr/bin/qemu-system-x86_64` |
 | `NAOS_AGENT_QEMU_IMG` | `qemu-img`, default `/usr/bin/qemu-img` |
+| `NAOS_AGENT_GIT_BINARY` | `git` for the shell gate, default `/usr/bin/git` |
 | `NAOS_AGENT_IMAGE_MAX_BYTES` | Largest image the agent downloads, default `8589934592` |
 
 The agent never looks for a `.env` file on its own. A file dropped into the
@@ -113,9 +115,9 @@ reuse.
 The QEMU runtime turns one desired Run into one VM. Starting a Run takes these
 steps, and any failure stops it and removes the VM directory:
 
-1. build the network gate from the policy snapshot and register it against the
-   Run, then refuse the Run when a mount, shell or MCP policy is set: those are
-   not enforced by this runtime yet, so they fail closed;
+1. build the network and shell gates from the policy snapshots and register
+   them against the Run, then refuse the Run when an MCP policy is set: it is
+   not enforced by this runtime yet, so it fails closed;
 2. download the image from the `image_url` the API returned into the cache
    unless a file already has its name: the agent follows at most five
    redirects and never sends its runner token there, the download goes to a
@@ -147,13 +149,14 @@ $NAOS_AGENT_VM_DIR/vm_<32 hex>/
   qemu.log       QEMU stderr, mode 0600
 ```
 
-The network gate lives as long as the VM and is dropped when it is destroyed.
-It is the host-side egress described in [06](06-network-gate.md); the VM itself
-has no network device.
+Both gates live as long as the VM and are dropped when it is destroyed. They
+are the host-side egress ([06](06-network-gate.md)) and the host-side read-only
+filesystem capabilities ([07](07-shell-gate.md)); the VM itself has neither a
+network device nor a mount device.
 
 The runtime writes audit events `image_cached`, `image_rejected`,
-`vm_created`, `vm_stopped`, `vm_destroyed` and `network_policy_configured`,
-each with its `run_id`, `vm_id` or digest.
+`vm_created`, `vm_stopped`, `vm_destroyed`, `network_policy_configured` and
+`shell_policy_configured`, each with its `run_id`, `vm_id` or digest.
 
 ## Console
 

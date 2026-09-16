@@ -8,6 +8,7 @@ from naos_api.models import Policy
 from naos_api.mounts import MountPolicyIn
 from naos_api.network import NetworkPolicyIn
 from naos_api.routes.deps import MountRootsDep, SessionDep
+from naos_api.shell import ShellPolicyIn
 from naos_api.spec import PolicyKind, StrictModel
 
 
@@ -21,7 +22,14 @@ class NetworkPolicyCreate(StrictModel):
     document: NetworkPolicyIn
 
 
-PolicyCreate = Annotated[MountPolicyCreate | NetworkPolicyCreate, Field(discriminator="kind")]
+class ShellPolicyCreate(StrictModel):
+    kind: Literal["shell"]
+    document: ShellPolicyIn
+
+
+PolicyCreate = Annotated[
+    MountPolicyCreate | NetworkPolicyCreate | ShellPolicyCreate, Field(discriminator="kind")
+]
 
 
 class PolicyRead(BaseModel):
@@ -51,8 +59,10 @@ def create_policy(
 ) -> PolicyRead:
     if isinstance(body, MountPolicyCreate):
         policy, created = policies.create_mount_policy(session, body.document, roots)
-    else:
+    elif isinstance(body, NetworkPolicyCreate):
         policy, created = policies.create_network_policy(session, body.document)
+    else:
+        policy, created = policies.create_shell_policy(session, body.document)
     if not created:
         response.status_code = 200
     return PolicyRead.of(policy)

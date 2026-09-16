@@ -100,7 +100,8 @@ equivalent documents share one digest and therefore one id. Ids carry the kind:
 A Run names a policy per kind under `spec.mounts`, `spec.network`, `spec.shell`
 and `spec.mcp`, and the reference is immutable once the Run starts. The runner
 receives the resolved document as a snapshot rather than the id. The network
-document is described in [06](06-network-gate.md).
+document is described in [06](06-network-gate.md), the shell document in
+[07](07-shell-gate.md).
 
 ## Images
 

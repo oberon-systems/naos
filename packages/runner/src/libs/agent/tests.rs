@@ -25,6 +25,7 @@ fn setup(runtime: FakeRuntime) -> (TempDir, Agent<FakeApi, FakeRuntime>) {
             vm_dir: dir.path().join("runs"),
             qemu_binary: "/bin/false".into(),
             qemu_img: "/bin/false".into(),
+            git_binary: "/bin/false".into(),
             image_max_bytes: 1024,
         },
     };

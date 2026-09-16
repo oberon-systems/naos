@@ -26,6 +26,7 @@ use crate::libs::ids::random_hex;
 use crate::libs::image::{ImageCache, ImageSource};
 use crate::libs::network::NetworkGate;
 use crate::libs::qemu::{self, VmPaths, PROCESS_PREFIX};
+use crate::libs::shell::ShellGate;
 
 const READY_TIMEOUT: Duration = Duration::from_secs(30);
 const POWERDOWN_TIMEOUT: Duration = Duration::from_secs(30);
@@ -65,12 +66,22 @@ struct VmMeta {
     digest: String,
 }
 
+/// The host-side capabilities of one Run, built once and dropped with its VM.
+#[derive(Debug)]
+pub struct RunGates {
+    #[allow(dead_code)] // The MCP broker of prompt 06 is the only caller.
+    pub network: NetworkGate,
+    #[allow(dead_code)]
+    pub shell: ShellGate,
+}
+
 pub struct QemuRuntime {
     vm_dir: PathBuf,
     images: ImageCache,
     qemu_binary: PathBuf,
     qemu_img: PathBuf,
-    gates: Mutex<HashMap<String, Arc<NetworkGate>>>,
+    git_binary: PathBuf,
+    gates: Mutex<HashMap<String, Arc<RunGates>>>,
 }
 
 impl QemuRuntime {
@@ -82,13 +93,14 @@ impl QemuRuntime {
             images: ImageCache::new(config.image_dir.clone(), config.image_max_bytes),
             qemu_binary: config.qemu_binary.clone(),
             qemu_img: config.qemu_img.clone(),
+            git_binary: config.git_binary.clone(),
             gates: Mutex::new(HashMap::new()),
         })
     }
 
-    /// The egress gate of a running Run, for the MCP broker of prompt 06 to borrow.
+    /// The gates of a running Run, for the MCP broker of prompt 06 to borrow.
     #[allow(dead_code)]
-    pub fn gate(&self, run_id: &str) -> Option<Arc<NetworkGate>> {
+    pub fn gates(&self, run_id: &str) -> Option<Arc<RunGates>> {
         self.gates.lock().expect("gates").get(run_id).cloned()
     }
 
@@ -227,11 +239,16 @@ impl Runtime for QemuRuntime {
     ) -> Result<LocalVm, AgentError> {
         // Admission check: an unusable policy fails the run before an image is ever fetched.
         let network = run.policies.get("network").and_then(Option::as_ref);
-        let gate = NetworkGate::from_snapshot(&run.id, network)?;
+        let shell = run.policies.get("shell").and_then(Option::as_ref);
+        let mounts = run.policies.get("mount").and_then(Option::as_ref);
+        let gates = RunGates {
+            network: NetworkGate::from_snapshot(&run.id, network)?,
+            shell: ShellGate::from_snapshot(&run.id, shell, mounts, &self.git_binary)?,
+        };
         let granted: Vec<&str> = run
             .granted_policies()
             .into_iter()
-            .filter(|kind| *kind != "network")
+            .filter(|kind| !matches!(*kind, "network" | "shell" | "mount"))
             .collect();
         if !granted.is_empty() {
             return Err(AgentError::Runtime(format!(
@@ -246,7 +263,7 @@ impl Runtime for QemuRuntime {
             .lock()
             .expect("gates")
             .entry(run.id.clone())
-            .or_insert_with(|| Arc::new(gate));
+            .or_insert_with(|| Arc::new(gates));
         if let Some(existing) = scan(&self.vm_dir)?
             .into_iter()
             .find(|vm| vm.run_id == run.id && vm.running)
@@ -280,6 +297,9 @@ impl Runtime for QemuRuntime {
             Ok(()) => {
                 if network.is_some() {
                     audit::network_policy_configured(&vm.run_id);
+                }
+                if shell.is_some() {
+                    audit::shell_policy_configured(&vm.run_id);
                 }
                 audit::vm_created(&vm.vm_id, &vm.run_id);
                 Ok(vm)

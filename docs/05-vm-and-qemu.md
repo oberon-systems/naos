@@ -56,8 +56,9 @@ shell. Everything the guest can reach is on this list:
 | `-fw_cfg name=opt/naos/session` | per-Run parameters from `session.json` |
 
 There is no `-virtfs`, `-fsdev`, `-drive`, `-hda`, `-netdev`, `-kernel`,
-`-cdrom` or `-usb`, and a unit test fails when one appears. Host mounts are not
-part of this runtime yet: a Run with a mount policy does not start.
+`-cdrom` or `-usb`, and a unit test fails when one appears. A Run with a mount
+policy starts, but the guest gets no mount device: its host paths are served
+read-only by the shell gate ([07](07-shell-gate.md)) and nowhere else.
 
 ## Console and session
 

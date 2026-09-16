@@ -139,6 +139,26 @@ def test_network_policy_flow(
     assert run["spec"]["network"]["policy"] == policy_id
 
 
+def test_shell_policy_flow(
+    client: TestClient, spec_body: dict[str, Any], shell_body: dict[str, Any]
+) -> None:
+    body = {"kind": "shell", "document": shell_body}
+    created = client.post("/api/v1/policies", json=body)
+    replayed = client.post("/api/v1/policies", json=body)
+    policy_id = created.json()["id"]
+
+    assert created.status_code == 201
+    assert replayed.status_code == 200
+    assert replayed.json()["id"] == policy_id
+    assert policy_id.startswith("shellpol_")
+    assert created.json()["document"]["allow"] == ["read_file", "list_dir", "grep"]
+    assert client.get(f"/api/v1/policies/{policy_id}").json() == created.json()
+
+    spec_body["shell"] = {"policy": policy_id}
+    run = _create(client, spec_body).json()
+    assert run["spec"]["shell"]["policy"] == policy_id
+
+
 @pytest.mark.parametrize(
     "body",
     [
@@ -147,6 +167,10 @@ def test_network_policy_flow(
         {"kind": "network", "document": {"allow": [{"host": "bad_host"}]}},
         {"kind": "network", "document": {"allow": [{"protocol": "ftp"}]}},
         {"kind": "beta", "document": {"allow": [{"host": "example.com"}]}},
+        {"kind": "shell", "document": {}},
+        {"kind": "shell", "document": {"allow": []}},
+        {"kind": "shell", "document": {"allow": ["write_file"]}},
+        {"kind": "shell", "document": {"allow": ["read_file", "read_file"]}},
         {"kind": "mount", "document": {"workspace": {"host_path": "/etc/beta"}}},
         {"kind": "mount", "document": {"workspace": {"host_path": "/srv/projects/../../etc"}}},
         {"kind": "mount", "document": {"workspace": {"host_path": "/srv/projects/alpha"}, "x": 1}},

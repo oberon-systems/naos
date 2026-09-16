@@ -89,6 +89,10 @@ default VM user `naos`; this is where agent settings and credentials go. Host
 paths must be absolute, normalized and inside `NAOS_ALLOWED_MOUNT_ROOTS`; the
 default is empty, which denies every mount.
 
+The guest paths are not a filesystem the VM sees yet. They are the namespace
+the shell gate serves ([07](07-shell-gate.md)), read-only and on request; the
+VM has no mount device of its own.
+
 ## Acceptance criteria
 
 - Run is the primary lifecycle entity.
