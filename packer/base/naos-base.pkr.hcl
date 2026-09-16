@@ -88,6 +88,7 @@ build {
       "echo 'ttyS0::respawn:/sbin/agetty --autologin naos --noclear 115200 ttyS0 vt100' >> /etc/inittab",
 
       "echo qemu_fw_cfg >> /etc/modules",
+      "echo virtio_console >> /etc/modules",
       "chmod 0755 /etc/init.d/naos-probe",
       "rc-update add naos-probe default",
       "rc-update add acpid default",

@@ -5,7 +5,7 @@ set -eu
 files=/tmp/naos-files
 home=/home/naos
 
-apk add --no-cache bash git libgcc libstdc++ nodejs npm ripgrep tmux
+apk add --no-cache bash git libgcc libstdc++ nodejs npm ripgrep socat tmux
 
 npm install -g \
     "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
@@ -15,12 +15,14 @@ gemini --version
 
 install -d -m 0755 /etc/claude-code
 install -m 0644 "$files/claude/managed-settings.json" /etc/claude-code/managed-settings.json
+install -m 0644 "$files/claude/managed-mcp.json" /etc/claude-code/managed-mcp.json
 install -d -m 0755 /etc/naos /etc/gemini-cli
 install -m 0444 "$files/AGENTS.md" /etc/naos/AGENTS.md
 ln -sf /etc/naos/AGENTS.md /etc/claude-code/CLAUDE.md
 install -m 0644 "$files/gemini/settings.json" /etc/gemini-cli/settings.json
 
 install -m 0755 "$files/naos-session" /etc/init.d/naos-session
+install -m 0755 "$files/naos-mcp" /usr/local/bin/naos-mcp
 install -m 0644 "$files/naos-console.sh" /etc/profile.d/naos-console.sh
 rc-update add naos-session default
 

@@ -25,8 +25,24 @@ agent_command() {
     esac
 }
 
+# The gate port is root-owned when it appears; naos gets it under a stable name for naos-mcp.
+share_mcp_port() {
+    for name in /sys/class/virtio-ports/*/name; do
+        [ "$(cat "$name" 2> /dev/null)" = naos.mcp ] || continue
+        port=${name%/name}
+        port=/dev/${port##*/}
+        chgrp naos "$port" || return 1
+        chmod 0660 "$port" || return 1
+        install -d -m 0755 /run/naos
+        ln -sfn "$port" /run/naos/mcp
+        return 0
+    done
+    return 1
+}
+
 start() {
     ebegin "Starting the agent session"
+    share_mcp_port || ewarn "no naos.mcp port, the agent starts without gates"
     command=$(agent_command)
     su -l naos -s /bin/sh -c "tmux new-session -d -s agent '$command; exec bash -l'"
     eend $?

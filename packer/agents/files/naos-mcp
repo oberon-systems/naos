@@ -1,0 +1,11 @@
+#!/bin/sh
+# MCP stdio server of the Naos gates. It only pipes bytes to the host through the
+# virtio-serial port; every decision is taken by the runner on the other side.
+set -eu
+
+port=/run/naos/mcp
+[ -e "$port" ] || {
+    echo "naos-mcp: $port is missing, the Run has no gate port" >&2
+    exit 1
+}
+exec socat - "$port"

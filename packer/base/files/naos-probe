@@ -16,6 +16,28 @@ report() {
     echo "$1" > /dev/ttyS1 2> /dev/null || true
 }
 
+mcp_port() {
+    for name in /sys/class/virtio-ports/*/name; do
+        [ "$(cat "$name" 2> /dev/null)" = naos.mcp ] || continue
+        port=${name%/name}
+        echo "/dev/${port##*/}"
+        return 0
+    done
+    return 1
+}
+
+# The runner answers on this port, so a ping proves the channel end to end.
+mcp_ping() {
+    exec 3<> "$1" || return 1
+    printf '%s\n' '{"jsonrpc":"2.0","id":"probe","method":"ping"}' >&3
+    read -r -t 10 reply <&3
+    exec 3>&-
+    case "$reply" in
+        *'"id":"probe"'*'"result"'*) return 0 ;;
+    esac
+    return 1
+}
+
 start() {
     ebegin "Running naos probes"
     report naos-ready
@@ -35,6 +57,12 @@ start() {
         name=${link##*/}
         [ "$name" = lo ] || failures="$failures interface=$name"
     done
+
+    if port=$(mcp_port); then
+        mcp_ping "$port" || failures="$failures mcp-ping"
+    else
+        failures="$failures mcp-port"
+    fi
 
     if [ -z "$failures" ]; then
         report "naos-probe ok"
