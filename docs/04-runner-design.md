@@ -116,8 +116,8 @@ The QEMU runtime turns one desired Run into one VM. Starting a Run takes these
 steps, and any failure stops it and removes the VM directory:
 
 1. build the network and shell gates from the policy snapshots and register
-   them against the Run, then refuse the Run when an MCP policy is set: it is
-   not enforced by this runtime yet, so it fails closed;
+   them against the Run, then refuse the Run when an MCP policy is set:
+   external MCP servers are not proxied yet, so it fails closed;
 2. download the image from the `image_url` the API returned into the cache
    unless a file already has its name: the agent follows at most five
    redirects and never sends its runner token there, the download goes to a
@@ -156,13 +156,14 @@ filesystem capabilities ([07](07-shell-gate.md)); the VM itself has neither a
 network device nor a mount device.
 
 Once QEMU answers, and again on every reconcile of a running VM, the runtime
-connects to `mcp.sock` and serves the MCP session ([08](08-mcp-gate.md)). A
+connects to `mcp.sock` and serves the Run's gates as MCP tools
+([08](08-mcp-gate.md)). A
 session that ended is replaced on the next pass, which is also how a restarted
 runner reattaches; destroying the VM aborts it.
 
 The runtime writes audit events `image_cached`, `image_rejected`,
 `vm_created`, `vm_stopped`, `vm_destroyed`, `network_policy_configured`,
-`shell_policy_configured`, `mcp_attached` and `mcp_rejected`, each with its
+`shell_policy_configured`, `mcp_attached`, `mcp_rejected` and `mcp_call`, each with its
 `run_id`, `vm_id` or digest.
 
 ## Console

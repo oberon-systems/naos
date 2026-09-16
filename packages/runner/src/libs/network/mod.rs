@@ -1,4 +1,4 @@
-//! Host-side HTTP(S) capability. Only the MCP broker may call it.
+//! Host-side HTTP(S) capability. Only the MCP broker calls it.
 use crate::libs::audit;
 use crate::libs::error::AgentError;
 use reqwest::header::HeaderMap;
@@ -77,7 +77,6 @@ impl Rule {
 
 /// One outbound call, as the broker submits it. The gate owns the client, so a caller can never
 /// reuse an authorization for a second destination.
-#[allow(dead_code)] // The MCP broker of prompt 06 is the only caller.
 #[derive(Debug)]
 pub struct GateRequest {
     pub method: Method,
@@ -86,7 +85,6 @@ pub struct GateRequest {
     pub body: Option<Vec<u8>>,
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct GateResponse {
     pub status: StatusCode,
@@ -136,8 +134,11 @@ impl NetworkGate {
         })
     }
 
+    pub fn allows_any(&self) -> bool {
+        !self.allow.is_empty()
+    }
+
     /// The whole egress surface: budget, authorization, the pinned request and a bounded body.
-    #[allow(dead_code)] // The MCP broker of prompt 06 is the only caller.
     pub async fn send(&self, request: GateRequest) -> Result<GateResponse, AgentError> {
         let url = Url::parse(&request.url)
             .map_err(|err| AgentError::Runtime(format!("network deny: invalid URL: {err}")))?;
@@ -293,7 +294,7 @@ impl NetworkGate {
 #[cfg(test)]
 impl NetworkGate {
     /// Test-only: reaches a local server by allowing loopback and answering DNS from `ips`.
-    fn local(document: &Value, ips: Vec<IpAddr>) -> Result<Self, AgentError> {
+    pub(crate) fn local(document: &Value, ips: Vec<IpAddr>) -> Result<Self, AgentError> {
         let mut gate = Self::from_snapshot("run_a", Some(document))?;
         gate.forbidden = |ip| !ip.is_loopback() && forbidden(ip);
         gate.resolved = Some(ips);

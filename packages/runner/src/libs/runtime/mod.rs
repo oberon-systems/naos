@@ -72,9 +72,7 @@ struct VmMeta {
 /// The host-side capabilities of one Run, built once and dropped with its VM.
 #[derive(Debug)]
 pub struct RunGates {
-    #[allow(dead_code)] // The MCP broker of prompt 06 is the only caller.
     pub network: NetworkGate,
-    #[allow(dead_code)]
     pub shell: ShellGate,
 }
 
@@ -103,8 +101,7 @@ impl QemuRuntime {
         })
     }
 
-    /// The gates of a running Run, for the MCP broker of prompt 06 to borrow.
-    #[allow(dead_code)]
+    /// The gates of a running Run, which its MCP session borrows.
     pub fn gates(&self, run_id: &str) -> Option<Arc<RunGates>> {
         self.gates.lock().expect("gates").get(run_id).cloned()
     }
@@ -119,6 +116,10 @@ impl QemuRuntime {
         {
             return;
         }
+        let Some(gates) = self.gates(&vm.run_id) else {
+            tracing::warn!(run_id = %vm.run_id, "no gates registered, the mcp port stays closed");
+            return;
+        };
         let run_id = vm.run_id.clone();
         let socket = paths.mcp();
         let task = tokio::spawn(async move {
@@ -131,7 +132,7 @@ impl QemuRuntime {
             };
             audit::mcp_attached(&run_id);
             let (read, write) = stream.into_split();
-            if let Err(err) = mcp::serve(&run_id, read, write).await {
+            if let Err(err) = mcp::serve(&run_id, &gates, read, write).await {
                 tracing::warn!(run_id = %run_id, error = %err, "mcp session ended");
             }
         });

@@ -101,8 +101,9 @@ and that is the expected state of this runtime.
 
 - The network gate ([06](06-network-gate.md)) enforces the policy host-side and
   will carry provider traffic with credentials attached there, so a key never
-  enters the VM. It has no caller yet: the MCP broker will be the first, and the
-  session will then point the agents at the gate instead of the provider.
+  enters the VM. Its only caller today is the `http_request` tool of the MCP
+  broker ([08](08-mcp-gate.md)); the session does not yet point the agents at
+  the gate instead of the provider.
 - The MCP gate ([P3](12-roadmap.md)) will hand out short-lived per-Run tokens
   where a provider cannot be proxied.
 - An interactive login inside the VM, such as an OAuth flow, will only be

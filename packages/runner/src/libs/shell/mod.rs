@@ -1,4 +1,4 @@
-//! Host-side read-only filesystem capabilities. Only the MCP broker may call it.
+//! Host-side read-only filesystem capabilities. Only the MCP broker calls it.
 use crate::libs::audit;
 use crate::libs::error::AgentError;
 use serde::Deserialize;
@@ -80,7 +80,6 @@ struct Root {
 }
 
 /// One capability call, as the broker submits it.
-#[allow(dead_code)] // The MCP broker of prompt 06 is the only caller.
 #[derive(Debug)]
 pub enum ShellRequest {
     ReadFile { path: String },
@@ -112,7 +111,6 @@ impl ShellRequest {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct Entry {
     pub name: String,
@@ -120,7 +118,6 @@ pub struct Entry {
     pub size: u64,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Match {
     pub path: String,
@@ -128,7 +125,6 @@ pub struct Match {
     pub text: String,
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
 pub enum ShellResponse {
     File(Vec<u8>),
@@ -182,8 +178,11 @@ impl ShellGate {
         })
     }
 
+    pub fn granted(&self) -> impl Iterator<Item = &'static str> + '_ {
+        self.allow.iter().map(|capability| capability.name())
+    }
+
     /// The whole capability surface: budget, grant, path confinement, then the operation.
-    #[allow(dead_code)] // The MCP broker of prompt 06 is the only caller.
     pub async fn call(&self, request: ShellRequest) -> Result<ShellResponse, AgentError> {
         let capability = request.capability();
         let path = request.path();
