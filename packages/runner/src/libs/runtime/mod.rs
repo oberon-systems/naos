@@ -16,7 +16,9 @@ use nix::sys::signal::{kill, Signal};
 use nix::unistd::Pid;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use tokio::net::UnixStream;
 use tokio::process::Command;
+use tokio::task::AbortHandle;
 
 use crate::libs::api::DesiredRun;
 use crate::libs::audit;
@@ -24,6 +26,7 @@ use crate::libs::config::{prepare_private_dir, RuntimeConfig};
 use crate::libs::error::AgentError;
 use crate::libs::ids::random_hex;
 use crate::libs::image::{ImageCache, ImageSource};
+use crate::libs::mcp;
 use crate::libs::network::NetworkGate;
 use crate::libs::qemu::{self, VmPaths, PROCESS_PREFIX};
 use crate::libs::shell::ShellGate;
@@ -82,6 +85,7 @@ pub struct QemuRuntime {
     qemu_img: PathBuf,
     git_binary: PathBuf,
     gates: Mutex<HashMap<String, Arc<RunGates>>>,
+    sessions: Mutex<HashMap<String, AbortHandle>>,
 }
 
 impl QemuRuntime {
@@ -95,6 +99,7 @@ impl QemuRuntime {
             qemu_img: config.qemu_img.clone(),
             git_binary: config.git_binary.clone(),
             gates: Mutex::new(HashMap::new()),
+            sessions: Mutex::new(HashMap::new()),
         })
     }
 
@@ -102,6 +107,35 @@ impl QemuRuntime {
     #[allow(dead_code)]
     pub fn gates(&self, run_id: &str) -> Option<Arc<RunGates>> {
         self.gates.lock().expect("gates").get(run_id).cloned()
+    }
+
+    /// Serves the guest's MCP port unless a live session already does; a session that ended is
+    /// replaced, which is also how a restarted runner reattaches to a running VM.
+    fn attach(&self, vm: &LocalVm, paths: &VmPaths) {
+        let mut sessions = self.sessions.lock().expect("sessions");
+        if sessions
+            .get(&vm.run_id)
+            .is_some_and(|session| !session.is_finished())
+        {
+            return;
+        }
+        let run_id = vm.run_id.clone();
+        let socket = paths.mcp();
+        let task = tokio::spawn(async move {
+            let stream = match UnixStream::connect(&socket).await {
+                Ok(stream) => stream,
+                Err(err) => {
+                    tracing::warn!(run_id = %run_id, error = %err, "cannot reach the mcp port");
+                    return;
+                }
+            };
+            audit::mcp_attached(&run_id);
+            let (read, write) = stream.into_split();
+            if let Err(err) = mcp::serve(&run_id, read, write).await {
+                tracing::warn!(run_id = %run_id, error = %err, "mcp session ended");
+            }
+        });
+        sessions.insert(vm.run_id.clone(), task.abort_handle());
     }
 
     fn paths(&self, vm_id: &str) -> Result<VmPaths, AgentError> {
@@ -268,6 +302,7 @@ impl Runtime for QemuRuntime {
             .into_iter()
             .find(|vm| vm.run_id == run.id && vm.running)
         {
+            self.attach(&existing, &self.paths(&existing.vm_id)?);
             return Ok(existing);
         }
 
@@ -302,6 +337,7 @@ impl Runtime for QemuRuntime {
                     audit::shell_policy_configured(&vm.run_id);
                 }
                 audit::vm_created(&vm.vm_id, &vm.run_id);
+                self.attach(&vm, &paths);
                 Ok(vm)
             }
             Err(err) => {
@@ -334,6 +370,9 @@ impl Runtime for QemuRuntime {
             _ => {}
         }
         self.gates.lock().expect("gates").remove(&vm.run_id);
+        if let Some(session) = self.sessions.lock().expect("sessions").remove(&vm.run_id) {
+            session.abort();
+        }
         audit::vm_destroyed(&vm.vm_id, &vm.run_id);
         Ok(())
     }

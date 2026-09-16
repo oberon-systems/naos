@@ -12,6 +12,7 @@ use crate::libs::error::AgentError;
 pub const QMP_TIMEOUT: Duration = Duration::from_secs(10);
 pub const PROCESS_PREFIX: &str = "naos-";
 pub const SESSION_FW_CFG: &str = "opt/naos/session";
+pub const MCP_PORT: &str = "naos.mcp";
 const SANDBOX: &str = "on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny";
 
 #[derive(Debug, Clone)]
@@ -42,6 +43,10 @@ impl VmPaths {
 
     pub fn console(&self) -> PathBuf {
         self.dir.join("console.sock")
+    }
+
+    pub fn mcp(&self) -> PathBuf {
+        self.dir.join("mcp.sock")
     }
 
     pub fn boot_log(&self) -> PathBuf {
@@ -101,6 +106,12 @@ pub fn argv(vm_id: &str, base: &Path, paths: &VmPaths, runtime: &RuntimeSpec) ->
         ),
         "-serial".into(),
         "chardev:console".into(),
+        "-device".into(),
+        "virtio-serial-pci,id=naos-serial".into(),
+        "-chardev".into(),
+        format!("socket,id=mcp,path={},server=on,wait=off", text(paths.mcp())),
+        "-device".into(),
+        format!("virtserialport,bus=naos-serial.0,chardev=mcp,name={MCP_PORT}"),
         "-chardev".into(),
         format!("file,id=boot,path={}", text(paths.boot_log())),
         "-serial".into(),

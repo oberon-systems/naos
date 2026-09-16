@@ -8,6 +8,7 @@ pub mod error;
 pub mod ids;
 pub mod image;
 pub mod lease;
+pub mod mcp;
 pub mod network;
 pub mod qemu;
 pub mod reconciler;

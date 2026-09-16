@@ -16,6 +16,6 @@ commitizen:
   name: wyld_cz
   tag_format: image-$version
   update_changelog_on_bump: true
-  version: 0.1.1
+  version: 0.2.0
   version_provider: commitizen
   version_scheme: semver

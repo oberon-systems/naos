@@ -73,3 +73,11 @@ pub fn shell_allowed(run_id: &str, capability: &str, path: &str) {
 pub fn shell_denied(run_id: &str, capability: &str, path: &str, reason: &str) {
     tracing::warn!(target: "audit", event = "shell_denied", run_id, capability, path, reason);
 }
+
+pub fn mcp_attached(run_id: &str) {
+    tracing::info!(target: "audit", event = "mcp_attached", run_id);
+}
+
+pub fn mcp_rejected(run_id: &str, reason: &str) {
+    tracing::warn!(target: "audit", event = "mcp_rejected", run_id, reason);
+}

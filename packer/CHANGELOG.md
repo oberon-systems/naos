@@ -1,3 +1,9 @@
+## image-0.2.0 (2026-09-16)
+
+### Features
+
+- **packer**: base, agent: added native embeded mcp into image
+
 ## image-0.1.1 (2026-09-13)
 
 ## image-0.1.0 (2026-09-13)

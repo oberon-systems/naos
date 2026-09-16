@@ -145,6 +145,7 @@ $NAOS_AGENT_VM_DIR/vm_<32 hex>/
   overlay.qcow2  the guest's writable disk
   qmp.sock       QEMU monitor
   console.sock   guest ttyS0
+  mcp.sock       guest virtio-serial port naos.mcp
   boot.log       guest ttyS1
   qemu.log       QEMU stderr, mode 0600
 ```
@@ -154,9 +155,15 @@ are the host-side egress ([06](06-network-gate.md)) and the host-side read-only
 filesystem capabilities ([07](07-shell-gate.md)); the VM itself has neither a
 network device nor a mount device.
 
+Once QEMU answers, and again on every reconcile of a running VM, the runtime
+connects to `mcp.sock` and serves the MCP session ([08](08-mcp-gate.md)). A
+session that ended is replaced on the next pass, which is also how a restarted
+runner reattaches; destroying the VM aborts it.
+
 The runtime writes audit events `image_cached`, `image_rejected`,
-`vm_created`, `vm_stopped`, `vm_destroyed`, `network_policy_configured` and
-`shell_policy_configured`, each with its `run_id`, `vm_id` or digest.
+`vm_created`, `vm_stopped`, `vm_destroyed`, `network_policy_configured`,
+`shell_policy_configured`, `mcp_attached` and `mcp_rejected`, each with its
+`run_id`, `vm_id` or digest.
 
 ## Console
 

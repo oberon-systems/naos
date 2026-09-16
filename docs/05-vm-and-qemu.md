@@ -51,6 +51,7 @@ shell. Everything the guest can reach is on this list:
 | `-blockdev` overlay with `backing` set to the base | the only writable disk, inside the VM directory |
 | `-device virtio-blk-pci,drive=disk` | the single disk the guest sees |
 | `-chardev socket` + `-serial` | `ttyS0` on `console.sock` |
+| `-device virtio-serial-pci` + `-device virtserialport,name=naos.mcp` | the MCP port on `mcp.sock` |
 | `-chardev file` + `-serial` | `ttyS1` into `boot.log` |
 | `-qmp unix:qmp.sock` | monitor for readiness and power-down |
 | `-fw_cfg name=opt/naos/session` | per-Run parameters from `session.json` |
@@ -62,10 +63,18 @@ read-only by the shell gate ([07](07-shell-gate.md)) and nowhere else.
 
 ## Console and session
 
-The guest has two serial ports. `ttyS0` is interactive: the runner exposes it
-as `console.sock`, and the image logs `naos` in there and attaches to the
-agent's tmux session. `ttyS1` carries kernel messages and the isolation probes
-into `boot.log`.
+The guest has two serial ports and one virtio-serial port. `ttyS0` is
+interactive: the runner exposes it as `console.sock`, and the image logs `naos`
+in there and attaches to the agent's tmux session. `ttyS1` carries kernel
+messages and the isolation probes into `boot.log`. The virtio-serial port
+`naos.mcp` is the only way from the agent to the gates: the runner serves it on
+`mcp.sock`, and [08](08-mcp-gate.md) describes what flows over it.
+
+At boot `naos-probe` finds the port by name and sends it a `ping`; a missing
+port or a missing answer fails the probe, so a VM that cannot reach its gates
+never counts as booted. `naos-session` then hands the port to `naos` as
+`/run/naos/mcp`, and `/usr/local/bin/naos-mcp` pipes stdio into it. Claude Code
+and Gemini CLI register that command as the MCP server `naos`.
 
 The guest reads `/sys/firmware/qemu_fw_cfg/by_name/opt/naos/session/raw` for
 its per-Run parameters: `run_id`, `vm_id` and `agent`, which selects `claude`

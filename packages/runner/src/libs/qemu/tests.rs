@@ -87,7 +87,26 @@ fn base_is_read_only_under_a_writable_overlay() {
     assert_eq!(node("disk")["backing"], "base");
     assert!(node("disk").get("read-only").is_none());
     assert_eq!(
-        value_of(&args, "-device"),
+        value_of(&args, "-device")
+            .into_iter()
+            .filter(|device| device.starts_with("virtio-blk"))
+            .collect::<Vec<_>>(),
         vec!["virtio-blk-pci,drive=disk"]
     );
+}
+
+#[test]
+fn the_guest_gets_exactly_one_disk_and_one_mcp_port() {
+    let args = args();
+
+    assert_eq!(
+        value_of(&args, "-device"),
+        vec![
+            "virtio-blk-pci,drive=disk",
+            "virtio-serial-pci,id=naos-serial",
+            "virtserialport,bus=naos-serial.0,chardev=mcp,name=naos.mcp",
+        ]
+    );
+    assert!(value_of(&args, "-chardev")
+        .contains(&format!("socket,id=mcp,path={VM_DIR}/mcp.sock,server=on,wait=off").as_str()));
 }
