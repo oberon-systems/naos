@@ -1,3 +1,9 @@
+## image-0.3.0 (2026-09-17)
+
+### Features
+
+- **packer**: mount the run workspace as a read-only share with an overlay
+
 ## image-0.2.1 (2026-09-17)
 
 ### Bug Fixes
