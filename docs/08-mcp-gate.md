@@ -235,6 +235,14 @@ The broker tests in `packages/runner/src/libs/mcp/tests.rs` verify that:
 The API tests in `packages/api/tests/test_mcp.py`, `test_routes.py` and
 `test_runner_lifecycle.py` cover the policy, secrets and credential issuance.
 
+The smoke test is the end-to-end pass: the guest runs `naos-mcp` over the gate
+port and sends `tools/list`, an allowed and a refused call of each built-in
+gate, a call of the external server's tool and a request reusing an id. It
+fails unless the built-in tools are listed, the workspace file comes back, the
+reused id is refused, and the runner logged an `mcp_call` for every one of
+those decisions, the external server included. Nothing answers as that server,
+so its call proves the routing and the failure path, not a working upstream.
+
 ```bash
 make test
 make smoke

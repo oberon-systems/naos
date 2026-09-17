@@ -147,8 +147,13 @@ Acceptance tests must verify:
 - malformed hostnames and malformed policies are refused.
 
 The gate tests in `packages/runner/src/libs/network/tests.rs` cover all of
-these, `packages/api/tests/test_network.py` covers policy resolution, and the
-smoke test fails unless `network_policy_configured` reaches the agent log:
+these, and `packages/api/tests/test_network.py` covers policy resolution. The
+smoke test drives the gate from inside the guest through the MCP broker: one
+request to the allowed host and one to a host that resolves but the policy does
+not name, and it fails unless `network_allowed` and `network_denied` both reach
+the agent log. A destination that does not resolve is refused before the rules
+are matched, which is why the refused host is a real one.
+The allowed request really leaves the host, so the run needs outbound https.
 
 ```bash
 make test

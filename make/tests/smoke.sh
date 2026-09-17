@@ -53,7 +53,13 @@ booted() {
 }
 
 collected() {
-    [ "$(task_status)" = COLLECTING ]
+    local status
+    status="$(task_status)"
+    if [ "$status" = FAILED ]; then
+        grep -e '"event":"run_failed"' -e 'reconcile action failed' "$TEMP_DIR/agent.log" >&2 || true
+        fail "task $task failed while its workspace was collected"
+    fi
+    [ "$status" = COLLECTING ] && [ "$(events workspace_collected)" -ge 1 ]
 }
 
 events() {
@@ -80,6 +86,84 @@ workspace_tree() {
     ) | sha256sum
 }
 
+fail() {
+    echo "$1" >&2
+    echo "--- last lines of the guest console ---" >&2
+    tail -40 "$TEMP_DIR/console.log" >&2
+    exit 1
+}
+
+# A second tmux window gets a shell next to the agent, and the lines are typed into it.
+guest() {
+    {
+        sleep 2
+        printf '\002c'
+        sleep 3
+        for line in "$@"; do
+            printf '%s\r' "$line"
+            sleep 1
+        done
+        sleep 25
+    } | NAOS_AGENT_IMAGE_DIR="$TEMP_DIR/vms" NAOS_AGENT_VM_DIR="$TEMP_DIR/runs" \
+        cargo run -q -p naos-agent -- console "$task" >>"$TEMP_DIR/console.log" 2>&1
+}
+
+# Every gate call the guest makes is one audit line of the runner, which took the decision.
+mcp_calls() {
+    grep '"event":"mcp_call"' "$TEMP_DIR/agent.log" |
+        grep -c "\"server\":\"$1\",\"tool\":\"$2\",.*\"decision\":\"$3\"" || true
+}
+
+check_gates() {
+    grep -q NAOS-SMOKE-DONE "$TEMP_DIR/console.log" || fail "the guest commands did not finish"
+    for tool in read_file list_dir grep http_request; do
+        grep -q "\"name\":\"$tool\"" "$TEMP_DIR/console.log" ||
+            fail "$tool is missing from the tools/list reply"
+    done
+    # The shell gate serves the host workspace, so it still reads the text the guest overwrote.
+    grep -q '"text":"alpha' "$TEMP_DIR/console.log" ||
+        fail "the shell gate did not read the host workspace"
+    grep -q 'duplicate request id' "$TEMP_DIR/console.log" ||
+        fail "a reused request id was accepted"
+    for call in "naos read_file allow" "naos http_request allow" "naos read_file deny" \
+        "naos git_status deny" "naos http_request deny" "alpha search deny"; do
+        # shellcheck disable=SC2086  # the three fields are one argument each
+        [ "$(mcp_calls $call)" -ge 1 ] || fail "no mcp_call for: $call"
+    done
+    for event in shell_allowed shell_denied network_allowed network_denied; do
+        [ "$(events "$event")" -ge 1 ] || fail "$event is missing from the agent log"
+    done
+}
+
+check_diff() {
+    local diff
+    diff="$(echo "$TEMP_DIR"/runs/*/diff.json)"
+    [ "$(stat -c %a "$diff")" = 600 ] || fail "$diff is not 0600"
+    [ -e "$(dirname "$diff")/upper.img" ] || fail "the upper disk is gone after collection"
+    "$VENV/bin/python" - "$diff" <<'PY' || fail "the workspace diff is wrong"
+import json
+import sys
+
+entries = json.load(open(sys.argv[1]))["entries"]
+found = {(entry["path"], entry["change"], entry.get("from")) for entry in entries}
+expected = {
+    ("added.txt", "created", None),
+    ("notes.txt", "modified", None),
+    ("old.txt", "deleted", None),
+    ("renamed.txt", "renamed", "moved.txt"),
+    ("link", "created", None),
+    ("pipe", "rejected", None),
+    ("dir/gone.txt", "deleted", None),
+    ("dir/keep.txt", "deleted", None),
+    ("dir/new.txt", "created", None),
+}
+missing = sorted(expected - found)
+probes = sorted(path for path, _, _ in found if path.startswith(".naos-probe"))
+if missing or probes:
+    sys.exit(f"missing {missing}, probe leftovers {probes}, in {entries}")
+PY
+}
+
 share_gone() {
     ! pgrep -f -- "--socket-path=$TEMP_DIR/runs" >/dev/null
 }
@@ -98,6 +182,11 @@ start_agent() {
 mkdir -m 700 "$TEMP_DIR" "$TEMP_DIR/state"
 mkdir -p "$TEMP_DIR/workspaces/alpha"
 printf 'alpha\n' >"$TEMP_DIR/workspaces/alpha/notes.txt"
+printf 'old\n' >"$TEMP_DIR/workspaces/alpha/old.txt"
+printf 'moved content\n' >"$TEMP_DIR/workspaces/alpha/moved.txt"
+mkdir "$TEMP_DIR/workspaces/alpha/dir"
+printf 'keep\n' >"$TEMP_DIR/workspaces/alpha/dir/keep.txt"
+printf 'gone\n' >"$TEMP_DIR/workspaces/alpha/dir/gone.txt"
 tree_before="$(workspace_tree)"
 echo "smoke test of $release/$image, working dir: $TEMP_DIR"
 
@@ -111,7 +200,7 @@ operator="$(token)"
 token >"$TEMP_DIR/enrollment"
 chmod 600 "$TEMP_DIR/enrollment"
 auth=(-H "Authorization: Bearer $operator" -H "Content-Type: application/json")
-touch "$TEMP_DIR/api.log" "$TEMP_DIR/agent.log"
+touch "$TEMP_DIR/api.log" "$TEMP_DIR/agent.log" "$TEMP_DIR/console.log"
 tail -f "$TEMP_DIR/api.log" "$TEMP_DIR/agent.log" &
 logs=$!
 
@@ -130,7 +219,7 @@ curl -fsS "${auth[@]}" "$api/api/v1/images" -o /dev/null -d @- <<EOF
 EOF
 network_policy="$(
     curl -fsS "${auth[@]}" "$api/api/v1/policies" -d @- <<EOF | field id
-{"kind": "network", "document": {"allow": [{"protocol": "https", "host": "example.com"}]}}
+{"kind": "network", "document": {"allow": [{"protocol": "https", "host": "www.google.com"}]}}
 EOF
 )"
 shell_policy="$(
@@ -187,6 +276,29 @@ if [ "$(task_status)" != STARTED ] || [ "$(events vm_created)" -ne 1 ]; then
     echo "the restarted agent did not keep the running vm" >&2
     exit 1
 fi
+echo "editing the workspace and calling the gates from the console..."
+guest \
+    "cd /naos/alpha" \
+    "printf 'beta\n' > notes.txt" \
+    "printf 'gamma\n' > added.txt" \
+    "rm old.txt" \
+    "mv moved.txt renamed.txt" \
+    "ln -s /etc/passwd link" \
+    "mkfifo pipe" \
+    "rm -rf dir && mkdir dir && printf 'new\n' > dir/new.txt" \
+    "cat > /tmp/rpc <<'JSON'" \
+    '{"jsonrpc":"2.0","id":11,"method":"tools/list"}' \
+    '{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"read_file","arguments":{"path":"/naos/alpha/notes.txt"}}}' \
+    '{"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"read_file","arguments":{"path":"/etc/passwd"}}}' \
+    '{"jsonrpc":"2.0","id":14,"method":"tools/call","params":{"name":"git_status","arguments":{"path":"/naos/alpha"}}}' \
+    '{"jsonrpc":"2.0","id":15,"method":"tools/call","params":{"name":"http_request","arguments":{"method":"GET","url":"https://www.google.com/robots.txt"}}}' \
+    '{"jsonrpc":"2.0","id":16,"method":"tools/call","params":{"name":"http_request","arguments":{"method":"GET","url":"https://www.wikipedia.org/"}}}' \
+    '{"jsonrpc":"2.0","id":17,"method":"tools/call","params":{"name":"alpha__search","arguments":{"query":"naos"}}}' \
+    '{"jsonrpc":"2.0","id":11,"method":"ping"}' \
+    "JSON" \
+    "{ cat /tmp/rpc; sleep 20; } | naos-mcp" \
+    "echo NAOS-SMOKE-DONE"
+check_gates
 echo "task $task booted, stopping it..."
 curl -fsS "${auth[@]}" -X POST "$api/api/v1/tasks/$task/stop" -o /dev/null
 wait_for 120 collected
@@ -195,4 +307,5 @@ if [ "$(workspace_tree)" != "$tree_before" ]; then
     echo "the guest changed the host workspace" >&2
     exit 1
 fi
+check_diff
 echo "smoke test passed"

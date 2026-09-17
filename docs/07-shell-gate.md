@@ -199,8 +199,11 @@ There is no cwd to escape: the gate keeps no working directory, and every path
 the agent sends must be an absolute, normalized guest path.
 
 The gate tests in `packages/runner/src/libs/shell/tests.rs` cover all of these,
-`packages/api/tests/test_shell.py` covers policy resolution, and the smoke test
-fails unless `shell_policy_configured` reaches the agent log:
+and `packages/api/tests/test_shell.py` covers policy resolution. The smoke test
+calls the gate from inside the guest through the MCP broker: reading a
+workspace file answers with the text the host has, while a path outside every
+mount and a capability the policy does not grant are refused, so it fails
+unless `shell_allowed` and `shell_denied` both reach the agent log:
 
 ```bash
 make test
