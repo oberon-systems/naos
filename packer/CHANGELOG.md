@@ -1,3 +1,9 @@
+## image-0.2.1 (2026-09-17)
+
+### Bug Fixes
+
+- **packer**: fail the probe on any virtio device but disk and serial
+
 ## image-0.2.0 (2026-09-16)
 
 ### Features
