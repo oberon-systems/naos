@@ -21,6 +21,9 @@ session_value() {
     sed -n "s/.*\"$1\": *\"\([^\"]*\)\".*/\1/p" "$session_config" 2> /dev/null
 }
 
+# The runner reads the upper disk without the kernel, so every option that changes its format is off.
+options="redirect_dir=off,metacopy=off,index=off,xino=off"
+
 # mdev creates no /dev/disk/by-id links, so the upper disk is found by the serial the runner set.
 upper_disk() {
     for serial in /sys/block/vd*/serial; do
@@ -42,7 +45,7 @@ mount_overlay() {
     chown "$(stat -c %u:%g "$lower")" "$upper/data" || return 1
     chmod "$(stat -c %a "$lower")" "$upper/data" || return 1
     mount -t overlay overlay \
-        -o "lowerdir=$lower,upperdir=$upper/data,workdir=$upper/work" "$1"
+        -o "lowerdir=$lower,upperdir=$upper/data,workdir=$upper/work,$options" "$1"
 }
 
 start() {

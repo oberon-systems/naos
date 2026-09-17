@@ -82,9 +82,10 @@ symlinks.
 
 In the guest, `naos-workspace` mounts the share at `/run/naos/lower`. In `rw`
 mode it formats the upper disk on first use, mounts it at `/run/naos/upper`
-and puts an overlay at `/naos/<name>`, so every change lands on the upper disk
-for collection ([09](09-overlay-and-merge.md)). In `ro` mode the share is bound
-read-only at `/naos/<name>`. The agent's tmux session starts there.
+and puts an overlay at `/naos/<name>` with `redirect_dir`, `metacopy`, `index`
+and `xino` off, so every change lands on the upper disk as whole files and
+whiteouts the runner can read ([09](09-overlay-and-merge.md#collection)).
+In `ro` mode the share is bound read-only at `/naos/<name>`. The agent's tmux session starts there.
 
 ## Console and session
 
