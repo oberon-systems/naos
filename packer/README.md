@@ -57,7 +57,9 @@ Run the runner's boot test against every built image of the version in `packer/.
 make test-image
 ```
 
-The test passes when both VMs boot, `boot.log` shows `naos-ready` and `naos-probe ok`, a VM killed from outside is reported as not running, and the cached base image still matches its digest after the guests wrote to their disks.
+The test passes when both VMs boot, `boot.log` shows `naos-ready` and `naos-probe ok`, neither QEMU command line names the other VM's directory, a VM killed from outside is reported as not running, and the cached base image still matches its digest after the guests wrote to their disks.
+
+`naos-probe` fails when the guest sees more than one disk, a 9p or virtiofs mount, a network interface other than `lo`, a virtio device other than the disk and the serial ports, or no answer to a `ping` on the `naos.mcp` port.
 
 ## Publish a release
 

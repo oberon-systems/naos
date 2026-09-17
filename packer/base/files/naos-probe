@@ -58,6 +58,15 @@ start() {
         [ "$name" = lo ] || failures="$failures interface=$name"
     done
 
+    # Only the disk (2) and the serial ports (3): no net, vsock, 9p or virtiofs path to the host.
+    for device in /sys/bus/virtio/devices/*/device; do
+        [ -e "$device" ] || continue
+        case "$(cat "$device")" in
+            0x0002 | 0x0003) ;;
+            *) failures="$failures virtio=$(cat "$device")" ;;
+        esac
+    done
+
     if port=$(mcp_port); then
         mcp_ping "$port" || failures="$failures mcp-ping"
     else
