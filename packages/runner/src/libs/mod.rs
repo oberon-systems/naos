@@ -10,6 +10,7 @@ pub mod image;
 pub mod lease;
 pub mod mcp;
 pub mod network;
+pub mod overlay;
 pub mod qemu;
 pub mod reconciler;
 pub mod runtime;

@@ -44,6 +44,10 @@ pub fn workspace_shared(run_id: &str, mode: &str) {
     tracing::info!(target: "audit", event = "workspace_shared", run_id, mode);
 }
 
+pub fn workspace_collected(run_id: &str, entries: usize, rejected: usize) {
+    tracing::info!(target: "audit", event = "workspace_collected", run_id, entries, rejected);
+}
+
 pub fn vm_destroyed(vm_id: &str, run_id: &str) {
     tracing::info!(target: "audit", event = "vm_destroyed", vm_id, run_id);
 }

@@ -1,5 +1,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -17,6 +19,54 @@ use crate::libs::image::{BoxFuture, ImageSource};
 use crate::libs::runtime::{LocalVm, Runtime};
 
 pub const LEASE_ID: &str = "lease_alpha";
+
+/// An ext4 disk built without root: `mkfs.ext4`, then `debugfs -w` runs `script` from `dir`.
+pub fn ext4_image(dir: &Path, name: &str, script: &str) -> PathBuf {
+    ext4_image_with(dir, name, &[], script)
+}
+
+pub fn ext4_image_with(dir: &Path, name: &str, options: &[&str], script: &str) -> PathBuf {
+    let image = dir.join(name);
+    std::fs::File::create(&image)
+        .and_then(|file| file.set_len(32 * 1024 * 1024))
+        .expect("image");
+    let mkfs = Command::new(e2fs_tool("mkfs.ext4"))
+        .args(["-q", "-F"])
+        .args(options)
+        .arg(&image)
+        .output()
+        .expect("mkfs.ext4");
+    assert!(
+        mkfs.status.success(),
+        "{}",
+        String::from_utf8_lossy(&mkfs.stderr)
+    );
+    let commands = dir.join(format!("{name}.debugfs"));
+    std::fs::write(&commands, script).expect("script");
+    let debugfs = Command::new(e2fs_tool("debugfs"))
+        .arg("-w")
+        .arg(&image)
+        .arg("-f")
+        .arg(&commands)
+        .current_dir(dir)
+        .output()
+        .expect("debugfs");
+    let errors: Vec<_> = String::from_utf8_lossy(&debugfs.stderr)
+        .lines()
+        .filter(|line| !line.starts_with("debugfs "))
+        .map(str::to_owned)
+        .collect();
+    assert!(debugfs.status.success() && errors.is_empty(), "{errors:?}");
+    image
+}
+
+pub fn e2fs_tool(name: &str) -> PathBuf {
+    ["/usr/sbin", "/sbin", "/usr/bin", "/bin"]
+        .iter()
+        .map(|dir| Path::new(dir).join(name))
+        .find(|path| path.exists())
+        .unwrap_or_else(|| panic!("{name} from e2fsprogs is needed by this test"))
+}
 
 pub fn digest_of(bytes: &[u8]) -> String {
     format!("sha256:{}", hex(&Sha256::digest(bytes)))
@@ -219,7 +269,9 @@ pub struct FakeRuntime {
     unavailable: AtomicBool,
     fail_ensure: AtomicBool,
     fail_sync: AtomicBool,
+    fail_collect: AtomicBool,
     synced: Mutex<Vec<LocalVm>>,
+    collected: Mutex<Vec<LocalVm>>,
     ensure_delay: Mutex<Duration>,
 }
 
@@ -252,6 +304,14 @@ impl FakeRuntime {
 
     pub fn synced(&self) -> Vec<LocalVm> {
         lock(&self.synced).clone()
+    }
+
+    pub fn fail_collect(&self) {
+        self.fail_collect.store(true, Ordering::SeqCst);
+    }
+
+    pub fn collected(&self) -> Vec<LocalVm> {
+        lock(&self.collected).clone()
     }
 
     pub fn delay_ensure(&self, delay: Duration) {
@@ -292,6 +352,14 @@ impl Runtime for FakeRuntime {
 
     async fn stop(&self, vm: &LocalVm) -> Result<(), AgentError> {
         lock(&self.stopped).push(vm.clone());
+        Ok(())
+    }
+
+    async fn collect(&self, _: &DesiredRun, vm: &LocalVm) -> Result<(), AgentError> {
+        if self.fail_collect.load(Ordering::SeqCst) {
+            return Err(AgentError::Runtime("collection failed".into()));
+        }
+        lock(&self.collected).push(vm.clone());
         Ok(())
     }
 

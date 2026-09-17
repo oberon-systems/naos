@@ -28,12 +28,14 @@ fn plan_covers_every_status() {
             Action::Sync(vm("run_c")),
             Action::Fail {
                 run_id: "run_d".into(),
+                from: RunStatus::Started,
                 reason: VM_LOST
             },
             Action::Stop {
                 run_id: "run_e".into(),
                 vm: Some(vm("run_e"))
             },
+            Action::Collect(vm("run_f")),
             Action::DestroyOrphan(vm("run_g")),
         ]
     );
@@ -71,7 +73,7 @@ fn plan_ignores_duplicate_desired_entries() {
 }
 
 #[test]
-fn dead_vms_are_replaced_reported_or_kept_for_collection() {
+fn dead_vms_are_replaced_reported_or_collected() {
     let runs = [
         desired_run("run_a", RunStatus::Pending),
         desired_run("run_b", RunStatus::Starting),
@@ -96,9 +98,11 @@ fn dead_vms_are_replaced_reported_or_kept_for_collection() {
             Action::Start("run_b".into()),
             Action::Fail {
                 run_id: "run_c".into(),
+                from: RunStatus::Started,
                 reason: VM_LOST
             },
             Action::DestroyOrphan(dead_vm("run_c")),
+            Action::Collect(dead_vm("run_d")),
             Action::Stop {
                 run_id: "run_e".into(),
                 vm: Some(dead_vm("run_e"))
@@ -261,5 +265,67 @@ async fn orphans_are_destroyed_and_stops_collected() {
     assert_eq!(
         api.transitions(),
         vec![("run_a".into(), RunStatus::Stopping, RunStatus::Collecting)]
+    );
+}
+
+#[test]
+fn a_collecting_run_without_its_vm_is_lost() {
+    let runs = [desired_run("run_a", RunStatus::Collecting)];
+
+    assert_eq!(
+        plan(&runs, &[]),
+        vec![Action::Fail {
+            run_id: "run_a".into(),
+            from: RunStatus::Collecting,
+            reason: VM_LOST
+        }]
+    );
+}
+
+#[tokio::test]
+async fn a_collected_run_stays_collecting() {
+    let api = FakeApi::default();
+    let runtime = FakeRuntime::with_vms(vec![dead_vm("run_a")]);
+    let state = desired(vec![desired_run("run_a", RunStatus::Collecting)]);
+    let images = FakeSource::new(IMAGE);
+
+    let failures = reconcile(
+        &api,
+        &runtime,
+        &images,
+        &api.credentials(),
+        &state,
+        &runtime.vms(),
+    )
+    .await;
+
+    assert_eq!(failures, 0);
+    assert_eq!(runtime.collected(), vec![dead_vm("run_a")]);
+    assert_eq!(runtime.vms(), vec![dead_vm("run_a")]);
+    assert!(api.transitions().is_empty());
+}
+
+#[tokio::test]
+async fn a_failed_collection_fails_the_run() {
+    let api = FakeApi::default();
+    let runtime = FakeRuntime::with_vms(vec![dead_vm("run_a")]);
+    runtime.fail_collect();
+    let state = desired(vec![desired_run("run_a", RunStatus::Collecting)]);
+    let images = FakeSource::new(IMAGE);
+
+    let failures = reconcile(
+        &api,
+        &runtime,
+        &images,
+        &api.credentials(),
+        &state,
+        &runtime.vms(),
+    )
+    .await;
+
+    assert_eq!(failures, 1);
+    assert_eq!(
+        api.transitions(),
+        vec![("run_a".into(), RunStatus::Collecting, RunStatus::Failed)]
     );
 }

@@ -9,6 +9,7 @@ use crate::libs::runtime::{LocalVm, Runtime};
 
 pub const VM_LOST: &str = "vm lost";
 pub const VM_START_FAILED: &str = "vm start failed";
+pub const COLLECTION_FAILED: &str = "collection failed";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
@@ -17,12 +18,14 @@ pub enum Action {
     Sync(LocalVm),
     Fail {
         run_id: String,
+        from: RunStatus,
         reason: &'static str,
     },
     Stop {
         run_id: String,
         vm: Option<LocalVm>,
     },
+    Collect(LocalVm),
     DestroyOrphan(LocalVm),
 }
 
@@ -58,6 +61,7 @@ pub fn plan(desired: &[DesiredRun], actual: &[LocalVm]) -> Vec<Action> {
                 None => {
                     actions.push(Action::Fail {
                         run_id,
+                        from: RunStatus::Started,
                         reason: VM_LOST,
                     });
                     actions.extend(dead.map(Action::DestroyOrphan));
@@ -67,7 +71,15 @@ pub fn plan(desired: &[DesiredRun], actual: &[LocalVm]) -> Vec<Action> {
                 run_id,
                 vm: live.or(dead),
             }),
-            RunStatus::Collecting | RunStatus::WaitingMerge => {}
+            RunStatus::Collecting => actions.push(match live.or(dead) {
+                Some(vm) => Action::Collect(vm),
+                None => Action::Fail {
+                    run_id,
+                    from: RunStatus::Collecting,
+                    reason: VM_LOST,
+                },
+            }),
+            RunStatus::WaitingMerge => {}
             RunStatus::Completed | RunStatus::Failed | RunStatus::Cancelled => {
                 actions.extend(live.or(dead).map(Action::DestroyOrphan));
             }
@@ -122,8 +134,12 @@ impl<A: Api + Sync, R: Runtime> Executor<'_, A, R> {
             }
             Action::Start(run_id) => self.start(run_id).await,
             Action::Sync(vm) => self.runtime.sync(self.run(&vm.run_id)?, vm).await,
-            Action::Fail { run_id, reason } => {
-                self.advance(run_id, RunStatus::Started, RunStatus::Failed, Some(reason))
+            Action::Fail {
+                run_id,
+                from,
+                reason,
+            } => {
+                self.advance(run_id, *from, RunStatus::Failed, Some(reason))
                     .await?;
                 audit::run_failed(run_id, reason);
                 Ok(())
@@ -134,6 +150,20 @@ impl<A: Api + Sync, R: Runtime> Executor<'_, A, R> {
                 }
                 self.advance(run_id, RunStatus::Stopping, RunStatus::Collecting, None)
                     .await
+            }
+            Action::Collect(vm) => {
+                let Err(err) = self.runtime.collect(self.run(&vm.run_id)?, vm).await else {
+                    return Ok(());
+                };
+                self.advance(
+                    &vm.run_id,
+                    RunStatus::Collecting,
+                    RunStatus::Failed,
+                    Some(COLLECTION_FAILED),
+                )
+                .await?;
+                audit::run_failed(&vm.run_id, COLLECTION_FAILED);
+                Err(err)
             }
             Action::DestroyOrphan(vm) => {
                 self.runtime.destroy(vm).await?;

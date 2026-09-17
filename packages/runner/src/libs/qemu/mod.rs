@@ -77,6 +77,10 @@ impl VmPaths {
     pub fn virtiofsd_log(&self) -> PathBuf {
         self.dir.join("virtiofsd.log")
     }
+
+    pub fn diff(&self) -> PathBuf {
+        self.dir.join("diff.json")
+    }
 }
 
 /// The complete QEMU command line: every device and host path the guest can reach is listed here.

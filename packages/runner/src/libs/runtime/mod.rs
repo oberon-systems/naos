@@ -29,6 +29,7 @@ use crate::libs::ids::random_hex;
 use crate::libs::image::{ImageCache, ImageSource};
 use crate::libs::mcp::{self, McpGate};
 use crate::libs::network::NetworkGate;
+use crate::libs::overlay::{self, Diff};
 use crate::libs::qemu::{self, VmPaths, WorkspaceMode, PROCESS_PREFIX};
 use crate::libs::shell::ShellGate;
 
@@ -68,6 +69,13 @@ pub trait Runtime {
     ) -> impl Future<Output = Result<(), AgentError>> + Send;
 
     fn stop(&self, vm: &LocalVm) -> impl Future<Output = Result<(), AgentError>> + Send;
+
+    /// Writes the workspace diff of a stopped Run once; a Run without a writable workspace gets an empty one.
+    fn collect(
+        &self,
+        run: &DesiredRun,
+        vm: &LocalVm,
+    ) -> impl Future<Output = Result<(), AgentError>> + Send;
 
     fn destroy(&self, vm: &LocalVm) -> impl Future<Output = Result<(), AgentError>> + Send;
 }
@@ -516,6 +524,33 @@ impl Runtime for QemuRuntime {
         }
         release_share(&paths).await?;
         audit::vm_stopped(&vm.vm_id, &vm.run_id);
+        Ok(())
+    }
+
+    async fn collect(&self, run: &DesiredRun, vm: &LocalVm) -> Result<(), AgentError> {
+        let paths = self.paths(&vm.vm_id)?;
+        if paths.diff().exists() {
+            return Ok(());
+        }
+        terminate(&vm.vm_id).await?;
+        release_share(&paths).await?;
+        let diff = match workspace_of(run)? {
+            Some(workspace) if workspace.mode == WorkspaceMode::ReadWrite => {
+                let upper = paths.upper();
+                tokio::task::spawn_blocking(move || overlay::collect(&upper, &workspace.host))
+                    .await
+                    .map_err(runtime_error)??
+            }
+            _ => Diff::default(),
+        };
+        let staged = paths.dir.join("diff.json.tmp");
+        match fs::remove_file(&staged) {
+            Err(err) if err.kind() != ErrorKind::NotFound => return Err(err.into()),
+            _ => {}
+        }
+        write_private(&staged, &serde_json::to_vec(&diff).map_err(runtime_error)?)?;
+        fs::rename(&staged, paths.diff())?;
+        audit::workspace_collected(&vm.run_id, diff.entries.len(), diff.rejected());
         Ok(())
     }
 

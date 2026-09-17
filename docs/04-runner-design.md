@@ -97,7 +97,9 @@ this table. While the runtime cannot list VMs, the heartbeat offers capacity
 | STARTED | running | refresh the gates, reattach the MCP session |
 | STARTED | dead or missing | report FAILED `vm lost`, destroy a dead VM |
 | STOPPING | any | stop the VM, report COLLECTING |
-| COLLECTING, WAITING_MERGE | any | none, the overlay is kept |
+| COLLECTING | running or dead | collect the workspace diff once; on failure report FAILED `collection failed` |
+| COLLECTING | missing | report FAILED `vm lost` |
+| WAITING_MERGE | any | none, the overlay is kept |
 | terminal | present | destroy as orphan |
 | not desired | present | destroy as orphan |
 
@@ -146,6 +148,14 @@ and the Run's virtiofsd; the overlay and the upper disk stay for collection.
 Destroying kills both and removes the VM directory, and repeating it is
 harmless. virtiofsd is found by the `fs.sock` path on its command line.
 
+Collecting a Run kills whatever is left of QEMU and virtiofsd, then writes
+`diff.json` into the VM directory through a temporary file and a rename. A Run
+without a `rw` workspace gets an empty diff; otherwise the runner reads
+`upper.img` in userspace and compares it with the host workspace
+([09](09-overlay-and-merge.md#collection)). An existing `diff.json` is kept,
+so collection runs once per VM. The Run stays COLLECTING until the diff
+reaches the API.
+
 ```text
 $NAOS_AGENT_VM_DIR/vm_<32 hex>/
   vm.json        vm_id, run_id, image id and digest, mode 0600
@@ -158,6 +168,7 @@ $NAOS_AGENT_VM_DIR/vm_<32 hex>/
   qemu.log       QEMU stderr, mode 0600
   fs.sock        virtiofsd socket of the workspace share
   upper.img      rw workspace: the disk the guest's changes land on
+  diff.json      the collected workspace diff, mode 0600
   virtiofsd.log  virtiofsd stderr, mode 0600
 ```
 
@@ -176,7 +187,8 @@ The runtime writes audit events `image_cached`, `image_rejected`,
 `vm_created`, `vm_stopped`, `vm_destroyed`, `network_policy_configured`,
 `shell_policy_configured`, `mcp_policy_configured`,
 `mcp_credentials_updated`, `mcp_attached`, `mcp_rejected`, `mcp_call` and
-`workspace_shared` (with `mode`),
+`workspace_shared` (with `mode`), `workspace_collected` (with `entries` and
+`rejected`),
 each with its `run_id`, `vm_id` or digest.
 
 ## Console

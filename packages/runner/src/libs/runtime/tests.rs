@@ -6,7 +6,7 @@ use tempfile::TempDir;
 use super::*;
 use crate::libs::api::{RunCredential, RunStatus};
 use crate::libs::shell::{ShellRequest, ShellResponse};
-use crate::libs::testing::{desired_run, digest_of, FakeSource};
+use crate::libs::testing::{desired_run, digest_of, ext4_image, FakeSource};
 
 const IMAGE: &[u8] = b"qcow2-alpha";
 const FAKE_QEMU_IMG: &str = "#!/bin/sh\n\
@@ -413,6 +413,97 @@ async fn list_reports_dead_vms_and_destroy_is_idempotent() {
     runtime.destroy(&dead).await.expect("destroy");
     runtime.destroy(&dead).await.expect("destroy again");
     assert_eq!(vm_dirs(&dir), vec!["junk".to_owned()]);
+}
+
+fn stopped_vm(dir: &TempDir) -> (LocalVm, PathBuf) {
+    let vm = LocalVm {
+        vm_id: "vm_0123456789abcdef0123456789abcdef".into(),
+        run_id: "run_a".into(),
+        running: false,
+    };
+    let vm_dir = dir.path().join("runs").join(&vm.vm_id);
+    fs::create_dir(&vm_dir).expect("mkdir");
+    (vm, vm_dir)
+}
+
+#[tokio::test]
+async fn a_run_without_a_writable_workspace_collects_an_empty_diff_once() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let runtime =
+        QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
+    let (vm, vm_dir) = stopped_vm(&dir);
+    let host = dir.path().join("alpha");
+    fs::create_dir(&host).expect("workspace");
+    let mut run = desired_run("run_a", RunStatus::Collecting);
+    with_workspace(&mut run, &host, "ro");
+
+    runtime.collect(&run, &vm).await.expect("collect");
+    assert_eq!(
+        fs::read_to_string(vm_dir.join("diff.json")).expect("diff"),
+        r#"{"entries":[]}"#
+    );
+    assert_eq!(
+        fs::metadata(vm_dir.join("diff.json"))
+            .expect("meta")
+            .permissions()
+            .mode()
+            & 0o777,
+        0o600
+    );
+
+    fs::write(vm_dir.join("diff.json"), "kept").expect("write");
+    runtime.collect(&run, &vm).await.expect("collect again");
+    assert_eq!(
+        fs::read_to_string(vm_dir.join("diff.json")).expect("diff"),
+        "kept"
+    );
+}
+
+#[tokio::test]
+async fn a_writable_workspace_is_collected_from_its_upper_disk() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let runtime =
+        QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
+    let (vm, vm_dir) = stopped_vm(&dir);
+    let host = dir.path().join("alpha");
+    fs::create_dir(&host).expect("workspace");
+    fs::write(host.join("old.txt"), "old\n").expect("write");
+    let mut run = desired_run("run_a", RunStatus::Collecting);
+    with_workspace(&mut run, &host, "rw");
+    let upper = ext4_image(
+        &vm_dir,
+        "upper.img",
+        "mkdir data\nmkdir work\ncd data\nmknod old.txt c 0 0\n",
+    );
+    fs::remove_file(vm_dir.join("upper.img.debugfs")).expect("script");
+
+    runtime.collect(&run, &vm).await.expect("collect");
+
+    let diff: Value =
+        serde_json::from_slice(&fs::read(vm_dir.join("diff.json")).expect("diff")).expect("json");
+    assert_eq!(diff["entries"][0]["path"], "old.txt");
+    assert_eq!(diff["entries"][0]["change"], "deleted");
+    assert!(upper.exists());
+    assert_eq!(
+        fs::read_to_string(host.join("old.txt")).expect("host"),
+        "old\n"
+    );
+}
+
+#[tokio::test]
+async fn a_broken_upper_disk_leaves_no_diff() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let runtime =
+        QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
+    let (vm, vm_dir) = stopped_vm(&dir);
+    let host = dir.path().join("alpha");
+    fs::create_dir(&host).expect("workspace");
+    let mut run = desired_run("run_a", RunStatus::Collecting);
+    with_workspace(&mut run, &host, "rw");
+    fs::write(vm_dir.join("upper.img"), vec![0u8; 1 << 20]).expect("upper");
+
+    assert!(runtime.collect(&run, &vm).await.is_err());
+    assert!(!vm_dir.join("diff.json").exists());
 }
 
 #[tokio::test]
