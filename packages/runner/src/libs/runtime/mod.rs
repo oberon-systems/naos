@@ -56,6 +56,13 @@ pub trait Runtime {
         images: &dyn ImageSource,
     ) -> impl Future<Output = Result<LocalVm, AgentError>> + Send;
 
+    /// Keeps a running VM in step with its Run: fresh credentials and a live MCP session.
+    fn sync(
+        &self,
+        run: &DesiredRun,
+        vm: &LocalVm,
+    ) -> impl Future<Output = Result<(), AgentError>> + Send;
+
     fn stop(&self, vm: &LocalVm) -> impl Future<Output = Result<(), AgentError>> + Send;
 
     fn destroy(&self, vm: &LocalVm) -> impl Future<Output = Result<(), AgentError>> + Send;
@@ -100,6 +107,44 @@ impl QemuRuntime {
             gates: Mutex::new(HashMap::new()),
             sessions: Mutex::new(HashMap::new()),
         })
+    }
+
+    /// Admission check and gate registration: an unusable policy fails the run before an image is
+    /// ever fetched, and every call hands the kept MCP gate the latest credentials.
+    fn register(&self, run: &DesiredRun) -> Result<(), AgentError> {
+        let policy = |kind: &str| run.policies.get(kind).and_then(Option::as_ref);
+        let gates = RunGates {
+            network: NetworkGate::from_snapshot(&run.id, policy("network"))?,
+            shell: ShellGate::from_snapshot(
+                &run.id,
+                policy("shell"),
+                policy("mount"),
+                &self.git_binary,
+            )?,
+            mcp: McpGate::from_snapshot(&run.id, policy("mcp"))?,
+        };
+        let granted: Vec<&str> = run
+            .granted_policies()
+            .into_iter()
+            .filter(|kind| !matches!(*kind, "network" | "shell" | "mount" | "mcp"))
+            .collect();
+        if !granted.is_empty() {
+            return Err(AgentError::Runtime(format!(
+                "run {} grants {} which this runtime cannot enforce yet",
+                run.id,
+                granted.join(", ")
+            )));
+        }
+        // The policy is immutable for the life of the Run, so a reconcile keeps the gate it
+        // registered: rebuilding it would hand the Run a fresh request budget every tick.
+        self.gates
+            .lock()
+            .expect("gates")
+            .entry(run.id.clone())
+            .or_insert_with(|| Arc::new(gates))
+            .mcp
+            .refresh(&run.credentials);
+        Ok(())
     }
 
     /// The gates of a running Run, which its MCP session borrows.
@@ -273,37 +318,7 @@ impl Runtime for QemuRuntime {
         run: &DesiredRun,
         images: &dyn ImageSource,
     ) -> Result<LocalVm, AgentError> {
-        // Admission check: an unusable policy fails the run before an image is ever fetched.
-        let network = run.policies.get("network").and_then(Option::as_ref);
-        let shell = run.policies.get("shell").and_then(Option::as_ref);
-        let mounts = run.policies.get("mount").and_then(Option::as_ref);
-        let mcp_policy = run.policies.get("mcp").and_then(Option::as_ref);
-        let gates = RunGates {
-            network: NetworkGate::from_snapshot(&run.id, network)?,
-            shell: ShellGate::from_snapshot(&run.id, shell, mounts, &self.git_binary)?,
-            mcp: McpGate::from_snapshot(&run.id, mcp_policy)?,
-        };
-        let granted: Vec<&str> = run
-            .granted_policies()
-            .into_iter()
-            .filter(|kind| !matches!(*kind, "network" | "shell" | "mount" | "mcp"))
-            .collect();
-        if !granted.is_empty() {
-            return Err(AgentError::Runtime(format!(
-                "run {} grants {} which this runtime cannot enforce yet",
-                run.id,
-                granted.join(", ")
-            )));
-        }
-        // The policy is immutable for the life of the Run, so a reconcile keeps the gate it
-        // registered: rebuilding it would hand the Run a fresh request budget every tick.
-        self.gates
-            .lock()
-            .expect("gates")
-            .entry(run.id.clone())
-            .or_insert_with(|| Arc::new(gates))
-            .mcp
-            .refresh(&run.credentials);
+        self.register(run)?;
         if let Some(existing) = scan(&self.vm_dir)?
             .into_iter()
             .find(|vm| vm.run_id == run.id && vm.running)
@@ -336,13 +351,14 @@ impl Runtime for QemuRuntime {
         drop(base);
         match launched {
             Ok(()) => {
-                if network.is_some() {
+                let granted = |kind: &str| run.policies.get(kind).is_some_and(Option::is_some);
+                if granted("network") {
                     audit::network_policy_configured(&vm.run_id);
                 }
-                if shell.is_some() {
+                if granted("shell") {
                     audit::shell_policy_configured(&vm.run_id);
                 }
-                if mcp_policy.is_some() {
+                if granted("mcp") {
                     audit::mcp_policy_configured(&vm.run_id);
                 }
                 audit::vm_created(&vm.vm_id, &vm.run_id);
@@ -356,6 +372,12 @@ impl Runtime for QemuRuntime {
                 Err(err)
             }
         }
+    }
+
+    async fn sync(&self, run: &DesiredRun, vm: &LocalVm) -> Result<(), AgentError> {
+        self.register(run)?;
+        self.attach(vm, &self.paths(&vm.vm_id)?);
+        Ok(())
     }
 
     async fn stop(&self, vm: &LocalVm) -> Result<(), AgentError> {

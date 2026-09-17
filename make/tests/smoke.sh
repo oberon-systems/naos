@@ -56,6 +56,33 @@ collected() {
     [ "$(task_status)" = COLLECTING ]
 }
 
+events() {
+    grep -c "event\":\"$1\"" "$TEMP_DIR/agent.log" || true
+}
+
+first_line() {
+    grep -n -m1 "event\":\"$1\"" "$TEMP_DIR/agent.log" | cut -d: -f1
+}
+
+agent_gone() {
+    ! kill -0 -- "-$agent" 2>/dev/null
+}
+
+reattached() {
+    [ "$(events mcp_attached)" -ge 2 ] && [ "$(events mcp_credentials_updated)" -ge 2 ]
+}
+
+start_agent() {
+    NAOS_AGENT_API_URL="$api" \
+        NAOS_AGENT_NAME=alpha \
+        NAOS_AGENT_STATE_DIR="$TEMP_DIR/state" \
+        NAOS_AGENT_ENROLLMENT_TOKEN_FILE="$TEMP_DIR/enrollment" \
+        NAOS_AGENT_IMAGE_DIR="$TEMP_DIR/vms" \
+        NAOS_AGENT_VM_DIR="$TEMP_DIR/runs" \
+        setsid cargo run -q -p naos-agent >>"$TEMP_DIR/agent.log" 2>&1 &
+    agent=$!
+}
+
 mkdir -m 700 "$TEMP_DIR" "$TEMP_DIR/state"
 echo "smoke test of $release/$image, working dir: $TEMP_DIR"
 
@@ -79,7 +106,7 @@ NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256="$(sha256sum "$TEMP_DIR/enrollment" | cut -d
 NAOS_DATABASE_URL="sqlite:///$TEMP_DIR/naos.db" \
     setsid "$MAKE" -C "$ROOT" run-api >"$TEMP_DIR/api.log" 2>&1 &
 server=$!
-wait_for 30 curl -fsS -o /dev/null "$api/healthz"
+wait_for 30 curl -fs -o /dev/null "$api/healthz"
 
 echo "registering the image and creating a task..."
 curl -fsS "${auth[@]}" "$api/api/v1/images" -o /dev/null -d @- <<EOF
@@ -95,29 +122,45 @@ shell_policy="$(
 {"kind": "shell", "document": {"allow": ["read_file", "list_dir", "grep"]}}
 EOF
 )"
+curl -fsS "${auth[@]}" "$api/api/v1/secrets" -o /dev/null -d @- <<EOF
+{"name": "alpha-token", "value": "$(token)"}
+EOF
+mcp_policy="$(
+    curl -fsS "${auth[@]}" "$api/api/v1/policies" -d @- <<EOF | field id
+{"kind": "mcp", "document": {"servers": [{"name": "alpha", "url": "https://example.com/mcp", "tools": ["search"], "resources": [], "credential": "alpha-token"}]}}
+EOF
+)"
 task="$(
     curl -fsS "${auth[@]}" -H "Idempotency-Key: smoke" "$api/api/v1/tasks" -d @- <<EOF | field id
-{"image": {"id": "naos-agents", "digest": "$digest"}, "runtime": {"cpu": 2, "memory_mib": 2048, "disk_gib": 8}, "network": {"policy": "$network_policy"}, "shell": {"policy": "$shell_policy"}, "timeout": 3600}
+{"image": {"id": "naos-agents", "digest": "$digest"}, "runtime": {"cpu": 2, "memory_mib": 2048, "disk_gib": 8}, "network": {"policy": "$network_policy"}, "shell": {"policy": "$shell_policy"}, "mcp": {"policy": "$mcp_policy"}, "timeout": 3600}
 EOF
 )"
 
 echo "starting agent..."
-NAOS_AGENT_API_URL="$api" \
-    NAOS_AGENT_NAME=alpha \
-    NAOS_AGENT_STATE_DIR="$TEMP_DIR/state" \
-    NAOS_AGENT_ENROLLMENT_TOKEN_FILE="$TEMP_DIR/enrollment" \
-    NAOS_AGENT_IMAGE_DIR="$TEMP_DIR/vms" \
-    NAOS_AGENT_VM_DIR="$TEMP_DIR/runs" \
-    setsid cargo run -q -p naos-agent >"$TEMP_DIR/agent.log" 2>&1 &
-agent=$!
+start_agent
 
 wait_for 900 booted
-for event in network_policy_configured shell_policy_configured; do
-    grep -qs "event\":\"$event\"" "$TEMP_DIR/agent.log" || {
+for event in network_policy_configured shell_policy_configured mcp_policy_configured mcp_attached; do
+    [ "$(events "$event")" -ge 1 ] || {
         echo "$event is missing from the agent log" >&2
         exit 1
     }
 done
+credentials="$(first_line mcp_credentials_updated)"
+if [ -z "$credentials" ] || [ "$credentials" -gt "$(first_line vm_created)" ]; then
+    echo "the vm started before its mcp gate held the credentials" >&2
+    exit 1
+fi
+
+echo "restarting agent with the vm running..."
+kill -- "-$agent"
+wait_for 30 agent_gone
+start_agent
+wait_for 120 reattached
+if [ "$(task_status)" != STARTED ] || [ "$(events vm_created)" -ne 1 ]; then
+    echo "the restarted agent did not keep the running vm" >&2
+    exit 1
+fi
 echo "task $task booted, stopping it..."
 curl -fsS "${auth[@]}" -X POST "$api/api/v1/tasks/$task/stop" -o /dev/null
 wait_for 120 collected

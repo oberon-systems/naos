@@ -218,6 +218,8 @@ pub struct FakeRuntime {
     stopped: Mutex<Vec<LocalVm>>,
     unavailable: AtomicBool,
     fail_ensure: AtomicBool,
+    fail_sync: AtomicBool,
+    synced: Mutex<Vec<LocalVm>>,
     ensure_delay: Mutex<Duration>,
 }
 
@@ -242,6 +244,14 @@ impl FakeRuntime {
 
     pub fn fail_ensure(&self) {
         self.fail_ensure.store(true, Ordering::SeqCst);
+    }
+
+    pub fn fail_sync(&self) {
+        self.fail_sync.store(true, Ordering::SeqCst);
+    }
+
+    pub fn synced(&self) -> Vec<LocalVm> {
+        lock(&self.synced).clone()
     }
 
     pub fn delay_ensure(&self, delay: Duration) {
@@ -270,6 +280,14 @@ impl Runtime for FakeRuntime {
         let created = vm(&run.id);
         vms.push(created.clone());
         Ok(created)
+    }
+
+    async fn sync(&self, _: &DesiredRun, vm: &LocalVm) -> Result<(), AgentError> {
+        if self.fail_sync.load(Ordering::SeqCst) {
+            return Err(AgentError::Runtime("sync failed".into()));
+        }
+        lock(&self.synced).push(vm.clone());
+        Ok(())
     }
 
     async fn stop(&self, vm: &LocalVm) -> Result<(), AgentError> {

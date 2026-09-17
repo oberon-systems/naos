@@ -297,7 +297,7 @@ def test_desired_state_resolves_policy_documents(
     assert run["policies"]["network"] is None
 
 
-def test_credentials_reach_only_starting_and_started_runs(
+def test_credentials_reach_only_leased_runs_before_they_stop(
     client: TestClient,
     register: Register,
     spec_body: dict[str, Any],
@@ -315,11 +315,11 @@ def test_credentials_reach_only_starting_and_started_runs(
     def credentials() -> Any:
         return _desired(client, runner).json()["tasks"][0]["credentials"]
 
-    assert credentials() == {}
+    issued = {"alpha-token": {"value": "secret-alpha-value", "expires_at": clock() + 300}}
+
+    assert credentials() == issued
     _walk(client, runner, run_id, [S.PENDING, S.STARTING, S.STARTED])
-    assert credentials() == {
-        "alpha-token": {"value": "secret-alpha-value", "expires_at": clock() + 300}
-    }
+    assert credentials() == issued
     _walk(client, runner, run_id, [S.STARTED, S.STOPPING])
     assert credentials() == {}
 

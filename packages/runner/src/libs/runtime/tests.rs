@@ -1,9 +1,10 @@
+use std::collections::BTreeMap;
 use std::os::unix::fs::PermissionsExt;
 
 use tempfile::TempDir;
 
 use super::*;
-use crate::libs::api::RunStatus;
+use crate::libs::api::{RunCredential, RunStatus};
 use crate::libs::testing::{desired_run, digest_of, FakeSource};
 
 const IMAGE: &[u8] = b"qcow2-alpha";
@@ -120,6 +121,50 @@ async fn a_failed_start_leaves_no_gate_behind() {
     assert!(runtime.ensure(&run, &FakeSource::new(IMAGE)).await.is_err());
 
     assert!(runtime.gates(&run.id).is_none());
+}
+
+#[tokio::test]
+async fn sync_refreshes_credentials_on_the_kept_gate_and_never_launches() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let runtime =
+        QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
+    let mut run = desired_run("run_a", RunStatus::Started);
+    run.policies.insert(
+        "mcp".into(),
+        Some(json!({ "servers": [{
+            "name": "alpha", "url": "https://example.com/mcp", "tools": ["search"],
+            "resources": [], "credential": "alpha-token",
+            "timeout_seconds": 30, "max_calls_per_minute": 60,
+        }] })),
+    );
+    let vm = LocalVm {
+        vm_id: "vm_0123456789abcdef0123456789abcdef".into(),
+        run_id: run.id.clone(),
+        running: true,
+    };
+    let issue = |run: &mut DesiredRun, value: &str| {
+        run.credentials = BTreeMap::from([(
+            "alpha-token".to_owned(),
+            RunCredential {
+                value: value.into(),
+                expires_at: u64::MAX,
+            },
+        )]);
+    };
+
+    runtime.sync(&run, &vm).await.expect("sync");
+    let first = runtime.gates(&run.id).expect("gates");
+    assert_eq!(first.mcp.credential_value("alpha-token"), None);
+    issue(&mut run, "alpha-secret-2");
+    runtime.sync(&run, &vm).await.expect("sync again");
+
+    let kept = runtime.gates(&run.id).expect("gates");
+    assert!(Arc::ptr_eq(&first, &kept));
+    assert_eq!(
+        kept.mcp.credential_value("alpha-token").as_deref(),
+        Some("alpha-secret-2")
+    );
+    assert!(vm_dirs(&dir).is_empty());
 }
 
 #[tokio::test]

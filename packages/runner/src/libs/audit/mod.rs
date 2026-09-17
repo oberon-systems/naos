@@ -86,6 +86,11 @@ pub fn mcp_policy_configured(run_id: &str) {
     tracing::info!(target: "audit", event = "mcp_policy_configured", run_id);
 }
 
+// Only the secret names, which the policy document already carries.
+pub fn mcp_credentials_updated(run_id: &str, names: &str) {
+    tracing::info!(target: "audit", event = "mcp_credentials_updated", run_id, names);
+}
+
 // Arguments are not logged: a header or body may carry a secret. The resource is the policy prefix that matched.
 pub fn mcp_call(
     run_id: &str,

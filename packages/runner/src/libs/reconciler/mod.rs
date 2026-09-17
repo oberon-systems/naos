@@ -14,6 +14,7 @@ pub const VM_START_FAILED: &str = "vm start failed";
 pub enum Action {
     Claim(String),
     Start(String),
+    Sync(LocalVm),
     Fail {
         run_id: String,
         reason: &'static str,
@@ -52,18 +53,21 @@ pub fn plan(desired: &[DesiredRun], actual: &[LocalVm]) -> Vec<Action> {
                 actions.extend(dead.map(Action::DestroyOrphan));
                 actions.push(Action::Start(run_id));
             }
-            RunStatus::Started if live.is_none() => {
-                actions.push(Action::Fail {
-                    run_id,
-                    reason: VM_LOST,
-                });
-                actions.extend(dead.map(Action::DestroyOrphan));
-            }
+            RunStatus::Started => match live {
+                Some(vm) => actions.push(Action::Sync(vm)),
+                None => {
+                    actions.push(Action::Fail {
+                        run_id,
+                        reason: VM_LOST,
+                    });
+                    actions.extend(dead.map(Action::DestroyOrphan));
+                }
+            },
             RunStatus::Stopping => actions.push(Action::Stop {
                 run_id,
                 vm: live.or(dead),
             }),
-            RunStatus::Started | RunStatus::Collecting | RunStatus::WaitingMerge => {}
+            RunStatus::Collecting | RunStatus::WaitingMerge => {}
             RunStatus::Completed | RunStatus::Failed | RunStatus::Cancelled => {
                 actions.extend(live.or(dead).map(Action::DestroyOrphan));
             }
@@ -117,6 +121,7 @@ impl<A: Api + Sync, R: Runtime> Executor<'_, A, R> {
                 self.start(run_id).await
             }
             Action::Start(run_id) => self.start(run_id).await,
+            Action::Sync(vm) => self.runtime.sync(self.run(&vm.run_id)?, vm).await,
             Action::Fail { run_id, reason } => {
                 self.advance(run_id, RunStatus::Started, RunStatus::Failed, Some(reason))
                     .await?;
@@ -138,13 +143,16 @@ impl<A: Api + Sync, R: Runtime> Executor<'_, A, R> {
         }
     }
 
-    async fn start(&self, run_id: &str) -> Result<(), AgentError> {
-        let run = self
-            .desired
+    fn run(&self, run_id: &str) -> Result<&DesiredRun, AgentError> {
+        self.desired
             .runs
             .iter()
             .find(|run| run.id == run_id)
-            .ok_or_else(|| AgentError::Runtime(format!("run {run_id} is not desired")))?;
+            .ok_or_else(|| AgentError::Runtime(format!("run {run_id} is not desired")))
+    }
+
+    async fn start(&self, run_id: &str) -> Result<(), AgentError> {
+        let run = self.run(run_id)?;
         match self.runtime.ensure(run, self.images).await {
             Ok(_) => {
                 self.advance(run_id, RunStatus::Starting, RunStatus::Started, None)

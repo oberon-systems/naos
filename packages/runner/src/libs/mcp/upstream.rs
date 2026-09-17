@@ -11,6 +11,7 @@ use serde_json::{json, Value};
 
 use super::PROTOCOL_VERSIONS;
 use crate::libs::api::RunCredential;
+use crate::libs::audit;
 use crate::libs::error::AgentError;
 use crate::libs::network::{GateRequest, NetworkGate};
 
@@ -162,6 +163,7 @@ impl Upstream {
 /// The external servers of one Run and the credentials the API last issued for it.
 #[derive(Debug)]
 pub struct McpGate {
+    run_id: String,
     servers: Vec<Upstream>,
     credentials: Mutex<BTreeMap<String, RunCredential>>,
 }
@@ -191,13 +193,19 @@ impl McpGate {
             None => vec![],
         };
         Ok(Self {
+            run_id: run_id.to_owned(),
             servers,
             credentials: Mutex::new(BTreeMap::new()),
         })
     }
 
     pub fn refresh(&self, credentials: &BTreeMap<String, RunCredential>) {
-        *self.credentials.lock().expect("credentials") = credentials.clone();
+        let mut held = self.credentials.lock().expect("credentials");
+        if !held.keys().eq(credentials.keys()) {
+            let names: Vec<&str> = credentials.keys().map(String::as_str).collect();
+            audit::mcp_credentials_updated(&self.run_id, &names.join(","));
+        }
+        *held = credentials.clone();
     }
 
     pub fn servers(&self) -> &[Upstream] {
@@ -547,6 +555,13 @@ impl McpGate {
         Self::build("run_a", Some(document), "http", &|_, policy| {
             NetworkGate::local(policy, ips.clone())
         })
+    }
+
+    pub(crate) fn credential_value(&self, name: &str) -> Option<String> {
+        let credentials = self.credentials.lock().expect("credentials");
+        credentials
+            .get(name)
+            .map(|credential| credential.value.clone())
     }
 }
 

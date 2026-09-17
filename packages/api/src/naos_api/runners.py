@@ -18,7 +18,7 @@ from naos_api.spec import PolicyKind, RunSpec
 S = TaskStatus
 LEASE_EXPIRED_REASON = "runner lease expired"
 LEASE_BOUND = frozenset({S.STARTING, S.STARTED, S.STOPPING, S.COLLECTING})
-CREDENTIAL_BOUND = frozenset({S.STARTING, S.STARTED})
+CREDENTIAL_BOUND = frozenset({S.PENDING, S.STARTING, S.STARTED})
 RUNNER_TRANSITIONS = frozenset(
     {
         (S.PENDING, S.STARTING),

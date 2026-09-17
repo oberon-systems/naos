@@ -172,9 +172,6 @@ The agent never holds a provider credential:
 - every string an upstream answer or error carries back has the credential
   value replaced by `<redacted>`.
 
-The first reconcile of a claimed Run starts the VM with the desired state read
-before the claim, so calls that need a credential deny until the next pass.
-
 ## Resources
 
 `resources/list` asks every server with resource prefixes and keeps the
@@ -196,8 +193,13 @@ The broker writes to the `audit` target ([11](11-observability.md)):
 |---|---|
 | `mcp_policy_configured` | `run_id` |
 | `mcp_attached` | `run_id` |
+| `mcp_credentials_updated` | `run_id`, `names` |
 | `mcp_rejected` | `run_id`, `reason` |
 | `mcp_call` | `run_id`, `server`, `tool`, `resource`, `decision`, `duration_ms`, `category` |
+
+`mcp_credentials_updated` fires when the set of credential names the gate
+holds changes, and `names` lists them comma-separated; values are never
+logged.
 
 `server` is `naos` for the built-in tools and the policy name of an external
 server, or `unknown`. `tool` is the tool name, `tools/list`, `resources/list`

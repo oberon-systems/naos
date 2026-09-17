@@ -25,6 +25,7 @@ fn plan_covers_every_status() {
         vec![
             claim("run_a"),
             Action::Start("run_b".into()),
+            Action::Sync(vm("run_c")),
             Action::Fail {
                 run_id: "run_d".into(),
                 reason: VM_LOST
@@ -53,6 +54,7 @@ fn plan_destroys_unknown_and_duplicate_vms() {
         actions,
         vec![
             Action::DestroyOrphan(twin),
+            Action::Sync(vm("run_a")),
             Action::DestroyOrphan(vm("run_x"))
         ]
     );
@@ -106,10 +108,55 @@ fn dead_vms_are_replaced_reported_or_kept_for_collection() {
 }
 
 #[test]
-fn restart_with_live_vm_needs_no_action() {
+fn restart_with_live_vm_only_syncs_it() {
     let runs = [desired_run("run_a", RunStatus::Started)];
 
-    assert!(plan(&runs, &[vm("run_a")]).is_empty());
+    assert_eq!(plan(&runs, &[vm("run_a")]), vec![Action::Sync(vm("run_a"))]);
+}
+
+#[tokio::test]
+async fn a_running_vm_is_synced_without_a_transition() {
+    let api = FakeApi::default();
+    let runtime = FakeRuntime::with_vms(vec![vm("run_a")]);
+    let state = desired(vec![desired_run("run_a", RunStatus::Started)]);
+    let images = FakeSource::new(IMAGE);
+
+    let failures = reconcile(
+        &api,
+        &runtime,
+        &images,
+        &api.credentials(),
+        &state,
+        &runtime.vms(),
+    )
+    .await;
+
+    assert_eq!(failures, 0);
+    assert_eq!(runtime.synced(), vec![vm("run_a")]);
+    assert!(api.transitions().is_empty());
+}
+
+#[tokio::test]
+async fn a_failed_sync_does_not_fail_the_run() {
+    let api = FakeApi::default();
+    let runtime = FakeRuntime::with_vms(vec![vm("run_a")]);
+    runtime.fail_sync();
+    let state = desired(vec![desired_run("run_a", RunStatus::Started)]);
+    let images = FakeSource::new(IMAGE);
+
+    let failures = reconcile(
+        &api,
+        &runtime,
+        &images,
+        &api.credentials(),
+        &state,
+        &runtime.vms(),
+    )
+    .await;
+
+    assert_eq!(failures, 1);
+    assert_eq!(runtime.vms(), vec![vm("run_a")]);
+    assert!(api.transitions().is_empty());
 }
 
 #[tokio::test]

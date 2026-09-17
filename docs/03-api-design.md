@@ -175,10 +175,10 @@ POST /api/v1/runners/{runner_id}/tasks/{task_id}/transition  runner token
   live lease, with its spec, the `image_url` of its image, the resolved
   policy documents and `credentials`.
 - `credentials` maps each secret the MCP policy names to `value` and
-  `expires_at`, only for STARTING and STARTED Runs. A missing or expired
-  secret is left out, and `expires_at` is at most
-  `NAOS_RUN_CREDENTIAL_TTL_SECONDS` away, so a runner that loses its lease
-  loses its credentials with it.
+  `expires_at`, only for PENDING, STARTING and STARTED Runs, so the start that
+  follows a claim already has them. A missing or expired secret is left out,
+  and `expires_at` is at most `NAOS_RUN_CREDENTIAL_TTL_SECONDS` away, so a
+  runner that loses its lease loses its credentials with it.
 
 ### Runner transitions
 

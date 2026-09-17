@@ -93,7 +93,7 @@ this table. While the runtime cannot list VMs, the heartbeat offers capacity
 | PENDING | dead | destroy it, then claim and create |
 | STARTING | running or missing | create or reuse the VM, report STARTED |
 | STARTING | dead | destroy it, then create |
-| STARTED | running | none |
+| STARTED | running | refresh the gates, reattach the MCP session |
 | STARTED | dead or missing | report FAILED `vm lost`, destroy a dead VM |
 | STOPPING | any | stop the VM, report COLLECTING |
 | COLLECTING, WAITING_MERGE | any | none, the overlay is kept |
@@ -164,9 +164,9 @@ runner reattaches; destroying the VM aborts it.
 
 The runtime writes audit events `image_cached`, `image_rejected`,
 `vm_created`, `vm_stopped`, `vm_destroyed`, `network_policy_configured`,
-`shell_policy_configured`, `mcp_policy_configured`, `mcp_attached`,
-`mcp_rejected` and `mcp_call`, each with its
-`run_id`, `vm_id` or digest.
+`shell_policy_configured`, `mcp_policy_configured`,
+`mcp_credentials_updated`, `mcp_attached`, `mcp_rejected` and `mcp_call`,
+each with its `run_id`, `vm_id` or digest.
 
 ## Console
 
