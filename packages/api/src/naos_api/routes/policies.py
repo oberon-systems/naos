@@ -4,6 +4,7 @@ from fastapi import APIRouter, Response
 from pydantic import BaseModel, Field
 
 from naos_api import policies
+from naos_api.mcp import McpPolicyIn
 from naos_api.models import Policy
 from naos_api.mounts import MountPolicyIn
 from naos_api.network import NetworkPolicyIn
@@ -27,8 +28,14 @@ class ShellPolicyCreate(StrictModel):
     document: ShellPolicyIn
 
 
+class McpPolicyCreate(StrictModel):
+    kind: Literal["mcp"]
+    document: McpPolicyIn
+
+
 PolicyCreate = Annotated[
-    MountPolicyCreate | NetworkPolicyCreate | ShellPolicyCreate, Field(discriminator="kind")
+    MountPolicyCreate | NetworkPolicyCreate | ShellPolicyCreate | McpPolicyCreate,
+    Field(discriminator="kind"),
 ]
 
 
@@ -61,8 +68,10 @@ def create_policy(
         policy, created = policies.create_mount_policy(session, body.document, roots)
     elif isinstance(body, NetworkPolicyCreate):
         policy, created = policies.create_network_policy(session, body.document)
-    else:
+    elif isinstance(body, ShellPolicyCreate):
         policy, created = policies.create_shell_policy(session, body.document)
+    else:
+        policy, created = policies.create_mcp_policy(session, body.document)
     if not created:
         response.status_code = 200
     return PolicyRead.of(policy)

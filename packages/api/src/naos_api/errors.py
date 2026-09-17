@@ -24,3 +24,7 @@ class LeaseError(DomainError):
 
 class ImageConflictError(DomainError):
     """The image id or digest is already registered with other values."""
+
+
+class SecretConflictError(DomainError):
+    """A secret with this name already exists."""

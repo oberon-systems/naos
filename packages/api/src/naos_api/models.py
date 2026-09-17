@@ -64,6 +64,16 @@ class Task(SQLModel, table=True):
     updated_at: int = Field(default_factory=now_ts)
 
 
+class Secret(SQLModel, table=True):
+    __tablename__ = "secrets"
+
+    id: str = Field(primary_key=True)
+    name: str = Field(unique=True)
+    value: str
+    expires_at: int | None = None
+    created_at: int = Field(default_factory=now_ts)
+
+
 class Image(SQLModel, table=True):
     __tablename__ = "images"
 

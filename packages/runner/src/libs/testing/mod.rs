@@ -43,6 +43,7 @@ pub fn desired_run(id: &str, status: RunStatus) -> DesiredRun {
         spec: spec(),
         image_url: "https://images.example.com/naos-agents-1.0.0.qcow2".into(),
         policies: BTreeMap::new(),
+        credentials: BTreeMap::new(),
     }
 }
 

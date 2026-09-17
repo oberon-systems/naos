@@ -43,9 +43,10 @@ Messages are newline-delimited JSON-RPC 2.0, the MCP stdio framing:
 
 | Message | Answer |
 |---|---|
-| `initialize` | the requested protocol version when supported, else the latest; `tools` capability; server `naos` |
+| `initialize` | the requested protocol version when supported, else the latest; `tools` capability, and `resources` when the MCP policy allows any; server `naos` |
 | `tools/list` | the tools the Run was granted |
 | `tools/call` | a tool result, see [Calls](#calls) |
+| `resources/list`, `resources/read` | see [Resources](#resources); `-32601` without resources in the policy |
 | `ping` | an empty result |
 | a JSON-RPC 2.0 message without an `id` | nothing |
 | a request `id` already used in this session | error `-32600` |
@@ -68,8 +69,9 @@ else. `tools/list` names exactly what the Run was granted:
 |---|---|---|
 | `read_file`, `list_dir`, `grep`, `git_status`, `git_diff` | the shell policy grants that capability | [07](07-shell-gate.md) |
 | `http_request` | the network policy has an allow rule | [06](06-network-gate.md) |
+| `<server>__<tool>` | the MCP policy allows `tool` on `server` and the server lists it | [External servers](#external-servers) |
 
-A Run without shell or network policy sees an empty list. Listing is a
+A Run without shell, network or MCP policy sees an empty list. Listing is a
 convenience, not the check: a call to a known tool that was not granted still
 reaches its gate, which denies it and writes its own audit event.
 
@@ -100,15 +102,91 @@ one:
 
 | Outcome | Answer |
 |---|---|
-| unknown tool, invalid arguments, refused method or header | error `-32602` |
+| unknown tool or server, invalid arguments, refused method or header | error `-32602` |
 | the gate denies or fails | result with `isError: true` and the gate's reason |
-| the call runs longer than 45 seconds | result with `isError: true`, `call timed out` |
+| the call runs longer than 45 seconds, or the server's `timeout_seconds` | result with `isError: true`, `call timed out` |
 | a file or response body that is not UTF-8 | result with `isError: true` |
+| a tool the policy does not allow, the server budget spent | result with `isError: true` |
+| a missing or expired credential, or the server answers 401 or 403 | result with `isError: true` |
+| the server answers another error status, a JSON-RPC error or nothing usable | result with `isError: true` |
 
 A gate reason never carries a host path or a subprocess's output
 ([07](07-shell-gate.md)). The broker timeout sits above the limits of the gates
 themselves and bounds what they do not, such as a DNS lookup that never
 returns. Gate budgets live with the Run, so a new session does not reset them.
+
+## External servers
+
+The `mcp` policy names the external MCP servers a Run may reach. The API
+resolves it into this document ([03](03-api-design.md)):
+
+```json
+{
+  "servers": [
+    {
+      "name": "alpha",
+      "url": "https://mcp.example.com/mcp",
+      "tools": ["fetch", "search"],
+      "resources": ["docs://alpha/"],
+      "credential": "alpha-token",
+      "timeout_seconds": 30,
+      "max_calls_per_minute": 60
+    }
+  ]
+}
+```
+
+| Field | Rule |
+|---|---|
+| `name` | `^[a-z0-9][a-z0-9-]{0,31}$`, unique; it prefixes the tool names |
+| `url` | https, a hostname, no userinfo, query or fragment |
+| `tools`, `resources` | at least one of them; tool names are exact, resources are URI prefixes |
+| `credential` | the name of a secret, or `null` |
+| `timeout_seconds` | 1 to 45, default 30 |
+| `max_calls_per_minute` | 1 to 600, default 60, for `tools/call` and `resources/read` |
+
+A resource prefix of one server must not be a prefix of another server's, so
+a URI routes to at most one server.
+
+The broker speaks Streamable HTTP only. Each server gets its own network gate
+built from its URL, which allows https to that host and nothing else
+([06](06-network-gate.md)). The session opens on first use with `initialize`
+and `notifications/initialized`, carries `Mcp-Session-Id` and
+`MCP-Protocol-Version` afterwards, and opens again once when the server
+answers 404. A JSON or `text/event-stream` answer is accepted.
+
+`tools/list` asks every server, keeps the tools the policy allows and renames
+them `<server>__<tool>`. A server that fails or times out is left out of the
+list. A call checks the tool and the budget before anything leaves the host.
+
+## Credentials
+
+The agent never holds a provider credential:
+
+- the API issues credentials to the runner in the desired state, never in the
+  policy document, its digest or a log ([03](03-api-design.md));
+- each reconcile replaces the credentials of the Run's MCP gate, and one past
+  its `expires_at` denies;
+- the broker adds `Authorization: Bearer` itself, and the agent cannot set a
+  header on an MCP call;
+- every string an upstream answer or error carries back has the credential
+  value replaced by `<redacted>`.
+
+The first reconcile of a claimed Run starts the VM with the desired state read
+before the claim, so calls that need a credential deny until the next pass.
+
+## Resources
+
+`resources/list` asks every server with resource prefixes and keeps the
+resources whose URI starts with one of them. `resources/read` takes `uri`,
+routes it to the server whose prefix matches and returns its answer
+unchanged.
+
+| Outcome | Answer |
+|---|---|
+| no `uri` | error `-32602` |
+| no server prefix matches | error `-32002` |
+| budget, credential, server failure or timeout | error `-32603` with the reason |
 
 ## Audit
 
@@ -116,28 +194,19 @@ The broker writes to the `audit` target ([11](11-observability.md)):
 
 | Event | Fields |
 |---|---|
+| `mcp_policy_configured` | `run_id` |
 | `mcp_attached` | `run_id` |
 | `mcp_rejected` | `run_id`, `reason` |
-| `mcp_call` | `run_id`, `server`, `tool`, `decision`, `duration_ms`, `category` |
+| `mcp_call` | `run_id`, `server`, `tool`, `resource`, `decision`, `duration_ms`, `category` |
 
-`server` is `naos`. `tool` is `unknown` for a name the broker does not serve.
-`decision` is `allow` or `deny`, and `category` is `none`, `invalid`, `denied`
-or `timeout`. Arguments are not logged, since a header or body may carry a
-secret; the resource a call touched is in the gate's own event, `shell_*` with
-the guest path or `network_*` with the host.
-
-## Not built yet
-
-A Run carrying an MCP policy is still refused. Proxying external MCP servers
-comes next:
-
-- `mcppol` names the servers, their allowed tools and resources, a credential
-  reference, a timeout and usage limits;
-- the API issues the credential to the runner with the policy snapshot, and it
-  never enters the policy document, its digest, the VM or a log;
-- a missing or expired credential denies;
-- a server is reached over Streamable HTTP only, through a network gate built
-  from its URL, and its tools are listed as `<server>__<tool>`.
+`server` is `naos` for the built-in tools and the policy name of an external
+server, or `unknown`. `tool` is the tool name, `tools/list`, `resources/list`
+or `resources/read`, and `unknown` for a name the policy does not allow.
+`resource` is the policy prefix a read matched, or `none`. `decision` is
+`allow` or `deny`, and `category` is `none`, `invalid`, `denied`, `timeout`,
+`credential` or `provider`. Arguments and URIs are not logged, since they may
+carry a secret; the resource a built-in call touched is in the gate's own
+event, `shell_*` with the guest path or `network_*` with the host.
 
 ## Acceptance
 
@@ -151,7 +220,18 @@ The broker tests in `packages/runner/src/libs/mcp/tests.rs` verify that:
 - a denied host, a `Host` or `Proxy-*` header, `Transfer-Encoding` and
   `CONNECT` never reach the destination;
 - a reused request id is refused;
-- a slow destination times out and an unreachable one is a tool error.
+- a slow destination times out and an unreachable one is a tool error;
+- an allowed upstream tool is listed and answers over JSON and event streams,
+  with the Bearer credential and the session header;
+- a tool or server outside the policy, and a missing or expired credential,
+  never reach the server;
+- a credential the server echoes is redacted;
+- resources are filtered and read by prefix;
+- a server error, an unreachable server, a slow server, a spent budget and an
+  expired session are handled.
+
+The API tests in `packages/api/tests/test_mcp.py`, `test_routes.py` and
+`test_runner_lifecycle.py` cover the policy, secrets and credential issuance.
 
 ```bash
 make test

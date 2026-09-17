@@ -23,6 +23,8 @@ def test_runs_api_denies_without_principal(settings: Settings, spec_body: dict[s
     assert client.post("/api/v1/policies", json={}).status_code == 401
     assert client.post("/api/v1/images", json={}).status_code == 401
     assert client.get("/api/v1/images").status_code == 401
+    assert client.post("/api/v1/secrets", json={}).status_code == 401
+    assert client.get("/api/v1/secrets/alpha-token").status_code == 401
 
 
 def test_create_and_replay(client: TestClient, spec_body: dict[str, Any]) -> None:
@@ -159,9 +161,59 @@ def test_shell_policy_flow(
     assert run["spec"]["shell"]["policy"] == policy_id
 
 
+def test_mcp_policy_flow(
+    client: TestClient, spec_body: dict[str, Any], mcp_body: dict[str, Any]
+) -> None:
+    body = {"kind": "mcp", "document": mcp_body}
+    created = client.post("/api/v1/policies", json=body)
+    replayed = client.post("/api/v1/policies", json=body)
+    policy_id = created.json()["id"]
+
+    assert created.status_code == 201
+    assert replayed.status_code == 200
+    assert replayed.json()["id"] == policy_id
+    assert policy_id.startswith("mcppol_")
+    [server] = created.json()["document"]["servers"]
+    assert server["tools"] == ["fetch", "search"]
+    assert server["timeout_seconds"] == 30
+
+    spec_body["mcp"] = {"policy": policy_id}
+    run = _create(client, spec_body).json()
+    assert run["spec"]["mcp"]["policy"] == policy_id
+
+
+def test_secret_value_is_never_returned(client: TestClient) -> None:
+    body = {"name": "alpha-token", "value": "secret-alpha-value", "expires_at": 1767229200}
+    created = client.post("/api/v1/secrets", json=body)
+    fetched = client.get("/api/v1/secrets/alpha-token")
+
+    assert created.status_code == 201
+    assert created.json()["id"].startswith("sec_")
+    assert fetched.json() == created.json()
+    assert "secret-alpha-value" not in created.text + fetched.text
+    assert client.post("/api/v1/secrets", json=body).status_code == 409
+    assert client.get("/api/v1/secrets/beta-token").status_code == 404
+
+
 @pytest.mark.parametrize(
     "body",
     [
+        {"name": "Alpha", "value": "v"},
+        {"name": "alpha", "value": ""},
+        {"name": "alpha", "value": "has space"},
+        {"name": "alpha", "value": "v", "expires_at": -1},
+        {"name": "alpha", "value": "v", "extra": 1},
+    ],
+)
+def test_bad_secret_is_unprocessable(client: TestClient, body: dict[str, Any]) -> None:
+    assert client.post("/api/v1/secrets", json=body).status_code == 422
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"kind": "mcp", "document": {}},
+        {"kind": "mcp", "document": {"servers": [{"name": "alpha", "url": "https://example.com"}]}},
         {"kind": "network", "document": {}},
         {"kind": "network", "document": {"allow": [{}]}},
         {"kind": "network", "document": {"allow": [{"host": "bad_host"}]}},

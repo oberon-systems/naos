@@ -39,7 +39,7 @@ class NetworkPolicy(StrictModel):
     deny: list[NetworkRule]
 
 
-def _host(raw: str) -> str:
+def resolve_host(raw: str) -> str:
     host = raw.removesuffix(".").lower()
     try:
         ip_address(host)
@@ -61,7 +61,7 @@ def _rule(rule: NetworkRuleIn) -> NetworkRule:
         raise PolicyError("a rule must constrain at least one of protocol, host or ip")
     return NetworkRule(
         protocol=rule.protocol,
-        host=_host(rule.host) if rule.host is not None else None,
+        host=resolve_host(rule.host) if rule.host is not None else None,
         ip=str(rule.ip) if rule.ip is not None else None,
     )
 

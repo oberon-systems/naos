@@ -26,7 +26,7 @@ use crate::libs::config::{prepare_private_dir, RuntimeConfig};
 use crate::libs::error::AgentError;
 use crate::libs::ids::random_hex;
 use crate::libs::image::{ImageCache, ImageSource};
-use crate::libs::mcp;
+use crate::libs::mcp::{self, McpGate};
 use crate::libs::network::NetworkGate;
 use crate::libs::qemu::{self, VmPaths, PROCESS_PREFIX};
 use crate::libs::shell::ShellGate;
@@ -74,6 +74,7 @@ struct VmMeta {
 pub struct RunGates {
     pub network: NetworkGate,
     pub shell: ShellGate,
+    pub mcp: McpGate,
 }
 
 pub struct QemuRuntime {
@@ -276,14 +277,16 @@ impl Runtime for QemuRuntime {
         let network = run.policies.get("network").and_then(Option::as_ref);
         let shell = run.policies.get("shell").and_then(Option::as_ref);
         let mounts = run.policies.get("mount").and_then(Option::as_ref);
+        let mcp_policy = run.policies.get("mcp").and_then(Option::as_ref);
         let gates = RunGates {
             network: NetworkGate::from_snapshot(&run.id, network)?,
             shell: ShellGate::from_snapshot(&run.id, shell, mounts, &self.git_binary)?,
+            mcp: McpGate::from_snapshot(&run.id, mcp_policy)?,
         };
         let granted: Vec<&str> = run
             .granted_policies()
             .into_iter()
-            .filter(|kind| !matches!(*kind, "network" | "shell" | "mount"))
+            .filter(|kind| !matches!(*kind, "network" | "shell" | "mount" | "mcp"))
             .collect();
         if !granted.is_empty() {
             return Err(AgentError::Runtime(format!(
@@ -298,7 +301,9 @@ impl Runtime for QemuRuntime {
             .lock()
             .expect("gates")
             .entry(run.id.clone())
-            .or_insert_with(|| Arc::new(gates));
+            .or_insert_with(|| Arc::new(gates))
+            .mcp
+            .refresh(&run.credentials);
         if let Some(existing) = scan(&self.vm_dir)?
             .into_iter()
             .find(|vm| vm.run_id == run.id && vm.running)
@@ -336,6 +341,9 @@ impl Runtime for QemuRuntime {
                 }
                 if shell.is_some() {
                     audit::shell_policy_configured(&vm.run_id);
+                }
+                if mcp_policy.is_some() {
+                    audit::mcp_policy_configured(&vm.run_id);
                 }
                 audit::vm_created(&vm.vm_id, &vm.run_id);
                 self.attach(&vm, &paths);

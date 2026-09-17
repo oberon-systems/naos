@@ -12,11 +12,13 @@ from naos_api.errors import InvalidTransitionError, LeaseError, NotFoundError
 from naos_api.images.service import check_image
 from naos_api.lifecycle import TERMINAL, TaskStatus
 from naos_api.models import Lease, Policy, Runner, Task
+from naos_api.secrets import IssuedCredential, issue_credentials
 from naos_api.spec import PolicyKind, RunSpec
 
 S = TaskStatus
 LEASE_EXPIRED_REASON = "runner lease expired"
 LEASE_BOUND = frozenset({S.STARTING, S.STARTED, S.STOPPING, S.COLLECTING})
+CREDENTIAL_BOUND = frozenset({S.STARTING, S.STARTED})
 RUNNER_TRANSITIONS = frozenset(
     {
         (S.PENDING, S.STARTING),
@@ -66,6 +68,7 @@ class DesiredTask:
     task: Task
     image_url: str
     policies: dict[PolicyKind, dict[str, Any] | None]
+    credentials: dict[str, IssuedCredential]
 
 
 def _live_lease(session: Session, runner_id: str) -> Lease | None:
@@ -272,7 +275,18 @@ def _policies(session: Session, task: Task) -> dict[PolicyKind, dict[str, Any] |
     return policies
 
 
-def desired_state(session: Session, runner_id: str, now: int) -> tuple[str, list[DesiredTask]]:
+def _credentials(
+    session: Session, task: Task, mcp: dict[str, Any] | None, now: int, ttl: int
+) -> dict[str, IssuedCredential]:
+    if mcp is None or task.status not in CREDENTIAL_BOUND:
+        return {}
+    names = {server["credential"] for server in mcp["servers"] if server["credential"]}
+    return issue_credentials(session, names, now, ttl)
+
+
+def desired_state(
+    session: Session, runner_id: str, now: int, credential_ttl: int
+) -> tuple[str, list[DesiredTask]]:
     expire_leases(session, now)
     lease = _live_lease(session, runner_id)
     if lease is None:
@@ -283,14 +297,20 @@ def desired_state(session: Session, runner_id: str, now: int) -> tuple[str, list
         .order_by(col(Task.seq))
     )
     assigned = session.exec(statement).all()
-    return lease.id, [
-        DesiredTask(
-            task=task,
-            image_url=check_image(session, RunSpec.model_validate(task.spec).image).url,
-            policies=_policies(session, task),
+    desired: list[DesiredTask] = []
+    for task in assigned:
+        policies = _policies(session, task)
+        desired.append(
+            DesiredTask(
+                task=task,
+                image_url=check_image(session, RunSpec.model_validate(task.spec).image).url,
+                policies=policies,
+                credentials=_credentials(
+                    session, task, policies[PolicyKind.MCP], now, credential_ttl
+                ),
+            )
         )
-        for task in assigned
-    ]
+    return lease.id, desired
 
 
 def transition(

@@ -1,5 +1,6 @@
 //! The MCP endpoint a guest reaches through its virtio-serial port: the gates of its Run as tools.
 use std::collections::{BTreeMap, HashSet};
+use std::future::Future;
 use std::time::{Duration, Instant};
 
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
@@ -15,6 +16,10 @@ use crate::libs::network::{GateRequest, GateResponse};
 use crate::libs::runtime::RunGates;
 use crate::libs::shell::{ShellRequest, ShellResponse};
 
+mod upstream;
+pub use upstream::McpGate;
+use upstream::{Failure, Upstream};
+
 const MAX_LINE: usize = 1024 * 1024;
 const MAX_IDS: usize = 65536;
 const CALL_TIMEOUT: Duration = Duration::from_secs(45);
@@ -26,7 +31,11 @@ const FORBIDDEN_HEADERS: &[&str] = &["host", "connection", "transfer-encoding", 
 const INVALID_REQUEST: i64 = -32600;
 const METHOD_NOT_FOUND: i64 = -32601;
 const INVALID_PARAMS: i64 = -32602;
+const INTERNAL_ERROR: i64 = -32603;
 const PARSE_ERROR: i64 = -32700;
+const RESOURCE_NOT_FOUND: i64 = -32002;
+const SERVER: &str = "naos";
+const NO_RESOURCE: &str = "none";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -156,18 +165,31 @@ impl<'a> Session<'a> {
                 let version = requested
                     .filter(|version| PROTOCOL_VERSIONS.contains(version))
                     .unwrap_or(PROTOCOL_VERSIONS[0]);
+                let mut capabilities = json!({ "tools": { "listChanged": false } });
+                if self.gates.mcp.has_resources() {
+                    capabilities["resources"] = json!({ "listChanged": false });
+                }
                 json!({
                     "protocolVersion": version,
-                    "capabilities": { "tools": { "listChanged": false } },
-                    "serverInfo": { "name": "naos", "version": env!("CARGO_PKG_VERSION") },
+                    "capabilities": capabilities,
+                    "serverInfo": { "name": SERVER, "version": env!("CARGO_PKG_VERSION") },
                 })
             }
             "ping" => json!({}),
-            "tools/list" => json!({ "tools": tools(self.gates) }),
+            "tools/list" => json!({ "tools": self.tools().await }),
             "tools/call" => match self.call(message.get("params")).await {
                 Ok(result) => result,
                 Err(message) => return Ok(Some(error(id, INVALID_PARAMS, &message))),
             },
+            "resources/list" if self.gates.mcp.has_resources() => {
+                json!({ "resources": self.resources().await })
+            }
+            "resources/read" if self.gates.mcp.has_resources() => {
+                match self.read(message.get("params")).await {
+                    Ok(result) => result,
+                    Err((code, message)) => return Ok(Some(error(id, code, &message))),
+                }
+            }
             _ => return Ok(Some(error(id, METHOD_NOT_FOUND, "method not found"))),
         };
         Ok(Some(
@@ -186,30 +208,140 @@ impl<'a> Session<'a> {
             .and_then(|params| params.get("arguments"))
             .cloned()
             .unwrap_or_else(|| json!({}));
+        if let Some((server, tool)) = name.split_once("__") {
+            return self.call_upstream(server, tool, arguments, started).await;
+        }
         let tool = if is_tool(name) { name } else { "unknown" };
         let call = match parse_call(name, arguments) {
             Ok(call) => call,
             Err(reason) => {
-                audit::mcp_call(self.run_id, tool, "deny", elapsed_ms(started), "invalid");
+                self.audit(SERVER, tool, NO_RESOURCE, started, "invalid");
                 return Err(reason);
             }
         };
         let outcome = tokio::time::timeout(self.timeout, self.dispatch(call)).await;
-        let (text, is_error) = match outcome {
-            Ok(Ok(text)) => {
-                audit::mcp_call(self.run_id, tool, "allow", elapsed_ms(started), "none");
-                (text, false)
-            }
-            Ok(Err(reason)) => {
-                audit::mcp_call(self.run_id, tool, "deny", elapsed_ms(started), "denied");
-                (reason, true)
-            }
-            Err(_) => {
-                audit::mcp_call(self.run_id, tool, "deny", elapsed_ms(started), "timeout");
-                ("call timed out".to_owned(), true)
-            }
+        let (text, category) = match outcome {
+            Ok(Ok(text)) => (Ok(text), "none"),
+            Ok(Err(reason)) => (Err(reason), "denied"),
+            Err(_) => (Err("call timed out".to_owned()), "timeout"),
         };
-        Ok(json!({ "content": [{ "type": "text", "text": text }], "isError": is_error }))
+        self.audit(SERVER, tool, NO_RESOURCE, started, category);
+        Ok(match text {
+            Ok(text) => tool_result(text, false),
+            Err(reason) => tool_result(reason, true),
+        })
+    }
+
+    async fn call_upstream(
+        &self,
+        server: &str,
+        tool: &str,
+        arguments: Value,
+        started: Instant,
+    ) -> Result<Value, String> {
+        let Some(upstream) = self.gates.mcp.server(server) else {
+            self.audit("unknown", "unknown", NO_RESOURCE, started, "invalid");
+            return Err("unknown tool".into());
+        };
+        let logged = if upstream.allows_tool(tool) {
+            tool
+        } else {
+            "unknown"
+        };
+        if !arguments.is_object() {
+            self.audit(&upstream.name, logged, NO_RESOURCE, started, "invalid");
+            return Err("invalid arguments: expected an object".into());
+        }
+        let work = self.gates.mcp.call_tool(upstream, tool, arguments);
+        Ok(self
+            .guarded(upstream, logged, NO_RESOURCE, work)
+            .await
+            .unwrap_or_else(|reason| tool_result(reason, true)))
+    }
+
+    async fn tools(&self) -> Vec<Value> {
+        let mut tools = builtin_tools(self.gates);
+        for upstream in self.gates.mcp.servers().iter().filter(|u| u.lists_tools()) {
+            let work = self.gates.mcp.list_tools(upstream);
+            if let Ok(listed) = self
+                .guarded(upstream, "tools/list", NO_RESOURCE, work)
+                .await
+            {
+                tools.extend(listed);
+            }
+        }
+        tools
+    }
+
+    async fn resources(&self) -> Vec<Value> {
+        let mut resources = Vec::new();
+        for upstream in self
+            .gates
+            .mcp
+            .servers()
+            .iter()
+            .filter(|u| u.lists_resources())
+        {
+            let work = self.gates.mcp.list_resources(upstream);
+            if let Ok(listed) = self
+                .guarded(upstream, "resources/list", NO_RESOURCE, work)
+                .await
+            {
+                resources.extend(listed);
+            }
+        }
+        resources
+    }
+
+    async fn read(&self, params: Option<&Value>) -> Result<Value, (i64, String)> {
+        let started = Instant::now();
+        let Some(uri) = params
+            .and_then(|params| params.get("uri"))
+            .and_then(Value::as_str)
+        else {
+            self.audit("unknown", "resources/read", NO_RESOURCE, started, "invalid");
+            return Err((INVALID_PARAMS, "invalid arguments: uri is required".into()));
+        };
+        let Some((upstream, prefix)) = self.gates.mcp.resource(uri) else {
+            self.audit("unknown", "resources/read", NO_RESOURCE, started, "denied");
+            return Err((RESOURCE_NOT_FOUND, "resource not allowed".into()));
+        };
+        let work = self.gates.mcp.read_resource(upstream, uri);
+        self.guarded(upstream, "resources/read", prefix, work)
+            .await
+            .map_err(|reason| (INTERNAL_ERROR, reason))
+    }
+
+    /// Bounds one upstream operation by the tighter of the broker and server timeouts, and audits it.
+    async fn guarded<T>(
+        &self,
+        upstream: &Upstream,
+        tool: &str,
+        resource: &str,
+        work: impl Future<Output = Result<T, Failure>>,
+    ) -> Result<T, String> {
+        let started = Instant::now();
+        let outcome = tokio::time::timeout(self.timeout.min(upstream.timeout), work).await;
+        let (result, category) = match outcome {
+            Ok(Ok(value)) => (Ok(value), "none"),
+            Ok(Err(failure)) => (Err(failure.reason), failure.category),
+            Err(_) => (Err("call timed out".to_owned()), "timeout"),
+        };
+        self.audit(&upstream.name, tool, resource, started, category);
+        result
+    }
+
+    fn audit(&self, server: &str, tool: &str, resource: &str, started: Instant, category: &str) {
+        let decision = if category == "none" { "allow" } else { "deny" };
+        audit::mcp_call(
+            self.run_id,
+            server,
+            tool,
+            resource,
+            decision,
+            elapsed_ms(started),
+            category,
+        );
     }
 
     async fn dispatch(&self, call: Call) -> Result<String, String> {
@@ -232,7 +364,7 @@ fn is_tool(name: &str) -> bool {
 }
 
 /// Only what the Run was granted is listed; a call to anything else still meets the gate.
-fn tools(gates: &RunGates) -> Vec<Value> {
+fn builtin_tools(gates: &RunGates) -> Vec<Value> {
     let mut tools: Vec<Value> = gates.shell.granted().map(shell_tool).collect();
     if gates.network.allows_any() {
         tools.push(json!({
@@ -366,6 +498,10 @@ fn render_http(response: GateResponse) -> Result<String, String> {
         );
     }
     Ok(json!({ "status": response.status.as_u16(), "headers": headers, "body": body }).to_string())
+}
+
+fn tool_result(text: String, is_error: bool) -> Value {
+    json!({ "content": [{ "type": "text", "text": text }], "isError": is_error })
 }
 
 fn reason(err: AgentError) -> String {

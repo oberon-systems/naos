@@ -3,23 +3,30 @@ use std::net::SocketAddr;
 use std::path::Path;
 
 use tempfile::TempDir;
-use wiremock::matchers::{method, path};
-use wiremock::{Mock, MockServer, ResponseTemplate};
+use wiremock::matchers::{body_partial_json, method, path};
+use wiremock::{Mock, MockServer, Request, ResponseTemplate};
 
 use super::*;
+use crate::libs::api::RunCredential;
 use crate::libs::network::NetworkGate;
 use crate::libs::shell::ShellGate;
 
 const GUEST: &str = "/naos/alpha";
+const SECRET: &str = "secret-alpha-value";
 
 fn no_shell() -> ShellGate {
     ShellGate::from_snapshot("run_a", None, None, Path::new("/usr/bin/git")).expect("policy")
+}
+
+fn no_mcp() -> McpGate {
+    McpGate::from_snapshot("run_a", None).expect("policy")
 }
 
 fn no_gates() -> RunGates {
     RunGates {
         network: NetworkGate::from_snapshot("run_a", None).expect("policy"),
         shell: no_shell(),
+        mcp: no_mcp(),
     }
 }
 
@@ -41,6 +48,7 @@ fn shell_gates(dir: &TempDir, allow: &[&str]) -> RunGates {
             Path::new("/usr/bin/git"),
         )
         .expect("policy"),
+        mcp: no_mcp(),
     }
 }
 
@@ -52,6 +60,7 @@ fn http_gates(address: SocketAddr) -> RunGates {
         )
         .expect("policy"),
         shell: no_shell(),
+        mcp: no_mcp(),
     }
 }
 
@@ -417,4 +426,403 @@ async fn an_unreachable_destination_is_a_tool_error() {
 
     assert!(outcome.is_ok());
     assert!(tool_text(&replies[0]).0);
+}
+
+type Handler = fn(&str, &Value) -> Value;
+
+/// A Streamable HTTP server that opens a session and answers every request through `handler`.
+async fn upstream(handler: Handler, events: bool) -> MockServer {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/mcp"))
+        .respond_with(move |request: &Request| {
+            let message: Value = serde_json::from_slice(&request.body).expect("json");
+            let Some(id) = message.get("id").cloned() else {
+                return ResponseTemplate::new(202);
+            };
+            let method = message["method"].as_str().expect("method");
+            let mut reply = if method == "initialize" {
+                json!({"result": {"protocolVersion": "2025-06-18", "capabilities": {}, "serverInfo": {"name": "alpha", "version": "1"}}})
+            } else {
+                handler(method, &message["params"])
+            };
+            reply["jsonrpc"] = json!("2.0");
+            reply["id"] = id;
+            let template = ResponseTemplate::new(200).insert_header("mcp-session-id", "session-alpha");
+            if events {
+                template.set_body_raw(format!("event: message\ndata: {reply}\n\n"), "text/event-stream")
+            } else {
+                template.set_body_json(reply)
+            }
+        })
+        .mount(&server)
+        .await;
+    server
+}
+
+fn answers(method: &str, params: &Value) -> Value {
+    match method {
+        "tools/list" => json!({"result": {"tools": [
+            {"name": "search", "inputSchema": {"type": "object"}},
+            {"name": "delete", "inputSchema": {"type": "object"}},
+        ]}}),
+        "tools/call" if params["arguments"]["echo"] == true => {
+            json!({"result": {"content": [{"type": "text", "text": format!("token {SECRET}")}], "isError": false}})
+        }
+        "tools/call" if params["arguments"]["fail"] == true => {
+            json!({"error": {"code": -32000, "message": format!("rejected {SECRET}")}})
+        }
+        "tools/call" => {
+            json!({"result": {"content": [{"type": "text", "text": "found"}], "isError": false}})
+        }
+        "resources/list" => json!({"result": {"resources": [
+            {"uri": "docs://alpha/guide", "name": "guide"},
+            {"uri": "docs://beta/private", "name": "private"},
+        ]}}),
+        "resources/read" => {
+            json!({"result": {"contents": [{"uri": params["uri"], "text": "guide"}]}})
+        }
+        _ => json!({"error": {"code": -32601, "message": "method not found"}}),
+    }
+}
+
+fn upstream_gates(address: SocketAddr, server: Value) -> RunGates {
+    let mut document = json!({
+        "name": "alpha",
+        "url": format!("http://example.com:{}/mcp", address.port()),
+        "tools": ["search"],
+        "resources": ["docs://alpha/"],
+        "credential": "alpha-token",
+        "timeout_seconds": 30,
+        "max_calls_per_minute": 60,
+    });
+    for (key, value) in server.as_object().expect("object") {
+        document[key] = value.clone();
+    }
+    let gates = RunGates {
+        network: NetworkGate::from_snapshot("run_a", None).expect("policy"),
+        shell: no_shell(),
+        mcp: McpGate::local(&json!({ "servers": [document] }), vec![address.ip()]).expect("policy"),
+    };
+    grant(&gates, u64::MAX);
+    gates
+}
+
+fn grant(gates: &RunGates, expires_at: u64) {
+    gates.mcp.refresh(&BTreeMap::from([(
+        "alpha-token".to_owned(),
+        RunCredential {
+            value: SECRET.into(),
+            expires_at,
+        },
+    )]));
+}
+
+fn request(id: u64, method: &str, params: Value) -> String {
+    format!(
+        "{}\n",
+        json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params})
+    )
+}
+
+async fn methods(server: &MockServer) -> Vec<String> {
+    server
+        .received_requests()
+        .await
+        .expect("recording")
+        .iter()
+        .map(|request| {
+            let message: Value = serde_json::from_slice(&request.body).expect("json");
+            message["method"].as_str().expect("method").to_owned()
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn an_allowed_upstream_tool_is_listed_and_answers() {
+    for events in [false, true] {
+        let server = upstream(answers, events).await;
+        let input = [
+            request(1, "tools/list", json!({})),
+            call(2, "alpha__search", json!({"query": "beta"})),
+        ]
+        .concat();
+
+        let (outcome, replies) = exchange(
+            &upstream_gates(*server.address(), json!({})),
+            input.as_bytes(),
+        )
+        .await;
+
+        assert!(outcome.is_ok());
+        let names: Vec<&str> = replies[0]["result"]["tools"]
+            .as_array()
+            .expect("tools")
+            .iter()
+            .map(|tool| tool["name"].as_str().expect("name"))
+            .collect();
+        assert_eq!(names, ["alpha__search"]);
+        assert_eq!(tool_text(&replies[1]), (false, "found".to_owned()));
+        let received = server.received_requests().await.expect("recording");
+        assert!(
+            received
+                .iter()
+                .all(|request| request.headers["authorization"]
+                    == format!("Bearer {SECRET}").as_str())
+        );
+        assert!(received[2..]
+            .iter()
+            .all(|request| request.headers["mcp-session-id"] == "session-alpha"));
+        assert_eq!(
+            methods(&server).await,
+            [
+                "initialize",
+                "notifications/initialized",
+                "tools/list",
+                "tools/call"
+            ]
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_tool_or_server_outside_the_policy_never_reaches_upstream() {
+    let server = upstream(answers, false).await;
+    let input = [
+        call(1, "alpha__delete", json!({})),
+        call(2, "beta__search", json!({})),
+        call(3, "alpha__search", json!("not an object")),
+    ]
+    .concat();
+
+    let (outcome, replies) = exchange(
+        &upstream_gates(*server.address(), json!({})),
+        input.as_bytes(),
+    )
+    .await;
+
+    assert!(outcome.is_ok());
+    assert_eq!(
+        tool_text(&replies[0]),
+        (true, "tool not allowed".to_owned())
+    );
+    assert_eq!(error_code(&replies[1]), -32602);
+    assert_eq!(error_code(&replies[2]), -32602);
+    assert!(methods(&server).await.is_empty());
+}
+
+#[tokio::test]
+async fn a_missing_or_expired_credential_denies_without_a_request() {
+    let server = upstream(answers, false).await;
+    let gates = upstream_gates(*server.address(), json!({}));
+    gates.mcp.refresh(&BTreeMap::new());
+
+    let (_, missing) = exchange(&gates, call(1, "alpha__search", json!({})).as_bytes()).await;
+    grant(&gates, 1);
+    let (_, expired) = exchange(&gates, call(1, "alpha__search", json!({})).as_bytes()).await;
+
+    assert_eq!(
+        tool_text(&missing[0]),
+        (true, "credential unavailable".to_owned())
+    );
+    assert_eq!(
+        tool_text(&expired[0]),
+        (true, "credential expired".to_owned())
+    );
+    assert!(methods(&server).await.is_empty());
+}
+
+#[tokio::test]
+async fn an_echoed_credential_is_redacted() {
+    let server = upstream(answers, false).await;
+    let input = [
+        call(1, "alpha__search", json!({"echo": true})),
+        call(2, "alpha__search", json!({"fail": true})),
+    ]
+    .concat();
+
+    let (_, replies) = exchange(
+        &upstream_gates(*server.address(), json!({})),
+        input.as_bytes(),
+    )
+    .await;
+
+    assert_eq!(
+        tool_text(&replies[0]),
+        (false, "token <redacted>".to_owned())
+    );
+    assert_eq!(
+        tool_text(&replies[1]),
+        (true, "server error: rejected <redacted>".to_owned())
+    );
+    assert!(!replies
+        .iter()
+        .any(|reply| reply.to_string().contains(SECRET)));
+}
+
+#[tokio::test]
+async fn resources_are_filtered_and_read_by_prefix() {
+    let server = upstream(answers, false).await;
+    let input = [
+        request(1, "initialize", json!({"protocolVersion": "2025-06-18"})),
+        request(2, "resources/list", json!({})),
+        request(3, "resources/read", json!({"uri": "docs://alpha/guide"})),
+        request(4, "resources/read", json!({"uri": "docs://beta/private"})),
+        request(5, "resources/read", json!({})),
+    ]
+    .concat();
+
+    let (outcome, replies) = exchange(
+        &upstream_gates(*server.address(), json!({})),
+        input.as_bytes(),
+    )
+    .await;
+
+    assert!(outcome.is_ok());
+    assert!(replies[0]["result"]["capabilities"]["resources"].is_object());
+    assert_eq!(
+        replies[1]["result"]["resources"],
+        json!([{"uri": "docs://alpha/guide", "name": "guide"}])
+    );
+    assert_eq!(replies[2]["result"]["contents"][0]["text"], "guide");
+    assert_eq!(error_code(&replies[3]), -32002);
+    assert_eq!(error_code(&replies[4]), -32602);
+    assert_eq!(
+        methods(&server).await,
+        [
+            "initialize",
+            "notifications/initialized",
+            "resources/list",
+            "resources/read"
+        ]
+    );
+}
+
+#[tokio::test]
+async fn resources_are_not_served_without_a_resource_policy() {
+    let (_, replies) = exchange(
+        &no_gates(),
+        request(1, "resources/list", json!({})).as_bytes(),
+    )
+    .await;
+
+    assert_eq!(error_code(&replies[0]), -32601);
+}
+
+#[tokio::test]
+async fn provider_failures_are_tool_errors() {
+    let server = upstream(answers, false).await;
+    Mock::given(body_partial_json(json!({"method": "tools/call"})))
+        .respond_with(ResponseTemplate::new(500))
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    let input = [
+        request(1, "tools/list", json!({})),
+        call(2, "alpha__search", json!({})),
+    ]
+    .concat();
+
+    let (outcome, replies) = exchange(
+        &upstream_gates(*server.address(), json!({})),
+        input.as_bytes(),
+    )
+    .await;
+
+    assert!(outcome.is_ok());
+    assert_eq!(
+        replies[0]["result"]["tools"]
+            .as_array()
+            .expect("tools")
+            .len(),
+        1
+    );
+    assert_eq!(
+        tool_text(&replies[1]),
+        (true, "server answered 500".to_owned())
+    );
+}
+
+#[tokio::test]
+async fn an_unreachable_upstream_is_left_out_of_the_listing() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+    let address = listener.local_addr().expect("address");
+    drop(listener);
+
+    let (outcome, replies) = exchange(
+        &upstream_gates(address, json!({})),
+        request(1, "tools/list", json!({})).as_bytes(),
+    )
+    .await;
+
+    assert!(outcome.is_ok());
+    assert_eq!(replies[0]["result"]["tools"], json!([]));
+}
+
+#[tokio::test]
+async fn a_slow_upstream_times_out() {
+    let server = upstream(answers, false).await;
+    Mock::given(body_partial_json(json!({"method": "tools/call"})))
+        .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(5)))
+        .with_priority(1)
+        .mount(&server)
+        .await;
+
+    let (outcome, replies) = exchange(
+        &upstream_gates(*server.address(), json!({"timeout_seconds": 1})),
+        call(1, "alpha__search", json!({})).as_bytes(),
+    )
+    .await;
+
+    assert!(outcome.is_ok());
+    assert_eq!(tool_text(&replies[0]), (true, "call timed out".to_owned()));
+}
+
+#[tokio::test]
+async fn the_call_budget_is_enforced() {
+    let server = upstream(answers, false).await;
+    let input = [
+        call(1, "alpha__search", json!({})),
+        call(2, "alpha__search", json!({})),
+    ]
+    .concat();
+
+    let (_, replies) = exchange(
+        &upstream_gates(*server.address(), json!({"max_calls_per_minute": 1})),
+        input.as_bytes(),
+    )
+    .await;
+
+    assert!(!tool_text(&replies[0]).0);
+    assert_eq!(tool_text(&replies[1]), (true, "rate limit".to_owned()));
+}
+
+#[tokio::test]
+async fn an_expired_session_is_opened_again() {
+    let server = upstream(answers, false).await;
+    Mock::given(body_partial_json(json!({"method": "tools/call"})))
+        .respond_with(ResponseTemplate::new(404))
+        .up_to_n_times(1)
+        .with_priority(1)
+        .mount(&server)
+        .await;
+
+    let (_, replies) = exchange(
+        &upstream_gates(*server.address(), json!({})),
+        call(1, "alpha__search", json!({})).as_bytes(),
+    )
+    .await;
+
+    assert_eq!(tool_text(&replies[0]), (false, "found".to_owned()));
+    assert_eq!(
+        methods(&server).await,
+        [
+            "initialize",
+            "notifications/initialized",
+            "tools/call",
+            "initialize",
+            "notifications/initialized",
+            "tools/call"
+        ]
+    );
 }

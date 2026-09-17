@@ -5,6 +5,7 @@ from uuid import uuid4
 from sqlmodel import Session, select
 
 from naos_api.errors import NotFoundError, PolicyError
+from naos_api.mcp import McpPolicyIn, resolve_mcp_policy
 from naos_api.models import Policy
 from naos_api.mounts import MountPolicyIn, resolve_mount_policy
 from naos_api.network import NetworkPolicyIn, resolve_network_policy
@@ -60,6 +61,11 @@ def create_network_policy(session: Session, policy: NetworkPolicyIn) -> tuple[Po
 def create_shell_policy(session: Session, policy: ShellPolicyIn) -> tuple[Policy, bool]:
     resolved = resolve_shell_policy(policy)
     return _store(session, PolicyKind.SHELL, resolved.model_dump(mode="json"))
+
+
+def create_mcp_policy(session: Session, policy: McpPolicyIn) -> tuple[Policy, bool]:
+    resolved = resolve_mcp_policy(policy)
+    return _store(session, PolicyKind.MCP, resolved.model_dump(mode="json"))
 
 
 def get_policy(session: Session, policy_id: str) -> Policy:

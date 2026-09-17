@@ -297,6 +297,33 @@ def test_desired_state_resolves_policy_documents(
     assert run["policies"]["network"] is None
 
 
+def test_credentials_reach_only_starting_and_started_runs(
+    client: TestClient,
+    register: Register,
+    spec_body: dict[str, Any],
+    mcp_body: dict[str, Any],
+    clock: Callable[[], int],
+) -> None:
+    client.post("/api/v1/secrets", json={"name": "alpha-token", "value": "secret-alpha-value"})
+    policy = client.post("/api/v1/policies", json={"kind": "mcp", "document": mcp_body}).json()
+    spec_body["mcp"] = {"policy": policy["id"]}
+    headers = {"Idempotency-Key": "key-1"}
+    run_id = client.post("/api/v1/tasks", json=spec_body, headers=headers).json()["id"]
+    runner = register()
+    _heartbeat(client, runner, capacity=1)
+
+    def credentials() -> Any:
+        return _desired(client, runner).json()["tasks"][0]["credentials"]
+
+    assert credentials() == {}
+    _walk(client, runner, run_id, [S.PENDING, S.STARTING, S.STARTED])
+    assert credentials() == {
+        "alpha-token": {"value": "secret-alpha-value", "expires_at": clock() + 300}
+    }
+    _walk(client, runner, run_id, [S.STARTED, S.STOPPING])
+    assert credentials() == {}
+
+
 def test_operator_stop_reaches_the_runner(
     client: TestClient, register: Register, create_task: CreateTask
 ) -> None:

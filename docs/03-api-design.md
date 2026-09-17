@@ -33,6 +33,7 @@ process. List values are JSON. Every route depends only on the values it uses.
 | `NAOS_RUNNER_TOKEN_TTL_SECONDS` | `86400` | Runner token lifetime, 60 to 604800 |
 | `NAOS_LEASE_TTL_SECONDS` | `60` | Lease extension per heartbeat, 5 to 3600 |
 | `NAOS_LEASE_SWEEP_INTERVAL_SECONDS` | `15` | Background lease sweep period, 1 to 3600 |
+| `NAOS_RUN_CREDENTIAL_TTL_SECONDS` | `300` | Lifetime of a credential issued to a runner, 60 to 3600 |
 
 ## Operator credentials
 
@@ -64,6 +65,8 @@ GET /api/v1/policies/{policy_id}
 POST /api/v1/images
 GET /api/v1/images
 GET /api/v1/images/{image_id}
+POST /api/v1/secrets
+GET /api/v1/secrets/{name}
 ```
 
 Do not allow clients to arbitrarily set Run status. Validate legal transitions centrally.
@@ -101,7 +104,19 @@ A Run names a policy per kind under `spec.mounts`, `spec.network`, `spec.shell`
 and `spec.mcp`, and the reference is immutable once the Run starts. The runner
 receives the resolved document as a snapshot rather than the id. The network
 document is described in [06](06-network-gate.md), the shell document in
-[07](07-shell-gate.md).
+[07](07-shell-gate.md), the MCP document in [08](08-mcp-gate.md).
+
+## Secrets
+
+A secret is a provider credential an MCP policy names by `name`. The API
+stores it as given, without encryption for now, and never returns its value.
+
+- `POST /api/v1/secrets` takes `name`, `value` and an optional `expires_at`
+  and answers 201 with `id`, `name`, `expires_at` and `created_at`.
+- `name` matches `^[a-z0-9][a-z0-9._-]{0,63}$`, `value` is 1 to 8192 visible
+  ASCII characters; anything else gets 422.
+- A name that already exists gets 409, and `GET /api/v1/secrets/{name}`
+  returns the same metadata or 404.
 
 ## Images
 
@@ -157,8 +172,13 @@ POST /api/v1/runners/{runner_id}/tasks/{task_id}/transition  runner token
   reports. Each assignment is compare-and-swap, so a Run never lands on two
   leases.
 - `GET .../tasks` returns the desired state: every non-terminal Run on the
-  live lease, with its spec, the `image_url` of its image and the resolved
-  policy documents.
+  live lease, with its spec, the `image_url` of its image, the resolved
+  policy documents and `credentials`.
+- `credentials` maps each secret the MCP policy names to `value` and
+  `expires_at`, only for STARTING and STARTED Runs. A missing or expired
+  secret is left out, and `expires_at` is at most
+  `NAOS_RUN_CREDENTIAL_TTL_SECONDS` away, so a runner that loses its lease
+  loses its credentials with it.
 
 ### Runner transitions
 

@@ -57,12 +57,11 @@ async fn granted_capabilities_are_refused_before_anything_happens() {
         QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
     let source = FakeSource::new(IMAGE);
     let mut run = run_of(IMAGE);
-    run.policies
-        .insert("mcp".into(), Some(json!({ "allow": [] })));
+    run.policies.insert("beta".into(), Some(json!({})));
 
     let outcome = runtime.ensure(&run, &source).await;
 
-    assert!(matches!(outcome, Err(AgentError::Runtime(message)) if message.contains("mcp")));
+    assert!(matches!(outcome, Err(AgentError::Runtime(message)) if message.contains("beta")));
     assert_eq!(source.calls(), 0);
     assert!(vm_dirs(&dir).is_empty());
 }
@@ -81,6 +80,27 @@ async fn malformed_network_policy_is_refused_before_anything_happens() {
 
     assert!(
         matches!(outcome, Err(AgentError::Runtime(message)) if message.contains("invalid network policy"))
+    );
+    assert_eq!(source.calls(), 0);
+    assert!(vm_dirs(&dir).is_empty());
+}
+
+#[tokio::test]
+async fn malformed_mcp_policy_is_refused_before_anything_happens() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let runtime =
+        QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
+    let source = FakeSource::new(IMAGE);
+    let mut run = run_of(IMAGE);
+    run.policies.insert(
+        "mcp".into(),
+        Some(json!({ "servers": [{ "name": "alpha", "url": "http://example.com/mcp" }] })),
+    );
+
+    let outcome = runtime.ensure(&run, &source).await;
+
+    assert!(
+        matches!(outcome, Err(AgentError::Runtime(message)) if message.contains("invalid mcp policy"))
     );
     assert_eq!(source.calls(), 0);
     assert!(vm_dirs(&dir).is_empty());

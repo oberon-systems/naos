@@ -12,6 +12,7 @@ from naos_api.errors import (
     LeaseError,
     NotFoundError,
     PolicyError,
+    SecretConflictError,
 )
 from naos_api.settings import get_settings
 
@@ -24,6 +25,10 @@ def _token_ttl() -> int:
     return get_settings().runner_token_ttl_seconds
 
 
+def _credential_ttl() -> int:
+    return get_settings().run_credential_ttl_seconds
+
+
 def _mount_roots() -> list[str]:
     return get_settings().allowed_mount_roots
 
@@ -31,6 +36,7 @@ def _mount_roots() -> list[str]:
 SessionDep = Annotated[Session, Depends(get_session)]
 LeaseTtlDep = Annotated[int, Depends(_lease_ttl)]
 TokenTtlDep = Annotated[int, Depends(_token_ttl)]
+CredentialTtlDep = Annotated[int, Depends(_credential_ttl)]
 MountRootsDep = Annotated[list[str], Depends(_mount_roots)]
 IdempotencyKey = Annotated[str, Header(pattern=r"^[A-Za-z0-9._:-]{1,128}$")]
 
@@ -40,6 +46,7 @@ _ERROR_STATUS: dict[type[Exception], int] = {
     IdempotencyConflictError: 409,
     LeaseError: 409,
     ImageConflictError: 409,
+    SecretConflictError: 409,
     PolicyError: 422,
 }
 

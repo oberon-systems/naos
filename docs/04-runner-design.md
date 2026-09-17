@@ -115,9 +115,10 @@ reuse.
 The QEMU runtime turns one desired Run into one VM. Starting a Run takes these
 steps, and any failure stops it and removes the VM directory:
 
-1. build the network and shell gates from the policy snapshots and register
-   them against the Run, then refuse the Run when an MCP policy is set:
-   external MCP servers are not proxied yet, so it fails closed;
+1. build the network, shell and MCP gates from the policy snapshots and
+   register them against the Run, then refuse the Run when it grants a policy
+   kind the runtime does not know; every reconcile hands the kept MCP gate the
+   credentials of the latest desired state;
 2. download the image from the `image_url` the API returned into the cache
    unless a file already has its name: the agent follows at most five
    redirects and never sends its runner token there, the download goes to a
@@ -150,7 +151,7 @@ $NAOS_AGENT_VM_DIR/vm_<32 hex>/
   qemu.log       QEMU stderr, mode 0600
 ```
 
-Both gates live as long as the VM and are dropped when it is destroyed. They
+The gates live as long as the VM and are dropped when it is destroyed. They
 are the host-side egress ([06](06-network-gate.md)) and the host-side read-only
 filesystem capabilities ([07](07-shell-gate.md)); the VM itself has neither a
 network device nor a mount device.
@@ -163,7 +164,8 @@ runner reattaches; destroying the VM aborts it.
 
 The runtime writes audit events `image_cached`, `image_rejected`,
 `vm_created`, `vm_stopped`, `vm_destroyed`, `network_policy_configured`,
-`shell_policy_configured`, `mcp_attached`, `mcp_rejected` and `mcp_call`, each with its
+`shell_policy_configured`, `mcp_policy_configured`, `mcp_attached`,
+`mcp_rejected` and `mcp_call`, each with its
 `run_id`, `vm_id` or digest.
 
 ## Console

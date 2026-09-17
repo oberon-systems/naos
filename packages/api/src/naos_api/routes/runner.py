@@ -8,7 +8,7 @@ from naos_api.auth import require_enrollment, require_runner
 from naos_api.clock import NowDep
 from naos_api.lifecycle import TaskStatus
 from naos_api.models import Lease
-from naos_api.routes.deps import LeaseTtlDep, SessionDep, TokenTtlDep
+from naos_api.routes.deps import CredentialTtlDep, LeaseTtlDep, SessionDep, TokenTtlDep
 from naos_api.routes.tasks import TaskRead
 from naos_api.runners import IssuedToken, RunnerPrincipal
 from naos_api.spec import PolicyKind, RunSpec, StrictModel
@@ -51,6 +51,11 @@ class TokenOut(BaseModel):
         return cls(value=token.value, expires_at=token.expires_at)
 
 
+class CredentialOut(BaseModel):
+    value: str
+    expires_at: int
+
+
 class LeaseOut(BaseModel):
     id: str
     expires_at: int
@@ -78,6 +83,7 @@ class DesiredTaskOut(BaseModel):
     spec: RunSpec
     image_url: str
     policies: dict[PolicyKind, dict[str, Any] | None]
+    credentials: dict[str, CredentialOut]
 
 
 class DesiredStateOut(BaseModel):
@@ -117,8 +123,10 @@ def heartbeat(
 
 
 @router.get("/{runner_id}/tasks")
-def desired_tasks(principal: PrincipalDep, session: SessionDep, now: NowDep) -> DesiredStateOut:
-    lease_id, desired = runners.desired_state(session, principal.runner_id, now)
+def desired_tasks(
+    principal: PrincipalDep, session: SessionDep, now: NowDep, credential_ttl: CredentialTtlDep
+) -> DesiredStateOut:
+    lease_id, desired = runners.desired_state(session, principal.runner_id, now, credential_ttl)
     return DesiredStateOut(
         lease_id=lease_id,
         tasks=[
@@ -128,6 +136,10 @@ def desired_tasks(principal: PrincipalDep, session: SessionDep, now: NowDep) -> 
                 spec=RunSpec.model_validate(item.task.spec),
                 image_url=item.image_url,
                 policies=item.policies,
+                credentials={
+                    name: CredentialOut(value=issued.value, expires_at=issued.expires_at)
+                    for name, issued in item.credentials.items()
+                },
             )
             for item in desired
         ],

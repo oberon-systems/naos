@@ -178,3 +178,18 @@ def network_body() -> dict[str, Any]:
 @pytest.fixture
 def shell_body() -> dict[str, Any]:
     return {"allow": ["read_file", "list_dir", "grep"]}
+
+
+@pytest.fixture
+def mcp_body() -> dict[str, Any]:
+    return {
+        "servers": [
+            {
+                "name": "alpha",
+                "url": "https://mcp.example.com/mcp",
+                "tools": ["search", "fetch"],
+                "resources": ["docs://alpha/"],
+                "credential": "alpha-token",
+            }
+        ]
+    }

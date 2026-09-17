@@ -82,7 +82,19 @@ pub fn mcp_rejected(run_id: &str, reason: &str) {
     tracing::warn!(target: "audit", event = "mcp_rejected", run_id, reason);
 }
 
-// Arguments are not logged: a header or body the agent sends may carry a secret.
-pub fn mcp_call(run_id: &str, tool: &str, decision: &str, duration_ms: u64, category: &str) {
-    tracing::info!(target: "audit", event = "mcp_call", server = "naos", run_id, tool, decision, duration_ms, category);
+pub fn mcp_policy_configured(run_id: &str) {
+    tracing::info!(target: "audit", event = "mcp_policy_configured", run_id);
+}
+
+// Arguments are not logged: a header or body may carry a secret. The resource is the policy prefix that matched.
+pub fn mcp_call(
+    run_id: &str,
+    server: &str,
+    tool: &str,
+    resource: &str,
+    decision: &str,
+    duration_ms: u64,
+    category: &str,
+) {
+    tracing::info!(target: "audit", event = "mcp_call", run_id, server, tool, resource, decision, duration_ms, category);
 }

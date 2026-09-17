@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fmt;
 use std::future::Future;
 use std::time::Duration;
 
@@ -78,6 +79,23 @@ pub struct RunSpec {
     pub runtime: RuntimeSpec,
 }
 
+/// A provider credential the API issued for one Run; it never leaves the runner.
+#[derive(Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RunCredential {
+    pub value: String,
+    pub expires_at: u64,
+}
+
+impl fmt::Debug for RunCredential {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RunCredential")
+            .field("value", &"<redacted>")
+            .field("expires_at", &self.expires_at)
+            .finish()
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct DesiredRun {
     pub id: String,
@@ -86,6 +104,8 @@ pub struct DesiredRun {
     pub image_url: String,
     #[serde(default)]
     pub policies: BTreeMap<String, Option<serde_json::Value>>,
+    #[serde(default)]
+    pub credentials: BTreeMap<String, RunCredential>,
 }
 
 impl DesiredRun {

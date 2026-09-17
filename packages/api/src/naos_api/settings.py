@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     runner_enrollment_token_sha256: TokenHash = None
     lease_ttl_seconds: Annotated[int, Field(ge=5, le=3600)] = 60
     runner_token_ttl_seconds: Annotated[int, Field(ge=60, le=604800)] = 86400
+    run_credential_ttl_seconds: Annotated[int, Field(ge=60, le=3600)] = 300
     lease_sweep_interval_seconds: Annotated[int, Field(ge=1, le=3600)] = 15
 
 
