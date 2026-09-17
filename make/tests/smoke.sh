@@ -72,6 +72,18 @@ reattached() {
     [ "$(events mcp_attached)" -ge 2 ] && [ "$(events mcp_credentials_updated)" -ge 2 ]
 }
 
+workspace_tree() {
+    (
+        cd "$TEMP_DIR/workspaces/alpha"
+        find . -type f -print0 | sort -z | xargs -0 sha256sum
+        find . | sort
+    ) | sha256sum
+}
+
+share_gone() {
+    ! pgrep -f -- "--socket-path=$TEMP_DIR/runs" >/dev/null
+}
+
 start_agent() {
     NAOS_AGENT_API_URL="$api" \
         NAOS_AGENT_NAME=alpha \
@@ -84,6 +96,9 @@ start_agent() {
 }
 
 mkdir -m 700 "$TEMP_DIR" "$TEMP_DIR/state"
+mkdir -p "$TEMP_DIR/workspaces/alpha"
+printf 'alpha\n' >"$TEMP_DIR/workspaces/alpha/notes.txt"
+tree_before="$(workspace_tree)"
 echo "smoke test of $release/$image, working dir: $TEMP_DIR"
 
 digest="$(curl -fsSL "$release/SHA256SUMS" | awk -v name="$image" '$2 == name { print "sha256:" $1 }')"
@@ -104,6 +119,7 @@ echo "starting api..."
 NAOS_OPERATOR_TOKEN_SHA256="$(printf '%s' "$operator" | sha256sum | cut -d' ' -f1)" \
 NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256="$(sha256sum "$TEMP_DIR/enrollment" | cut -d' ' -f1)" \
 NAOS_DATABASE_URL="sqlite:///$TEMP_DIR/naos.db" \
+NAOS_ALLOWED_MOUNT_ROOTS="[\"$TEMP_DIR/workspaces\"]" \
     setsid "$MAKE" -C "$ROOT" run-api >"$TEMP_DIR/api.log" 2>&1 &
 server=$!
 wait_for 30 curl -fs -o /dev/null "$api/healthz"
@@ -122,6 +138,11 @@ shell_policy="$(
 {"kind": "shell", "document": {"allow": ["read_file", "list_dir", "grep"]}}
 EOF
 )"
+mount_policy="$(
+    curl -fsS "${auth[@]}" "$api/api/v1/policies" -d @- <<EOF | field id
+{"kind": "mount", "document": {"workspace": {"host_path": "$TEMP_DIR/workspaces/alpha", "mode": "rw"}}}
+EOF
+)"
 curl -fsS "${auth[@]}" "$api/api/v1/secrets" -o /dev/null -d @- <<EOF
 {"name": "alpha-token", "value": "$(token)"}
 EOF
@@ -132,7 +153,7 @@ EOF
 )"
 task="$(
     curl -fsS "${auth[@]}" -H "Idempotency-Key: smoke" "$api/api/v1/tasks" -d @- <<EOF | field id
-{"image": {"id": "naos-agents", "digest": "$digest"}, "runtime": {"cpu": 2, "memory_mib": 2048, "disk_gib": 8}, "network": {"policy": "$network_policy"}, "shell": {"policy": "$shell_policy"}, "mcp": {"policy": "$mcp_policy"}, "timeout": 3600}
+{"image": {"id": "naos-agents", "digest": "$digest"}, "runtime": {"cpu": 2, "memory_mib": 2048, "disk_gib": 8}, "mounts": {"policy": "$mount_policy"}, "network": {"policy": "$network_policy"}, "shell": {"policy": "$shell_policy"}, "mcp": {"policy": "$mcp_policy"}, "timeout": 3600}
 EOF
 )"
 
@@ -140,7 +161,7 @@ echo "starting agent..."
 start_agent
 
 wait_for 900 booted
-for event in network_policy_configured shell_policy_configured mcp_policy_configured mcp_attached; do
+for event in network_policy_configured shell_policy_configured mcp_policy_configured mcp_attached workspace_shared; do
     [ "$(events "$event")" -ge 1 ] || {
         echo "$event is missing from the agent log" >&2
         exit 1
@@ -149,6 +170,11 @@ done
 credentials="$(first_line mcp_credentials_updated)"
 if [ -z "$credentials" ] || [ "$credentials" -gt "$(first_line vm_created)" ]; then
     echo "the vm started before its mcp gate held the credentials" >&2
+    exit 1
+fi
+
+if [ "$(workspace_tree)" != "$tree_before" ]; then
+    echo "the guest changed the host workspace" >&2
     exit 1
 fi
 
@@ -164,4 +190,9 @@ fi
 echo "task $task booted, stopping it..."
 curl -fsS "${auth[@]}" -X POST "$api/api/v1/tasks/$task/stop" -o /dev/null
 wait_for 120 collected
+wait_for 10 share_gone
+if [ "$(workspace_tree)" != "$tree_before" ]; then
+    echo "the guest changed the host workspace" >&2
+    exit 1
+fi
 echo "smoke test passed"

@@ -40,6 +40,10 @@ pub fn vm_stopped(vm_id: &str, run_id: &str) {
     tracing::info!(target: "audit", event = "vm_stopped", vm_id, run_id);
 }
 
+pub fn workspace_shared(run_id: &str, mode: &str) {
+    tracing::info!(target: "audit", event = "workspace_shared", run_id, mode);
+}
+
 pub fn vm_destroyed(vm_id: &str, run_id: &str) {
     tracing::info!(target: "audit", event = "vm_destroyed", vm_id, run_id);
 }

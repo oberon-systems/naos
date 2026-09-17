@@ -17,6 +17,7 @@ const ENV_FILE: &str = "NAOS_AGENT_ENV_FILE";
 pub const DEFAULT_QEMU_BINARY: &str = "/usr/bin/qemu-system-x86_64";
 pub const DEFAULT_QEMU_IMG: &str = "/usr/bin/qemu-img";
 pub const DEFAULT_GIT_BINARY: &str = "/usr/bin/git";
+pub const DEFAULT_VIRTIOFSD_BINARY: &str = "/usr/libexec/virtiofsd";
 pub const DEFAULT_IMAGE_MAX_BYTES: u64 = 8 * 1024 * 1024 * 1024;
 
 #[derive(Debug, Clone)]
@@ -36,6 +37,7 @@ pub struct RuntimeConfig {
     pub qemu_binary: PathBuf,
     pub qemu_img: PathBuf,
     pub git_binary: PathBuf,
+    pub virtiofsd_binary: PathBuf,
     pub image_max_bytes: u64,
 }
 
@@ -56,6 +58,7 @@ pub struct RawRuntimeConfig {
     pub qemu_binary: Option<PathBuf>,
     pub qemu_img: Option<PathBuf>,
     pub git_binary: Option<PathBuf>,
+    pub virtiofsd_binary: Option<PathBuf>,
     pub image_max_bytes: Option<u64>,
 }
 
@@ -138,6 +141,11 @@ impl RuntimeConfig {
             git_binary: checked_path(
                 "NAOS_AGENT_GIT_BINARY",
                 raw.git_binary.unwrap_or_else(|| DEFAULT_GIT_BINARY.into()),
+            )?,
+            virtiofsd_binary: checked_path(
+                "NAOS_AGENT_VIRTIOFSD_BINARY",
+                raw.virtiofsd_binary
+                    .unwrap_or_else(|| DEFAULT_VIRTIOFSD_BINARY.into()),
             )?,
             image_max_bytes,
         })

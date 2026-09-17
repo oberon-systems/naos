@@ -67,6 +67,10 @@ fn runtime_dirs_default_to_xdg_locations() {
     assert_eq!(config.vm_dir, PathBuf::from("/srv/state/alpha/naos/runs"));
     assert_eq!(config.qemu_binary, PathBuf::from(DEFAULT_QEMU_BINARY));
     assert_eq!(config.git_binary, PathBuf::from(DEFAULT_GIT_BINARY));
+    assert_eq!(
+        config.virtiofsd_binary,
+        PathBuf::from(DEFAULT_VIRTIOFSD_BINARY)
+    );
     assert_eq!(config.image_max_bytes, DEFAULT_IMAGE_MAX_BYTES);
 }
 

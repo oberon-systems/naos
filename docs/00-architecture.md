@@ -89,9 +89,12 @@ default VM user `naos`; this is where agent settings and credentials go. Host
 paths must be absolute, normalized and inside `NAOS_ALLOWED_MOUNT_ROOTS`; the
 default is empty, which denies every mount.
 
-The guest paths are not a filesystem the VM sees yet. They are the namespace
-the shell gate serves ([07](07-shell-gate.md)), read-only and on request; the
-VM has no mount device of its own.
+The workspace is a real mount: virtiofsd shares the host directory read-only,
+and in `rw` mode the guest overlays it with a disk of its own, so the agent
+writes freely while the host copy never changes and nothing is copied
+([05](05-vm-and-qemu.md#workspace)). Home entries are not mounted; they are the
+namespace the shell gate serves ([07](07-shell-gate.md)), read-only and on
+request.
 
 ## Acceptance criteria
 

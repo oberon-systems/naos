@@ -1,9 +1,10 @@
 use std::collections::HashMap;
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::fmt::Display;
 use std::fs::{self, DirBuilder, OpenOptions};
 use std::future::Future;
 use std::io::{ErrorKind, Write};
+use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt};
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
@@ -28,7 +29,7 @@ use crate::libs::ids::random_hex;
 use crate::libs::image::{ImageCache, ImageSource};
 use crate::libs::mcp::{self, McpGate};
 use crate::libs::network::NetworkGate;
-use crate::libs::qemu::{self, VmPaths, PROCESS_PREFIX};
+use crate::libs::qemu::{self, VmPaths, WorkspaceMode, PROCESS_PREFIX};
 use crate::libs::shell::ShellGate;
 
 const READY_TIMEOUT: Duration = Duration::from_secs(30);
@@ -38,6 +39,9 @@ const POLL_INTERVAL: Duration = Duration::from_millis(100);
 const GIB: u64 = 1024 * 1024 * 1024;
 const PRIVATE_MODE: u32 = 0o600;
 const DEFAULT_AGENT: &str = "claude";
+const VIRTIOFSD_MIN: (u64, u64) = (1, 13);
+// The uid and gid of `naos`, the first user setup-alpine creates in the image.
+const GUEST_ID: u32 = 1000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalVm {
@@ -76,6 +80,27 @@ struct VmMeta {
     digest: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct MountDoc {
+    workdir: String,
+    mounts: Vec<MountEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct MountEntry {
+    host_path: String,
+    guest_path: String,
+    mode: String,
+}
+
+/// The mount the guest works in, shared read-only by virtiofsd.
+#[derive(Debug)]
+struct Workspace {
+    host: PathBuf,
+    guest: String,
+    mode: WorkspaceMode,
+}
+
 /// The host-side capabilities of one Run, built once and dropped with its VM.
 #[derive(Debug)]
 pub struct RunGates {
@@ -90,6 +115,7 @@ pub struct QemuRuntime {
     qemu_binary: PathBuf,
     qemu_img: PathBuf,
     git_binary: PathBuf,
+    virtiofsd_binary: PathBuf,
     gates: Mutex<HashMap<String, Arc<RunGates>>>,
     sessions: Mutex<HashMap<String, AbortHandle>>,
 }
@@ -104,6 +130,7 @@ impl QemuRuntime {
             qemu_binary: config.qemu_binary.clone(),
             qemu_img: config.qemu_img.clone(),
             git_binary: config.git_binary.clone(),
+            virtiofsd_binary: config.virtiofsd_binary.clone(),
             gates: Mutex::new(HashMap::new()),
             sessions: Mutex::new(HashMap::new()),
         })
@@ -234,12 +261,78 @@ impl QemuRuntime {
             .ok_or_else(|| AgentError::Image("qemu-img did not report the image size".into()))
     }
 
+    async fn check_virtiofsd(&self) -> Result<(), AgentError> {
+        let refused =
+            || AgentError::Runtime("a workspace needs virtiofsd 1.13 or newer (--readonly)".into());
+        let output = Command::new(&self.virtiofsd_binary)
+            .arg("--version")
+            .stdin(Stdio::null())
+            .output()
+            .await
+            .map_err(|_| refused())?;
+        let text = String::from_utf8_lossy(&output.stdout);
+        let version = text.split_whitespace().nth(1).and_then(|version| {
+            let mut parts = version.split('.').map(str::parse::<u64>);
+            Some((parts.next()?.ok()?, parts.next()?.ok()?))
+        });
+        match version {
+            Some(found) if output.status.success() && found >= VIRTIOFSD_MIN => Ok(()),
+            _ => Err(refused()),
+        }
+    }
+
+    /// Starts virtiofsd over the workspace; the host refuses every write, whatever the guest mounts.
+    async fn share(&self, workspace: &Workspace, paths: &VmPaths) -> Result<(), AgentError> {
+        let own = fs::metadata("/proc/self")?;
+        let flag = |name: &str, value: &Path| {
+            let mut arg = OsString::from(name);
+            arg.push(value);
+            arg
+        };
+        let log = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(PRIVATE_MODE)
+            .open(paths.virtiofsd_log())?;
+        let mut child = Command::new(&self.virtiofsd_binary)
+            .arg(flag("--socket-path=", &paths.fs_socket()))
+            .arg(flag("--shared-dir=", &workspace.host))
+            .args(["--readonly", "--sandbox=namespace", "--cache=never"])
+            .arg(format!("--uid-map=:{GUEST_ID}:{}:1:", own.uid()))
+            .arg(format!("--gid-map=:{GUEST_ID}:{}:1:", own.gid()))
+            .current_dir(&paths.dir)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::from(log))
+            .process_group(0)
+            .spawn()?;
+        let deadline = Instant::now() + READY_TIMEOUT;
+        loop {
+            if let Some(status) = child.try_wait()? {
+                return Err(AgentError::Runtime(format!(
+                    "virtiofsd exited with {status}, see {}",
+                    paths.virtiofsd_log().display()
+                )));
+            }
+            if paths.fs_socket().exists() {
+                return Ok(());
+            }
+            if Instant::now() >= deadline {
+                return Err(AgentError::Runtime(
+                    "virtiofsd did not open its socket in time".into(),
+                ));
+            }
+            tokio::time::sleep(POLL_INTERVAL).await;
+        }
+    }
+
     async fn launch(
         &self,
         run: &DesiredRun,
         vm_id: &str,
         paths: &VmPaths,
         base: &Path,
+        workspace: Option<&Workspace>,
     ) -> Result<(), AgentError> {
         let meta = VmMeta {
             vm_id: vm_id.to_owned(),
@@ -251,7 +344,13 @@ impl QemuRuntime {
             &paths.meta(),
             &serde_json::to_vec(&meta).map_err(runtime_error)?,
         )?;
-        let session = json!({ "run_id": run.id, "vm_id": vm_id, "agent": DEFAULT_AGENT });
+        let session = json!({
+            "run_id": run.id,
+            "vm_id": vm_id,
+            "agent": DEFAULT_AGENT,
+            "workspace": workspace.map(|workspace| workspace.guest.as_str()),
+            "workspace_mode": workspace.map(|workspace| mode_name(workspace.mode)),
+        });
         write_private(&paths.session(), session.to_string().as_bytes())?;
 
         let disk = u64::from(run.spec.runtime.disk_gib) * GIB;
@@ -272,6 +371,17 @@ impl QemuRuntime {
             OsStr::new(&disk_bytes),
         ])
         .await?;
+        if let Some(workspace) = workspace {
+            if workspace.mode == WorkspaceMode::ReadWrite {
+                OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .mode(PRIVATE_MODE)
+                    .open(paths.upper())?
+                    .set_len(disk)?;
+            }
+            self.share(workspace, paths).await?;
+        }
 
         let log = OpenOptions::new()
             .write(true)
@@ -279,7 +389,13 @@ impl QemuRuntime {
             .mode(PRIVATE_MODE)
             .open(paths.qemu_log())?;
         let mut child = Command::new(&self.qemu_binary)
-            .args(qemu::argv(vm_id, base, paths, &run.spec.runtime))
+            .args(qemu::argv(
+                vm_id,
+                base,
+                paths,
+                &run.spec.runtime,
+                workspace.map(|workspace| workspace.mode),
+            ))
             .current_dir(&paths.dir)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
@@ -327,6 +443,10 @@ impl Runtime for QemuRuntime {
             return Ok(existing);
         }
 
+        let workspace = workspace_of(run)?;
+        if workspace.is_some() {
+            self.check_virtiofsd().await?;
+        }
         let digest = run.spec.image.digest.clone();
         self.images.fetch(images, &run.image_url, &digest).await?;
         let cache = self.images.clone();
@@ -347,7 +467,9 @@ impl Runtime for QemuRuntime {
         };
         let paths = self.paths(&vm.vm_id)?;
         DirBuilder::new().mode(0o700).create(&paths.dir)?;
-        let launched = self.launch(run, &vm.vm_id, &paths, &base_path).await;
+        let launched = self
+            .launch(run, &vm.vm_id, &paths, &base_path, workspace.as_ref())
+            .await;
         drop(base);
         match launched {
             Ok(()) => {
@@ -360,6 +482,9 @@ impl Runtime for QemuRuntime {
                 }
                 if granted("mcp") {
                     audit::mcp_policy_configured(&vm.run_id);
+                }
+                if let Some(workspace) = &workspace {
+                    audit::workspace_shared(&vm.run_id, mode_name(workspace.mode));
                 }
                 audit::vm_created(&vm.vm_id, &vm.run_id);
                 self.attach(&vm, &paths);
@@ -389,6 +514,7 @@ impl Runtime for QemuRuntime {
                 terminate(&vm.vm_id).await?;
             }
         }
+        release_share(&paths).await?;
         audit::vm_stopped(&vm.vm_id, &vm.run_id);
         Ok(())
     }
@@ -396,6 +522,7 @@ impl Runtime for QemuRuntime {
     async fn destroy(&self, vm: &LocalVm) -> Result<(), AgentError> {
         let paths = self.paths(&vm.vm_id)?;
         terminate(&vm.vm_id).await?;
+        release_share(&paths).await?;
         match fs::remove_dir_all(&paths.dir) {
             Err(err) if err.kind() != ErrorKind::NotFound => return Err(err.into()),
             _ => {}
@@ -442,9 +569,9 @@ pub fn scan(vm_dir: &Path) -> Result<Vec<LocalVm>, AgentError> {
     Ok(vms)
 }
 
-// Matching the -name argument of our own processes survives pid reuse and agent restarts alike.
-fn qemu_processes() -> HashMap<String, i32> {
-    let mut found = HashMap::new();
+/// The pid and argv of every process running as the agent's own user.
+fn own_processes() -> Vec<(i32, Vec<Vec<u8>>)> {
+    let mut found = Vec::new();
     let Ok(own_uid) = fs::metadata("/proc/self").map(|meta| meta.uid()) else {
         return found;
     };
@@ -465,11 +592,23 @@ fn qemu_processes() -> HashMap<String, i32> {
         let Ok(cmdline) = fs::read(entry.path().join("cmdline")) else {
             continue;
         };
-        let args: Vec<&[u8]> = cmdline.split(|byte| *byte == 0).collect();
+        let args = cmdline
+            .split(|byte| *byte == 0)
+            .map(<[u8]>::to_vec)
+            .collect();
+        found.push((pid, args));
+    }
+    found
+}
+
+// Matching the -name argument of our own processes survives pid reuse and agent restarts alike.
+fn qemu_processes() -> HashMap<String, i32> {
+    let mut found = HashMap::new();
+    for (pid, args) in own_processes() {
         let vm_id = args
             .windows(2)
             .filter(|pair| pair[0] == b"-name")
-            .filter_map(|pair| std::str::from_utf8(pair[1]).ok())
+            .filter_map(|pair| std::str::from_utf8(&pair[1]).ok())
             .filter_map(|name| name.strip_prefix(PROCESS_PREFIX))
             .find(|vm_id| is_vm_id(vm_id));
         if let Some(vm_id) = vm_id {
@@ -477,6 +616,38 @@ fn qemu_processes() -> HashMap<String, i32> {
         }
     }
     found
+}
+
+// The namespace sandbox forks, so one share can be more than one process with the same argv.
+fn virtiofsd_pids(paths: &VmPaths) -> Vec<i32> {
+    let mut wanted = b"--socket-path=".to_vec();
+    wanted.extend_from_slice(paths.fs_socket().as_os_str().as_bytes());
+    own_processes()
+        .into_iter()
+        .filter(|(_, args)| args.contains(&wanted))
+        .map(|(pid, _)| pid)
+        .collect()
+}
+
+async fn release_share(paths: &VmPaths) -> Result<(), AgentError> {
+    for pid in virtiofsd_pids(paths) {
+        match kill(Pid::from_raw(pid), Signal::SIGKILL) {
+            Ok(()) | Err(Errno::ESRCH) => {}
+            Err(err) => {
+                return Err(AgentError::Runtime(format!(
+                    "cannot kill virtiofsd {pid}: {err}"
+                )))
+            }
+        }
+    }
+    let deadline = Instant::now() + KILL_TIMEOUT;
+    while !virtiofsd_pids(paths).is_empty() {
+        if Instant::now() >= deadline {
+            return Err(AgentError::Runtime("virtiofsd survived SIGKILL".into()));
+        }
+        tokio::time::sleep(POLL_INTERVAL).await;
+    }
+    Ok(())
 }
 
 fn find_pid(vm_id: &str) -> Option<i32> {
@@ -512,6 +683,47 @@ async fn terminate(vm_id: &str) -> Result<(), AgentError> {
         Err(AgentError::Runtime(format!(
             "qemu of {vm_id} survived SIGKILL"
         )))
+    }
+}
+
+fn workspace_of(run: &DesiredRun) -> Result<Option<Workspace>, AgentError> {
+    let Some(document) = run.policies.get("mount").and_then(Option::as_ref) else {
+        return Ok(None);
+    };
+    let refuse = |reason: String| AgentError::Runtime(format!("invalid mount policy: {reason}"));
+    let doc: MountDoc =
+        serde_json::from_value(document.clone()).map_err(|err| refuse(err.to_string()))?;
+    let Some(entry) = doc
+        .mounts
+        .into_iter()
+        .find(|entry| entry.guest_path == doc.workdir)
+    else {
+        return Ok(None);
+    };
+    let mode = match entry.mode.as_str() {
+        "rw" => WorkspaceMode::ReadWrite,
+        "ro" => WorkspaceMode::ReadOnly,
+        other => return Err(refuse(format!("unknown workspace mode {other:?}"))),
+    };
+    let host = PathBuf::from(&entry.host_path);
+    // A symlink anywhere on the path would share a directory the policy never named.
+    match fs::canonicalize(&host) {
+        Ok(canonical) if canonical == host && canonical.is_dir() => Ok(Some(Workspace {
+            host: canonical,
+            guest: entry.guest_path,
+            mode,
+        })),
+        _ => Err(refuse(format!(
+            "workspace {} is not a directory reached without symlinks",
+            host.display()
+        ))),
+    }
+}
+
+fn mode_name(mode: WorkspaceMode) -> &'static str {
+    match mode {
+        WorkspaceMode::ReadOnly => "ro",
+        WorkspaceMode::ReadWrite => "rw",
     }
 }
 

@@ -22,8 +22,43 @@ fn config(dir: &TempDir, qemu_binary: &str, qemu_img: PathBuf) -> RuntimeConfig 
         qemu_binary: qemu_binary.into(),
         qemu_img,
         git_binary: "/usr/bin/git".into(),
+        virtiofsd_binary: "/nonexistent/virtiofsd".into(),
         image_max_bytes: 1024 * 1024,
     }
+}
+
+/// A virtiofsd that reports `version`, records its arguments and keeps running like the real one.
+fn fake_virtiofsd(dir: &Path, version: &str) -> PathBuf {
+    let path = dir.join("virtiofsd");
+    let record = dir.join("virtiofsd.args");
+    fs::write(
+        &path,
+        format!(
+            "#!/bin/sh\n\
+             [ \"$1\" = --version ] && {{ echo 'virtiofsd {version}'; exit 0; }}\n\
+             printf '%s\\n' \"$@\" > {record}\n\
+             for arg; do case $arg in --socket-path=*) : > \"${{arg#--socket-path=}}\" ;; esac; done\n\
+             while :; do sleep 1; done\n",
+            record = record.display()
+        ),
+    )
+    .expect("write");
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).expect("chmod");
+    path
+}
+
+fn with_workspace(run: &mut DesiredRun, host: &Path, mode: &str) {
+    run.policies.insert(
+        "mount".into(),
+        Some(json!({
+            "workdir": "/naos/alpha",
+            "mounts": [{
+                "host_path": host.to_str().expect("utf-8"),
+                "guest_path": "/naos/alpha",
+                "mode": mode,
+            }],
+        })),
+    );
 }
 
 fn fake_qemu_img(dir: &TempDir) -> PathBuf {
@@ -253,6 +288,88 @@ async fn failed_qemu_start_leaves_no_vm_behind() {
 }
 
 #[tokio::test]
+async fn a_workspace_is_shared_read_only_and_released_when_qemu_fails() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let bin = tempfile::tempdir().expect("tempdir");
+    let workspace = dir.path().join("alpha");
+    fs::create_dir(&workspace).expect("mkdir");
+    let mut config = config(&dir, "/bin/false", fake_qemu_img(&dir));
+    config.virtiofsd_binary = fake_virtiofsd(bin.path(), "1.13.0");
+    let runtime = QemuRuntime::new(&config).expect("runtime");
+    let mut run = run_of(IMAGE);
+    with_workspace(&mut run, &workspace, "rw");
+
+    let outcome = runtime.ensure(&run, &FakeSource::new(IMAGE)).await;
+
+    assert!(
+        matches!(outcome, Err(AgentError::Runtime(message)) if message.contains("qemu exited"))
+    );
+    let recorded = fs::read_to_string(bin.path().join("virtiofsd.args")).expect("args");
+    let args: Vec<&str> = recorded.lines().collect();
+    for expected in ["--readonly", "--sandbox=namespace", "--cache=never"] {
+        assert!(args.contains(&expected), "{expected} in {args:?}");
+    }
+    assert!(args.contains(&format!("--shared-dir={}", workspace.display()).as_str()));
+    let socket = args
+        .iter()
+        .find_map(|arg| arg.strip_prefix("--socket-path="))
+        .expect("socket");
+    let paths = VmPaths::new(Path::new(socket).parent().expect("vm dir").to_path_buf());
+    assert!(
+        virtiofsd_pids(&paths).is_empty(),
+        "virtiofsd outlived the failed start"
+    );
+    assert!(vm_dirs(&dir).is_empty());
+}
+
+#[tokio::test]
+async fn a_workspace_needs_a_virtiofsd_that_can_refuse_writes() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let bin = tempfile::tempdir().expect("tempdir");
+    let workspace = dir.path().join("alpha");
+    fs::create_dir(&workspace).expect("mkdir");
+    let mut config = config(&dir, "/bin/false", fake_qemu_img(&dir));
+    config.virtiofsd_binary = fake_virtiofsd(bin.path(), "1.10.0");
+    let runtime = QemuRuntime::new(&config).expect("runtime");
+    let source = FakeSource::new(IMAGE);
+    let mut run = run_of(IMAGE);
+    with_workspace(&mut run, &workspace, "rw");
+
+    let outcome = runtime.ensure(&run, &source).await;
+
+    assert!(
+        matches!(outcome, Err(AgentError::Runtime(message)) if message.contains("virtiofsd 1.13"))
+    );
+    assert_eq!(source.calls(), 0);
+    assert!(vm_dirs(&dir).is_empty());
+    assert!(!bin.path().join("virtiofsd.args").exists());
+}
+
+#[tokio::test]
+async fn a_workspace_reached_through_a_symlink_is_refused() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let bin = tempfile::tempdir().expect("tempdir");
+    let target = dir.path().join("beta");
+    fs::create_dir(&target).expect("mkdir");
+    let link = dir.path().join("alpha");
+    std::os::unix::fs::symlink(&target, &link).expect("symlink");
+    let mut config = config(&dir, "/bin/false", fake_qemu_img(&dir));
+    config.virtiofsd_binary = fake_virtiofsd(bin.path(), "1.13.0");
+    let runtime = QemuRuntime::new(&config).expect("runtime");
+    let source = FakeSource::new(IMAGE);
+    let mut run = run_of(IMAGE);
+    with_workspace(&mut run, &link, "rw");
+
+    let outcome = runtime.ensure(&run, &source).await;
+
+    assert!(
+        matches!(outcome, Err(AgentError::Runtime(message)) if message.contains("without symlinks"))
+    );
+    assert_eq!(source.calls(), 0);
+    assert!(vm_dirs(&dir).is_empty());
+}
+
+#[tokio::test]
 async fn corrupted_cache_is_refused_and_removed() {
     let dir = tempfile::tempdir().expect("tempdir");
     let runtime =
@@ -326,6 +443,7 @@ async fn real_image_boots_probes_and_is_cleaned_up() {
         crate::libs::config::DEFAULT_QEMU_IMG.into(),
     );
     config.image_max_bytes = u64::MAX;
+    config.virtiofsd_binary = crate::libs::config::DEFAULT_VIRTIOFSD_BINARY.into();
     let runtime = QemuRuntime::new(&config).expect("runtime");
     let source = FakeSource::new(bytes.clone());
     let mut first = run_of(&bytes);
@@ -333,6 +451,10 @@ async fn real_image_boots_probes_and_is_cleaned_up() {
     first.spec.runtime.memory_mib = 2048;
     let mut second = first.clone();
     second.id = "run_b".into();
+    let workspace = dir.path().join("alpha");
+    fs::create_dir(&workspace).expect("mkdir");
+    fs::write(workspace.join("notes.txt"), "alpha\n").expect("write");
+    with_workspace(&mut first, &workspace, "rw");
 
     let alpha = runtime.ensure(&first, &source).await.expect("boot run_a");
     let beta = runtime.ensure(&second, &source).await.expect("boot run_b");
@@ -387,4 +509,14 @@ async fn real_image_boots_probes_and_is_cleaned_up() {
         .images
         .open_verified(&first.spec.image.digest)
         .expect("base image is untouched by the guest");
+    let entries: Vec<_> = fs::read_dir(&workspace)
+        .expect("workspace")
+        .map(|entry| entry.expect("entry").file_name())
+        .collect();
+    assert_eq!(entries, vec![std::ffi::OsString::from("notes.txt")]);
+    assert_eq!(
+        fs::read_to_string(workspace.join("notes.txt")).expect("notes"),
+        "alpha\n",
+        "the guest wrote through the read-only share"
+    );
 }

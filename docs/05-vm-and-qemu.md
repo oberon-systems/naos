@@ -56,10 +56,35 @@ shell. Everything the guest can reach is on this list:
 | `-qmp unix:qmp.sock` | monitor for readiness and power-down |
 | `-fw_cfg name=opt/naos/session` | per-Run parameters from `session.json` |
 
+A Run whose mount policy has a workspace adds:
+
+| Option | Purpose |
+|---|---|
+| `-object memory-backend-memfd,share=on` + `-machine q35,memory-backend=mem` | guest RAM virtiofsd can map |
+| `-chardev socket,path=fs.sock` + `-device vhost-user-fs-pci,tag=naos-workspace` | the workspace, shared read-only by virtiofsd |
+| `-blockdev` raw `upper.img` + `-device virtio-blk-pci,serial=naos-upper` | `rw` only: the disk the guest's workspace writes land on |
+
 There is no `-virtfs`, `-fsdev`, `-drive`, `-hda`, `-netdev`, `-kernel`,
-`-cdrom` or `-usb`, and a unit test fails when one appears. A Run with a mount
-policy starts, but the guest gets no mount device: its host paths are served
-read-only by the shell gate ([07](07-shell-gate.md)) and nowhere else.
+`-cdrom` or `-usb`, and a unit test fails when one appears. Home entries of a
+mount policy get no device: the shell gate serves them read-only
+([07](07-shell-gate.md)).
+
+## Workspace
+
+The runner never copies a workspace. It starts virtiofsd over the host
+directory with `--readonly --sandbox namespace --cache never`, mapping its own
+uid and gid onto the guest's `naos` (1000), so the host refuses every write
+whatever the guest mounts. That needs virtiofsd 1.13 or newer, which
+`virtiofsd --version` must report before the Run starts, `newuidmap` and
+unprivileged user namespaces for the namespace sandbox; a host whose package is
+older builds it with [build-virtiofsd.md](host/build-virtiofsd.md). The host path must be a directory reached without
+symlinks.
+
+In the guest, `naos-workspace` mounts the share at `/run/naos/lower`. In `rw`
+mode it formats the upper disk on first use, mounts it at `/run/naos/upper`
+and puts an overlay at `/naos/<name>`, so every change lands on the upper disk
+for collection ([09](09-overlay-and-merge.md)). In `ro` mode the share is bound
+read-only at `/naos/<name>`. The agent's tmux session starts there.
 
 ## Console and session
 
@@ -77,8 +102,8 @@ never counts as booted. `naos-session` then hands the port to `naos` as
 and Gemini CLI register that command as the MCP server `naos`.
 
 The guest reads `/sys/firmware/qemu_fw_cfg/by_name/opt/naos/session/raw` for
-its per-Run parameters: `run_id`, `vm_id` and `agent`, which selects `claude`
-or `gemini`. fw_cfg is read-only for the guest and needs no disk or host path.
+its per-Run parameters: `run_id`, `vm_id`, `agent`, which selects `claude`
+or `gemini`, and `workspace` with `workspace_mode` when there is one. fw_cfg is read-only for the guest and needs no disk or host path.
 
 ## Guest user and instructions
 
@@ -125,9 +150,10 @@ Acceptance tests must verify:
 | approved image starts | `real_image_boots_probes_and_is_cleaned_up`, `make smoke` |
 | overlay is disposable | `base_is_read_only_under_a_writable_overlay`; the boot test destroys every VM directory with its overlay and re-verifies the base digest |
 | VM is destroyed after Run | the boot test, `failed_qemu_start_leaves_no_vm_behind` |
-| unauthorized host paths are invisible | `no_host_path_reaches_the_guest_implicitly`; the probe fails on a second disk or a 9p or virtiofs mount |
+| unauthorized host paths are invisible | `no_host_path_reaches_the_guest_implicitly`, `a_workspace_reached_through_a_symlink_is_refused`; the probe fails on an unexpected disk, any 9p mount and any virtiofs mount but the workspace share |
+| the workspace is read-only on the host | `a_workspace_is_shared_read_only_and_released_when_qemu_fails`, `a_workspace_needs_a_virtiofsd_that_can_refuse_writes`; the probe remounts the share rw and fails if a write gets through, and in `rw` mode fails unless a write by `naos` lands in the overlay only; the boot and smoke tests compare the host workspace before and after |
 | Runs cannot access one another | the boot test checks that no QEMU command line names another VM directory; `runs_sharing_a_guest_path_read_only_their_own_mounts` |
-| runner APIs are unreachable | `vm_has_no_network_no_defaults_and_a_sandbox`; the probe fails on any interface but `lo` and on any virtio device but the disk and the serial ports |
+| runner APIs are unreachable | `vm_has_no_network_no_defaults_and_a_sandbox`; the probe fails on any interface but `lo` and on any virtio device but the disks, the serial ports and, with a workspace, the share |
 
 The probe runs inside every booted guest, and both the boot test and the smoke
 test fail on `naos-probe fail`:

@@ -4,6 +4,10 @@ const VM_DIR: &str = "/tmp/runs/vm_00000000000000000000000000000000";
 const BASE: &str = "/proc/1/fd/7";
 
 fn args() -> Vec<String> {
+    args_with(None)
+}
+
+fn args_with(workspace: Option<WorkspaceMode>) -> Vec<String> {
     let runtime = RuntimeSpec {
         cpu: 2,
         memory_mib: 1024,
@@ -14,6 +18,7 @@ fn args() -> Vec<String> {
         Path::new(BASE),
         &VmPaths::new(VM_DIR.into()),
         &runtime,
+        workspace,
     )
     .into_iter()
     .map(|arg| arg.into_string().expect("utf-8"))
@@ -43,8 +48,16 @@ fn vm_has_no_network_no_defaults_and_a_sandbox() {
 
 #[test]
 fn no_host_path_reaches_the_guest_implicitly() {
-    let args = args();
+    for args in [
+        args(),
+        args_with(Some(WorkspaceMode::ReadOnly)),
+        args_with(Some(WorkspaceMode::ReadWrite)),
+    ] {
+        assert_no_implicit_host_path(&args);
+    }
+}
 
+fn assert_no_implicit_host_path(args: &[String]) {
     for forbidden in [
         "-virtfs",
         "-fsdev",
@@ -109,4 +122,48 @@ fn the_guest_gets_exactly_one_disk_and_one_mcp_port() {
     );
     assert!(value_of(&args, "-chardev")
         .contains(&format!("socket,id=mcp,path={VM_DIR}/mcp.sock,server=on,wait=off").as_str()));
+}
+
+#[test]
+fn a_workspace_adds_one_shared_filesystem_and_an_upper_disk_only_when_writable() {
+    for (mode, upper) in [
+        (WorkspaceMode::ReadOnly, false),
+        (WorkspaceMode::ReadWrite, true),
+    ] {
+        let args = args_with(Some(mode));
+        let devices = value_of(&args, "-device");
+
+        assert_eq!(value_of(&args, "-machine"), vec!["q35,memory-backend=mem"]);
+        assert_eq!(
+            value_of(&args, "-object"),
+            vec!["memory-backend-memfd,id=mem,size=1024M,share=on"]
+        );
+        assert_eq!(
+            devices
+                .iter()
+                .filter(|device| device.starts_with("vhost-user-fs-pci"))
+                .collect::<Vec<_>>(),
+            vec![&"vhost-user-fs-pci,chardev=workspace,tag=naos-workspace"]
+        );
+        assert!(value_of(&args, "-chardev")
+            .contains(&format!("socket,id=workspace,path={VM_DIR}/fs.sock").as_str()));
+        assert_eq!(
+            devices.contains(&"virtio-blk-pci,drive=upper,serial=naos-upper"),
+            upper,
+            "{mode:?}"
+        );
+        assert_eq!(
+            args.iter()
+                .any(|arg| arg.contains(&format!("{VM_DIR}/upper.img"))),
+            upper
+        );
+    }
+}
+
+#[test]
+fn without_a_workspace_the_command_line_has_no_shared_memory() {
+    let args = args();
+
+    assert_eq!(value_of(&args, "-machine"), vec!["q35"]);
+    assert!(value_of(&args, "-object").is_empty());
 }

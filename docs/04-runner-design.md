@@ -62,6 +62,7 @@ without them.
 | `NAOS_AGENT_QEMU_BINARY` | QEMU system emulator, default `/usr/bin/qemu-system-x86_64` |
 | `NAOS_AGENT_QEMU_IMG` | `qemu-img`, default `/usr/bin/qemu-img` |
 | `NAOS_AGENT_GIT_BINARY` | `git` for the shell gate, default `/usr/bin/git` |
+| `NAOS_AGENT_VIRTIOFSD_BINARY` | virtiofsd 1.13 or newer for workspaces, default `/usr/libexec/virtiofsd` |
 | `NAOS_AGENT_IMAGE_MAX_BYTES` | Largest image the agent downloads, default `8589934592` |
 
 The agent never looks for a `.env` file on its own. A file dropped into the
@@ -130,31 +131,40 @@ steps, and any failure stops it and removes the VM directory:
 4. read the image with `qemu-img info -f qcow2` and refuse one that names a
    backing file or is larger than `disk_gib`;
 5. create an empty qcow2 overlay of `disk_gib` in the VM directory;
-6. start QEMU in its own process group, not daemonized, with the base image
+6. when the mount policy has a workspace, refuse a virtiofsd older than 1.13
+   before the image is fetched, create a sparse 0600 `upper.img` of `disk_gib`
+   for `rw`, and start virtiofsd read-only over the workspace in its own
+   process group, waiting up to 30 seconds for `fs.sock`
+   ([05](05-vm-and-qemu.md#workspace));
+7. start QEMU in its own process group, not daemonized, with the base image
    reopened through `/proc/<agent pid>/fd/<n>`, the descriptor that was
    hashed;
-7. wait up to 30 seconds for QMP to answer.
+8. wait up to 30 seconds for QMP to answer.
 
-Stopping sends `system_powerdown` over QMP, waits 30 seconds, then kills QEMU;
-the overlay stays for collection. Destroying kills QEMU and removes the VM
-directory, and repeating it is harmless.
+Stopping sends `system_powerdown` over QMP, waits 30 seconds, then kills QEMU
+and the Run's virtiofsd; the overlay and the upper disk stay for collection.
+Destroying kills both and removes the VM directory, and repeating it is
+harmless. virtiofsd is found by the `fs.sock` path on its command line.
 
 ```text
 $NAOS_AGENT_VM_DIR/vm_<32 hex>/
   vm.json        vm_id, run_id, image id and digest, mode 0600
-  session.json   run_id, vm_id, agent; handed to the guest through fw_cfg
+  session.json   run_id, vm_id, agent, workspace; handed to the guest through fw_cfg
   overlay.qcow2  the guest's writable disk
   qmp.sock       QEMU monitor
   console.sock   guest ttyS0
   mcp.sock       guest virtio-serial port naos.mcp
   boot.log       guest ttyS1
   qemu.log       QEMU stderr, mode 0600
+  fs.sock        virtiofsd socket of the workspace share
+  upper.img      rw workspace: the disk the guest's changes land on
+  virtiofsd.log  virtiofsd stderr, mode 0600
 ```
 
 The gates live as long as the VM and are dropped when it is destroyed. They
 are the host-side egress ([06](06-network-gate.md)) and the host-side read-only
-filesystem capabilities ([07](07-shell-gate.md)); the VM itself has neither a
-network device nor a mount device.
+filesystem capabilities ([07](07-shell-gate.md)); the VM itself has no network
+device, and its only host filesystem is the read-only workspace share.
 
 Once QEMU answers, and again on every reconcile of a running VM, the runtime
 connects to `mcp.sock` and serves the Run's gates as MCP tools
@@ -165,7 +175,8 @@ runner reattaches; destroying the VM aborts it.
 The runtime writes audit events `image_cached`, `image_rejected`,
 `vm_created`, `vm_stopped`, `vm_destroyed`, `network_policy_configured`,
 `shell_policy_configured`, `mcp_policy_configured`,
-`mcp_credentials_updated`, `mcp_attached`, `mcp_rejected` and `mcp_call`,
+`mcp_credentials_updated`, `mcp_attached`, `mcp_rejected`, `mcp_call` and
+`workspace_shared` (with `mode`),
 each with its `run_id`, `vm_id` or digest.
 
 ## Console

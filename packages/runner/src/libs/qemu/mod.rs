@@ -13,7 +13,16 @@ pub const QMP_TIMEOUT: Duration = Duration::from_secs(10);
 pub const PROCESS_PREFIX: &str = "naos-";
 pub const SESSION_FW_CFG: &str = "opt/naos/session";
 pub const MCP_PORT: &str = "naos.mcp";
+pub const WORKSPACE_TAG: &str = "naos-workspace";
+pub const UPPER_SERIAL: &str = "naos-upper";
 const SANDBOX: &str = "on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny";
+
+/// How the guest sees the Run's workspace: `rw` gets an upper disk to write into.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkspaceMode {
+    ReadOnly,
+    ReadWrite,
+}
 
 #[derive(Debug, Clone)]
 pub struct VmPaths {
@@ -56,18 +65,42 @@ impl VmPaths {
     pub fn qemu_log(&self) -> PathBuf {
         self.dir.join("qemu.log")
     }
+
+    pub fn fs_socket(&self) -> PathBuf {
+        self.dir.join("fs.sock")
+    }
+
+    pub fn upper(&self) -> PathBuf {
+        self.dir.join("upper.img")
+    }
+
+    pub fn virtiofsd_log(&self) -> PathBuf {
+        self.dir.join("virtiofsd.log")
+    }
 }
 
 /// The complete QEMU command line: every device and host path the guest can reach is listed here.
-pub fn argv(vm_id: &str, base: &Path, paths: &VmPaths, runtime: &RuntimeSpec) -> Vec<OsString> {
+pub fn argv(
+    vm_id: &str,
+    base: &Path,
+    paths: &VmPaths,
+    runtime: &RuntimeSpec,
+    workspace: Option<WorkspaceMode>,
+) -> Vec<OsString> {
     let text = |path: PathBuf| path.to_string_lossy().into_owned();
-    let args: Vec<String> = vec![
+    // vhost-user-fs maps guest memory into virtiofsd, so the RAM has to be a shared memfd.
+    let machine = if workspace.is_some() {
+        "q35,memory-backend=mem"
+    } else {
+        "q35"
+    };
+    let mut args: Vec<String> = vec![
         "-name".into(),
         format!("{PROCESS_PREFIX}{vm_id}"),
         "-nodefaults".into(),
         "-no-user-config".into(),
         "-machine".into(),
-        "q35".into(),
+        machine.into(),
         "-accel".into(),
         "kvm".into(),
         "-cpu".into(),
@@ -121,6 +154,30 @@ pub fn argv(vm_id: &str, base: &Path, paths: &VmPaths, runtime: &RuntimeSpec) ->
         "-fw_cfg".into(),
         format!("name={SESSION_FW_CFG},file={}", text(paths.session())),
     ];
+    if let Some(mode) = workspace {
+        args.extend([
+            "-object".into(),
+            format!(
+                "memory-backend-memfd,id=mem,size={}M,share=on",
+                runtime.memory_mib
+            ),
+            "-chardev".into(),
+            format!("socket,id=workspace,path={}", text(paths.fs_socket())),
+            "-device".into(),
+            format!("vhost-user-fs-pci,chardev=workspace,tag={WORKSPACE_TAG}"),
+        ]);
+        if mode == WorkspaceMode::ReadWrite {
+            args.extend([
+                "-blockdev".into(),
+                json!({ "driver": "file", "node-name": "upper-file", "filename": text(paths.upper()) })
+                    .to_string(),
+                "-blockdev".into(),
+                json!({ "driver": "raw", "node-name": "upper", "file": "upper-file" }).to_string(),
+                "-device".into(),
+                format!("virtio-blk-pci,drive=upper,serial={UPPER_SERIAL}"),
+            ]);
+        }
+    }
     args.into_iter().map(OsString::from).collect()
 }
 
