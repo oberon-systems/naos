@@ -5,6 +5,7 @@ use tempfile::TempDir;
 
 use super::*;
 use crate::libs::api::{RunCredential, RunStatus};
+use crate::libs::shell::{ShellRequest, ShellResponse};
 use crate::libs::testing::{desired_run, digest_of, FakeSource};
 
 const IMAGE: &[u8] = b"qcow2-alpha";
@@ -168,6 +169,54 @@ async fn sync_refreshes_credentials_on_the_kept_gate_and_never_launches() {
 }
 
 #[tokio::test]
+async fn runs_sharing_a_guest_path_read_only_their_own_mounts() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let runtime =
+        QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
+    let expected = [("run_a", "alpha"), ("run_b", "beta")];
+    for (run_id, content) in expected {
+        let host = dir.path().join(run_id);
+        fs::create_dir(&host).expect("mkdir");
+        fs::write(host.join("notes.txt"), content).expect("write");
+        let mut run = desired_run(run_id, RunStatus::Started);
+        run.policies
+            .insert("shell".into(), Some(json!({ "allow": ["read_file"] })));
+        run.policies.insert(
+            "mount".into(),
+            Some(json!({
+                "workdir": "/naos/alpha",
+                "mounts": [{
+                    "host_path": host.to_str().expect("utf-8"),
+                    "guest_path": "/naos/alpha",
+                    "mode": "rw",
+                }],
+            })),
+        );
+        let vm = LocalVm {
+            vm_id: format!("vm_{}", random_hex(16).expect("id")),
+            run_id: run_id.into(),
+            running: true,
+        };
+        runtime.sync(&run, &vm).await.expect("sync");
+    }
+
+    for (run_id, content) in expected {
+        let gates = runtime.gates(run_id).expect("gates");
+        let read = gates
+            .shell
+            .call(ShellRequest::ReadFile {
+                path: "/naos/alpha/notes.txt".into(),
+            })
+            .await
+            .expect("read");
+        let ShellResponse::File(bytes) = read else {
+            panic!("file");
+        };
+        assert_eq!(bytes, content.as_bytes(), "{run_id}");
+    }
+}
+
+#[tokio::test]
 async fn malformed_mount_policy_is_refused_before_anything_happens() {
     let dir = tempfile::tempdir().expect("tempdir");
     let runtime =
@@ -305,6 +354,21 @@ async fn real_image_boots_probes_and_is_cleaned_up() {
             "guest did not report its probes:\n{log}"
         );
         tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+
+    let cmdline = |vm: &LocalVm| {
+        let pid = find_pid(&vm.vm_id).expect("running");
+        let raw = fs::read(format!("/proc/{pid}/cmdline")).expect("cmdline");
+        String::from_utf8_lossy(&raw).into_owned()
+    };
+    for (own, other) in [(&alpha, &beta), (&beta, &alpha)] {
+        let other_dir = runtime.paths(&other.vm_id).expect("paths").dir;
+        assert!(
+            !cmdline(own).contains(other_dir.to_str().expect("utf-8")),
+            "{} reaches the directory of {}",
+            own.vm_id,
+            other.vm_id
+        );
     }
 
     let pid = find_pid(&beta.vm_id).expect("run_b is running");

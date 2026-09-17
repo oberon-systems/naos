@@ -120,11 +120,22 @@ Acceptance tests must verify:
 - Runs cannot access one another;
 - runner APIs are unreachable unless explicitly allowed.
 
-The boot test `real_image_boots_probes_and_is_cleaned_up` covers the first four
-with a real image, together with the unit tests of the runner:
+| Property | Verified by |
+|---|---|
+| approved image starts | `real_image_boots_probes_and_is_cleaned_up`, `make smoke` |
+| overlay is disposable | `base_is_read_only_under_a_writable_overlay`; the boot test destroys every VM directory with its overlay and re-verifies the base digest |
+| VM is destroyed after Run | the boot test, `failed_qemu_start_leaves_no_vm_behind` |
+| unauthorized host paths are invisible | `no_host_path_reaches_the_guest_implicitly`; the probe fails on a second disk or a 9p or virtiofs mount |
+| Runs cannot access one another | the boot test checks that no QEMU command line names another VM directory; `runs_sharing_a_guest_path_read_only_their_own_mounts` |
+| runner APIs are unreachable | `vm_has_no_network_no_defaults_and_a_sandbox`; the probe fails on any interface but `lo` and on any virtio device but the disk and the serial ports |
+
+The probe runs inside every booted guest, and both the boot test and the smoke
+test fail on `naos-probe fail`:
 
 ```bash
+make test
 make test-image
+make smoke
 ```
 
 ## Hardening backlog
