@@ -8,7 +8,7 @@ use std::fs;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::process::Command;
 
@@ -138,7 +138,7 @@ pub enum ShellResponse {
 pub struct ShellGate {
     run_id: String,
     allow: BTreeSet<Capability>,
-    roots: Vec<Root>,
+    roots: Arc<[Root]>,
     git_binary: PathBuf,
     window: Mutex<(Instant, u32)>,
 }
@@ -172,7 +172,7 @@ impl ShellGate {
         Ok(Self {
             run_id: run_id.to_owned(),
             allow: policy.allow.into_iter().collect(),
-            roots,
+            roots: roots.into(),
             git_binary: git_binary.to_owned(),
             window: Mutex::new((Instant::now(), 0)),
         })
@@ -195,9 +195,12 @@ impl ShellGate {
             Err(reason) => return Err(self.deny(capability, path, reason)),
         };
         let outcome = match &request {
-            ShellRequest::ReadFile { .. } => read_file(&target),
-            ShellRequest::ListDir { .. } => list_dir(&target),
-            ShellRequest::Grep { pattern, .. } => self.grep(&target, pattern),
+            ShellRequest::ReadFile { .. } => blocking(move || read_file(&target)).await,
+            ShellRequest::ListDir { .. } => blocking(move || list_dir(&target)).await,
+            ShellRequest::Grep { pattern, .. } => {
+                let (roots, pattern) = (Arc::clone(&self.roots), pattern.clone());
+                blocking(move || grep(&roots, &target, &pattern)).await
+            }
             ShellRequest::GitStatus { .. } => self.git(&target, GIT_STATUS).await,
             ShellRequest::GitDiff { .. } => self.git(&target, GIT_DIFF).await,
         };
@@ -244,70 +247,6 @@ impl ShellGate {
             return Err("path is a hard link");
         }
         Ok(target)
-    }
-
-    fn guest_of(&self, host: &Path) -> String {
-        self.roots
-            .iter()
-            .find_map(|root| {
-                host.strip_prefix(&root.host)
-                    .ok()
-                    .map(|rest| root.guest.join(rest).to_string_lossy().into_owned())
-            })
-            .unwrap_or_default()
-    }
-
-    // A literal search in process: no pattern reaches a regular expression engine or a binary,
-    // so neither injection nor a pathological pattern is reachable from here.
-    fn grep(&self, target: &Path, pattern: &str) -> Result<ShellResponse, &'static str> {
-        if pattern.is_empty() || pattern.len() > MAX_LINE {
-            return Err("pattern is empty or too long");
-        }
-        let mut matches = Vec::new();
-        let mut files = 0usize;
-        let mut stack = vec![target.to_owned()];
-        while let Some(current) = stack.pop() {
-            let meta = fs::symlink_metadata(&current).map_err(|_| "path is unreadable")?;
-            if meta.is_symlink() {
-                continue;
-            }
-            if meta.is_dir() {
-                let mut names: Vec<PathBuf> = fs::read_dir(&current)
-                    .map_err(|_| "directory is unreadable")?
-                    .map(|entry| entry.map(|entry| entry.path()))
-                    .collect::<Result<_, _>>()
-                    .map_err(|_| "directory is unreadable")?;
-                names.sort();
-                stack.extend(names.into_iter().rev());
-                continue;
-            }
-            if !meta.is_file() || meta.nlink() > 1 || meta.len() > MAX_FILE_BYTES {
-                continue;
-            }
-            files += 1;
-            if files > MAX_GREP_FILES {
-                return Err("too many files to search");
-            }
-            let Ok(text) = fs::read_to_string(&current) else {
-                continue;
-            };
-            let guest = self.guest_of(&current);
-            for (number, line) in text.lines().enumerate() {
-                if line.len() > MAX_LINE || !line.contains(pattern) {
-                    continue;
-                }
-                matches.push(Match {
-                    path: guest.clone(),
-                    line: number + 1,
-                    text: line.to_owned(),
-                });
-                // Unlike a truncated file a short match list is honest output, so it is returned.
-                if matches.len() >= MAX_MATCHES {
-                    return Ok(ShellResponse::Matches(matches));
-                }
-            }
-        }
-        Ok(ShellResponse::Matches(matches))
     }
 
     // The repository config belongs to the agent, and `diff.external`, textconv filters and
@@ -367,6 +306,80 @@ impl ShellGate {
         audit::shell_denied(&self.run_id, capability.name(), path, reason);
         AgentError::Runtime(format!("shell deny: {reason}"))
     }
+}
+
+// Filesystem walks block, so they run off the async threads and the broker timeout can answer.
+async fn blocking<F>(work: F) -> Result<ShellResponse, &'static str>
+where
+    F: FnOnce() -> Result<ShellResponse, &'static str> + Send + 'static,
+{
+    tokio::task::spawn_blocking(work)
+        .await
+        .unwrap_or(Err("capability call failed"))
+}
+
+fn guest_of(roots: &[Root], host: &Path) -> String {
+    roots
+        .iter()
+        .find_map(|root| {
+            host.strip_prefix(&root.host)
+                .ok()
+                .map(|rest| root.guest.join(rest).to_string_lossy().into_owned())
+        })
+        .unwrap_or_default()
+}
+
+// A literal search in process: no pattern reaches a regular expression engine or a binary,
+// so neither injection nor a pathological pattern is reachable from here.
+fn grep(roots: &[Root], target: &Path, pattern: &str) -> Result<ShellResponse, &'static str> {
+    if pattern.is_empty() || pattern.len() > MAX_LINE {
+        return Err("pattern is empty or too long");
+    }
+    let mut matches = Vec::new();
+    let mut files = 0usize;
+    let mut stack = vec![target.to_owned()];
+    while let Some(current) = stack.pop() {
+        let meta = fs::symlink_metadata(&current).map_err(|_| "path is unreadable")?;
+        if meta.is_symlink() {
+            continue;
+        }
+        if meta.is_dir() {
+            let mut names: Vec<PathBuf> = fs::read_dir(&current)
+                .map_err(|_| "directory is unreadable")?
+                .map(|entry| entry.map(|entry| entry.path()))
+                .collect::<Result<_, _>>()
+                .map_err(|_| "directory is unreadable")?;
+            names.sort();
+            stack.extend(names.into_iter().rev());
+            continue;
+        }
+        if !meta.is_file() || meta.nlink() > 1 || meta.len() > MAX_FILE_BYTES {
+            continue;
+        }
+        files += 1;
+        if files > MAX_GREP_FILES {
+            return Err("too many files to search");
+        }
+        let Ok(text) = fs::read_to_string(&current) else {
+            continue;
+        };
+        let guest = guest_of(roots, &current);
+        for (number, line) in text.lines().enumerate() {
+            if line.len() > MAX_LINE || !line.contains(pattern) {
+                continue;
+            }
+            matches.push(Match {
+                path: guest.clone(),
+                line: number + 1,
+                text: line.to_owned(),
+            });
+            // Unlike a truncated file a short match list is honest output, so it is returned.
+            if matches.len() >= MAX_MATCHES {
+                return Ok(ShellResponse::Matches(matches));
+            }
+        }
+    }
+    Ok(ShellResponse::Matches(matches))
 }
 
 fn read_file(target: &Path) -> Result<ShellResponse, &'static str> {

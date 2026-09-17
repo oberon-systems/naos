@@ -306,6 +306,23 @@ async fn grep_finds_matches_and_stops_at_the_cap() {
 }
 
 #[tokio::test]
+async fn grep_leaves_the_async_thread_free() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    for index in 0..500 {
+        fs::write(dir.path().join(format!("{index}.txt")), "alpha\n").expect("write");
+    }
+    let gate = gate(&dir, &["grep"]);
+    let request = ShellRequest::Grep {
+        path: GUEST.to_owned(),
+        pattern: "needle".into(),
+    };
+
+    let outcome = tokio::time::timeout(Duration::ZERO, gate.call(request)).await;
+
+    assert!(outcome.is_err());
+}
+
+#[tokio::test]
 async fn grep_does_not_follow_a_symlinked_directory() {
     let dir = tempfile::tempdir().expect("tempdir");
     let outside = tempfile::tempdir().expect("tempdir");
