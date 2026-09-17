@@ -1,3 +1,9 @@
+## image-0.3.1 (2026-09-17)
+
+### Bug Fixes
+
+- **packer**: keep the upper disk in the format the runner reads
+
 ## image-0.3.0 (2026-09-17)
 
 ### Features
