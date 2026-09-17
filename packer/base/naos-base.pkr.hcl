@@ -74,11 +74,16 @@ build {
     destination = "/etc/init.d/naos-probe"
   }
 
+  provisioner "file" {
+    source      = "${path.root}/files/naos-workspace"
+    destination = "/etc/init.d/naos-workspace"
+  }
+
   provisioner "shell" {
     inline = [
       "apk update",
       "apk upgrade --no-cache",
-      "apk add --no-cache agetty",
+      "apk add --no-cache agetty e2fsprogs",
 
       // The runner wires ttyS0 to the interactive console and ttyS1 to boot.log,
       // so the kernel talks to ttyS1 and ttyS0 logs naos in.
@@ -89,7 +94,10 @@ build {
 
       "echo qemu_fw_cfg >> /etc/modules",
       "echo virtio_console >> /etc/modules",
-      "chmod 0755 /etc/init.d/naos-probe",
+      "echo virtiofs >> /etc/modules",
+      "echo overlay >> /etc/modules",
+      "chmod 0755 /etc/init.d/naos-probe /etc/init.d/naos-workspace",
+      "rc-update add naos-workspace default",
       "rc-update add naos-probe default",
       "rc-update add acpid default",
       "rm -rf /var/cache/apk/*",

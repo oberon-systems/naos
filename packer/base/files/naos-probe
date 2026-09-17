@@ -7,9 +7,16 @@
 
 description="Report guest isolation probes to the runner"
 
+session_config=/sys/firmware/qemu_fw_cfg/by_name/opt/naos/session/raw
+lower=/run/naos/lower
+
 depend() {
     need localmount
-    after modules
+    after modules naos-workspace
+}
+
+session_value() {
+    sed -n "s/.*\"$1\": *\"\([^\"]*\)\".*/\1/p" "$session_config" 2> /dev/null
 }
 
 report() {
@@ -24,6 +31,28 @@ mcp_port() {
         return 0
     done
     return 1
+}
+
+# The host must refuse writes to the share; in rw mode naos writes into the overlay, never the share.
+workspace_probe() {
+    grep -q " $1 " /proc/mounts || {
+        echo " workspace-missing"
+        return
+    }
+    # Guest root can remount the share rw, so the write goes through that: only virtiofsd may refuse it.
+    mount -o remount,rw "$lower" 2> /dev/null
+    if touch "$lower/.naos-probe" 2> /dev/null; then
+        rm -f "$lower/.naos-probe"
+        echo " share-writable"
+    fi
+    mount -o remount,ro "$lower" 2> /dev/null
+    [ "$2" = rw ] || return
+    if su naos -s /bin/sh -c "echo probe > '$1/.naos-probe'" 2> /dev/null; then
+        [ -e "$lower/.naos-probe" ] && echo " write-reached-share"
+        rm -f "$1/.naos-probe"
+    else
+        echo " workspace-not-writable"
+    fi
 }
 
 # The runner answers on this port, so a ping proves the channel end to end.
@@ -43,13 +72,23 @@ start() {
     report naos-ready
 
     failures=""
+    workspace=$(session_value workspace)
+    mode=$(session_value workspace_mode)
+    expected_disks=1
+    [ "$mode" = rw ] && expected_disks=2
     disks=0
     for disk in /sys/block/vd*; do
         [ -e "$disk" ] && disks=$((disks + 1))
     done
-    [ "$disks" -eq 1 ] || failures="$failures disks=$disks"
+    [ "$disks" -eq "$expected_disks" ] || failures="$failures disks=$disks"
 
-    if grep -Eq ' (9p|virtiofs) ' /proc/mounts; then
+    # The only host filesystem allowed is the workspace share, and only where it was mounted.
+    grep -q ' 9p ' /proc/mounts && failures="$failures host-mounts"
+    grep ' virtiofs ' /proc/mounts | grep -qv '^naos-workspace ' && failures="$failures host-mounts"
+    if [ -n "$workspace" ]; then
+        grep -q "^naos-workspace $lower virtiofs ro," /proc/mounts || failures="$failures host-mounts"
+        failures="$failures$(workspace_probe "$workspace" "$mode")"
+    elif grep -q ' virtiofs ' /proc/mounts; then
         failures="$failures host-mounts"
     fi
 
@@ -58,11 +97,12 @@ start() {
         [ "$name" = lo ] || failures="$failures interface=$name"
     done
 
-    # Only the disk (2) and the serial ports (3): no net, vsock, 9p or virtiofs path to the host.
+    # Disks (2) and serial ports (3), plus the workspace share (0x1a) when the Run has one.
     for device in /sys/bus/virtio/devices/*/device; do
         [ -e "$device" ] || continue
         case "$(cat "$device")" in
             0x0002 | 0x0003) ;;
+            0x001a) [ -n "$workspace" ] || failures="$failures virtio=0x001a" ;;
             *) failures="$failures virtio=$(cat "$device")" ;;
         esac
     done

@@ -1,0 +1,69 @@
+#!/sbin/openrc-run
+# shellcheck shell=sh
+# shellcheck disable=SC2034  # openrc reads $description itself
+#
+# Mounts the Run's workspace. The host shares it read-only over virtiofs; in rw
+# mode an overlay puts every write on the upper disk, which the runner collects.
+
+description="Mount the workspace of this Run"
+
+session_config=/sys/firmware/qemu_fw_cfg/by_name/opt/naos/session/raw
+lower=/run/naos/lower
+upper=/run/naos/upper
+
+depend() {
+    need localmount
+    after modules
+    before naos-probe naos-session
+}
+
+session_value() {
+    sed -n "s/.*\"$1\": *\"\([^\"]*\)\".*/\1/p" "$session_config" 2> /dev/null
+}
+
+# mdev creates no /dev/disk/by-id links, so the upper disk is found by the serial the runner set.
+upper_disk() {
+    for serial in /sys/block/vd*/serial; do
+        [ "$(cat "$serial" 2> /dev/null)" = naos-upper ] || continue
+        disk=${serial%/serial}
+        echo "/dev/${disk##*/}"
+        return 0
+    done
+    return 1
+}
+
+mount_overlay() {
+    disk=$(upper_disk) || return 1
+    blkid "$disk" > /dev/null 2>&1 || mkfs.ext4 -q "$disk" || return 1
+    install -d -m 0755 "$upper"
+    mount -t ext4 "$disk" "$upper" || return 1
+    install -d -m 0700 "$upper/work"
+    install -d "$upper/data"
+    chown "$(stat -c %u:%g "$lower")" "$upper/data" || return 1
+    chmod "$(stat -c %a "$lower")" "$upper/data" || return 1
+    mount -t overlay overlay \
+        -o "lowerdir=$lower,upperdir=$upper/data,workdir=$upper/work" "$1"
+}
+
+start() {
+    workspace=$(session_value workspace)
+    [ -n "$workspace" ] || return 0
+    case "$workspace" in
+        /naos/*/* | /naos/) eerror "refusing workspace $workspace" && return 1 ;;
+        /naos/*) ;;
+        *) eerror "refusing workspace $workspace" && return 1 ;;
+    esac
+    mode=$(session_value workspace_mode)
+    ebegin "Mounting the workspace $workspace ($mode)"
+    install -d -m 0755 "$lower" "$workspace"
+    mount -t virtiofs -o ro naos-workspace "$lower" || {
+        eend 1
+        return 1
+    }
+    if [ "$mode" = rw ]; then
+        mount_overlay "$workspace"
+    else
+        mount --bind "$lower" "$workspace" && mount -o remount,ro,bind "$workspace"
+    fi
+    eend $?
+}

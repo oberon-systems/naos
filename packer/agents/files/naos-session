@@ -11,7 +11,7 @@ session_config=/sys/firmware/qemu_fw_cfg/by_name/opt/naos/session/raw
 
 depend() {
     need localmount
-    after modules naos-probe
+    after modules naos-workspace naos-probe
 }
 
 agent_command() {
@@ -44,7 +44,8 @@ start() {
     ebegin "Starting the agent session"
     share_mcp_port || ewarn "no naos.mcp port, the agent starts without gates"
     command=$(agent_command)
-    su -l naos -s /bin/sh -c "tmux new-session -d -s agent '$command; exec bash -l'"
+    workspace=$(sed -n 's/.*"workspace": *"\([^"]*\)".*/\1/p' "$session_config" 2> /dev/null)
+    su -l naos -s /bin/sh -c "tmux new-session -d -s agent -c '${workspace:-/home/naos}' '$command; exec bash -l'"
     eend $?
 }
 

@@ -24,6 +24,7 @@ packer/.env                            Alpine and agent versions for make, packe
 packer/base/naos-base.pkr.hcl          Alpine install, serial layout, probes
 packer/base/http/answers               setup-alpine answer file
 packer/base/files/naos-probe           isolation probes, written to ttyS1
+packer/base/files/naos-workspace       mounts the Run's workspace share and overlay
 packer/agents/naos-agents.pkr.hcl      agents, session, seal
 packer/agents/files/install.sh         packages, agents, default instructions
 packer/agents/files/AGENTS.md          default instructions for every agent
@@ -59,7 +60,7 @@ make test-image
 
 The test passes when both VMs boot, `boot.log` shows `naos-ready` and `naos-probe ok`, neither QEMU command line names the other VM's directory, a VM killed from outside is reported as not running, and the cached base image still matches its digest after the guests wrote to their disks.
 
-`naos-probe` fails when the guest sees more than one disk, a 9p or virtiofs mount, a network interface other than `lo`, a virtio device other than the disk and the serial ports, or no answer to a `ping` on the `naos.mcp` port.
+`naos-probe` fails when the guest sees an unexpected number of disks, a 9p mount, a virtiofs mount other than the workspace share, a network interface other than `lo`, a virtio device other than the disks, the serial ports and the share, or no answer to a `ping` on the `naos.mcp` port. With a workspace it also fails when the share is not mounted, when a write gets through the share after a rw remount, and in `rw` mode when `naos` cannot write into the workspace or the write reaches the share.
 
 ## Publish a release
 
