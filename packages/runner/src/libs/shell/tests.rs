@@ -1,4 +1,4 @@
-use std::os::unix::fs::symlink;
+use std::os::unix::fs::{symlink, PermissionsExt};
 
 use serde_json::json;
 use tempfile::TempDir;
@@ -153,6 +153,7 @@ async fn traversal_and_unnormalized_paths_are_refused() {
         format!("{GUEST}//file"),
         "naos/alpha/file".to_owned(),
         format!("{GUEST}/file\0name"),
+        format!("{GUEST}/{}", "a".repeat(MAX_PATH)),
     ] {
         let err = gate
             .call(ShellRequest::ReadFile { path: path.clone() })
@@ -237,6 +238,24 @@ async fn an_oversized_file_is_refused() {
 }
 
 #[tokio::test]
+async fn a_directory_over_the_entry_limit_is_refused() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    for index in 0..=MAX_ENTRIES {
+        fs::write(dir.path().join(index.to_string()), "").expect("write");
+    }
+    let gate = gate(&dir, &["list_dir"]);
+
+    let err = gate
+        .call(ShellRequest::ListDir {
+            path: GUEST.to_owned(),
+        })
+        .await
+        .expect_err("denied");
+
+    assert!(err.to_string().contains("too many entries"));
+}
+
+#[tokio::test]
 async fn a_granted_path_is_read_and_listed() {
     let dir = tempfile::tempdir().expect("tempdir");
     fs::write(dir.path().join("file"), b"beta").expect("write");
@@ -303,6 +322,53 @@ async fn grep_finds_matches_and_stops_at_the_cap() {
     assert_eq!(found[0].path, format!("{GUEST}/sub/one.txt"));
     assert_eq!((found[0].line, found[1].line), (1, 3));
     assert_eq!(capped.len(), MAX_MATCHES);
+}
+
+#[tokio::test]
+async fn grep_refuses_bad_patterns_and_skips_long_lines() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let long = format!("needle{}", "x".repeat(MAX_LINE));
+    fs::write(dir.path().join("lines.txt"), format!("{long}\nneedle\n")).expect("write");
+    let gate = gate(&dir, &["grep"]);
+    let grep = |pattern: String| {
+        gate.call(ShellRequest::Grep {
+            path: GUEST.to_owned(),
+            pattern,
+        })
+    };
+
+    let empty = grep(String::new()).await.expect_err("denied");
+    let oversized = grep("a".repeat(MAX_LINE + 1)).await.expect_err("denied");
+    let found = grep("needle".into()).await.expect("grep");
+
+    assert!(empty.to_string().contains("pattern is empty or too long"));
+    assert!(oversized
+        .to_string()
+        .contains("pattern is empty or too long"));
+    let ShellResponse::Matches(found) = found else {
+        panic!("matches");
+    };
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].line, 2);
+}
+
+#[tokio::test]
+async fn grep_over_too_many_files_is_refused() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    for index in 0..=MAX_GREP_FILES {
+        fs::write(dir.path().join(index.to_string()), "alpha\n").expect("write");
+    }
+    let gate = gate(&dir, &["grep"]);
+
+    let err = gate
+        .call(ShellRequest::Grep {
+            path: GUEST.to_owned(),
+            pattern: "needle".into(),
+        })
+        .await
+        .expect_err("denied");
+
+    assert!(err.to_string().contains("too many files"));
 }
 
 #[tokio::test]
@@ -424,6 +490,65 @@ async fn a_hostile_repository_config_cannot_hook_a_program() {
     };
     assert!(diff.contains("-one") && diff.contains("+two"), "{diff}");
     assert!(!marker.exists(), "the repository config hooked a program");
+}
+
+#[tokio::test]
+async fn git_output_over_the_limit_is_refused() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    repo(dir.path());
+    fs::write(dir.path().join("tracked.txt"), "x\n".repeat(MAX_OUTPUT)).expect("write");
+    let gate = gate(&dir, &["git_diff"]);
+
+    let err = gate
+        .call(ShellRequest::GitDiff {
+            path: GUEST.to_owned(),
+        })
+        .await
+        .expect_err("denied");
+
+    assert!(err.to_string().contains("too much output"));
+}
+
+#[tokio::test]
+async fn a_hanging_git_is_killed_at_the_timeout() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let bin = tempfile::tempdir().expect("tempdir");
+    let pid_file = bin.path().join("pid");
+    let script = bin.path().join("git");
+    fs::write(
+        &script,
+        format!(
+            "#!/bin/sh\necho $$ > {}\nexec sleep 30\n",
+            pid_file.display()
+        ),
+    )
+    .expect("write");
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o700)).expect("chmod");
+    let mut gate = ShellGate::from_snapshot(
+        "run_a",
+        Some(&json!({ "allow": ["git_status"] })),
+        Some(&mounts(dir.path())),
+        &script,
+    )
+    .expect("policy");
+    gate.git_timeout = Duration::from_millis(500);
+
+    let err = gate
+        .call(ShellRequest::GitStatus {
+            path: GUEST.to_owned(),
+        })
+        .await
+        .expect_err("denied");
+
+    assert!(err.to_string().contains("git timed out"));
+    let pid = fs::read_to_string(&pid_file).expect("pid");
+    let stat = PathBuf::from(format!("/proc/{}/stat", pid.trim()));
+    let deadline = Instant::now() + Duration::from_secs(5);
+    // A killed child the runtime has not reaped yet is a zombie, which no longer runs.
+    while fs::read_to_string(&stat).is_ok_and(|stat| !stat.contains(") Z ")) {
+        assert!(Instant::now() < deadline, "git outlived its timeout");
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
 }
 
 #[tokio::test]

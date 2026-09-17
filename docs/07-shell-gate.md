@@ -158,7 +158,9 @@ validated like the QEMU paths ([04](04-runner-design.md)).
 
 A file over the read limit is refused rather than truncated, because a
 truncated file reads as a whole one. A capped match list is different: a short
-list of matches is honest output, so `grep` returns what it found.
+list of matches is honest output, so `grep` returns what it found. A longer
+grep line is skipped. Git output is capped while it is read, and a git over
+its timeout or its output limit is killed.
 
 ## Failure behavior
 
@@ -186,12 +188,15 @@ host's own layout and is never logged.
 Acceptance tests must verify:
 
 - every capability is authorized before it runs;
-- traversal, symlink escape, hard link escape and cwd escape are refused;
+- traversal, symlink escape and hard link escape are refused;
 - a path outside every mount is refused;
 - a capability that was not granted is refused on a legal path;
-- resource limits hold for files, directories, matches, output and call rate;
+- every limit in the table above holds;
 - a hostile repository config cannot hook an external program;
 - git leaves `.git` untouched.
+
+There is no cwd to escape: the gate keeps no working directory, and every path
+the agent sends must be an absolute, normalized guest path.
 
 The gate tests in `packages/runner/src/libs/shell/tests.rs` cover all of these,
 `packages/api/tests/test_shell.py` covers policy resolution, and the smoke test

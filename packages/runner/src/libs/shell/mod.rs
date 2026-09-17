@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 
 const MAX_PATH: usize = 4096;
@@ -140,6 +141,7 @@ pub struct ShellGate {
     allow: BTreeSet<Capability>,
     roots: Arc<[Root]>,
     git_binary: PathBuf,
+    git_timeout: Duration,
     window: Mutex<(Instant, u32)>,
 }
 
@@ -174,6 +176,7 @@ impl ShellGate {
             allow: policy.allow.into_iter().collect(),
             roots: roots.into(),
             git_binary: git_binary.to_owned(),
+            git_timeout: GIT_TIMEOUT,
             window: Mutex::new((Instant::now(), 0)),
         })
     }
@@ -255,35 +258,47 @@ impl ShellGate {
         if !root.is_dir() {
             return Err("path is not a directory");
         }
-        let output = tokio::time::timeout(
-            GIT_TIMEOUT,
-            Command::new(&self.git_binary)
-                .arg("--no-optional-locks")
-                .arg("--no-pager")
-                .arg("-C")
-                .arg(root)
-                .args(["-c", "core.fsmonitor="])
-                .args(args)
-                .current_dir(root)
-                .env_clear()
-                .env("GIT_CONFIG_NOSYSTEM", "1")
-                .env("GIT_CONFIG_GLOBAL", "/dev/null")
-                .env("GIT_OPTIONAL_LOCKS", "0")
-                .env("GIT_TERMINAL_PROMPT", "0")
-                .stdin(Stdio::null())
-                .kill_on_drop(true)
-                .output(),
-        )
-        .await
-        .map_err(|_| "git timed out")?
-        .map_err(|_| "git could not run")?;
-        if !output.status.success() {
+        let mut child = Command::new(&self.git_binary)
+            .arg("--no-optional-locks")
+            .arg("--no-pager")
+            .arg("-C")
+            .arg(root)
+            .args(["-c", "core.fsmonitor="])
+            .args(args)
+            .current_dir(root)
+            .env_clear()
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_OPTIONAL_LOCKS", "0")
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .kill_on_drop(true)
+            .spawn()
+            .map_err(|_| "git could not run")?;
+        let mut stdout = child.stdout.take().ok_or("git could not run")?;
+        // Capped while reading, so an oversized answer is never held; a dropped child is killed.
+        let run = async {
+            let mut output = Vec::new();
+            (&mut stdout)
+                .take(MAX_OUTPUT as u64 + 1)
+                .read_to_end(&mut output)
+                .await
+                .map_err(|_| "git failed")?;
+            if output.len() > MAX_OUTPUT {
+                return Err("git produced too much output");
+            }
+            let status = child.wait().await.map_err(|_| "git failed")?;
+            Ok((status, output))
+        };
+        let (status, output) = tokio::time::timeout(self.git_timeout, run)
+            .await
+            .map_err(|_| "git timed out")??;
+        if !status.success() {
             return Err("git failed");
         }
-        if output.stdout.len() > MAX_OUTPUT {
-            return Err("git produced too much output");
-        }
-        String::from_utf8(output.stdout)
+        String::from_utf8(output)
             .map(ShellResponse::Text)
             .map_err(|_| "git produced invalid utf-8")
     }
