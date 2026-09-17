@@ -161,6 +161,30 @@ async fn an_allowed_destination_is_reachable() {
     assert_eq!(response.body, b"beta");
 }
 
+// A hostname with an unreachable address next to a usable one must still reach the usable one.
+#[tokio::test]
+async fn every_resolved_address_is_pinned() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/ok"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("beta"))
+        .mount(&server)
+        .await;
+    let address = server.address();
+    let gate = NetworkGate::local(
+        &json!({"allow": [{"protocol": "http", "host": "example.com"}]}),
+        vec![IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2)), address.ip()],
+    )
+    .expect("policy");
+
+    let response = gate
+        .send(get(&format!("http://example.com:{}/ok", address.port())))
+        .await
+        .expect("response");
+
+    assert_eq!(response.body, b"beta");
+}
+
 #[tokio::test]
 async fn a_forbidden_destination_is_not_reached() {
     let server = MockServer::start().await;

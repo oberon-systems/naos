@@ -270,9 +270,10 @@ impl NetworkGate {
             .redirect(reqwest::redirect::Policy::none())
             .no_proxy()
             .timeout(REQUEST_TIMEOUT);
-        for ip in ips {
-            builder = builder.resolve(&host, SocketAddr::new(ip, port));
-        }
+        // One call per address would overwrite the pin instead of adding to it, leaving the last
+        // address as the only one the request can reach.
+        let pinned: Vec<SocketAddr> = ips.iter().map(|ip| SocketAddr::new(*ip, port)).collect();
+        builder = builder.resolve_to_addrs(&host, &pinned);
         builder
             .build()
             .map_err(|err| AgentError::Runtime(format!("network deny: client setup: {err}")))
