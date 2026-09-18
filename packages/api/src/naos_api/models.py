@@ -88,6 +88,21 @@ class Secret(SQLModel, table=True):
     created_at: int = Field(default_factory=now_ts)
 
 
+class AuditEvent(SQLModel, table=True):
+    __tablename__ = "audit_events"
+
+    seq: int | None = Field(default=None, primary_key=True)
+    id: str = Field(unique=True)
+    at: int
+    source: str
+    event: str = Field(index=True)
+    actor: str
+    run_id: str | None = Field(default=None, index=True)
+    vm_id: str | None = None
+    runner_id: str | None = Field(default=None, index=True)
+    data: dict[str, Any] = Field(sa_column=Column(JSON, nullable=False))
+
+
 class Image(SQLModel, table=True):
     __tablename__ = "images"
 

@@ -2,6 +2,7 @@ from collections.abc import Sequence
 
 from sqlmodel import Session, col, select
 
+from naos_api import audit
 from naos_api.errors import ImageConflictError, NotFoundError, PolicyError
 from naos_api.models import Image
 from naos_api.spec import ImageRef
@@ -29,6 +30,14 @@ def register_image(
 
     image = Image(id=image_id, version=version, digest=digest, url=url)
     session.add(image)
+    audit.record(
+        session,
+        "image_registered",
+        actor="operator",
+        image_id=image_id,
+        version=version,
+        digest=digest,
+    )
     try:
         session.commit()
     except Exception:

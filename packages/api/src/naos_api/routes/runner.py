@@ -3,7 +3,8 @@ from typing import Annotated, Any, Literal, Self
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field, StrictInt, model_validator
 
-from naos_api import merges, runners
+from naos_api import audit, merges, runners
+from naos_api.audit import RunnerEventIn
 from naos_api.auth import require_enrollment, require_runner
 from naos_api.clock import NowDep
 from naos_api.lifecycle import TaskStatus
@@ -90,6 +91,15 @@ class MergeResultIn(StrictModel):
         if self.outcome == "conflict" and not self.conflicts:
             raise ValueError("a conflict outcome lists its conflicts")
         return self
+
+
+class EventsIn(StrictModel):
+    events: Annotated[list[RunnerEventIn], Field(min_length=1, max_length=1000)]
+
+
+class EventsOut(BaseModel):
+    accepted: int
+    refused: list[str]
 
 
 class TokenOut(BaseModel):
@@ -243,3 +253,9 @@ def report_merge(
         now,
     )
     return TaskRead.of(task)
+
+
+@router.post("/{runner_id}/events")
+def report_events(body: EventsIn, principal: PrincipalDep, session: SessionDep) -> EventsOut:
+    accepted, refused = audit.ingest(session, principal.runner_id, body.events)
+    return EventsOut(accepted=accepted, refused=refused)

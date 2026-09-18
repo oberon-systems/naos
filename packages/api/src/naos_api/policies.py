@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from sqlmodel import Session, select
 
+from naos_api import audit
 from naos_api.errors import NotFoundError, PolicyError
 from naos_api.mcp import McpPolicyIn, resolve_mcp_policy
 from naos_api.models import Policy
@@ -35,6 +36,7 @@ def _store(session: Session, kind: PolicyKind, document: dict[str, Any]) -> tupl
         id=f"{ID_PREFIX[kind]}_{uuid4().hex}", kind=kind, digest=digest, document=document
     )
     session.add(policy)
+    audit.record(session, "policy_created", actor="operator", policy_id=policy.id, kind=str(kind))
     try:
         session.commit()
     except Exception:

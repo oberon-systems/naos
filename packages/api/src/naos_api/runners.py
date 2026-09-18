@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from sqlmodel import Session, col, func, or_, select, update
 
-from naos_api import tasks
+from naos_api import audit, tasks
 from naos_api.errors import InvalidTransitionError, LeaseError, NotFoundError
 from naos_api.images.service import check_image
 from naos_api.lifecycle import TERMINAL, TaskStatus
@@ -101,6 +101,8 @@ def register_runner(
         expires_at=now + lease_ttl,
     )
     session.add(lease)
+    audit.record(session, "runner_registered", actor="runner", runner_id=runner.id)
+    audit.record(session, "lease_acquired", actor="runner", runner_id=runner.id, lease_id=lease.id)
     session.commit()
     return runner, token, lease
 
@@ -127,26 +129,48 @@ def authenticate(session: Session, token: str, now: int) -> RunnerPrincipal | No
     )
 
 
-def expire_leases(session: Session, now: int) -> list[str]:
-    lapsed = (col(Lease.expired_at).is_(None), col(Lease.expires_at) <= now)
-    expired = list(session.exec(select(Lease.id).where(*lapsed)).all())
-    if expired:
-        session.exec(
-            update(Lease)
-            .where(col(Lease.id).in_(expired), *lapsed)
-            .values(expired_at=now, live_runner_id=None)
-        )
-        bound = col(Task.lease_id).in_(expired)
-        session.exec(
+def _fail_bound(session: Session, lease_id: str, runner_id: str, now: int) -> None:
+    bound = col(Task.lease_id) == lease_id
+    statement = select(Task.id, Task.status).where(bound, col(Task.status).in_(LEASE_BOUND))
+    for task_id, status in session.exec(statement).all():
+        failed = session.exec(
             update(Task)
-            .where(bound, col(Task.status) == S.PENDING)
-            .values(lease_id=None, updated_at=now)
-        )
-        session.exec(
-            update(Task)
-            .where(bound, col(Task.status).in_(LEASE_BOUND))
+            .where(col(Task.id) == task_id, col(Task.status) == status, bound)
             .values(status=S.FAILED, status_reason=LEASE_EXPIRED_REASON, updated_at=now)
         )
+        if failed.rowcount == 1:
+            audit.transitioned(
+                session,
+                task_id,
+                S(status),
+                S.FAILED,
+                LEASE_EXPIRED_REASON,
+                actor="system",
+                runner_id=runner_id,
+            )
+
+
+def expire_leases(session: Session, now: int) -> list[str]:
+    lapsed = (col(Lease.expired_at).is_(None), col(Lease.expires_at) <= now)
+    expired: list[str] = []
+    for lease_id, runner_id in session.exec(select(Lease.id, Lease.runner_id).where(*lapsed)).all():
+        claimed = session.exec(
+            update(Lease)
+            .where(col(Lease.id) == lease_id, *lapsed)
+            .values(expired_at=now, live_runner_id=None)
+        )
+        if claimed.rowcount != 1:
+            continue
+        expired.append(lease_id)
+        audit.record(
+            session, "lease_expired", actor="system", runner_id=runner_id, lease_id=lease_id
+        )
+        session.exec(
+            update(Task)
+            .where(col(Task.lease_id) == lease_id, col(Task.status) == S.PENDING)
+            .values(lease_id=None, updated_at=now)
+        )
+        _fail_bound(session, lease_id, runner_id, now)
     session.commit()
     return expired
 
@@ -165,6 +189,13 @@ def _renew_lease(session: Session, runner_id: str, now: int, lease_ttl: int) -> 
                     acquired_at=now,
                     expires_at=expires_at,
                 )
+            )
+            audit.record(
+                session,
+                "lease_acquired",
+                actor="runner",
+                runner_id=runner_id,
+                lease_id=lease_id,
             )
             try:
                 session.commit()
@@ -191,11 +222,22 @@ def _rebind_waiting(session: Session, runner_id: str, lease_id: str, now: int) -
     lapsed = select(Lease.id).where(
         col(Lease.runner_id) == runner_id, col(Lease.expired_at).is_not(None)
     )
-    session.exec(
-        update(Task)
-        .where(col(Task.status) == S.WAITING_MERGE, col(Task.lease_id).in_(lapsed))
-        .values(lease_id=lease_id, updated_at=now)
-    )
+    waiting = (col(Task.status) == S.WAITING_MERGE, col(Task.lease_id).in_(lapsed))
+    for task_id in session.exec(select(Task.id).where(*waiting)).all():
+        rebound = session.exec(
+            update(Task)
+            .where(col(Task.id) == task_id, *waiting)
+            .values(lease_id=lease_id, updated_at=now)
+        )
+        if rebound.rowcount == 1:
+            audit.record(
+                session,
+                "waiting_rebound",
+                actor="system",
+                run_id=task_id,
+                runner_id=runner_id,
+                lease_id=lease_id,
+            )
     session.commit()
 
 
@@ -221,6 +263,8 @@ def _rotate_token(
         )
         .values(**values)
     )
+    if rotated.rowcount == 1:
+        audit.record(session, "token_rotated", actor="runner", runner_id=principal.runner_id)
     session.commit()
     return token if rotated.rowcount == 1 else None
 
@@ -292,12 +336,27 @@ def _policies(session: Session, task: Task) -> dict[PolicyKind, dict[str, Any] |
 
 
 def _credentials(
-    session: Session, task: Task, mcp: dict[str, Any] | None, now: int, ttl: int
+    session: Session,
+    runner_id: str,
+    task: Task,
+    mcp: dict[str, Any] | None,
+    now: int,
+    ttl: int,
 ) -> dict[str, IssuedCredential]:
     if mcp is None or task.status not in CREDENTIAL_BOUND:
         return {}
     names = {server["credential"] for server in mcp["servers"] if server["credential"]}
-    return issue_credentials(session, names, now, ttl)
+    issued = issue_credentials(session, names, now, ttl)
+    if issued:
+        audit.record(
+            session,
+            "credentials_issued",
+            actor="runner",
+            run_id=task.id,
+            runner_id=runner_id,
+            names=sorted(issued),
+        )
+    return issued
 
 
 def _decision(session: Session, task: Task) -> dict[str, Any] | None:
@@ -329,11 +388,12 @@ def desired_state(
                 image_url=check_image(session, RunSpec.model_validate(task.spec).image).url,
                 policies=policies,
                 credentials=_credentials(
-                    session, task, policies[PolicyKind.MCP], now, credential_ttl
+                    session, runner_id, task, policies[PolicyKind.MCP], now, credential_ttl
                 ),
                 merge=_decision(session, task),
             )
         )
+    session.commit()
     return lease.id, desired
 
 
@@ -361,4 +421,13 @@ def transition(
     if (expected, target) not in RUNNER_TRANSITIONS:
         raise InvalidTransitionError(f"a runner may not move a task {expected} -> {target}")
     owned_task(session, runner_id, task_id, lease_id, now)
-    return tasks.transition_task(session, task_id, expected, target, reason, lease_id=lease_id)
+    return tasks.transition_task(
+        session,
+        task_id,
+        expected,
+        target,
+        reason,
+        lease_id=lease_id,
+        actor="runner",
+        runner_id=runner_id,
+    )

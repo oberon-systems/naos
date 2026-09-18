@@ -6,6 +6,7 @@ from uuid import uuid4
 from pydantic import Field
 from sqlmodel import Session, col, select
 
+from naos_api import audit
 from naos_api.errors import NotFoundError, SecretConflictError
 from naos_api.models import Secret
 
@@ -28,6 +29,7 @@ def create_secret(session: Session, name: str, value: str, expires_at: int | Non
         raise SecretConflictError(f"secret {name} already exists")
     secret = Secret(id=f"sec_{uuid4().hex}", name=name, value=value, expires_at=expires_at)
     session.add(secret)
+    audit.record(session, "secret_created", actor="operator", name=name)
     try:
         session.commit()
     except Exception:

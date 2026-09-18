@@ -3,6 +3,8 @@ from uuid import uuid4
 
 from sqlmodel import Session, col, func, select, update
 
+from naos_api import audit
+from naos_api.audit import Actor
 from naos_api.clock import now_ts
 from naos_api.errors import IdempotencyConflictError, InvalidTransitionError, NotFoundError
 from naos_api.images.service import check_image
@@ -54,6 +56,7 @@ def create_task(session: Session, spec: RunSpec, idempotency_key: str) -> tuple[
             request_digest=request_digest,
         )
         session.add(task)
+        audit.record(session, "task_created", actor="operator", run_id=task.id)
         try:
             session.commit()
         except Exception:
@@ -93,6 +96,8 @@ def transition_task(
     reason: str | None = None,
     *,
     lease_id: str | None = None,
+    actor: Actor = "operator",
+    runner_id: str | None = None,
 ) -> Task:
     ensure_transition(expected, target)
     if target is TaskStatus.FAILED and not (reason and len(reason) <= MAX_REASON_LENGTH):
@@ -104,6 +109,10 @@ def transition_task(
         statement = statement.where(col(Task.lease_id) == lease_id, live.exists())
     statement = statement.values(status=target, status_reason=reason, updated_at=now_ts())
     result = session.exec(statement)
+    if result.rowcount == 1:
+        audit.transitioned(
+            session, task_id, expected, target, reason, actor=actor, runner_id=runner_id
+        )
     session.commit()
 
     task = get_task(session, task_id)
@@ -113,6 +122,11 @@ def transition_task(
 
 
 def stop_task(session: Session, task_id: str) -> Task:
+    status = get_task(session, task_id).status
+    audit.record(
+        session, "task_stop_requested", actor="operator", run_id=task_id, status=str(status)
+    )
+    session.commit()
     # The lifecycle is acyclic, so racing a runner can move the task at most len(TaskStatus) times.
     for _ in TaskStatus:
         task = get_task(session, task_id)
