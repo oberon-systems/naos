@@ -59,7 +59,40 @@ collected() {
         grep -e '"event":"run_failed"' -e 'reconcile action failed' "$TEMP_DIR/agent.log" >&2 || true
         fail "task $task failed while its workspace was collected"
     fi
-    [ "$status" = COLLECTING ] && [ "$(events workspace_collected)" -ge 1 ]
+    [ "$status" = WAITING_MERGE ] && [ "$(events workspace_collected)" -ge 1 ]
+}
+
+merge_state() {
+    curl -fsS "${auth[@]}" "$api/api/v1/tasks/$task/merge"
+}
+
+# Selects every mergeable path of the collected diff, with the given resolutions.
+decide() {
+    merge_state | "$VENV/bin/python" -c '
+import json, sys
+entries = json.load(sys.stdin)["entries"]
+paths = sorted({entry["path"] for entry in entries if entry["change"] != "rejected"})
+print(json.dumps({"paths": paths, "resolutions": json.loads(sys.argv[1])}))
+' "$1" | curl -fsS "${auth[@]}" "$api/api/v1/tasks/$task/merge" -o /dev/null -d @-
+}
+
+conflicted() {
+    [ "$(events merge_conflict)" -ge 1 ] && merge_state | "$VENV/bin/python" -c '
+import json, sys
+state = json.load(sys.stdin)
+paths = [conflict["path"] for conflict in state["conflicts"] or []]
+sys.exit(0 if state["decision"] is None and paths == ["notes.txt"] else 1)
+'
+}
+
+completed() {
+    local status
+    status="$(task_status)"
+    if [ "$status" = FAILED ]; then
+        grep -e '"event":"run_failed"' -e 'reconcile action failed' "$TEMP_DIR/agent.log" >&2 || true
+        fail "task $task failed while it merged"
+    fi
+    [ "$status" = COMPLETED ] && [ "$(events changes_archived)" -ge 1 ]
 }
 
 events() {
@@ -151,7 +184,8 @@ expected = {
     ("notes.txt", "modified", None),
     ("old.txt", "deleted", None),
     ("renamed.txt", "renamed", "moved.txt"),
-    ("link", "created", None),
+    ("link", "rejected", None),
+    ("rel", "created", None),
     ("pipe", "rejected", None),
     ("dir/gone.txt", "deleted", None),
     ("dir/keep.txt", "deleted", None),
@@ -162,6 +196,28 @@ probes = sorted(path for path, _, _ in found if path.startswith(".naos-probe"))
 if missing or probes:
     sys.exit(f"missing {missing}, probe leftovers {probes}, in {entries}")
 PY
+}
+
+check_merge() {
+    local workspace="$TEMP_DIR/workspaces/alpha" kept
+    kept="$(echo "$TEMP_DIR"/runs/archive/*/merge)"
+    [ -e "$(dirname "$kept")/upper.img" ] || fail "the archive lost the upper disk"
+    [ "$(cat "$workspace/notes.txt")" = beta ] || fail "notes.txt did not take the agent's version"
+    [ "$(cat "$workspace/added.txt")" = gamma ] || fail "added.txt was not merged"
+    [ "$(cat "$workspace/renamed.txt")" = "moved content" ] || fail "renamed.txt was not merged"
+    [ "$(cat "$workspace/dir/new.txt")" = new ] || fail "dir/new.txt was not merged"
+    [ "$(readlink "$workspace/rel")" = notes.txt ] || fail "the relative symlink was not merged"
+    for gone in old.txt moved.txt dir/keep.txt dir/gone.txt link pipe; do
+        if [ -e "$workspace/$gone" ] || [ -L "$workspace/$gone" ]; then
+            fail "$gone should not be in the workspace"
+        fi
+    done
+    [ "$(cat "$kept/backup/notes.txt")" = local ] || fail "the host edit of notes.txt was not kept"
+    [ "$(cat "$kept/backup/old.txt")" = old ] || fail "the deleted old.txt was not kept"
+    [ "$(cat "$kept/backup/dir/keep.txt")" = keep ] || fail "the deleted dir/keep.txt was not kept"
+    if compgen -G "$workspace/.naos-merge-*" >/dev/null; then
+        fail "the merge left its staging directory in the workspace"
+    fi
 }
 
 share_gone() {
@@ -284,6 +340,7 @@ guest \
     "rm old.txt" \
     "mv moved.txt renamed.txt" \
     "ln -s /etc/passwd link" \
+    "ln -s notes.txt rel" \
     "mkfifo pipe" \
     "rm -rf dir && mkdir dir && printf 'new\n' > dir/new.txt" \
     "cat > /tmp/rpc <<'JSON'" \
@@ -308,4 +365,13 @@ if [ "$(workspace_tree)" != "$tree_before" ]; then
     exit 1
 fi
 check_diff
+echo "editing the host workspace and merging, which conflicts..."
+printf 'local\n' >"$TEMP_DIR/workspaces/alpha/notes.txt"
+decide '{}'
+wait_for 60 conflicted
+[ ! -e "$TEMP_DIR/workspaces/alpha/added.txt" ] || fail "a conflicted merge wrote to the workspace"
+echo "taking the agent's version of notes.txt..."
+decide '{"notes.txt": "take"}'
+wait_for 120 completed
+check_merge
 echo "smoke test passed"
