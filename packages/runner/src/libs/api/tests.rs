@@ -1,4 +1,5 @@
 use crate::libs::api::{Api, HttpApi, RunStatus, Transition};
+use crate::libs::audit::Event;
 use crate::libs::config::parse_api_url;
 use crate::libs::credentials::Credentials;
 use crate::libs::error::AgentError;
@@ -226,4 +227,35 @@ async fn unsafe_path_segments_never_reach_the_network() {
     let outcome = api(&server).heartbeat(&forged, 1).await;
 
     assert!(matches!(outcome, Err(AgentError::Api { status: 0, .. })));
+}
+
+#[tokio::test]
+async fn events_are_posted_as_one_flat_batch() {
+    let server = MockServer::start().await;
+    let fields = json!({ "run_id": "task_alpha", "vm_id": "vm_alpha" });
+    let event = Event::new("vm_created", fields.as_object().cloned().expect("object")).expect("id");
+    Mock::given(method("POST"))
+        .and(path(format!("{RUNNER}/events")))
+        .and(header("authorization", "Bearer token-alpha"))
+        .and(body_json(json!({ "events": [{
+            "id": event.id,
+            "at": event.at,
+            "event": "vm_created",
+            "run_id": "task_alpha",
+            "vm_id": "vm_alpha",
+        }] })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "accepted": 0,
+            "refused": [event.id],
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let reply = api(&server)
+        .report_events(&credentials(), std::slice::from_ref(&event))
+        .await
+        .expect("reported");
+
+    assert_eq!(reply.refused, vec![event.id]);
 }

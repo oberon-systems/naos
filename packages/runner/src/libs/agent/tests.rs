@@ -6,6 +6,7 @@ use tempfile::TempDir;
 
 use super::*;
 use crate::libs::api::RunStatus;
+use crate::libs::audit::Event;
 use crate::libs::config::{parse_api_url, RuntimeConfig};
 use crate::libs::testing::{dead_vm, desired, desired_run, vm, FakeApi, FakeRuntime, FakeSource};
 
@@ -152,4 +153,46 @@ async fn an_expired_lease_leaves_stopped_vms_to_the_reconciler() {
     let _ = agent.cycle().await;
 
     assert_eq!(agent.runtime.vms(), vec![dead_vm("run_b")]);
+}
+
+fn spooled(dir: &TempDir) -> Event {
+    let fields = serde_json::json!({ "run_id": "run_a" });
+    let event =
+        Event::new("run_claimed", fields.as_object().cloned().expect("object")).expect("id");
+    Spool::new(dir.path()).append(&event).expect("append");
+    event
+}
+
+#[tokio::test]
+async fn a_cycle_posts_spooled_events_and_acks_them() {
+    let (dir, mut agent) = setup(FakeRuntime::default());
+    agent.api.serve(desired(vec![]));
+    let event = spooled(&dir);
+
+    agent.cycle().await.expect("cycle");
+
+    assert_eq!(agent.api.events(), vec![event]);
+    assert!(Spool::new(dir.path())
+        .take(10)
+        .expect("take")
+        .events
+        .is_empty());
+}
+
+#[tokio::test]
+async fn a_failed_post_keeps_the_spool() {
+    let (dir, mut agent) = setup(FakeRuntime::default());
+    agent.api.serve(desired(vec![]));
+    agent.api.fail_events(true);
+    let event = spooled(&dir);
+
+    agent.cycle().await.expect("cycle");
+    assert_eq!(
+        Spool::new(dir.path()).take(10).expect("take").events,
+        vec![event.clone()]
+    );
+
+    agent.api.fail_events(false);
+    agent.cycle().await.expect("cycle");
+    assert_eq!(agent.api.events(), vec![event]);
 }

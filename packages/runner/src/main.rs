@@ -7,6 +7,7 @@ use tracing_subscriber::EnvFilter;
 
 use libs::agent::Agent;
 use libs::api::HttpApi;
+use libs::audit::{self, Spool};
 use libs::config::{self, Config};
 use libs::console;
 use libs::error::AgentError;
@@ -44,7 +45,12 @@ fn run() -> Result<(), AgentError> {
                 .block_on(serve(config))
         }
         Some("console") => match (args.next(), args.next()) {
-            (Some(run_id), None) => console::attach(&config::load_runtime()?.vm_dir, &run_id),
+            (Some(run_id), None) => {
+                if let Ok(config) = config::load() {
+                    audit::install(Spool::new(&config.state_dir));
+                }
+                console::attach(&config::load_runtime()?.vm_dir, &run_id)
+            }
             _ => Err(AgentError::Config(USAGE.into())),
         },
         Some(_) => Err(AgentError::Config(USAGE.into())),
@@ -52,6 +58,7 @@ fn run() -> Result<(), AgentError> {
 }
 
 async fn serve(config: Config) -> Result<(), AgentError> {
+    audit::install(Spool::new(&config.state_dir));
     let api = HttpApi::new(config.api_url.clone())?;
     let runtime = QemuRuntime::new(&config.runtime)?;
     let mut agent = Agent::new(&config, api, runtime, Box::new(HttpImages::new()?));

@@ -9,9 +9,10 @@ use std::time::Duration;
 use sha2::{Digest, Sha256};
 
 use crate::libs::api::{
-    Api, DesiredRun, DesiredState, DiffReport, HeartbeatReply, ImageRef, IssuedToken, LeaseGrant,
-    MergeReport, Registration, RunSpec, RunStatus, RuntimeSpec, Transition,
+    Api, DesiredRun, DesiredState, DiffReport, EventsReply, HeartbeatReply, ImageRef, IssuedToken,
+    LeaseGrant, MergeReport, Registration, RunSpec, RunStatus, RuntimeSpec, Transition,
 };
+use crate::libs::audit::Event;
 use crate::libs::credentials::Credentials;
 use crate::libs::error::AgentError;
 use crate::libs::ids::hex;
@@ -133,6 +134,8 @@ pub struct FakeApi {
     desired: Mutex<Option<DesiredState>>,
     rotated_token: Mutex<Option<String>>,
     reject_heartbeats: AtomicUsize,
+    events: Mutex<Vec<Event>>,
+    events_down: AtomicBool,
     pub registrations: AtomicUsize,
 }
 
@@ -184,6 +187,14 @@ impl FakeApi {
 
     pub fn capacities(&self) -> Vec<u32> {
         lock(&self.capacities).clone()
+    }
+
+    pub fn events(&self) -> Vec<Event> {
+        lock(&self.events).clone()
+    }
+
+    pub fn fail_events(&self, down: bool) {
+        self.events_down.store(down, Ordering::SeqCst);
     }
 }
 
@@ -256,6 +267,20 @@ impl Api for FakeApi {
     ) -> Result<(), AgentError> {
         lock(&self.merges).push((run_id.into(), report.outcome.clone()));
         Ok(())
+    }
+
+    async fn report_events(
+        &self,
+        _: &Credentials,
+        events: &[Event],
+    ) -> Result<EventsReply, AgentError> {
+        if self.events_down.load(Ordering::SeqCst) {
+            return Err(AgentError::Transport("api unavailable".into()));
+        }
+        lock(&self.events).extend_from_slice(events);
+        Ok(EventsReply {
+            refused: Vec::new(),
+        })
     }
 }
 

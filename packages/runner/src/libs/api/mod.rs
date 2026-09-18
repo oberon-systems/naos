@@ -8,6 +8,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+use crate::libs::audit::Event;
 use crate::libs::credentials::Credentials;
 use crate::libs::error::AgentError;
 use crate::libs::overlay::merge::{Decision, Outcome};
@@ -154,6 +155,16 @@ pub struct MergeReport<'a> {
     pub outcome: &'a Outcome,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct EventReport<'a> {
+    pub events: &'a [Event],
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct EventsReply {
+    pub refused: Vec<String>,
+}
+
 pub trait Api {
     fn register(
         &self,
@@ -192,6 +203,12 @@ pub trait Api {
         run_id: &str,
         report: &MergeReport<'_>,
     ) -> impl Future<Output = Result<(), AgentError>> + Send;
+
+    fn report_events(
+        &self,
+        credentials: &Credentials,
+        events: &[Event],
+    ) -> impl Future<Output = Result<EventsReply, AgentError>> + Send;
 }
 
 pub struct HttpApi {
@@ -333,6 +350,20 @@ impl Api for HttpApi {
             .bearer_auth(&credentials.token)
             .json(report);
         Self::send::<serde_json::Value>(request).await.map(|_| ())
+    }
+
+    async fn report_events(
+        &self,
+        credentials: &Credentials,
+        events: &[Event],
+    ) -> Result<EventsReply, AgentError> {
+        let request = self
+            .client
+            .post(self.url(&[&credentials.runner_id, "events"])?)
+            .bearer_auth(&credentials.token)
+            .timeout(REPORT_TIMEOUT)
+            .json(&EventReport { events });
+        Self::send(request).await
     }
 }
 

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use crate::libs::api::Api;
-use crate::libs::audit;
+use crate::libs::audit::{self, Spool};
 use crate::libs::config::Config;
 use crate::libs::credentials::{read_secret_file, CredentialStore, Credentials};
 use crate::libs::error::AgentError;
@@ -14,6 +14,8 @@ use crate::libs::runtime::Runtime;
 pub const STARTUP_GRACE: Duration = Duration::from_secs(60);
 const RETRY_INTERVAL: Duration = Duration::from_secs(5);
 const MIN_INTERVAL: Duration = Duration::from_secs(1);
+const EVENT_BATCH: usize = 1000;
+const EVENT_BATCHES: usize = 10;
 
 pub struct Agent<A, R> {
     api: A,
@@ -22,6 +24,7 @@ pub struct Agent<A, R> {
     name: String,
     capacity: u32,
     store: CredentialStore,
+    spool: Spool,
     enrollment_token_file: PathBuf,
     credentials: Option<Credentials>,
     lease: LeaseClock,
@@ -36,6 +39,7 @@ impl<A: Api + Sync, R: Runtime> Agent<A, R> {
             name: config.name.clone(),
             capacity: config.capacity,
             store: CredentialStore::new(&config.state_dir),
+            spool: Spool::new(&config.state_dir),
             enrollment_token_file: config.enrollment_token_file.clone(),
             credentials: None,
             lease: LeaseClock::starting(Instant::now(), STARTUP_GRACE),
@@ -48,7 +52,7 @@ impl<A: Api + Sync, R: Runtime> Agent<A, R> {
             .map_or(RETRY_INTERVAL, |ttl| (ttl / 3).max(MIN_INTERVAL))
     }
 
-    /// One pass: fence if the lease lapsed, heartbeat, then drive local VMs to the desired state.
+    /// One pass: fence if the lease lapsed, heartbeat, drive local VMs to the desired state, report.
     pub async fn cycle(&mut self) -> Result<usize, AgentError> {
         if self.lease.expired(Instant::now()) {
             self.fence().await;
@@ -87,9 +91,9 @@ impl<A: Api + Sync, R: Runtime> Agent<A, R> {
         ));
         // Image downloads and VM boots outlast the lease, so it is renewed while they run.
         let mut current = credentials.clone();
-        loop {
+        let failures = loop {
             tokio::select! {
-                failures = &mut reconciling => return Ok(failures),
+                failures = &mut reconciling => break failures,
                 () = tokio::time::sleep(interval) => {
                     let beat = heartbeat(
                         &self.api,
@@ -105,6 +109,48 @@ impl<A: Api + Sync, R: Runtime> Agent<A, R> {
                         Err(err) => tracing::warn!(error = %err, "heartbeat during reconcile failed"),
                     }
                 }
+            }
+        };
+        self.report_events(&current).await;
+        Ok(failures)
+    }
+
+    async fn report_events(&self, credentials: &Credentials) {
+        for _ in 0..EVENT_BATCHES {
+            let batch = match self.spool.take(EVENT_BATCH) {
+                Ok(batch) => batch,
+                Err(err) => {
+                    tracing::error!(error = %err, "cannot read the audit spool");
+                    return;
+                }
+            };
+            if !batch.events.is_empty() {
+                match self.api.report_events(credentials, &batch.events).await {
+                    Ok(reply) if !reply.refused.is_empty() => tracing::warn!(
+                        refused = ?reply.refused,
+                        "the API refused audit events of runs it does not bind to this runner"
+                    ),
+                    Ok(_) => {}
+                    Err(AgentError::Api {
+                        status: 422,
+                        detail,
+                    }) => tracing::error!(
+                        events = batch.events.len(),
+                        detail = %detail,
+                        "the API rejected an audit batch; dropping it"
+                    ),
+                    Err(err) => {
+                        tracing::warn!(error = %err, "audit events stay spooled");
+                        return;
+                    }
+                }
+            }
+            if let Err(err) = self.spool.ack(&batch) {
+                tracing::error!(error = %err, "cannot trim the audit spool");
+                return;
+            }
+            if batch.events.len() < EVENT_BATCH {
+                return;
             }
         }
     }
