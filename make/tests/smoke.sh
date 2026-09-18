@@ -220,6 +220,43 @@ check_merge() {
     fi
 }
 
+# The runner posts its events after each cycle, so the timeline fills in shortly after the log.
+audited() {
+    curl -fsS "${auth[@]}" "$api/api/v1/tasks/$task/events?limit=10000" |
+        "$VENV/bin/python" -c '
+import json, sys
+rows = json.load(sys.stdin)
+seen = {row["event"] for row in rows}
+seen |= {("to", row["data"]["to"]) for row in rows if row["event"] == "task_transition"}
+seen |= {("mcp_call", row["data"]["decision"]) for row in rows if row["event"] == "mcp_call"}
+statuses = ("STARTING", "STARTED", "STOPPING", "COLLECTING", "WAITING_MERGE", "COMPLETED")
+expected = {
+    "task_created", "vm_created", "workspace_shared", "network_allowed", "network_denied",
+    "shell_allowed", "shell_denied", ("mcp_call", "allow"), ("mcp_call", "deny"),
+    "workspace_collected", "diff_reported", "merge_decided", "merge_conflict", "merge_applied",
+    "changes_archived", *(("to", status) for status in statuses),
+}
+sys.exit(0 if expected <= seen else f"not in the timeline yet: {sorted(map(str, expected - seen))}")
+'
+}
+
+check_secrets() {
+    local after=0 page spool="$TEMP_DIR/state/audit.jsonl"
+    : >"$TEMP_DIR/audit.json"
+    while page="$(curl -fsS "${auth[@]}" "$api/api/v1/audit?limit=1000&after=$after")" &&
+        [ "$page" != "[]" ]; do
+        printf '%s\n' "$page" >>"$TEMP_DIR/audit.json"
+        after="$(printf '%s' "$page" | "$VENV/bin/python" -c 'import json, sys; print(json.load(sys.stdin)[-1]["seq"])')"
+    done
+    [ "$(stat -c %a "$spool")" = 600 ] || fail "$spool is not 0600"
+    for value in "$operator" "$(cat "$TEMP_DIR/enrollment")" "$secret" \
+        "$(field token <"$TEMP_DIR/state/credentials.json")"; do
+        if grep -qF -- "$value" "$TEMP_DIR/audit.json" "$spool"; then
+            fail "a credential reached the audit trail"
+        fi
+    done
+}
+
 share_gone() {
     ! pgrep -f -- "--socket-path=$TEMP_DIR/runs" >/dev/null
 }
@@ -288,8 +325,9 @@ mount_policy="$(
 {"kind": "mount", "document": {"workspace": {"host_path": "$TEMP_DIR/workspaces/alpha", "mode": "rw"}}}
 EOF
 )"
+secret="$(token)"
 curl -fsS "${auth[@]}" "$api/api/v1/secrets" -o /dev/null -d @- <<EOF
-{"name": "alpha-token", "value": "$(token)"}
+{"name": "alpha-token", "value": "$secret"}
 EOF
 mcp_policy="$(
     curl -fsS "${auth[@]}" "$api/api/v1/policies" -d @- <<EOF | field id
@@ -374,4 +412,7 @@ echo "taking the agent's version of notes.txt..."
 decide '{"notes.txt": "take"}'
 wait_for 120 completed
 check_merge
+echo "checking the audit timeline of the task..."
+wait_for 60 audited
+check_secrets
 echo "smoke test passed"
