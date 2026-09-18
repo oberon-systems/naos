@@ -10,6 +10,7 @@ from naos_api.errors import (
     ImageConflictError,
     InvalidTransitionError,
     LeaseError,
+    MergeError,
     NotFoundError,
     PolicyError,
     SecretConflictError,
@@ -48,6 +49,7 @@ _ERROR_STATUS: dict[type[Exception], int] = {
     ImageConflictError: 409,
     SecretConflictError: 409,
     PolicyError: 422,
+    MergeError: 422,
 }
 
 

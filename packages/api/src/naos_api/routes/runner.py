@@ -1,9 +1,9 @@
-from typing import Annotated, Any, Self
+from typing import Annotated, Any, Literal, Self
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field, StrictInt, model_validator
 
-from naos_api import runners
+from naos_api import merges, runners
 from naos_api.auth import require_enrollment, require_runner
 from naos_api.clock import NowDep
 from naos_api.lifecycle import TaskStatus
@@ -39,6 +39,56 @@ class TransitionIn(StrictModel):
     def _failure_needs_reason(self) -> Self:
         if self.target is TaskStatus.FAILED and self.reason is None:
             raise ValueError("a FAILED transition requires a reason")
+        return self
+
+
+LeaseId = Annotated[str, Field(max_length=64)]
+DiffPath = Annotated[str, Field(min_length=1, max_length=4096)]
+Sha256Hex = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
+Mode = Annotated[StrictInt, Field(ge=0, le=0o7777)]
+Note = Annotated[str, Field(min_length=1, max_length=MAX_REASON_LENGTH)]
+MAX_ENTRIES = 100_000
+
+
+class DiffEntryIn(StrictModel):
+    path: DiffPath
+    change: Literal["created", "modified", "deleted", "renamed", "rejected"]
+    kind: Literal["file", "dir", "symlink", "other"]
+    from_: DiffPath | None = Field(default=None, alias="from")
+    size: Annotated[StrictInt, Field(ge=0)] | None = None
+    sha256: Sha256Hex | None = None
+    mode: Mode | None = None
+    target: Annotated[str, Field(max_length=4096)] | None = None
+    reason: Note | None = None
+    base_sha256: Sha256Hex | None = None
+    base_mode: Mode | None = None
+    base_target: Annotated[str, Field(max_length=4096)] | None = None
+    sensitive: bool = False
+
+
+class DiffIn(StrictModel):
+    lease_id: LeaseId
+    entries: Annotated[list[DiffEntryIn], Field(max_length=MAX_ENTRIES)]
+
+
+class ConflictIn(StrictModel):
+    path: DiffPath
+    reason: Note
+
+
+class MergeResultIn(StrictModel):
+    lease_id: LeaseId
+    outcome: Literal["applied", "conflict"]
+    applied: list[DiffPath] = []
+    skipped: list[DiffPath] = []
+    exported: list[DiffPath] = []
+    backed_up: list[DiffPath] = []
+    conflicts: list[ConflictIn] = []
+
+    @model_validator(mode="after")
+    def _conflict_names_paths(self) -> Self:
+        if self.outcome == "conflict" and not self.conflicts:
+            raise ValueError("a conflict outcome lists its conflicts")
         return self
 
 
@@ -84,6 +134,7 @@ class DesiredTaskOut(BaseModel):
     image_url: str
     policies: dict[PolicyKind, dict[str, Any] | None]
     credentials: dict[str, CredentialOut]
+    merge: dict[str, Any] | None
 
 
 class DesiredStateOut(BaseModel):
@@ -140,6 +191,7 @@ def desired_tasks(
                     name: CredentialOut(value=issued.value, expires_at=issued.expires_at)
                     for name, issued in item.credentials.items()
                 },
+                merge=item.merge,
             )
             for item in desired
         ],
@@ -158,6 +210,36 @@ def transition(
         body.expected,
         body.target,
         body.reason,
+        now,
+    )
+    return TaskRead.of(task)
+
+
+@router.post("/{runner_id}/tasks/{task_id}/diff")
+def report_diff(
+    task_id: str, body: DiffIn, principal: PrincipalDep, session: SessionDep, now: NowDep
+) -> TaskRead:
+    entries = [
+        entry.model_dump(mode="json", by_alias=True, exclude_none=True) for entry in body.entries
+    ]
+    task = merges.report_diff(session, principal.runner_id, task_id, body.lease_id, entries, now)
+    return TaskRead.of(task)
+
+
+@router.post("/{runner_id}/tasks/{task_id}/merge")
+def report_merge(
+    task_id: str, body: MergeResultIn, principal: PrincipalDep, session: SessionDep, now: NowDep
+) -> TaskRead:
+    applied = body.outcome == "applied"
+    report = body.model_dump(include={"applied", "skipped", "exported", "backed_up"})
+    conflicts = [conflict.model_dump() for conflict in body.conflicts]
+    task = merges.report_merge(
+        session,
+        principal.runner_id,
+        task_id,
+        body.lease_id,
+        report if applied else None,
+        None if applied else conflicts,
         now,
     )
     return TaskRead.of(task)

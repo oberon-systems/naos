@@ -11,7 +11,7 @@ from naos_api import tasks
 from naos_api.errors import InvalidTransitionError, LeaseError, NotFoundError
 from naos_api.images.service import check_image
 from naos_api.lifecycle import TERMINAL, TaskStatus
-from naos_api.models import Lease, Policy, Runner, Task
+from naos_api.models import Lease, Merge, Policy, Runner, Task
 from naos_api.secrets import IssuedCredential, issue_credentials
 from naos_api.spec import PolicyKind, RunSpec
 
@@ -25,6 +25,7 @@ RUNNER_TRANSITIONS = frozenset(
         (S.STARTING, S.STARTED),
         (S.STARTED, S.STOPPING),
         (S.STOPPING, S.COLLECTING),
+        (S.WAITING_MERGE, S.FAILED),
         *((status, S.FAILED) for status in LEASE_BOUND),
     }
 )
@@ -69,6 +70,7 @@ class DesiredTask:
     image_url: str
     policies: dict[PolicyKind, dict[str, Any] | None]
     credentials: dict[str, IssuedCredential]
+    merge: dict[str, Any] | None
 
 
 def _live_lease(session: Session, runner_id: str) -> Lease | None:
@@ -169,6 +171,7 @@ def _renew_lease(session: Session, runner_id: str, now: int, lease_ttl: int) -> 
             except Exception:
                 session.rollback()
                 continue
+            _rebind_waiting(session, runner_id, lease_id, now)
             return lease_id
 
         lease_id = lease.id
@@ -181,6 +184,19 @@ def _renew_lease(session: Session, runner_id: str, now: int, lease_ttl: int) -> 
         if extended.rowcount == 1:
             return lease_id
     raise LeaseError(f"runner {runner_id} could not acquire a lease")
+
+
+def _rebind_waiting(session: Session, runner_id: str, lease_id: str, now: int) -> None:
+    # A Run waiting for its merge outlives the lease that ran it; its changes stay with the runner.
+    lapsed = select(Lease.id).where(
+        col(Lease.runner_id) == runner_id, col(Lease.expired_at).is_not(None)
+    )
+    session.exec(
+        update(Task)
+        .where(col(Task.status) == S.WAITING_MERGE, col(Task.lease_id).in_(lapsed))
+        .values(lease_id=lease_id, updated_at=now)
+    )
+    session.commit()
 
 
 def _rotate_token(
@@ -284,6 +300,13 @@ def _credentials(
     return issue_credentials(session, names, now, ttl)
 
 
+def _decision(session: Session, task: Task) -> dict[str, Any] | None:
+    if task.status is not S.WAITING_MERGE:
+        return None
+    merge = session.get(Merge, task.id)
+    return merge.decision if merge else None
+
+
 def desired_state(
     session: Session, runner_id: str, now: int, credential_ttl: int
 ) -> tuple[str, list[DesiredTask]]:
@@ -308,9 +331,21 @@ def desired_state(
                 credentials=_credentials(
                     session, task, policies[PolicyKind.MCP], now, credential_ttl
                 ),
+                merge=_decision(session, task),
             )
         )
     return lease.id, desired
+
+
+def owned_task(session: Session, runner_id: str, task_id: str, lease_id: str, now: int) -> Task:
+    expire_leases(session, now)
+    task = session.get(Task, task_id)
+    owner = session.get(Lease, task.lease_id) if task is not None and task.lease_id else None
+    if task is None or owner is None or owner.runner_id != runner_id:
+        raise NotFoundError(f"task {task_id} does not exist")
+    if task.lease_id != lease_id or owner.expired_at is not None:
+        raise LeaseError(f"lease {lease_id} does not hold task {task_id}")
+    return task
 
 
 def transition(
@@ -325,13 +360,5 @@ def transition(
 ) -> Task:
     if (expected, target) not in RUNNER_TRANSITIONS:
         raise InvalidTransitionError(f"a runner may not move a task {expected} -> {target}")
-    expire_leases(session, now)
-
-    task = session.get(Task, task_id)
-    owner = session.get(Lease, task.lease_id) if task is not None and task.lease_id else None
-    if task is None or owner is None or owner.runner_id != runner_id:
-        raise NotFoundError(f"task {task_id} does not exist")
-    if task.lease_id != lease_id or owner.expired_at is not None:
-        raise LeaseError(f"lease {lease_id} does not hold task {task_id}")
-
+    owned_task(session, runner_id, task_id, lease_id, now)
     return tasks.transition_task(session, task_id, expected, target, reason, lease_id=lease_id)

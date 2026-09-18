@@ -64,6 +64,20 @@ class Task(SQLModel, table=True):
     updated_at: int = Field(default_factory=now_ts)
 
 
+class Merge(SQLModel, table=True):
+    __tablename__ = "merges"
+
+    task_id: str = Field(primary_key=True)
+    entries: list[dict[str, Any]] = Field(sa_column=Column(JSON, nullable=False))
+    decision: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON(none_as_null=True)))
+    conflicts: list[dict[str, Any]] | None = Field(
+        default=None, sa_column=Column(JSON(none_as_null=True))
+    )
+    report: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON(none_as_null=True)))
+    created_at: int = Field(default_factory=now_ts)
+    updated_at: int = Field(default_factory=now_ts)
+
+
 class Secret(SQLModel, table=True):
     __tablename__ = "secrets"
 

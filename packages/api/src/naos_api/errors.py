@@ -28,3 +28,7 @@ class ImageConflictError(DomainError):
 
 class SecretConflictError(DomainError):
     """A secret with this name already exists."""
+
+
+class MergeError(DomainError):
+    """The merge selection does not fit the collected diff."""
