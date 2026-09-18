@@ -58,8 +58,9 @@ POST /api/v1/runners/{runner_id}/heartbeat
 GET /api/v1/runners/{runner_id}/tasks
 GET /api/v1/tasks/{task_id}/console
 GET /api/v1/tasks/{task_id}/events
-GET /api/v1/tasks/{task_id}/diff
+GET /api/v1/tasks/{task_id}/merge
 POST /api/v1/tasks/{task_id}/merge
+POST /api/v1/tasks/{task_id}/merge/reject
 POST /api/v1/policies
 GET /api/v1/policies/{policy_id}
 POST /api/v1/images
@@ -135,6 +136,24 @@ in [packer/README.md](../packer/README.md).
 - `POST /tasks` requires a registered image with the same `id` and `digest`,
   otherwise it returns 422.
 
+## Merge
+
+The operator side of a WAITING_MERGE Run. All three answer with `task_id`,
+`entries`, `decision`, `conflicts`, `report` and `updated_at`.
+
+- `GET /api/v1/tasks/{task_id}/merge` returns the collected diff and where
+  the merge stands, or 404 before the diff arrives.
+- `POST /api/v1/tasks/{task_id}/merge` takes `paths` and optional
+  `resolutions`, a map of a selected path to `skip`, `take` or `export`. A
+  selection that does not fit the diff gets 422, and a Run that is not
+  waiting or already has a pending decision gets 409.
+- `POST /api/v1/tasks/{task_id}/merge/reject` is a decision with no paths:
+  the Run completes and the workspace stays as it is.
+
+```bash
+curl -fsS "$api/api/v1/tasks/$task/merge" -d '{"paths": ["notes.txt"], "resolutions": {"notes.txt": "take"}}'
+```
+
 ## Runner interface
 
 Runners use the same API under `/api/v1/runners`. A runner token is not an
@@ -145,6 +164,8 @@ POST /api/v1/runners/register                                enrollment token
 POST /api/v1/runners/{runner_id}/heartbeat                   runner token
 GET  /api/v1/runners/{runner_id}/tasks                       runner token
 POST /api/v1/runners/{runner_id}/tasks/{task_id}/transition  runner token
+POST /api/v1/runners/{runner_id}/tasks/{task_id}/diff        runner token
+POST /api/v1/runners/{runner_id}/tasks/{task_id}/merge       runner token
 ```
 
 ### Runner credentials
@@ -167,13 +188,16 @@ POST /api/v1/runners/{runner_id}/tasks/{task_id}/transition  runner token
 - Expiry is detected on every runner call and by a background sweep every
   `NAOS_LEASE_SWEEP_INTERVAL_SECONDS`. PENDING Runs of the expired lease
   return to the pool; STARTING, STARTED, STOPPING and COLLECTING Runs become
-  FAILED with the reason `runner lease expired`.
+  FAILED with the reason `runner lease expired`. WAITING_MERGE Runs stay, and
+  the next lease of the same runner takes them over, since only that runner
+  holds their changes.
 - A heartbeat assigns unassigned PENDING Runs up to the capacity the runner
   reports. Each assignment is compare-and-swap, so a Run never lands on two
   leases.
 - `GET .../tasks` returns the desired state: every non-terminal Run on the
   live lease, with its spec, the `image_url` of its image, the resolved
-  policy documents and `credentials`.
+  policy documents, `credentials` and `merge`, the merge decision of a
+  WAITING_MERGE Run or null.
 - `credentials` maps each secret the MCP policy names to `value` and
   `expires_at`, only for PENDING, STARTING and STARTED Runs, so the start that
   follows a claim already has them. A missing or expired secret is left out,
@@ -190,11 +214,24 @@ A runner may only make these transitions; any other pair gets 409.
 | STARTING | STARTED |
 | STARTED | STOPPING |
 | STOPPING | COLLECTING |
-| STARTING, STARTED, STOPPING, COLLECTING | FAILED, with a reason |
+| STARTING, STARTED, STOPPING, COLLECTING, WAITING_MERGE | FAILED, with a reason |
 
 Every transition names the lease and is compare-and-swap on both the status
 and the lease. A stale lease gets 409, a Run held by another runner gets 404,
 and repeating a transition that already happened is a no-op.
+
+### Merge reports
+
+A runner never sets WAITING_MERGE or COMPLETED itself; it reports what it did
+and the API moves the Run ([09](09-overlay-and-merge.md#merge)).
+
+- `POST .../diff` takes `lease_id` and the collected `entries`, at most
+  100000. It stores the diff once, applies the merge policy and moves a
+  COLLECTING Run to WAITING_MERGE; a repeated report is a no-op.
+- `POST .../merge` takes `lease_id` and `outcome`. `applied` carries the
+  `applied`, `skipped`, `exported` and `backed_up` paths and completes the
+  Run. `conflict` carries `conflicts`, each a `path` and a `reason`, keeps
+  the Run waiting and clears the decision.
 
 Secrets must never be returned accidentally.
 

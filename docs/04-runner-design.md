@@ -97,11 +97,13 @@ this table. While the runtime cannot list VMs, the heartbeat offers capacity
 | STARTED | running | refresh the gates, reattach the MCP session |
 | STARTED | dead or missing | report FAILED `vm lost`, destroy a dead VM |
 | STOPPING | any | stop the VM, report COLLECTING |
-| COLLECTING | running or dead | collect the workspace diff once; on failure report FAILED `collection failed` |
+| COLLECTING | running or dead | collect the workspace diff once and report it; on failure report FAILED `collection failed` |
 | COLLECTING | missing | report FAILED `vm lost` |
-| WAITING_MERGE | any | none, the overlay is kept |
-| terminal | present | destroy as orphan |
-| not desired | present | destroy as orphan |
+| WAITING_MERGE | present, decided | merge and report the outcome |
+| WAITING_MERGE | present, undecided | none, the upper disk is kept |
+| WAITING_MERGE | missing | report FAILED `vm lost` |
+| terminal | present | destroy as orphan, archiving an upper disk |
+| not desired | present | destroy as orphan, archiving an upper disk |
 
 Creating a VM is idempotent by `run_id`, and a second VM for the same Run is
 destroyed. A claim rejected by the API creates nothing. When the desired
@@ -169,7 +171,10 @@ $NAOS_AGENT_VM_DIR/vm_<32 hex>/
   fs.sock        virtiofsd socket of the workspace share
   upper.img      rw workspace: the disk the guest's changes land on
   diff.json      the collected workspace diff, mode 0600
+  merge/         journal, result.json, backup/ and export/ of the merge
   virtiofsd.log  virtiofsd stderr, mode 0600
+$NAOS_AGENT_VM_DIR/archive/vm_<32 hex>/
+  upper.img, diff.json, merge/, vm.json of a destroyed VM, kept until removed
 ```
 
 The gates live as long as the VM and are dropped when it is destroyed. They
@@ -188,7 +193,8 @@ The runtime writes audit events `image_cached`, `image_rejected`,
 `shell_policy_configured`, `mcp_policy_configured`,
 `mcp_credentials_updated`, `mcp_attached`, `mcp_rejected`, `mcp_call` and
 `workspace_shared` (with `mode`), `workspace_collected` (with `entries` and
-`rejected`),
+`rejected`), `merge_conflict` (with `conflicts`), `merge_applied` (with
+`applied`, `backed_up` and `exported`) and `changes_archived`,
 each with its `run_id`, `vm_id` or digest.
 
 ## Console
@@ -210,7 +216,8 @@ through the API is a later step.
 
 The agent keeps a local lease deadline, measured from when each heartbeat was
 sent. Once it passes without a successful renewal, the agent destroys every
-local VM: the API has already failed those Runs. After a restart the deadline
+running VM: the API has already failed those Runs. A stopped VM runs nothing
+and may hold changes waiting for a merge, so it is left to the reconciler. After a restart the deadline
 starts at 60 seconds. Stopping the agent leaves VMs running for the next
 start to reconcile.
 
