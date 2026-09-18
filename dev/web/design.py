@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import time
+import webbrowser
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -29,6 +30,19 @@ def compose(*args: str) -> None:
     env = {"PENPOT_SECRET_KEY": secrets.token_urlsafe(48), **os.environ}
     command = ["docker", "compose", "-f", str(HERE / "compose.yaml"), *args]
     subprocess.run(command, check=True, env=env)  # noqa: S603, S607
+
+
+def publish(key: str) -> None:
+    location = (
+        "location = /mcp/claude {\n"
+        f"    rewrite ^ /mcp?userToken={key} break;\n"
+        "    proxy_pass http://penpot-mcp:4401;\n"
+        "    proxy_http_version 1.1;\n"
+        "    proxy_buffering off;\n"
+        "}\n"
+    )
+    script = 'printf "%s" "$1" > /etc/nginx/overrides/server.d/claude-mcp.conf && nginx -s reload'
+    compose("exec", "-T", "penpot-frontend", "sh", "-c", script, "sh", location)
 
 
 def templates() -> list[str]:
@@ -140,18 +154,24 @@ def up() -> None:
     rpc(client, "register-profile", token=token)
     rpc(client, "update-profile-props", props={"mcpEnabled": True})
     key = rpc(client, "create-access-token", name="mcp", type="mcp")["token"]
+    publish(key)
     if template != EMPTY:
         load(client, drafts(client), TEMPLATES / template)
-    print(f"\nPenpot: {URL}  login {PROFILE['email']} / {PROFILE['password']}")
-    print(f"MCP:    claude mcp add --transport http penpot '{URL}/mcp/stream?userToken={key}'")
+    login = f"{URL}/autologin?token={client.cookies['auth-token']}"
+    webbrowser.open(login)
+    print(f"\nPenpot: {login}")
+    print(f"MCP:    {URL}/mcp/claude")
 
 
 def down() -> None:
     client = connect(wait=0)
     if client is not None:
         rpc(client, "login-with-password", **PROFILE)
-        files = rpc(client, "get-project-files", projectId=drafts(client))
-        choices = [questionary.Choice(f["name"], value=f["id"]) for f in files]
+        choices = [
+            questionary.Choice(f"{p['name']} / {f['name']}", value=f["id"])
+            for p in rpc(client, "get-all-projects")
+            for f in rpc(client, "get-project-files", projectId=p["id"])
+        ]
         file_id = questionary.select("Export file", choices=[SKIP, *choices]).ask()
         if file_id is None:
             return

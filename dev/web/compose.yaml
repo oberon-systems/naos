@@ -19,6 +19,7 @@ services:
       - 127.0.0.1:9001:8080
     volumes:
       - assets:/opt/data/assets
+      - ./autologin.conf:/etc/nginx/overrides/server.d/autologin.conf:ro
     depends_on:
       - penpot-backend
       - penpot-exporter

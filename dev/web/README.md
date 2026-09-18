@@ -7,12 +7,16 @@ diffs and an agent can read them directly.
 
 ## Design loop
 
-Start the stack, pick a template or `(empty)`, and log in with the printed
-credentials:
+Start the stack and pick a template or `(empty)`:
 
 ```bash
 make -C dev/web up
 ```
+
+`up` creates a throwaway profile and opens the browser already logged in
+through the printed `/autologin` link. If that session is lost, log in as
+`designer@example.com` with password `naos-design`. `down` wipes the profile
+with the stack.
 
 Draw in the browser at `http://localhost:9001`. When you are done, pick the
 file to export and the template to write it to, then let the stack go down:
@@ -27,17 +31,19 @@ make -C dev/web down
 
 ## Connect Penpot MCP
 
-`up` enables MCP for the throwaway profile, issues its key and prints a ready
-command. The key changes on every `up`, so drop the old server first:
+`up` enables MCP for the throwaway profile, issues its key and serves it
+behind the fixed `/mcp/claude` URL, so Claude needs the server added only
+once. Add it, then restart Claude:
 
 ```bash
-claude mcp remove penpot
-claude mcp add --transport http penpot 'http://localhost:9001/mcp/stream?userToken=<key>'
+claude mcp add --transport http penpot http://localhost:9001/mcp/claude
 ```
 
+After later `up` runs, reconnect `penpot` from `/mcp` instead of restarting.
+While the stack is down, the server just shows as failed.
+
 The MCP plugin runs inside the Penpot browser tab. Keep a file open in the
-workspace while the agent works; a hidden or unloaded tab stops MCP. The key
-is also shown under Your account, Integrations, MCP Server.
+workspace while the agent works; a hidden or unloaded tab stops MCP.
 
 ## Templates
 
