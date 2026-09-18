@@ -1,4 +1,5 @@
 use super::*;
+use crate::libs::overlay::merge::{Conflict, Decision, Outcome, Report};
 use crate::libs::testing::{dead_vm, desired, desired_run, vm, FakeApi, FakeRuntime, FakeSource};
 
 const IMAGE: &[u8] = b"qcow2-alpha";
@@ -283,7 +284,7 @@ fn a_collecting_run_without_its_vm_is_lost() {
 }
 
 #[tokio::test]
-async fn a_collected_run_stays_collecting() {
+async fn a_collected_run_reports_its_diff_and_keeps_its_vm() {
     let api = FakeApi::default();
     let runtime = FakeRuntime::with_vms(vec![dead_vm("run_a")]);
     let state = desired(vec![desired_run("run_a", RunStatus::Collecting)]);
@@ -301,8 +302,78 @@ async fn a_collected_run_stays_collecting() {
 
     assert_eq!(failures, 0);
     assert_eq!(runtime.collected(), vec![dead_vm("run_a")]);
+    assert_eq!(api.diffs(), vec![("run_a".to_owned(), 0)]);
     assert_eq!(runtime.vms(), vec![dead_vm("run_a")]);
     assert!(api.transitions().is_empty());
+}
+
+fn waiting(id: &str, decision: Option<Decision>) -> DesiredRun {
+    DesiredRun {
+        merge: decision,
+        ..desired_run(id, RunStatus::WaitingMerge)
+    }
+}
+
+#[test]
+fn a_waiting_run_merges_once_decided_and_is_never_destroyed() {
+    let runs = [
+        waiting("run_a", Some(Decision::default())),
+        waiting("run_b", None),
+        waiting("run_c", None),
+    ];
+
+    assert_eq!(
+        plan(&runs, &[dead_vm("run_a"), dead_vm("run_b")]),
+        vec![
+            Action::Merge(dead_vm("run_a")),
+            Action::Fail {
+                run_id: "run_c".into(),
+                from: RunStatus::WaitingMerge,
+                reason: VM_LOST
+            },
+        ]
+    );
+}
+
+#[tokio::test]
+async fn a_merge_outcome_is_reported_as_it_came() {
+    for outcome in [
+        Outcome::Applied(Report {
+            applied: vec!["notes.txt".into()],
+            ..Report::default()
+        }),
+        Outcome::Conflict {
+            conflicts: vec![Conflict {
+                path: "notes.txt".into(),
+                reason: "the host changed since collection".into(),
+            }],
+        },
+    ] {
+        let api = FakeApi::default();
+        let runtime = FakeRuntime::with_vms(vec![dead_vm("run_a")]);
+        runtime.merge_with(outcome.clone());
+        let decision = Decision {
+            paths: vec!["notes.txt".into()],
+            ..Decision::default()
+        };
+        let state = desired(vec![waiting("run_a", Some(decision.clone()))]);
+        let images = FakeSource::new(IMAGE);
+
+        let failures = reconcile(
+            &api,
+            &runtime,
+            &images,
+            &api.credentials(),
+            &state,
+            &runtime.vms(),
+        )
+        .await;
+
+        assert_eq!(failures, 0);
+        assert_eq!(runtime.merged(), vec![(dead_vm("run_a"), decision)]);
+        assert_eq!(api.merges(), vec![("run_a".to_owned(), outcome)]);
+        assert_eq!(runtime.vms(), vec![dead_vm("run_a")]);
+    }
 }
 
 #[tokio::test]

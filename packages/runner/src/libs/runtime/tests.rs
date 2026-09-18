@@ -451,11 +451,13 @@ async fn a_run_without_a_writable_workspace_collects_an_empty_diff_once() {
         0o600
     );
 
-    fs::write(vm_dir.join("diff.json"), "kept").expect("write");
-    runtime.collect(&run, &vm).await.expect("collect again");
+    let kept = r#"{"entries":[{"path":"kept","change":"created","kind":"dir"}]}"#;
+    fs::write(vm_dir.join("diff.json"), kept).expect("write");
+    let again = runtime.collect(&run, &vm).await.expect("collect again");
+    assert_eq!(again.entries[0].path, "kept");
     assert_eq!(
         fs::read_to_string(vm_dir.join("diff.json")).expect("diff"),
-        "kept"
+        kept
     );
 }
 
@@ -504,6 +506,54 @@ async fn a_broken_upper_disk_leaves_no_diff() {
 
     assert!(runtime.collect(&run, &vm).await.is_err());
     assert!(!vm_dir.join("diff.json").exists());
+}
+
+#[tokio::test]
+async fn destroying_a_vm_with_changes_archives_them() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let runtime =
+        QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
+    let (vm, vm_dir) = stopped_vm(&dir);
+    for kept in ["upper.img", "diff.json", "overlay.qcow2"] {
+        fs::write(vm_dir.join(kept), kept).expect("write");
+    }
+    fs::create_dir(vm_dir.join("merge")).expect("merge");
+
+    runtime.destroy(&vm).await.expect("destroy");
+
+    let archived = dir.path().join("runs").join("archive").join(&vm.vm_id);
+    assert_eq!(vm_dirs(&dir), vec!["archive".to_owned()]);
+    assert!(archived.join("upper.img").exists() && archived.join("diff.json").exists());
+    assert!(archived.join("merge").is_dir());
+    assert!(!archived.join("overlay.qcow2").exists());
+    assert!(runtime.list().await.expect("list").is_empty());
+}
+
+#[tokio::test]
+async fn a_run_without_a_writable_workspace_merges_nothing() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let runtime =
+        QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
+    let (vm, vm_dir) = stopped_vm(&dir);
+    let run = desired_run("run_a", RunStatus::WaitingMerge);
+    runtime.collect(&run, &vm).await.expect("collect");
+
+    let outcome = runtime
+        .merge(&run, &vm, &Decision::default())
+        .await
+        .expect("merge");
+
+    assert_eq!(outcome, Outcome::Applied(Default::default()));
+    assert!(vm_dir.join("merge").join("result.json").exists());
+    let foreign = Decision {
+        paths: vec!["notes.txt".into()],
+        ..Decision::default()
+    };
+    fs::remove_file(vm_dir.join("merge").join("result.json")).expect("reset");
+    assert!(matches!(
+        runtime.merge(&run, &vm, &foreign).await.expect("merge"),
+        Outcome::Conflict { .. }
+    ));
 }
 
 #[tokio::test]

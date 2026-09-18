@@ -149,6 +149,8 @@ impl<A: Api + Sync, R: Runtime> Agent<A, R> {
                 return;
             }
         };
+        // A stopped VM runs nothing, and its upper disk may still wait for a merge.
+        let vms: Vec<_> = vms.into_iter().filter(|vm| vm.running).collect();
         if vms.is_empty() {
             return;
         }

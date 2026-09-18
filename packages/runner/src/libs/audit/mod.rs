@@ -48,6 +48,18 @@ pub fn workspace_collected(run_id: &str, entries: usize, rejected: usize) {
     tracing::info!(target: "audit", event = "workspace_collected", run_id, entries, rejected);
 }
 
+pub fn merge_conflict(run_id: &str, conflicts: usize) {
+    tracing::warn!(target: "audit", event = "merge_conflict", run_id, conflicts);
+}
+
+pub fn merge_applied(run_id: &str, applied: usize, backed_up: usize, exported: usize) {
+    tracing::info!(target: "audit", event = "merge_applied", run_id, applied, backed_up, exported);
+}
+
+pub fn changes_archived(vm_id: &str, run_id: &str) {
+    tracing::info!(target: "audit", event = "changes_archived", vm_id, run_id);
+}
+
 pub fn vm_destroyed(vm_id: &str, run_id: &str) {
     tracing::info!(target: "audit", event = "vm_destroyed", vm_id, run_id);
 }

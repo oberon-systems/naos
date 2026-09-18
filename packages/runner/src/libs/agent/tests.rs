@@ -7,7 +7,7 @@ use tempfile::TempDir;
 use super::*;
 use crate::libs::api::RunStatus;
 use crate::libs::config::{parse_api_url, RuntimeConfig};
-use crate::libs::testing::{desired, desired_run, vm, FakeApi, FakeRuntime, FakeSource};
+use crate::libs::testing::{dead_vm, desired, desired_run, vm, FakeApi, FakeRuntime, FakeSource};
 
 fn setup(runtime: FakeRuntime) -> (TempDir, Agent<FakeApi, FakeRuntime>) {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -142,4 +142,14 @@ async fn expired_lease_fences_every_vm() {
     let _ = agent.cycle().await;
 
     assert!(agent.runtime.vms().is_empty());
+}
+
+#[tokio::test]
+async fn an_expired_lease_leaves_stopped_vms_to_the_reconciler() {
+    let (_dir, mut agent) = setup(FakeRuntime::with_vms(vec![vm("run_a"), dead_vm("run_b")]));
+    agent.lease = LeaseClock::starting(Instant::now(), Duration::ZERO);
+
+    let _ = agent.cycle().await;
+
+    assert_eq!(agent.runtime.vms(), vec![dead_vm("run_b")]);
 }

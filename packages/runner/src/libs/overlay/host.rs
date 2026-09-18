@@ -87,6 +87,18 @@ impl Host {
         }))
     }
 
+    pub fn root(&self) -> Result<OwnedFd, AgentError> {
+        Ok(self.root.try_clone()?)
+    }
+
+    /// The directory holding `path`, reached without following a symlink.
+    pub fn parent(&self, path: &[Vec<u8>]) -> Result<Option<OwnedFd>, AgentError> {
+        match path.split_last() {
+            Some((_, parents)) => self.dir(parents),
+            None => Ok(None),
+        }
+    }
+
     pub fn exists(&self, path: &[Vec<u8>]) -> Result<bool, AgentError> {
         let Some((name, parents)) = path.split_last() else {
             return Ok(true);

@@ -81,6 +81,10 @@ impl VmPaths {
     pub fn diff(&self) -> PathBuf {
         self.dir.join("diff.json")
     }
+
+    pub fn merge(&self) -> PathBuf {
+        self.dir.join("merge")
+    }
 }
 
 /// The complete QEMU command line: every device and host path the guest can reach is listed here.

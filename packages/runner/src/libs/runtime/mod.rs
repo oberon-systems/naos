@@ -29,6 +29,7 @@ use crate::libs::ids::random_hex;
 use crate::libs::image::{ImageCache, ImageSource};
 use crate::libs::mcp::{self, McpGate};
 use crate::libs::network::NetworkGate;
+use crate::libs::overlay::merge::{Decision, Outcome};
 use crate::libs::overlay::{self, Diff};
 use crate::libs::qemu::{self, VmPaths, WorkspaceMode, PROCESS_PREFIX};
 use crate::libs::shell::ShellGate;
@@ -38,6 +39,7 @@ const POWERDOWN_TIMEOUT: Duration = Duration::from_secs(30);
 const KILL_TIMEOUT: Duration = Duration::from_secs(5);
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
 const GIB: u64 = 1024 * 1024 * 1024;
+const ARCHIVE_DIR: &str = "archive";
 const PRIVATE_MODE: u32 = 0o600;
 const DEFAULT_AGENT: &str = "claude";
 const VIRTIOFSD_MIN: (u64, u64) = (1, 13);
@@ -70,13 +72,24 @@ pub trait Runtime {
 
     fn stop(&self, vm: &LocalVm) -> impl Future<Output = Result<(), AgentError>> + Send;
 
-    /// Writes the workspace diff of a stopped Run once; a Run without a writable workspace gets an empty one.
+    /// Writes the workspace diff of a stopped Run once and returns it; a Run without a writable
+    /// workspace gets an empty one.
     fn collect(
         &self,
         run: &DesiredRun,
         vm: &LocalVm,
-    ) -> impl Future<Output = Result<(), AgentError>> + Send;
+    ) -> impl Future<Output = Result<Diff, AgentError>> + Send;
 
+    /// Applies the decided part of the collected diff to the workspace; repeating it returns the
+    /// same result.
+    fn merge(
+        &self,
+        run: &DesiredRun,
+        vm: &LocalVm,
+        decision: &Decision,
+    ) -> impl Future<Output = Result<Outcome, AgentError>> + Send;
+
+    /// Removes the VM; one that holds the agent's changes is archived instead of deleted.
     fn destroy(&self, vm: &LocalVm) -> impl Future<Output = Result<(), AgentError>> + Send;
 }
 
@@ -227,6 +240,31 @@ impl QemuRuntime {
             )));
         }
         Ok(VmPaths::new(self.vm_dir.join(vm_id)))
+    }
+
+    /// Moves the agent's changes, the diff and the merge record out of the VM directory; they stay
+    /// under `archive/<vm_id>` until an operator removes them.
+    fn archive(&self, paths: &VmPaths) -> Result<(), AgentError> {
+        let archive = self.vm_dir.join(ARCHIVE_DIR);
+        prepare_private_dir(&archive)?;
+        let Some(vm_id) = paths.dir.file_name() else {
+            return Err(AgentError::Runtime("a vm directory without a name".into()));
+        };
+        let target = archive.join(vm_id);
+        match DirBuilder::new().mode(0o700).create(&target) {
+            Err(err) if err.kind() != ErrorKind::AlreadyExists => return Err(err.into()),
+            _ => {}
+        }
+        for kept in [paths.upper(), paths.diff(), paths.merge(), paths.meta()] {
+            let Some(name) = kept.file_name() else {
+                continue;
+            };
+            match fs::rename(&kept, target.join(name)) {
+                Err(err) if err.kind() != ErrorKind::NotFound => return Err(err.into()),
+                _ => {}
+            }
+        }
+        Ok(())
     }
 
     async fn qemu_img(&self, args: &[&OsStr]) -> Result<Vec<u8>, AgentError> {
@@ -499,7 +537,7 @@ impl Runtime for QemuRuntime {
                 Ok(vm)
             }
             Err(err) => {
-                if let Err(cleanup) = self.destroy(&vm).await {
+                if let Err(cleanup) = self.teardown(&vm, false).await {
                     tracing::error!(error = %cleanup, vm_id = %vm.vm_id, "cleanup after a failed start failed");
                 }
                 Err(err)
@@ -527,10 +565,10 @@ impl Runtime for QemuRuntime {
         Ok(())
     }
 
-    async fn collect(&self, run: &DesiredRun, vm: &LocalVm) -> Result<(), AgentError> {
+    async fn collect(&self, run: &DesiredRun, vm: &LocalVm) -> Result<Diff, AgentError> {
         let paths = self.paths(&vm.vm_id)?;
-        if paths.diff().exists() {
-            return Ok(());
+        if let Ok(raw) = fs::read(paths.diff()) {
+            return serde_json::from_slice(&raw).map_err(runtime_error);
         }
         terminate(&vm.vm_id).await?;
         release_share(&paths).await?;
@@ -551,13 +589,59 @@ impl Runtime for QemuRuntime {
         write_private(&staged, &serde_json::to_vec(&diff).map_err(runtime_error)?)?;
         fs::rename(&staged, paths.diff())?;
         audit::workspace_collected(&vm.run_id, diff.entries.len(), diff.rejected());
-        Ok(())
+        Ok(diff)
+    }
+
+    async fn merge(
+        &self,
+        run: &DesiredRun,
+        vm: &LocalVm,
+        decision: &Decision,
+    ) -> Result<Outcome, AgentError> {
+        let paths = self.paths(&vm.vm_id)?;
+        let diff: Diff = serde_json::from_slice(&fs::read(paths.diff())?).map_err(runtime_error)?;
+        let workspace = workspace_of(run)?
+            .filter(|workspace| workspace.mode == WorkspaceMode::ReadWrite)
+            .map(|workspace| workspace.host);
+        let decision = decision.clone();
+        let outcome = tokio::task::spawn_blocking(move || {
+            overlay::merge::merge(
+                &paths.upper(),
+                workspace.as_deref(),
+                &diff,
+                &decision,
+                &paths.merge(),
+            )
+        })
+        .await
+        .map_err(runtime_error)??;
+        match &outcome {
+            Outcome::Applied(report) => audit::merge_applied(
+                &vm.run_id,
+                report.applied.len(),
+                report.backed_up.len(),
+                report.exported.len(),
+            ),
+            Outcome::Conflict { conflicts } => audit::merge_conflict(&vm.run_id, conflicts.len()),
+        }
+        Ok(outcome)
     }
 
     async fn destroy(&self, vm: &LocalVm) -> Result<(), AgentError> {
+        self.teardown(vm, true).await
+    }
+}
+
+impl QemuRuntime {
+    /// Stops everything the VM holds; `keep_changes` archives an upper disk instead of deleting it.
+    async fn teardown(&self, vm: &LocalVm, keep_changes: bool) -> Result<(), AgentError> {
         let paths = self.paths(&vm.vm_id)?;
         terminate(&vm.vm_id).await?;
         release_share(&paths).await?;
+        if keep_changes && paths.upper().exists() {
+            self.archive(&paths)?;
+            audit::changes_archived(&vm.vm_id, &vm.run_id);
+        }
         match fs::remove_dir_all(&paths.dir) {
             Err(err) if err.kind() != ErrorKind::NotFound => return Err(err.into()),
             _ => {}

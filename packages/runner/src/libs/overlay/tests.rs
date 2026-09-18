@@ -59,6 +59,7 @@ fn entries(diff: &Diff) -> Value {
             let mut entry = entry.clone();
             if let Some(object) = entry.as_object_mut() {
                 object.remove("sha256");
+                object.remove("base_sha256");
             }
             entry
         })
@@ -140,14 +141,15 @@ fn changes_are_created_modified_deleted_and_renamed() {
         entries(&diff),
         json!([
             {"path": "added.txt", "change": "created", "kind": "file", "size": 6, "mode": 0o644},
-            {"path": "mode.txt", "change": "modified", "kind": "file", "size": 5, "mode": 0o755},
+            {"path": "mode.txt", "change": "modified", "kind": "file", "size": 5, "mode": 0o755, "base_mode": 0o644},
             {"path": "newdir", "change": "created", "kind": "dir"},
-            {"path": "notes.txt", "change": "modified", "kind": "file", "size": 5, "mode": 0o644},
+            {"path": "notes.txt", "change": "modified", "kind": "file", "size": 5, "mode": 0o644, "base_mode": 0o644},
             {"path": "old.txt", "change": "deleted", "kind": "file", "size": 4, "mode": 0o644},
-            {"path": "renamed.txt", "change": "renamed", "kind": "file", "from": "moved.txt", "size": 14, "mode": 0o644},
+            {"path": "renamed.txt", "change": "renamed", "kind": "file", "from": "moved.txt", "size": 14, "mode": 0o644, "base_mode": 0o644},
         ])
     );
     assert_eq!(diff.entries[0].sha256, Some(sha("gamma\n")));
+    assert_eq!(diff.entries[3].base_sha256, Some(sha("alpha\n")));
     assert_eq!(diff.rejected(), 0);
 }
 
@@ -169,7 +171,7 @@ fn a_disk_with_a_checksum_seed_is_read() {
     assert_eq!(
         entries(&diff),
         json!([
-            {"path": "notes.txt", "change": "modified", "kind": "file", "size": 5, "mode": 0o644},
+            {"path": "notes.txt", "change": "modified", "kind": "file", "size": 5, "mode": 0o644, "base_mode": 0o644},
         ])
     );
 }
@@ -250,7 +252,7 @@ fn a_file_in_place_of_a_directory_deletes_it_first() {
 }
 
 #[test]
-fn symlinks_are_reported_and_never_followed() {
+fn symlinks_are_reported_never_followed_and_kept_inside() {
     let fixture = Fixture::new();
     let outside = fixture.dir.path().join("outside");
     fs::create_dir(&outside).expect("outside");
@@ -263,18 +265,22 @@ fn symlinks_are_reported_and_never_followed() {
             "symlink etc /etc/passwd\n\
              symlink up ../../outside\n\
              mkdir hostlink\n\
-             write file hostlink/file\n",
+             write file hostlink/file\n\
+             symlink hostlink/back ../etc\n\
+             symlink hostlink/away ../../x\n",
         )
         .expect("collect");
 
     assert_eq!(
         entries(&diff),
         json!([
-            {"path": "etc", "change": "created", "kind": "symlink", "target": "/etc/passwd"},
+            {"path": "etc", "change": "rejected", "kind": "symlink", "reason": "symlink leaves the workspace"},
             {"path": "hostlink", "change": "deleted", "kind": "symlink", "target": outside.to_str().expect("utf-8")},
             {"path": "hostlink", "change": "created", "kind": "dir"},
+            {"path": "hostlink/away", "change": "rejected", "kind": "symlink", "reason": "symlink leaves the workspace"},
+            {"path": "hostlink/back", "change": "created", "kind": "symlink", "target": "../etc"},
             {"path": "hostlink/file", "change": "created", "kind": "file", "size": 7, "mode": 0o644},
-            {"path": "up", "change": "created", "kind": "symlink", "target": "../../outside"},
+            {"path": "up", "change": "rejected", "kind": "symlink", "reason": "symlink leaves the workspace"},
         ])
     );
     assert_eq!(
@@ -421,4 +427,371 @@ fn a_workspace_reached_through_a_symlink_is_refused() {
         .expect("collect")
         .entries
         .is_empty());
+}
+
+#[test]
+fn paths_that_run_on_the_host_are_marked_sensitive() {
+    let fixture = Fixture::new();
+    fixture.source("x", "x\n");
+
+    let diff = fixture
+        .collect(
+            "mkdir .git\nmkdir .git/hooks\nwrite x .git/hooks/pre-commit\n\
+             mkdir .github\nmkdir .github/workflows\nwrite x .github/workflows/ci.yml\n\
+             write x Makefile\nwrite x Dockerfile.dev\nmkdir src\nwrite x src/main.rs\n",
+        )
+        .expect("collect");
+
+    let flagged: Vec<(&str, bool)> = diff
+        .entries
+        .iter()
+        .map(|entry| (entry.path.as_str(), entry.sensitive))
+        .collect();
+    assert_eq!(
+        flagged,
+        vec![
+            (".git", true),
+            (".git/hooks", true),
+            (".git/hooks/pre-commit", true),
+            (".github", true),
+            (".github/workflows", true),
+            (".github/workflows/ci.yml", true),
+            ("Dockerfile.dev", true),
+            ("Makefile", true),
+            ("src", false),
+            ("src/main.rs", false),
+        ]
+    );
+    assert!(sensitive("vendor/lib/.git/config"));
+    assert!(sensitive("deploy/main.tf"));
+    assert!(!sensitive("docs/github.md"));
+}
+
+fn decide(paths: &[&str]) -> merge::Decision {
+    merge::Decision {
+        paths: paths.iter().map(|path| (*path).to_owned()).collect(),
+        resolutions: std::collections::BTreeMap::new(),
+    }
+}
+
+fn everything(diff: &Diff) -> merge::Decision {
+    merge::Decision {
+        paths: diff
+            .entries
+            .iter()
+            .filter(|entry| entry.change != Change::Rejected)
+            .map(|entry| entry.path.clone())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect(),
+        resolutions: std::collections::BTreeMap::new(),
+    }
+}
+
+impl Fixture {
+    fn merge_dir(&self) -> PathBuf {
+        self.dir.path().join("merge")
+    }
+
+    fn merge(&self, upper: &Path, diff: &Diff, decision: &merge::Decision) -> merge::Outcome {
+        merge::merge(upper, Some(&self.host), diff, decision, &self.merge_dir()).expect("merge")
+    }
+
+    fn host_text(&self, path: &str) -> String {
+        fs::read_to_string(self.host.join(path)).expect("host file")
+    }
+
+    fn kept(&self, area: &str, path: &str) -> String {
+        fs::read_to_string(self.merge_dir().join(area).join(path)).expect("kept file")
+    }
+
+    fn has(&self, path: &str) -> bool {
+        fs::symlink_metadata(self.host.join(path)).is_ok()
+    }
+
+    fn left_behind(&self) -> bool {
+        let staging = fs::read_dir(&self.host).expect("workspace").any(|entry| {
+            entry
+                .expect("entry")
+                .file_name()
+                .to_string_lossy()
+                .starts_with(".naos-merge-")
+        });
+        staging || self.merge_dir().join("journal").exists()
+    }
+}
+
+fn applied(outcome: merge::Outcome) -> merge::Report {
+    match outcome {
+        merge::Outcome::Applied(report) => report,
+        other => panic!("expected the merge to apply, got {other:?}"),
+    }
+}
+
+fn conflicts(outcome: merge::Outcome) -> Vec<(String, String)> {
+    match outcome {
+        merge::Outcome::Conflict { conflicts } => conflicts
+            .into_iter()
+            .map(|conflict| (conflict.path, conflict.reason))
+            .collect(),
+        other => panic!("expected a conflict, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_merge_applies_every_change_and_keeps_the_host_versions() {
+    let fixture = Fixture::new();
+    fixture.host_file("notes.txt", "alpha\n");
+    fixture.host_file("old.txt", "old\n");
+    fixture.host_file("moved.txt", "moved content\n");
+    fixture.host_file("docs/x.md", "x\n");
+    fixture.source("notes", "beta\n");
+    fixture.source("added", "gamma\n");
+    fixture.source("moved", "moved content\n");
+    let upper = fixture.upper(
+        "write notes notes.txt\n\
+         mknod old.txt c 0 0\n\
+         mknod moved.txt c 0 0\n\
+         write moved renamed.txt\n\
+         mknod docs c 0 0\n\
+         mkdir newdir\n\
+         write added newdir/added.txt\n\
+         symlink link notes.txt\n",
+    );
+    let diff = collect(&upper, &fixture.host).expect("collect");
+
+    let report = applied(fixture.merge(&upper, &diff, &everything(&diff)));
+
+    assert_eq!(
+        report.applied,
+        [
+            "docs",
+            "docs/x.md",
+            "link",
+            "newdir",
+            "newdir/added.txt",
+            "notes.txt",
+            "old.txt",
+            "renamed.txt"
+        ]
+    );
+    assert_eq!(fixture.host_text("notes.txt"), "beta\n");
+    assert_eq!(fixture.host_text("newdir/added.txt"), "gamma\n");
+    assert_eq!(fixture.host_text("renamed.txt"), "moved content\n");
+    assert_eq!(
+        fs::read_link(fixture.host.join("link")).expect("link"),
+        Path::new("notes.txt")
+    );
+    assert!(!fixture.has("old.txt") && !fixture.has("moved.txt") && !fixture.has("docs"));
+    assert_eq!(fixture.kept("backup", "notes.txt"), "alpha\n");
+    assert_eq!(fixture.kept("backup", "old.txt"), "old\n");
+    assert_eq!(fixture.kept("backup", "moved.txt"), "moved content\n");
+    assert_eq!(fixture.kept("backup", "docs/x.md"), "x\n");
+    assert!(!fixture.left_behind());
+    assert_eq!(
+        applied(fixture.merge(&upper, &diff, &everything(&diff))),
+        report
+    );
+}
+
+#[test]
+fn an_empty_decision_changes_nothing() {
+    let fixture = Fixture::new();
+    fixture.host_file("notes.txt", "alpha\n");
+    fixture.source("notes", "beta\n");
+    let upper = fixture.upper("write notes notes.txt\n");
+    let diff = collect(&upper, &fixture.host).expect("collect");
+
+    let report = applied(fixture.merge(&upper, &diff, &decide(&[])));
+
+    assert_eq!(report, merge::Report::default());
+    assert_eq!(fixture.host_text("notes.txt"), "alpha\n");
+    assert!(!fixture.merge_dir().join("backup").exists());
+    assert!(!fixture.left_behind());
+}
+
+#[test]
+fn a_host_changed_since_collection_is_a_conflict_and_nothing_is_written() {
+    let fixture = Fixture::new();
+    fixture.host_file("notes.txt", "alpha\n");
+    fixture.source("notes", "beta\n");
+    fixture.source("added", "gamma\n");
+    let upper = fixture.upper("write notes notes.txt\nwrite added added.txt\n");
+    let diff = collect(&upper, &fixture.host).expect("collect");
+    fixture.host_file("notes.txt", "local edit\n");
+
+    let found = conflicts(fixture.merge(&upper, &diff, &everything(&diff)));
+
+    assert_eq!(
+        found,
+        [(
+            "notes.txt".to_owned(),
+            "the host changed since collection".to_owned()
+        )]
+    );
+    assert_eq!(fixture.host_text("notes.txt"), "local edit\n");
+    assert!(!fixture.has("added.txt"));
+    assert!(!fixture.left_behind());
+}
+
+#[test]
+fn conflicts_are_resolved_by_skip_take_or_export() {
+    let fixture = Fixture::new();
+    for name in ["a.txt", "b.txt", "c.txt"] {
+        fixture.host_file(name, "host\n");
+    }
+    fixture.source("agent", "agent\n");
+    let upper = fixture.upper("write agent a.txt\nwrite agent b.txt\nwrite agent c.txt\n");
+    let diff = collect(&upper, &fixture.host).expect("collect");
+    for name in ["a.txt", "b.txt", "c.txt"] {
+        fixture.host_file(name, "local\n");
+    }
+    let mut decision = everything(&diff);
+    decision.resolutions.extend([
+        ("a.txt".to_owned(), merge::Resolution::Skip),
+        ("b.txt".to_owned(), merge::Resolution::Take),
+        ("c.txt".to_owned(), merge::Resolution::Export),
+    ]);
+
+    let report = applied(fixture.merge(&upper, &diff, &decision));
+
+    assert_eq!(report.applied, ["b.txt"]);
+    assert_eq!(report.skipped, ["a.txt"]);
+    assert_eq!(report.exported, ["c.txt"]);
+    assert_eq!(report.backed_up, ["b.txt"]);
+    assert_eq!(fixture.host_text("a.txt"), "local\n");
+    assert_eq!(fixture.host_text("b.txt"), "agent\n");
+    assert_eq!(fixture.host_text("c.txt"), "local\n");
+    assert_eq!(fixture.kept("backup", "b.txt"), "local\n");
+    assert_eq!(fixture.kept("export", "c.txt"), "agent\n");
+    assert!(!fixture.left_behind());
+}
+
+#[test]
+fn a_directory_swapped_for_a_symlink_is_never_written_through() {
+    let fixture = Fixture::new();
+    fixture.host_file("sub/keep.txt", "keep\n");
+    fixture.source("new", "new\n");
+    let upper = fixture.upper("mkdir sub\nwrite new sub/new.txt\n");
+    let diff = collect(&upper, &fixture.host).expect("collect");
+    let outside = fixture.dir.path().join("outside");
+    fs::create_dir(&outside).expect("outside");
+    fs::rename(fixture.host.join("sub"), fixture.dir.path().join("sub")).expect("move");
+    symlink(&outside, fixture.host.join("sub")).expect("symlink");
+
+    let found = conflicts(fixture.merge(&upper, &diff, &everything(&diff)));
+
+    assert_eq!(
+        found,
+        [(
+            "sub/new.txt".to_owned(),
+            "the parent directory is gone".to_owned()
+        )]
+    );
+    assert_eq!(fs::read_dir(&outside).expect("outside").count(), 0);
+    assert!(!fixture.left_behind());
+}
+
+#[test]
+fn a_failure_midway_rolls_back_what_was_applied() {
+    // Root ignores the read-only directory this test fails the merge with.
+    if std::os::unix::fs::MetadataExt::uid(&fs::metadata("/proc/self").expect("proc")) == 0 {
+        return;
+    }
+    let fixture = Fixture::new();
+    fixture.host_file("a.txt", "a\n");
+    fixture.host_file("locked/keep", "keep\n");
+    fixture.source("agent", "agent\n");
+    let upper = fixture.upper("write agent a.txt\nmkdir locked\nwrite agent locked/b.txt\n");
+    let diff = collect(&upper, &fixture.host).expect("collect");
+    let locked = fixture.host.join("locked");
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o555)).expect("chmod");
+
+    let found = conflicts(fixture.merge(&upper, &diff, &everything(&diff)));
+
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).expect("chmod");
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].0, "locked/b.txt");
+    assert!(found[0].1.contains("Permission denied"), "{}", found[0].1);
+    assert_eq!(fixture.host_text("a.txt"), "a\n");
+    assert!(!fixture.has("locked/b.txt"));
+    assert!(!fixture.left_behind());
+}
+
+#[test]
+fn an_interrupted_merge_is_rolled_back_before_it_runs_again() {
+    let fixture = Fixture::new();
+    fixture.host_file("notes.txt", "alpha\n");
+    fixture.source("notes", "beta\n");
+    let upper = fixture.upper("write notes notes.txt\n");
+    let diff = collect(&upper, &fixture.host).expect("collect");
+    // What a crash right after moving the host file aside leaves behind.
+    let staging = fixture.host.join(".naos-merge-dead");
+    fs::create_dir(&staging).expect("staging");
+    fs::rename(fixture.host.join("notes.txt"), staging.join("b1")).expect("move");
+    fs::create_dir(fixture.merge_dir()).expect("merge dir");
+    fs::write(
+        fixture.merge_dir().join("journal"),
+        "{\"staging\":\".naos-merge-dead\"}\n{\"moved\":{\"path\":\"notes.txt\",\"to\":\"b1\"}}\n{\"placed\"",
+    )
+    .expect("journal");
+
+    let report = applied(fixture.merge(&upper, &diff, &everything(&diff)));
+
+    assert_eq!(report.applied, ["notes.txt"]);
+    assert_eq!(fixture.host_text("notes.txt"), "beta\n");
+    assert_eq!(fixture.kept("backup", "notes.txt"), "alpha\n");
+    assert!(!staging.exists());
+    assert!(!fixture.left_behind());
+}
+
+#[test]
+fn only_mergeable_and_complete_selections_are_accepted() {
+    let fixture = Fixture::new();
+    fixture.host_file("docs/x.md", "x\n");
+    fixture.source("x", "x\n");
+    fixture.source("y", "y\n");
+    let upper = fixture.upper(
+        "write x hard\nlink hard hard2\nset_inode_field hard links_count 2\n\
+         mknod docs c 0 0\nmkdir newdir\nwrite y newdir/f\n",
+    );
+    let diff = collect(&upper, &fixture.host).expect("collect");
+
+    let found = conflicts(fixture.merge(
+        &upper,
+        &diff,
+        &decide(&["hard", "../etc/passwd", "/etc/passwd", "docs", "newdir/f"]),
+    ));
+
+    let paths: Vec<&str> = found.iter().map(|(path, _)| path.as_str()).collect();
+    assert_eq!(
+        paths,
+        ["../etc/passwd", "/etc/passwd", "hard", "docs", "newdir/f"]
+    );
+    assert_eq!(found[3].1, "needs docs/x.md too");
+    assert_eq!(found[4].1, "needs newdir too");
+    assert_eq!(fixture.host_text("docs/x.md"), "x\n");
+    assert!(!fixture.has("newdir"));
+    assert!(!fixture.left_behind());
+}
+
+#[test]
+fn a_deleted_directory_needs_the_rename_out_of_it() {
+    let fixture = Fixture::new();
+    fixture.host_file("docs/x.md", "x\n");
+    fixture.source("x", "x\n");
+    let upper = fixture.upper("mknod docs c 0 0\nwrite x moved.md\n");
+    let diff = collect(&upper, &fixture.host).expect("collect");
+
+    let found = conflicts(fixture.merge(&upper, &diff, &decide(&["docs"])));
+    let report = applied(fixture.merge(&upper, &diff, &decide(&["docs", "moved.md"])));
+
+    assert_eq!(
+        found,
+        [("docs".to_owned(), "needs moved.md too".to_owned())]
+    );
+    assert_eq!(report.applied, ["docs", "moved.md"]);
+    assert_eq!(fixture.host_text("moved.md"), "x\n");
+    assert!(!fixture.has("docs"));
+    assert_eq!(fixture.kept("backup", "docs/x.md"), "x\n");
 }

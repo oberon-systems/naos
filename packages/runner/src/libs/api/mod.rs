@@ -10,8 +10,12 @@ use url::Url;
 
 use crate::libs::credentials::Credentials;
 use crate::libs::error::AgentError;
+use crate::libs::overlay::merge::{Decision, Outcome};
+use crate::libs::overlay::Entry;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+// A diff can hold up to 100 000 entries.
+const REPORT_TIMEOUT: Duration = Duration::from_secs(60);
 const MAX_DETAIL: usize = 200;
 pub const DIGEST_PREFIX: &str = "sha256:";
 
@@ -106,6 +110,9 @@ pub struct DesiredRun {
     pub policies: BTreeMap<String, Option<serde_json::Value>>,
     #[serde(default)]
     pub credentials: BTreeMap<String, RunCredential>,
+    /// What to merge, once the policy or an operator decided it.
+    #[serde(default)]
+    pub merge: Option<Decision>,
 }
 
 impl DesiredRun {
@@ -134,6 +141,19 @@ pub struct Transition<'a> {
     pub reason: Option<&'a str>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct DiffReport<'a> {
+    pub lease_id: &'a str,
+    pub entries: &'a [Entry],
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MergeReport<'a> {
+    pub lease_id: &'a str,
+    #[serde(flatten)]
+    pub outcome: &'a Outcome,
+}
+
 pub trait Api {
     fn register(
         &self,
@@ -157,6 +177,20 @@ pub trait Api {
         credentials: &Credentials,
         run_id: &str,
         transition: &Transition<'_>,
+    ) -> impl Future<Output = Result<(), AgentError>> + Send;
+
+    fn report_diff(
+        &self,
+        credentials: &Credentials,
+        run_id: &str,
+        report: &DiffReport<'_>,
+    ) -> impl Future<Output = Result<(), AgentError>> + Send;
+
+    fn report_merge(
+        &self,
+        credentials: &Credentials,
+        run_id: &str,
+        report: &MergeReport<'_>,
     ) -> impl Future<Output = Result<(), AgentError>> + Send;
 }
 
@@ -269,6 +303,35 @@ impl Api for HttpApi {
             .post(self.url(&[&credentials.runner_id, "tasks", run_id, "transition"])?)
             .bearer_auth(&credentials.token)
             .json(transition);
+        Self::send::<serde_json::Value>(request).await.map(|_| ())
+    }
+
+    async fn report_diff(
+        &self,
+        credentials: &Credentials,
+        run_id: &str,
+        report: &DiffReport<'_>,
+    ) -> Result<(), AgentError> {
+        let request = self
+            .client
+            .post(self.url(&[&credentials.runner_id, "tasks", run_id, "diff"])?)
+            .bearer_auth(&credentials.token)
+            .timeout(REPORT_TIMEOUT)
+            .json(report);
+        Self::send::<serde_json::Value>(request).await.map(|_| ())
+    }
+
+    async fn report_merge(
+        &self,
+        credentials: &Credentials,
+        run_id: &str,
+        report: &MergeReport<'_>,
+    ) -> Result<(), AgentError> {
+        let request = self
+            .client
+            .post(self.url(&[&credentials.runner_id, "tasks", run_id, "merge"])?)
+            .bearer_auth(&credentials.token)
+            .json(report);
         Self::send::<serde_json::Value>(request).await.map(|_| ())
     }
 }

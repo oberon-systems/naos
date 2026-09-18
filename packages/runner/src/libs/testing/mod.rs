@@ -9,13 +9,15 @@ use std::time::Duration;
 use sha2::{Digest, Sha256};
 
 use crate::libs::api::{
-    Api, DesiredRun, DesiredState, HeartbeatReply, ImageRef, IssuedToken, LeaseGrant, Registration,
-    RunSpec, RunStatus, RuntimeSpec, Transition,
+    Api, DesiredRun, DesiredState, DiffReport, HeartbeatReply, ImageRef, IssuedToken, LeaseGrant,
+    MergeReport, Registration, RunSpec, RunStatus, RuntimeSpec, Transition,
 };
 use crate::libs::credentials::Credentials;
 use crate::libs::error::AgentError;
 use crate::libs::ids::hex;
 use crate::libs::image::{BoxFuture, ImageSource};
+use crate::libs::overlay::merge::{Decision, Outcome, Report};
+use crate::libs::overlay::Diff;
 use crate::libs::runtime::{LocalVm, Runtime};
 
 pub const LEASE_ID: &str = "lease_alpha";
@@ -94,6 +96,7 @@ pub fn desired_run(id: &str, status: RunStatus) -> DesiredRun {
         image_url: "https://images.example.com/naos-agents-1.0.0.qcow2".into(),
         policies: BTreeMap::new(),
         credentials: BTreeMap::new(),
+        merge: None,
     }
 }
 
@@ -124,6 +127,8 @@ pub struct FakeApi {
     lease_ttl: Mutex<Option<u64>>,
     conflicts: Mutex<HashSet<(String, RunStatus)>>,
     transitions: Mutex<Vec<(String, RunStatus, RunStatus)>>,
+    diffs: Mutex<Vec<(String, usize)>>,
+    merges: Mutex<Vec<(String, Outcome)>>,
     capacities: Mutex<Vec<u32>>,
     desired: Mutex<Option<DesiredState>>,
     rotated_token: Mutex<Option<String>>,
@@ -167,6 +172,14 @@ impl FakeApi {
 
     pub fn transitions(&self) -> Vec<(String, RunStatus, RunStatus)> {
         lock(&self.transitions).clone()
+    }
+
+    pub fn diffs(&self) -> Vec<(String, usize)> {
+        lock(&self.diffs).clone()
+    }
+
+    pub fn merges(&self) -> Vec<(String, Outcome)> {
+        lock(&self.merges).clone()
     }
 
     pub fn capacities(&self) -> Vec<u32> {
@@ -224,6 +237,26 @@ impl Api for FakeApi {
         lock(&self.transitions).push((run_id.into(), transition.expected, transition.target));
         Ok(())
     }
+
+    async fn report_diff(
+        &self,
+        _: &Credentials,
+        run_id: &str,
+        report: &DiffReport<'_>,
+    ) -> Result<(), AgentError> {
+        lock(&self.diffs).push((run_id.into(), report.entries.len()));
+        Ok(())
+    }
+
+    async fn report_merge(
+        &self,
+        _: &Credentials,
+        run_id: &str,
+        report: &MergeReport<'_>,
+    ) -> Result<(), AgentError> {
+        lock(&self.merges).push((run_id.into(), report.outcome.clone()));
+        Ok(())
+    }
 }
 
 pub struct FakeSource {
@@ -272,6 +305,8 @@ pub struct FakeRuntime {
     fail_collect: AtomicBool,
     synced: Mutex<Vec<LocalVm>>,
     collected: Mutex<Vec<LocalVm>>,
+    merged: Mutex<Vec<(LocalVm, Decision)>>,
+    merge_outcome: Mutex<Option<Outcome>>,
     ensure_delay: Mutex<Duration>,
 }
 
@@ -312,6 +347,14 @@ impl FakeRuntime {
 
     pub fn collected(&self) -> Vec<LocalVm> {
         lock(&self.collected).clone()
+    }
+
+    pub fn merged(&self) -> Vec<(LocalVm, Decision)> {
+        lock(&self.merged).clone()
+    }
+
+    pub fn merge_with(&self, outcome: Outcome) {
+        *lock(&self.merge_outcome) = Some(outcome);
     }
 
     pub fn delay_ensure(&self, delay: Duration) {
@@ -355,12 +398,24 @@ impl Runtime for FakeRuntime {
         Ok(())
     }
 
-    async fn collect(&self, _: &DesiredRun, vm: &LocalVm) -> Result<(), AgentError> {
+    async fn collect(&self, _: &DesiredRun, vm: &LocalVm) -> Result<Diff, AgentError> {
         if self.fail_collect.load(Ordering::SeqCst) {
             return Err(AgentError::Runtime("collection failed".into()));
         }
         lock(&self.collected).push(vm.clone());
-        Ok(())
+        Ok(Diff::default())
+    }
+
+    async fn merge(
+        &self,
+        _: &DesiredRun,
+        vm: &LocalVm,
+        decision: &Decision,
+    ) -> Result<Outcome, AgentError> {
+        lock(&self.merged).push((vm.clone(), decision.clone()));
+        Ok(lock(&self.merge_outcome)
+            .clone()
+            .unwrap_or_else(|| Outcome::Applied(Report::default())))
     }
 
     async fn destroy(&self, vm: &LocalVm) -> Result<(), AgentError> {

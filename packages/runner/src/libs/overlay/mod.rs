@@ -1,5 +1,6 @@
 mod ext4;
 mod host;
+pub mod merge;
 
 use std::collections::{BTreeMap, HashSet};
 use std::fs::OpenOptions;
@@ -7,7 +8,7 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 
 use nix::fcntl::OFlag;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::libs::error::AgentError;
@@ -20,7 +21,7 @@ const MAX_ENTRIES: usize = 100_000;
 const MAX_PATH: usize = 4096;
 const DATA_DIR: &[u8] = b"data";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Change {
     Deleted,
@@ -30,7 +31,7 @@ pub enum Change {
     Rejected,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Kind {
     File,
@@ -39,23 +40,31 @@ pub enum Kind {
     Other,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Entry {
     pub path: String,
     pub change: Change,
     pub kind: Kind,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub from: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sha256: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mode: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub reason: Option<&'static str>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_mode: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_target: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub sensitive: bool,
 }
 
 impl Entry {
@@ -70,11 +79,15 @@ impl Entry {
             mode: None,
             target: None,
             reason: None,
+            base_sha256: None,
+            base_mode: None,
+            base_target: None,
+            sensitive: false,
         }
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Diff {
     pub entries: Vec<Entry>,
 }
@@ -90,6 +103,26 @@ impl Diff {
 
 /// Reads the upper disk of a stopped VM and compares it with the host workspace it was laid over.
 pub fn collect(upper: &Path, workspace: &Path) -> Result<Diff, AgentError> {
+    let (fs, data) = open_upper(upper)?;
+    let mut walker = Walker {
+        fs: &fs,
+        host: Host::open(workspace)?,
+        entries: Vec::new(),
+        dirs: HashSet::new(),
+        visited: 0,
+    };
+    let opaque = opaque(&fs, &data)?;
+    walker.dir(&data, &[], 0, opaque)?;
+    let mut entries = pair_renames(walker.entries);
+    for entry in &mut entries {
+        entry.sensitive = sensitive(&entry.path) || entry.from.as_deref().is_some_and(sensitive);
+    }
+    entries.sort_by(|a, b| (a.path.as_bytes(), a.change).cmp(&(b.path.as_bytes(), b.change)));
+    Ok(Diff { entries })
+}
+
+/// The upper disk and its `data/` directory, the root of everything the guest changed.
+fn open_upper(upper: &Path) -> Result<(Ext4, Inode), AgentError> {
     let file = OpenOptions::new()
         .read(true)
         .custom_flags(OFlag::O_NOFOLLOW.bits())
@@ -105,18 +138,7 @@ pub fn collect(upper: &Path, workspace: &Path) -> Result<Diff, AgentError> {
         .find(|(name, _)| name == DATA_DIR)
         .ok_or_else(|| corrupt("no data directory"))?;
     let data = fs.inode(data.1)?;
-    let mut walker = Walker {
-        fs: &fs,
-        host: Host::open(workspace)?,
-        entries: Vec::new(),
-        dirs: HashSet::new(),
-        visited: 0,
-    };
-    let opaque = opaque(&fs, &data)?;
-    walker.dir(&data, &[], 0, opaque)?;
-    let mut entries = pair_renames(walker.entries);
-    entries.sort_by(|a, b| (a.path.as_bytes(), a.change).cmp(&(b.path.as_bytes(), b.change)));
-    Ok(Diff { entries })
+    Ok((fs, data))
 }
 
 struct Walker<'a> {
@@ -214,25 +236,29 @@ impl Walker<'_> {
                 })?;
                 let (size, sha256) = (inode.size, hex(&digest.finalize()));
                 let mode = u32::from(inode.mode & 0o777);
-                let change = match self.host.node(path)? {
+                let mut entry = Entry {
+                    size: Some(size),
+                    mode: Some(mode),
+                    ..Entry::new(display, Change::Created, Kind::File)
+                };
+                match self.host.node(path)? {
                     Some(Node::File {
                         mode: host_mode,
                         sha256: host_sha,
                         ..
-                    }) if host_sha == sha256 && host_mode == mode => return Ok(()),
-                    Some(Node::File { .. }) => Change::Modified,
-                    None => Change::Created,
-                    Some(_) => {
-                        self.deleted(path, depth)?;
-                        Change::Created
+                    }) => {
+                        if host_sha == sha256 && host_mode == mode {
+                            return Ok(());
+                        }
+                        entry.change = Change::Modified;
+                        entry.base_sha256 = Some(host_sha);
+                        entry.base_mode = Some(host_mode);
                     }
-                };
-                self.push(Entry {
-                    size: Some(size),
-                    sha256: Some(sha256),
-                    mode: Some(mode),
-                    ..Entry::new(display, change, Kind::File)
-                });
+                    None => {}
+                    Some(_) => self.deleted(path, depth)?,
+                }
+                entry.sha256 = Some(sha256);
+                self.push(entry);
                 Ok(())
             }
             S_IFLNK => {
@@ -241,19 +267,26 @@ impl Walker<'_> {
                     self.reject(display, kind, "symlink target is not utf-8");
                     return Ok(());
                 };
-                let change = match self.host.node(path)? {
-                    Some(Node::Symlink(host_target)) if host_target == target => return Ok(()),
-                    Some(Node::Symlink(_)) => Change::Modified,
-                    None => Change::Created,
-                    Some(_) => {
-                        self.deleted(path, depth)?;
-                        Change::Created
-                    }
-                };
-                self.push(Entry {
+                if escapes(path.len() - 1, &text) {
+                    self.reject(display, kind, "symlink leaves the workspace");
+                    return Ok(());
+                }
+                let mut entry = Entry {
                     target: Some(text),
-                    ..Entry::new(display, change, Kind::Symlink)
-                });
+                    ..Entry::new(display, Change::Created, Kind::Symlink)
+                };
+                match self.host.node(path)? {
+                    Some(Node::Symlink(host_target)) => {
+                        if host_target == target {
+                            return Ok(());
+                        }
+                        entry.change = Change::Modified;
+                        entry.base_target = Some(String::from_utf8_lossy(&host_target).into());
+                    }
+                    None => {}
+                    Some(_) => self.deleted(path, depth)?,
+                }
+                self.push(entry);
                 Ok(())
             }
             _ => {
@@ -309,9 +342,9 @@ impl Walker<'_> {
         Ok(())
     }
 
-    fn reject(&mut self, path: String, kind: Kind, reason: &'static str) {
+    fn reject(&mut self, path: String, kind: Kind, reason: &str) {
         self.push(Entry {
-            reason: Some(reason),
+            reason: Some(reason.into()),
             ..Entry::new(path, Change::Rejected, kind)
         });
     }
@@ -377,10 +410,88 @@ fn pair_renames(entries: Vec<Entry>) -> Vec<Entry> {
         if let Some(from) = renamed_from.get(&index) {
             entry.change = Change::Renamed;
             entry.from = Some(entries[*from].path.clone());
+            entry.base_mode = entries[*from].mode;
         }
         result.push(entry);
     }
     result
+}
+
+/// A target that is absolute, empty or climbs above the workspace root would point the host outside it.
+fn escapes(depth: usize, target: &str) -> bool {
+    if target.is_empty() || target.starts_with('/') {
+        return true;
+    }
+    let mut level = depth;
+    for part in target.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => match level.checked_sub(1) {
+                Some(up) => level = up,
+                None => return true,
+            },
+            _ => level += 1,
+        }
+    }
+    false
+}
+
+const SENSITIVE_DIRS: &[&str] = &[
+    ".git",
+    ".github",
+    ".gitlab",
+    ".circleci",
+    ".buildkite",
+    ".husky",
+];
+const SENSITIVE_NAMES: &[&str] = &[
+    ".gitlab-ci.yml",
+    ".gitattributes",
+    ".gitmodules",
+    ".pre-commit-config.yaml",
+    ".envrc",
+    ".npmrc",
+    ".drone.yml",
+    "azure-pipelines.yml",
+    "Jenkinsfile",
+    "Makefile",
+    "makefile",
+    "GNUmakefile",
+    "Justfile",
+    "justfile",
+    "Taskfile.yml",
+    "Containerfile",
+    "compose.yml",
+    "compose.yaml",
+    "package.json",
+    "setup.py",
+    "setup.cfg",
+    "pyproject.toml",
+    "Cargo.toml",
+    "build.rs",
+];
+const SENSITIVE_SUFFIXES: &[&str] = &[".mk", ".tf", ".tfvars", ".hcl"];
+const SENSITIVE_PREFIXES: &[&str] = &["Dockerfile", "docker-compose"];
+
+/// Paths that run on the host or in CI once merged: `always` holds them for approval.
+pub fn sensitive(path: &str) -> bool {
+    let mut parts = path.split('/').peekable();
+    while let Some(part) = parts.next() {
+        if SENSITIVE_DIRS.contains(&part) && parts.peek().is_some() || part == ".git" {
+            return true;
+        }
+        if parts.peek().is_none() {
+            return SENSITIVE_NAMES.contains(&part)
+                || SENSITIVE_DIRS.contains(&part)
+                || SENSITIVE_SUFFIXES
+                    .iter()
+                    .any(|suffix| part.ends_with(suffix))
+                || SENSITIVE_PREFIXES
+                    .iter()
+                    .any(|prefix| part.starts_with(prefix));
+        }
+    }
+    false
 }
 
 fn kind_of(mode: u16) -> Kind {

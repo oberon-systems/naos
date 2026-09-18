@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, HashSet};
 
-use crate::libs::api::{Api, DesiredRun, DesiredState, RunStatus, Transition};
+use crate::libs::api::{
+    Api, DesiredRun, DesiredState, DiffReport, MergeReport, RunStatus, Transition,
+};
 use crate::libs::audit;
 use crate::libs::credentials::Credentials;
 use crate::libs::error::AgentError;
@@ -26,6 +28,7 @@ pub enum Action {
         vm: Option<LocalVm>,
     },
     Collect(LocalVm),
+    Merge(LocalVm),
     DestroyOrphan(LocalVm),
 }
 
@@ -79,7 +82,15 @@ pub fn plan(desired: &[DesiredRun], actual: &[LocalVm]) -> Vec<Action> {
                     reason: VM_LOST,
                 },
             }),
-            RunStatus::WaitingMerge => {}
+            RunStatus::WaitingMerge => match (live.or(dead), &run.merge) {
+                (Some(vm), Some(_)) => actions.push(Action::Merge(vm)),
+                (Some(_), None) => {}
+                (None, _) => actions.push(Action::Fail {
+                    run_id,
+                    from: RunStatus::WaitingMerge,
+                    reason: VM_LOST,
+                }),
+            },
             RunStatus::Completed | RunStatus::Failed | RunStatus::Cancelled => {
                 actions.extend(live.or(dead).map(Action::DestroyOrphan));
             }
@@ -152,8 +163,18 @@ impl<A: Api + Sync, R: Runtime> Executor<'_, A, R> {
                     .await
             }
             Action::Collect(vm) => {
-                let Err(err) = self.runtime.collect(self.run(&vm.run_id)?, vm).await else {
-                    return Ok(());
+                let err = match self.runtime.collect(self.run(&vm.run_id)?, vm).await {
+                    Ok(diff) => {
+                        let report = DiffReport {
+                            lease_id: &self.desired.lease_id,
+                            entries: &diff.entries,
+                        };
+                        return self
+                            .api
+                            .report_diff(self.credentials, &vm.run_id, &report)
+                            .await;
+                    }
+                    Err(err) => err,
                 };
                 self.advance(
                     &vm.run_id,
@@ -164,6 +185,20 @@ impl<A: Api + Sync, R: Runtime> Executor<'_, A, R> {
                 .await?;
                 audit::run_failed(&vm.run_id, COLLECTION_FAILED);
                 Err(err)
+            }
+            Action::Merge(vm) => {
+                let run = self.run(&vm.run_id)?;
+                let Some(decision) = &run.merge else {
+                    return Ok(());
+                };
+                let outcome = self.runtime.merge(run, vm, decision).await?;
+                let report = MergeReport {
+                    lease_id: &self.desired.lease_id,
+                    outcome: &outcome,
+                };
+                self.api
+                    .report_merge(self.credentials, &vm.run_id, &report)
+                    .await
             }
             Action::DestroyOrphan(vm) => {
                 self.runtime.destroy(vm).await?;
