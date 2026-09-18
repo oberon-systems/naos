@@ -68,6 +68,7 @@ GET /api/v1/images
 GET /api/v1/images/{image_id}
 POST /api/v1/secrets
 GET /api/v1/secrets/{name}
+GET /api/v1/audit
 ```
 
 Do not allow clients to arbitrarily set Run status. Validate legal transitions centrally.
@@ -166,6 +167,7 @@ GET  /api/v1/runners/{runner_id}/tasks                       runner token
 POST /api/v1/runners/{runner_id}/tasks/{task_id}/transition  runner token
 POST /api/v1/runners/{runner_id}/tasks/{task_id}/diff        runner token
 POST /api/v1/runners/{runner_id}/tasks/{task_id}/merge       runner token
+POST /api/v1/runners/{runner_id}/events                      runner token
 ```
 
 ### Runner credentials
@@ -232,6 +234,12 @@ and the API moves the Run ([09](09-overlay-and-merge.md#merge)).
   `applied`, `skipped`, `exported` and `backed_up` paths and completes the
   Run. `conflict` carries `conflicts`, each a `path` and a `reason`, keeps
   the Run waiting and clears the decision.
+
+### Audit events
+
+`GET /api/v1/tasks/{task_id}/events` and `GET /api/v1/audit` read the audit
+trail, and `POST .../events` takes the runner's own events; the catalogue and
+the schemas are in [11](11-observability.md#audit-trail).
 
 Secrets must never be returned accidentally.
 

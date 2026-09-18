@@ -54,7 +54,7 @@ without them.
 | `NAOS_AGENT_API_URL` | API base URL; plain `http` only to loopback |
 | `NAOS_AGENT_NAME` | Runner name, `[A-Za-z0-9][A-Za-z0-9._-]{0,63}` |
 | `NAOS_AGENT_CAPACITY` | Runs this runner accepts, 0 to 64, default 1 |
-| `NAOS_AGENT_STATE_DIR` | Holds `credentials.json`, mode 0600 |
+| `NAOS_AGENT_STATE_DIR` | Holds `credentials.json` and the audit spool `audit.jsonl`, mode 0600 |
 | `NAOS_AGENT_ENROLLMENT_TOKEN_FILE` | Enrollment token, mode 0600 |
 | `NAOS_AGENT_ENV_FILE` | Optional `.env` file loaded before the variables above |
 | `NAOS_AGENT_IMAGE_DIR` | Image cache; default `$XDG_DATA_HOME/naos/vms`, else `~/.local/share/naos/vms` |
@@ -196,6 +196,11 @@ The runtime writes audit events `image_cached`, `image_rejected`,
 `rejected`), `merge_conflict` (with `conflicts`), `merge_applied` (with
 `applied`, `backed_up` and `exported`) and `changes_archived`,
 each with its `run_id`, `vm_id` or digest.
+
+Each event also goes to the audit spool, which the agent posts to the API
+after every reconcile cycle and trims once the API took it
+([11](11-observability.md#runner-spool)). A failed post keeps the spool for
+the next cycle; fencing does not wait for it.
 
 ## Console
 
