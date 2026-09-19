@@ -1,0 +1,70 @@
+{
+  "id": "82f9a714-2547-80ed-8008-a9f9abf4d45d",
+  "name": "dot",
+  "type": "circle",
+  "x": 1096,
+  "y": 164.5,
+  "width": 7,
+  "height": 7,
+  "rotation": 0,
+  "selrect": {
+    "x": 1096,
+    "y": 164.5,
+    "width": 7,
+    "height": 7,
+    "x1": 1096,
+    "y1": 164.5,
+    "x2": 1103,
+    "y2": 171.5
+  },
+  "points": [
+    {
+      "x": 1096,
+      "y": 164.5
+    },
+    {
+      "x": 1103,
+      "y": 164.5
+    },
+    {
+      "x": 1103,
+      "y": 171.5
+    },
+    {
+      "x": 1096,
+      "y": 171.5
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "82f9a714-2547-80ed-8008-a9f9abf0e01d",
+  "frameId": "82f9a714-2547-80ed-8008-a9f9abf0e01d",
+  "flipX": null,
+  "flipY": null,
+  "proportionLock": false,
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "strokes": [],
+  "proportion": 1,
+  "fills": [
+    {
+      "fillColor": "#175cd3",
+      "fillOpacity": 1
+    }
+  ],
+  "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5"
+}

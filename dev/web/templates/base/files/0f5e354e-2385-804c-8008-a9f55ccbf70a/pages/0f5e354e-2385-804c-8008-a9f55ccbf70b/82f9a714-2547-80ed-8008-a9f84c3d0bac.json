@@ -1,0 +1,147 @@
+{
+  "id": "82f9a714-2547-80ed-8008-a9f84c3d0bac",
+  "name": "Text",
+  "type": "text",
+  "x": 343,
+  "y": 817.5,
+  "width": 52,
+  "height": 13,
+  "rotation": 0,
+  "selrect": {
+    "x": 343,
+    "y": 817.5,
+    "width": 52,
+    "height": 13,
+    "x1": 343,
+    "y1": 817.5,
+    "x2": 395,
+    "y2": 830.5
+  },
+  "points": [
+    {
+      "x": 343,
+      "y": 817.5
+    },
+    {
+      "x": 395,
+      "y": 817.5
+    },
+    {
+      "x": 395,
+      "y": 830.5
+    },
+    {
+      "x": 343,
+      "y": 830.5
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "82f9a714-2547-80ed-8008-a9f84c312b1a",
+  "frameId": "82f9a714-2547-80ed-8008-a9f84c312b1a",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-width",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "9",
+                "fontWeight": "600",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "600",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#667085",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "CANCELLED"
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "9",
+            "fontWeight": "600",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "600",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#667085",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 343,
+      "y": 829.1363637447357,
+      "width": 51.03409194946289,
+      "height": 10.909090995788574,
+      "x1": 0,
+      "y1": 0.7272727489471436,
+      "x2": 51.03409194946289,
+      "y2": 11.636363744735718,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "9px",
+      "fontWeight": "600",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#667085",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "CANCELLED"
+    }
+  ],
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b"
+}

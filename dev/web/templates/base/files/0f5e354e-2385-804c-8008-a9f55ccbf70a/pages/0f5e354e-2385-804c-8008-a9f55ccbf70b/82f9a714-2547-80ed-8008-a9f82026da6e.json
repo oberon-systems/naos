@@ -1,0 +1,93 @@
+{
+  "id": "82f9a714-2547-80ed-8008-a9f82026da6e",
+  "name": "Runners card",
+  "type": "frame",
+  "x": 996,
+  "y": 184,
+  "width": 420,
+  "height": 500.9999999999998,
+  "rotation": 0,
+  "selrect": {
+    "x": 996,
+    "y": 184,
+    "width": 420,
+    "height": 500.9999999999998,
+    "x1": 996,
+    "y1": 184,
+    "x2": 1416,
+    "y2": 684.9999999999998
+  },
+  "points": [
+    {
+      "x": 996,
+      "y": 184
+    },
+    {
+      "x": 1416,
+      "y": 184
+    },
+    {
+      "x": 1416,
+      "y": 684.9999999999998
+    },
+    {
+      "x": 996,
+      "y": 684.9999999999998
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "82f9a714-2547-80ed-8008-a9f7df7c1b7d",
+  "frameId": "82f9a714-2547-80ed-8008-a9f7df7c1b7d",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 20,
+    "columnGap": 20
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "auto",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": [],
+  "shapes": [
+    "82f9a714-2547-80ed-8008-a9f82031de8c"
+  ]
+}

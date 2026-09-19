@@ -1,0 +1,75 @@
+{
+  "id": "82f9a714-2547-80ed-8008-a9fa42752316",
+  "name": "left",
+  "type": "rect",
+  "x": 1012,
+  "y": 392,
+  "width": 310,
+  "height": 6,
+  "rotation": 0,
+  "selrect": {
+    "x": 1012,
+    "y": 392,
+    "width": 310,
+    "height": 6,
+    "x1": 1012,
+    "y1": 392,
+    "x2": 1322,
+    "y2": 398
+  },
+  "points": [
+    {
+      "x": 1012,
+      "y": 392
+    },
+    {
+      "x": 1322,
+      "y": 392
+    },
+    {
+      "x": 1322,
+      "y": 398
+    },
+    {
+      "x": 1012,
+      "y": 398
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "82f9a714-2547-80ed-8008-a9fa4270b769",
+  "frameId": "82f9a714-2547-80ed-8008-a9fa4270b769",
+  "flipX": null,
+  "flipY": null,
+  "r2": 3,
+  "layoutItemHSizing": "fix",
+  "proportionLock": false,
+  "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5",
+  "r3": 3,
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 3,
+  "strokes": [],
+  "proportion": 1,
+  "r4": 3,
+  "fills": [
+    {
+      "fillColor": "#12b76a",
+      "fillOpacity": 1
+    }
+  ]
+}
