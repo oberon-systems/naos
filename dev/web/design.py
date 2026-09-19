@@ -113,10 +113,11 @@ def save(client: httpx.Client, file_id: str, target: Path) -> None:
         "export-binfile",
         json={"fileId": file_id, "includeLibraries": False, "embedAssets": True},
     )
-    url = re.search(r'"~r([^"]+)"', result)
+    # Transit encodes the link either as a tagged string or as a tagged map, depending on Penpot.
+    url = re.search(r'"~r([^"]+)"|"~#uri"\s*:\s*"([^"]+)"', result)
     if url is None:
         sys.exit(f"export-binfile: no download link in {result}")
-    download = client.get(url.group(1))
+    download = client.get(url.group(1) or url.group(2))
     download.raise_for_status()
     archive = zipfile.ZipFile(io.BytesIO(download.content))
 
