@@ -16,12 +16,15 @@ export PACKER_PLUGIN_PATH := $(CURDIR)/.packer/plugins
 
 
 # common targets
+# The last line puts the terminal back: the installers draw progress bars and
+# leave it without echo or cursor when they are done.
 install:
 	python3 -m venv --prompt $(PROJECT) $(VENV)
 	$(PIP) install --upgrade pip
 	$(PIP) install -r requirements.txt
 	$(VENV)/bin/pre-commit install
 	$(MAKE) -C packer install
+	@stty sane 2> /dev/null; tput cnorm 2> /dev/null; true
 
 
 # tests
