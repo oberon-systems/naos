@@ -38,6 +38,10 @@ For the same reason it refuses to write a new `docker/.env` while
 first start, and a generated one would never match it. Delete that directory to
 start clean, or bring back the `.env` it was created with.
 
+Nothing is left half up: when the api does not answer within five seconds or
+the runner does not enroll, kickstart prints the api log, stops the stack and
+the runner, and exits.
+
 All settings come from `docker/.env`, the same file compose reads, so the
 printed urls follow `NAOS_BIND`, `NAOS_API_PORT` and `NAOS_WEB_PORT`.
 

@@ -94,6 +94,15 @@ agent_env() {
     [ -x "$runner" ] || cargo build --release -p naos-runner --manifest-path "$ROOT/Cargo.toml"
 }
 
+# Half a stack is worse than none: anything that fails after compose is up
+# takes the stack and the runner down with it.
+rollback() {
+    local status=$?
+    echo "kickstart failed, stopping the stack" >&2
+    down
+    exit "$status"
+}
+
 kickstart() {
     [ -x "$python" ] || fail "no virtualenv in $ROOT: run make install there first"
     [ -d "$LOCAL" ] || mkdir -m 700 "$LOCAL"
@@ -103,7 +112,8 @@ kickstart() {
     settings
     "$MAKE" -C "$compose" images
     "$MAKE" -C "$compose" up
-    if ! wait_for 60 curl -fs -o /dev/null "$api/healthz"; then
+    trap rollback EXIT
+    if ! wait_for 5 curl -fs -o /dev/null "$api/healthz"; then
         (cd "$compose" && docker compose logs --tail 20 api) >&2
         fail "the api did not answer at $api/healthz"
     fi
@@ -113,9 +123,10 @@ kickstart() {
         agent_env
         setsid "$runner" >>"$LOCAL/agent.log" 2>&1 &
         echo $! >"$LOCAL/agent.pid"
-        wait_for 30 test -f "$LOCAL/agent/credentials.json" ||
+        wait_for 10 test -f "$LOCAL/agent/credentials.json" ||
             fail "the runner did not enroll, see $LOCAL/agent.log"
     fi
+    trap - EXIT
     cat <<REPORT
 
 api   $api
