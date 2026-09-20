@@ -2,7 +2,7 @@
 
 ## Prompt
 
-Implement `naos-agent` as a Rust reconciliation/execution daemon.
+Implement `naos-runner` as a Rust reconciliation/execution daemon.
 
 ## Modules
 
@@ -208,7 +208,7 @@ The console of a running VM is its `ttyS0`, where the guest image attaches the
 agent's tmux session. From the runner host:
 
 ```bash
-naos-agent console run_0123456789abcdef0123456789abcdef
+naos-runner console run_0123456789abcdef0123456789abcdef
 ```
 
 The command reads only the runtime settings above, connects to

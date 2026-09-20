@@ -14,7 +14,7 @@ use libs::error::AgentError;
 use libs::image::HttpImages;
 use libs::runtime::QemuRuntime;
 
-const USAGE: &str = "usage: naos-agent [console <run_id>]";
+const USAGE: &str = "usage: naos-runner [console <run_id>]";
 
 fn main() -> ExitCode {
     tracing_subscriber::fmt()
@@ -28,7 +28,7 @@ fn main() -> ExitCode {
     match run() {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
-            tracing::error!(error = %err, "naos-agent stopped");
+            tracing::error!(error = %err, "naos-runner stopped");
             ExitCode::FAILURE
         }
     }
@@ -63,7 +63,7 @@ async fn serve(config: Config) -> Result<(), AgentError> {
     let runtime = QemuRuntime::new(&config.runtime)?;
     let mut agent = Agent::new(&config, api, runtime, Box::new(HttpImages::new()?));
     let mut terminate = signal(SignalKind::terminate())?;
-    tracing::info!(name = %config.name, capacity = config.capacity, "naos-agent started");
+    tracing::info!(name = %config.name, capacity = config.capacity, "naos-runner started");
 
     loop {
         match agent.cycle().await {
@@ -78,6 +78,6 @@ async fn serve(config: Config) -> Result<(), AgentError> {
             () = tokio::time::sleep(agent.interval()) => {}
         }
     }
-    tracing::info!("naos-agent stopped by signal");
+    tracing::info!("naos-runner stopped by signal");
     Ok(())
 }

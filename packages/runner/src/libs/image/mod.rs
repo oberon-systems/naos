@@ -44,7 +44,7 @@ impl HttpImages {
             .redirect(redirect::Policy::limited(MAX_REDIRECTS))
             .connect_timeout(CONNECT_TIMEOUT)
             .read_timeout(READ_TIMEOUT)
-            .user_agent(concat!("naos-agent/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("naos-runner/", env!("CARGO_PKG_VERSION")))
             .build()
             .map_err(|err| AgentError::Transport(err.to_string()))?;
         Ok(Self { client })

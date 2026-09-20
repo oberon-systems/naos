@@ -4,5 +4,5 @@ test-image:
 	test -n "$$images" || { echo "no images of version $$version in $(ROOT)/build" >&2; exit 1; }; \
 	for image in $$images; do \
 		echo "testing $$image"; \
-		NAOS_TEST_IMAGE="$$image" cargo test -p naos-agent -- --ignored real_image || exit 1; \
+		NAOS_TEST_IMAGE="$$image" cargo test -p naos-runner -- --ignored real_image || exit 1; \
 	done

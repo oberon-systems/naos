@@ -1,9 +1,16 @@
 [package]
-name = "naos-agent"
+name = "naos-runner"
 version = "0.0.0"
 edition.workspace = true
 rust-version.workspace = true
-publish.workspace = true
+description = "Runner daemon for naos: leases Runs and boots them in disposable QEMU VMs"
+license = "MIT"
+repository = "https://github.com/oberon-systems/naos"
+readme = "README.md"
+keywords = ["agents", "sandbox", "qemu", "vm"]
+categories = ["command-line-utilities", "virtualization"]
+# The workspace forbids publishing; the runner is the one crate that goes to crates.io.
+publish = true
 
 [dependencies]
 dotenvy = "0.15.7"

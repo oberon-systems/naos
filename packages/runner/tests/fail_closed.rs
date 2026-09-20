@@ -2,10 +2,10 @@ use std::process::Command;
 
 #[test]
 fn binary_refuses_to_start_without_configuration() {
-    let output = Command::new(env!("CARGO_BIN_EXE_naos-agent"))
+    let output = Command::new(env!("CARGO_BIN_EXE_naos-runner"))
         .env_clear()
         .output()
-        .expect("naos-agent binary runs");
+        .expect("naos-runner binary runs");
 
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -14,7 +14,7 @@ fn binary_refuses_to_start_without_configuration() {
 
 #[test]
 fn binary_refuses_plain_http_to_a_remote_api() {
-    let output = Command::new(env!("CARGO_BIN_EXE_naos-agent"))
+    let output = Command::new(env!("CARGO_BIN_EXE_naos-runner"))
         .env_clear()
         .env("NAOS_AGENT_API_URL", "http://api.example.com")
         .env("NAOS_AGENT_NAME", "alpha")
@@ -24,7 +24,7 @@ fn binary_refuses_plain_http_to_a_remote_api() {
             "/nonexistent/enrollment",
         )
         .output()
-        .expect("naos-agent binary runs");
+        .expect("naos-runner binary runs");
 
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -43,11 +43,11 @@ fn a_dropped_env_file_in_the_working_directory_is_ignored() {
     )
     .expect("write .env");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_naos-agent"))
+    let output = Command::new(env!("CARGO_BIN_EXE_naos-runner"))
         .env_clear()
         .current_dir(dir.path())
         .output()
-        .expect("naos-agent binary runs");
+        .expect("naos-runner binary runs");
 
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);

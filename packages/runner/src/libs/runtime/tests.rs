@@ -573,7 +573,7 @@ async fn unsafe_vm_ids_are_refused() {
 }
 
 #[tokio::test]
-#[ignore = "boots a real VM: NAOS_TEST_IMAGE=<qcow2> cargo test -p naos-agent -- --ignored"]
+#[ignore = "boots a real VM: NAOS_TEST_IMAGE=<qcow2> cargo test -p naos-runner -- --ignored"]
 async fn real_image_boots_probes_and_is_cleaned_up() {
     let image = std::env::var("NAOS_TEST_IMAGE").expect("NAOS_TEST_IMAGE names a built image");
     let bytes = fs::read(&image).expect("read image");

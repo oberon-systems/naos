@@ -224,7 +224,7 @@ impl HttpApi {
         let client = Client::builder()
             .redirect(redirect::Policy::none())
             .https_only(base.scheme() == "https")
-            .user_agent(concat!("naos-agent/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("naos-runner/", env!("CARGO_PKG_VERSION")))
             .timeout(REQUEST_TIMEOUT)
             .build()
             .map_err(|err| AgentError::Transport(err.to_string()))?;

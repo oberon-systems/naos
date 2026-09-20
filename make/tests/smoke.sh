@@ -138,7 +138,7 @@ guest() {
         done
         sleep 25
     } | NAOS_AGENT_IMAGE_DIR="$TEMP_DIR/vms" NAOS_AGENT_VM_DIR="$TEMP_DIR/runs" \
-        cargo run -q -p naos-agent -- console "$run" >>"$TEMP_DIR/console.log" 2>&1
+        cargo run -q -p naos-runner -- console "$run" >>"$TEMP_DIR/console.log" 2>&1
 }
 
 # Every gate call the guest makes is one audit line of the runner, which took the decision.
@@ -268,7 +268,7 @@ start_agent() {
         NAOS_AGENT_ENROLLMENT_TOKEN_FILE="$TEMP_DIR/enrollment" \
         NAOS_AGENT_IMAGE_DIR="$TEMP_DIR/vms" \
         NAOS_AGENT_VM_DIR="$TEMP_DIR/runs" \
-        setsid cargo run -q -p naos-agent >>"$TEMP_DIR/agent.log" 2>&1 &
+        setsid cargo run -q -p naos-runner >>"$TEMP_DIR/agent.log" 2>&1 &
     agent=$!
 }
 

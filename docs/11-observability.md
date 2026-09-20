@@ -96,7 +96,7 @@ drops what the API took; a failed post keeps them for the next cycle, and a
 batch the API rejects as malformed is dropped with an error in the log.
 
 The spool is capped at 64 MiB. When it is full, the oldest events go, and an
-`audit_dropped` event with their count takes their place. `naos-agent
+`audit_dropped` event with their count takes their place. `naos-runner
 console` appends to the same spool when the full agent settings are
 available, with `audit.lock` next to it serialising both processes.
 
