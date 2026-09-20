@@ -1,8 +1,8 @@
 # Disposable Penpot stack for Web UI mockups.
 
-.PHONY: up down
+.PHONY: up down import export extract convert
 
 
 # design loop
-up down:
-	../../.venv/bin/python design.py $@
+up down import export extract convert:
+	../../.venv/bin/penpot-stack $@
