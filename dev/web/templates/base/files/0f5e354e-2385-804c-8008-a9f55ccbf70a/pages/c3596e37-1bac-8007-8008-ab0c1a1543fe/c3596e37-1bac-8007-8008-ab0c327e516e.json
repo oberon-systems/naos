@@ -1,0 +1,124 @@
+{
+  "id": "c3596e37-1bac-8007-8008-ab0c327e516e",
+  "name": "Audit table",
+  "type": "frame",
+  "x": 24,
+  "y": 260,
+  "width": 952,
+  "height": 585,
+  "rotation": 0,
+  "selrect": {
+    "x": 24,
+    "y": 260,
+    "width": 952,
+    "height": 585,
+    "x1": 24,
+    "y1": 260,
+    "x2": 976,
+    "y2": 845
+  },
+  "points": [
+    {
+      "x": 24,
+      "y": 260
+    },
+    {
+      "x": 976,
+      "y": 260
+    },
+    {
+      "x": 976,
+      "y": 845
+    },
+    {
+      "x": 24,
+      "y": 845
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "c3596e37-1bac-8007-8008-ab0c41b37c03",
+  "frameId": "c3596e37-1bac-8007-8008-ab0c41b37c03",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 10,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "c3596e37-1bac-8007-8008-ab0c1a1543fe",
+  "layoutItemVSizing": "auto",
+  "r3": 10,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 10,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [
+    {
+      "strokeColor": "#e4e7ec",
+      "strokeAlignment": "inner",
+      "strokeWidth": 1
+    }
+  ],
+  "proportion": 1,
+  "r4": 10,
+  "fills": [
+    {
+      "fillColor": "#ffffff",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "c3596e37-1bac-8007-8008-ab0c32767ab6",
+    "c3596e37-1bac-8007-8008-ab0c326d09e6",
+    "c3596e37-1bac-8007-8008-ab0c32a67b63",
+    "c3596e37-1bac-8007-8008-ab0c32108f32",
+    "c3596e37-1bac-8007-8008-ab0c32a27acf",
+    "c3596e37-1bac-8007-8008-ab0c31b525d3",
+    "c3596e37-1bac-8007-8008-ab0c329e3474",
+    "c3596e37-1bac-8007-8008-ab0c315d53f2",
+    "c3596e37-1bac-8007-8008-ab0c3299c00f",
+    "c3596e37-1bac-8007-8008-ab0c30ffca5c",
+    "c3596e37-1bac-8007-8008-ab0c3295b14c",
+    "c3596e37-1bac-8007-8008-ab0c30ae26a0",
+    "c3596e37-1bac-8007-8008-ab0c32916ed8",
+    "c3596e37-1bac-8007-8008-ab0c305534e0",
+    "c3596e37-1bac-8007-8008-ab0c328c4315",
+    "c3596e37-1bac-8007-8008-ab0c3000d78e",
+    "c3596e37-1bac-8007-8008-ab0c3287d62c",
+    "c3596e37-1bac-8007-8008-ab0c2f5f50b1",
+    "c3596e37-1bac-8007-8008-ab0c32835a32",
+    "c3596e37-1bac-8007-8008-ab0c2f219786"
+  ]
+}

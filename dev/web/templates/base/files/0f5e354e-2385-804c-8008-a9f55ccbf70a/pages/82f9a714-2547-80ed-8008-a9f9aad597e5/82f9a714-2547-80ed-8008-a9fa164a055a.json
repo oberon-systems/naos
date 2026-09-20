@@ -114,34 +114,34 @@
       }
     ]
   },
+  "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 335,
       "y": 335.36363673210144,
-      "width": 33.5113639831543,
-      "height": 11.636363983154297,
-      "x1": 0,
-      "y1": 0.7272727489471436,
-      "x2": 33.5113639831543,
-      "y2": 12.36363673210144,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "10px",
       "fontWeight": "600",
+      "y1": 0.7272727489471436,
+      "width": 33.5113639831543,
       "textDecoration": "none",
       "letterSpacing": "0.6px",
+      "x": 335,
+      "x1": 0,
+      "y2": 12.36363673210144,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 33.5113639831543,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 11.636363983154297,
       "text": "SLOTS"
     }
-  ],
-  "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5"
+  ]
 }

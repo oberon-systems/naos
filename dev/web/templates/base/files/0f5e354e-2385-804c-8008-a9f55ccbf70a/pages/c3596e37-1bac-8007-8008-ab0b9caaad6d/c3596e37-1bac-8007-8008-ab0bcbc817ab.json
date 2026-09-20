@@ -1,0 +1,147 @@
+{
+  "id": "c3596e37-1bac-8007-8008-ab0bcbc817ab",
+  "name": "Text",
+  "type": "text",
+  "x": 405,
+  "y": 371,
+  "width": 48,
+  "height": 14,
+  "rotation": 0,
+  "selrect": {
+    "x": 405,
+    "y": 371,
+    "width": 48,
+    "height": 14,
+    "x1": 405,
+    "y1": 371,
+    "x2": 453,
+    "y2": 385
+  },
+  "points": [
+    {
+      "x": 405,
+      "y": 371
+    },
+    {
+      "x": 453,
+      "y": 371
+    },
+    {
+      "x": 453,
+      "y": 385
+    },
+    {
+      "x": 405,
+      "y": 385
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "c3596e37-1bac-8007-8008-ab0bcbc4d666",
+  "frameId": "c3596e37-1bac-8007-8008-ab0bcbc4d666",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-width",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "10",
+                "fontWeight": "600",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "600",
+                "textDecoration": "none",
+                "letterSpacing": "0.6",
+                "fills": [
+                  {
+                    "fillColor": "#98a2b3",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "POLICIES"
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "10",
+            "fontWeight": "600",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "600",
+            "textDecoration": "none",
+            "letterSpacing": "0.6",
+            "fills": [
+              {
+                "fillColor": "#98a2b3",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 405,
+      "y": 383.80000001192093,
+      "width": 47.150001525878906,
+      "height": 12,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 47.150001525878906,
+      "y2": 12.800000011920929,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "10px",
+      "fontWeight": "600",
+      "textDecoration": "none",
+      "letterSpacing": "0.6px",
+      "fills": [
+        {
+          "fillColor": "#98a2b3",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "POLICIES"
+    }
+  ],
+  "pageId": "c3596e37-1bac-8007-8008-ab0b9caaad6d"
+}

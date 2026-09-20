@@ -114,34 +114,34 @@
       }
     ]
   },
+  "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 1012,
       "y": 715.6363637447357,
-      "width": 77.55682373046875,
-      "height": 10.909090995788574,
-      "x1": 0,
-      "y1": 0.7272727489471436,
-      "x2": 77.55682373046875,
-      "y2": 11.636363744735718,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "9px",
       "fontWeight": "600",
+      "y1": 0.7272727489471436,
+      "width": 77.55682373046875,
       "textDecoration": "none",
       "letterSpacing": "0.6px",
+      "x": 1012,
+      "x1": 0,
+      "y2": 11.636363744735718,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 77.55682373046875,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 10.909090995788574,
       "text": "RECENT EVENTS"
     }
-  ],
-  "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5"
+  ]
 }

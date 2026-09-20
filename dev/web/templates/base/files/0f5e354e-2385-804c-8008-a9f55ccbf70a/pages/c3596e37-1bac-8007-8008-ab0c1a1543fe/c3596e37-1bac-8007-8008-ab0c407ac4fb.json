@@ -1,0 +1,98 @@
+{
+  "id": "c3596e37-1bac-8007-8008-ab0c407ac4fb",
+  "name": "When",
+  "type": "frame",
+  "x": 996,
+  "y": 334.99999999999994,
+  "width": 420,
+  "height": 145,
+  "rotation": 0,
+  "selrect": {
+    "x": 996,
+    "y": 334.99999999999994,
+    "width": 420,
+    "height": 145,
+    "x1": 996,
+    "y1": 334.99999999999994,
+    "x2": 1416,
+    "y2": 479.99999999999994
+  },
+  "points": [
+    {
+      "x": 996,
+      "y": 334.99999999999994
+    },
+    {
+      "x": 1416,
+      "y": 334.99999999999994
+    },
+    {
+      "x": 1416,
+      "y": 479.99999999999994
+    },
+    {
+      "x": 996,
+      "y": 479.99999999999994
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "c3596e37-1bac-8007-8008-ab0c4134bd31",
+  "frameId": "c3596e37-1bac-8007-8008-ab0c4134bd31",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 14,
+    "p2": 16,
+    "p3": 14,
+    "p4": 16
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 8,
+    "columnGap": 10
+  },
+  "pageId": "c3596e37-1bac-8007-8008-ab0c1a1543fe",
+  "layoutItemVSizing": "auto",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": [],
+  "shapes": [
+    "c3596e37-1bac-8007-8008-ab0c4065ad9d",
+    "c3596e37-1bac-8007-8008-ab0c4052b242",
+    "c3596e37-1bac-8007-8008-ab0c403e252c",
+    "c3596e37-1bac-8007-8008-ab0c401aeefa",
+    "c3596e37-1bac-8007-8008-ab0c400ecbdc"
+  ]
+}

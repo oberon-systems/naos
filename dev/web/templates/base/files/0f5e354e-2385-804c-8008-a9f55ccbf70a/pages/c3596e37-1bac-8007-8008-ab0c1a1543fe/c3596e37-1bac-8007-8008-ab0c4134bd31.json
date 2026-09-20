@@ -1,0 +1,113 @@
+{
+  "id": "c3596e37-1bac-8007-8008-ab0c4134bd31",
+  "name": "Event detail",
+  "type": "frame",
+  "x": 996,
+  "y": 260,
+  "width": 420,
+  "height": 630,
+  "rotation": 0,
+  "selrect": {
+    "x": 996,
+    "y": 260,
+    "width": 420,
+    "height": 630,
+    "x1": 996,
+    "y1": 260,
+    "x2": 1416,
+    "y2": 890
+  },
+  "points": [
+    {
+      "x": 996,
+      "y": 260
+    },
+    {
+      "x": 1416,
+      "y": 260
+    },
+    {
+      "x": 1416,
+      "y": 890
+    },
+    {
+      "x": 996,
+      "y": 890
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "c3596e37-1bac-8007-8008-ab0c41b37c03",
+  "frameId": "c3596e37-1bac-8007-8008-ab0c41b37c03",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 10,
+  "layoutItemHSizing": "fix",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "c3596e37-1bac-8007-8008-ab0c1a1543fe",
+  "layoutItemVSizing": "auto",
+  "r3": 10,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 10,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [
+    {
+      "strokeColor": "#e4e7ec",
+      "strokeAlignment": "inner",
+      "strokeWidth": 1
+    }
+  ],
+  "proportion": 1,
+  "r4": 10,
+  "fills": [
+    {
+      "fillColor": "#ffffff",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "c3596e37-1bac-8007-8008-ab0c4128085f",
+    "c3596e37-1bac-8007-8008-ab0c414a8d0a",
+    "c3596e37-1bac-8007-8008-ab0c4108d977",
+    "c3596e37-1bac-8007-8008-ab0c4145683b",
+    "c3596e37-1bac-8007-8008-ab0c40c14796",
+    "c3596e37-1bac-8007-8008-ab0c41403b65",
+    "c3596e37-1bac-8007-8008-ab0c407ac4fb",
+    "c3596e37-1bac-8007-8008-ab0c413b3294",
+    "c3596e37-1bac-8007-8008-ab0c3f81ea0c"
+  ]
+}
