@@ -38,15 +38,15 @@ field() {
     "$VENV/bin/python" -c "import json, sys; print(json.load(sys.stdin)['$1'])"
 }
 
-task_status() {
-    curl -fsS "${auth[@]}" "$api/api/v1/tasks/$task" | field status
+run_status() {
+    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run" | field status
 }
 
 booted() {
     local status
-    status="$(task_status)"
+    status="$(run_status)"
     if [ "$status" = FAILED ] || grep -qs 'naos-probe fail' "$TEMP_DIR"/runs/*/boot.log; then
-        echo "task $task failed to boot" >&2
+        echo "run $run failed to boot" >&2
         exit 1
     fi
     grep -qs naos-ready "$TEMP_DIR"/runs/*/boot.log && grep -qs 'naos-probe ok' "$TEMP_DIR"/runs/*/boot.log
@@ -54,16 +54,16 @@ booted() {
 
 collected() {
     local status
-    status="$(task_status)"
+    status="$(run_status)"
     if [ "$status" = FAILED ]; then
         grep -e '"event":"run_failed"' -e 'reconcile action failed' "$TEMP_DIR/agent.log" >&2 || true
-        fail "task $task failed while its workspace was collected"
+        fail "run $run failed while its workspace was collected"
     fi
     [ "$status" = WAITING_MERGE ] && [ "$(events workspace_collected)" -ge 1 ]
 }
 
 merge_state() {
-    curl -fsS "${auth[@]}" "$api/api/v1/tasks/$task/merge"
+    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/merge"
 }
 
 # Selects every mergeable path of the collected diff, with the given resolutions.
@@ -73,7 +73,7 @@ import json, sys
 entries = json.load(sys.stdin)["entries"]
 paths = sorted({entry["path"] for entry in entries if entry["change"] != "rejected"})
 print(json.dumps({"paths": paths, "resolutions": json.loads(sys.argv[1])}))
-' "$1" | curl -fsS "${auth[@]}" "$api/api/v1/tasks/$task/merge" -o /dev/null -d @-
+' "$1" | curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/merge" -o /dev/null -d @-
 }
 
 conflicted() {
@@ -87,10 +87,10 @@ sys.exit(0 if state["decision"] is None and paths == ["notes.txt"] else 1)
 
 completed() {
     local status
-    status="$(task_status)"
+    status="$(run_status)"
     if [ "$status" = FAILED ]; then
         grep -e '"event":"run_failed"' -e 'reconcile action failed' "$TEMP_DIR/agent.log" >&2 || true
-        fail "task $task failed while it merged"
+        fail "run $run failed while it merged"
     fi
     [ "$status" = COMPLETED ] && [ "$(events changes_archived)" -ge 1 ]
 }
@@ -138,7 +138,7 @@ guest() {
         done
         sleep 25
     } | NAOS_AGENT_IMAGE_DIR="$TEMP_DIR/vms" NAOS_AGENT_VM_DIR="$TEMP_DIR/runs" \
-        cargo run -q -p naos-agent -- console "$task" >>"$TEMP_DIR/console.log" 2>&1
+        cargo run -q -p naos-agent -- console "$run" >>"$TEMP_DIR/console.log" 2>&1
 }
 
 # Every gate call the guest makes is one audit line of the runner, which took the decision.
@@ -222,16 +222,16 @@ check_merge() {
 
 # The runner posts its events after each cycle, so the timeline fills in shortly after the log.
 audited() {
-    curl -fsS "${auth[@]}" "$api/api/v1/tasks/$task/events?limit=10000" |
+    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/events?limit=10000" |
         "$VENV/bin/python" -c '
 import json, sys
 rows = json.load(sys.stdin)
 seen = {row["event"] for row in rows}
-seen |= {("to", row["data"]["to"]) for row in rows if row["event"] == "task_transition"}
+seen |= {("to", row["data"]["to"]) for row in rows if row["event"] == "run_transition"}
 seen |= {("mcp_call", row["data"]["decision"]) for row in rows if row["event"] == "mcp_call"}
 statuses = ("STARTING", "STARTED", "STOPPING", "COLLECTING", "WAITING_MERGE", "COMPLETED")
 expected = {
-    "task_created", "vm_created", "workspace_shared", "network_allowed", "network_denied",
+    "run_created", "vm_created", "workspace_shared", "network_allowed", "network_denied",
     "shell_allowed", "shell_denied", ("mcp_call", "allow"), ("mcp_call", "deny"),
     "workspace_collected", "diff_reported", "merge_decided", "merge_conflict", "merge_applied",
     "changes_archived", *(("to", status) for status in statuses),
@@ -306,7 +306,7 @@ NAOS_ALLOWED_MOUNT_ROOTS="[\"$TEMP_DIR/workspaces\"]" \
 server=$!
 wait_for 30 curl -fs -o /dev/null "$api/healthz"
 
-echo "registering the image and creating a task..."
+echo "registering the image and creating a run..."
 curl -fsS "${auth[@]}" "$api/api/v1/images" -o /dev/null -d @- <<EOF
 {"id": "naos-agents", "version": "$version", "digest": "$digest", "url": "$release/$image"}
 EOF
@@ -334,8 +334,8 @@ mcp_policy="$(
 {"kind": "mcp", "document": {"servers": [{"name": "alpha", "url": "https://example.com/mcp", "tools": ["search"], "resources": [], "credential": "alpha-token"}]}}
 EOF
 )"
-task="$(
-    curl -fsS "${auth[@]}" -H "Idempotency-Key: smoke" "$api/api/v1/tasks" -d @- <<EOF | field id
+run="$(
+    curl -fsS "${auth[@]}" -H "Idempotency-Key: smoke" "$api/api/v1/runs" -d @- <<EOF | field id
 {"image": {"id": "naos-agents", "digest": "$digest"}, "runtime": {"cpu": 2, "memory_mib": 2048, "disk_gib": 8}, "mounts": {"policy": "$mount_policy"}, "network": {"policy": "$network_policy"}, "shell": {"policy": "$shell_policy"}, "mcp": {"policy": "$mcp_policy"}, "timeout": 3600}
 EOF
 )"
@@ -366,7 +366,7 @@ kill -- "-$agent"
 wait_for 30 agent_gone
 start_agent
 wait_for 120 reattached
-if [ "$(task_status)" != STARTED ] || [ "$(events vm_created)" -ne 1 ]; then
+if [ "$(run_status)" != STARTED ] || [ "$(events vm_created)" -ne 1 ]; then
     echo "the restarted agent did not keep the running vm" >&2
     exit 1
 fi
@@ -394,8 +394,8 @@ guest \
     "{ cat /tmp/rpc; sleep 20; } | naos-mcp" \
     "echo NAOS-SMOKE-DONE"
 check_gates
-echo "task $task booted, stopping it..."
-curl -fsS "${auth[@]}" -X POST "$api/api/v1/tasks/$task/stop" -o /dev/null
+echo "run $run booted, stopping it..."
+curl -fsS "${auth[@]}" -X POST "$api/api/v1/runs/$run/stop" -o /dev/null
 wait_for 120 collected
 wait_for 10 share_gone
 if [ "$(workspace_tree)" != "$tree_before" ]; then
@@ -412,7 +412,7 @@ echo "taking the agent's version of notes.txt..."
 decide '{"notes.txt": "take"}'
 wait_for 120 completed
 check_merge
-echo "checking the audit timeline of the task..."
+echo "checking the audit timeline of the run..."
 wait_for 60 audited
 check_secrets
 echo "smoke test passed"
