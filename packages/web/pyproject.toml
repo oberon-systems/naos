@@ -13,6 +13,10 @@ dependencies = [
   "pydantic-settings",
 ]
 
+[project.optional-dependencies]
+# What serves the app in a container; the library itself needs neither.
+server = ["uvicorn[standard]"]
+
 [tool.setuptools.package-data]
 naos_web = ["py.typed", "templates/*.html", "static/*.css", "static/vendor/*.js"]
 

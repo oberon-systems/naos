@@ -14,5 +14,9 @@ dependencies = [
   "sqlmodel",
 ]
 
+[project.optional-dependencies]
+# What serves the app in a container; the library itself needs neither.
+server = ["psycopg[binary]", "uvicorn[standard]"]
+
 [tool.setuptools.package-data]
 naos_api = ["py.typed"]

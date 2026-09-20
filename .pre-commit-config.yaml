@@ -68,6 +68,13 @@ repos:
         types_or: [html, jinja]
         files: ^packages/web/.*\.html$
 
+  # hadolint is a single binary and comes from the host, like cargo and packer
+  # in the local hooks below; install it once and `make lint` picks it up.
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.15.1
+    hooks:
+      - id: hadolint
+
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.0
     hooks:

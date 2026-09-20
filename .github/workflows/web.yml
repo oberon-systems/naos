@@ -1,0 +1,109 @@
+name: naos-web
+
+on:
+  pull_request:
+    paths:
+      - packages/web/**
+      - packages/common/**
+      - docker/web/**
+      - .github/workflows/web.yml
+  push:
+    tags:
+      - naos-web-*
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Install
+        run: pip install ./packages/common ./packages/web pytest
+      - name: Test
+        run: pytest -q packages/web
+
+  version:
+    if: startsWith(github.ref, 'refs/tags/naos-web-')
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the tag against pyproject.toml
+        id: check
+        run: |
+          version="$(sed -n 's/^version = "\(.*\)"/\1/p' packages/web/pyproject.toml)"
+          test "$GITHUB_REF_NAME" = "naos-web-$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  pypi:
+    needs: version
+    runs-on: ubuntu-24.04
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4  # v10.1.0
+      - name: Build
+        run: uv build --out-dir dist packages/web
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2
+
+  image:
+    needs: version
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
+        with:
+          context: .
+          file: docker/web/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/naos-web:${{ needs.version.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/naos-web:latest
+
+  release:
+    needs: [version, pypi, image]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          notes="$(awk -v head="## $GITHUB_REF_NAME " \
+            'index($0, head) == 1 { keep = 1; next } /^## / { keep = 0 } keep' \
+            packages/web/CHANGELOG.md)"
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes "${notes:-Naos web $VERSION on PyPI and ghcr.io.}"
