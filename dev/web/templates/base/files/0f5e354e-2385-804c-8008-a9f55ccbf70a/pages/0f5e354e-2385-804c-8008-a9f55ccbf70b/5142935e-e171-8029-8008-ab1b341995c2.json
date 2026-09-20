@@ -1,0 +1,147 @@
+{
+  "id": "5142935e-e171-8029-8008-ab1b341995c2",
+  "name": "Text",
+  "type": "text",
+  "x": 3512,
+  "y": 237,
+  "width": 219,
+  "height": 16,
+  "rotation": 0,
+  "selrect": {
+    "x": 3512,
+    "y": 237,
+    "width": 219,
+    "height": 16,
+    "x1": 3512,
+    "y1": 237,
+    "x2": 3731,
+    "y2": 253
+  },
+  "points": [
+    {
+      "x": 3512,
+      "y": 237
+    },
+    {
+      "x": 3731,
+      "y": 237
+    },
+    {
+      "x": 3731,
+      "y": 253
+    },
+    {
+      "x": 3512,
+      "y": 253
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "5142935e-e171-8029-8008-ab1b33ca776f",
+  "frameId": "5142935e-e171-8029-8008-ab1b33ca776f",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-width",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "11",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#667085",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "lease 52s of 60s \u00b7 renewed on every heartbeat"
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "11",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#667085",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 3512,
+      "y": 251.5454547405243,
+      "width": 218.28411865234375,
+      "height": 13.818181991577148,
+      "x1": 0,
+      "y1": 0.7272727489471436,
+      "x2": 218.28411865234375,
+      "y2": 14.545454740524292,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#667085",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "lease 52s of 60s \u00b7 renewed on every heartbeat"
+    }
+  ],
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b"
+}

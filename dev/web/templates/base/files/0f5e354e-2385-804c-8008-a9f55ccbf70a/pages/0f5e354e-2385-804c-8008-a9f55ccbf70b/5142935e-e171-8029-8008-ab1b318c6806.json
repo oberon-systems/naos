@@ -1,0 +1,147 @@
+{
+  "id": "5142935e-e171-8029-8008-ab1b318c6806",
+  "name": "Text",
+  "type": "text",
+  "x": 3276,
+  "y": 295.5,
+  "width": 188,
+  "height": 17,
+  "rotation": 0,
+  "selrect": {
+    "x": 3276,
+    "y": 295.5,
+    "width": 188,
+    "height": 17,
+    "x1": 3276,
+    "y1": 295.5,
+    "x2": 3464,
+    "y2": 312.5
+  },
+  "points": [
+    {
+      "x": 3276,
+      "y": 295.5
+    },
+    {
+      "x": 3464,
+      "y": 295.5
+    },
+    {
+      "x": 3464,
+      "y": 312.5
+    },
+    {
+      "x": 3276,
+      "y": 312.5
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "5142935e-e171-8029-8008-ab1b31837af7",
+  "frameId": "5142935e-e171-8029-8008-ab1b31837af7",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-width",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-jetbrains-mono",
+                "fontSize": "12",
+                "fontWeight": "500",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "500",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#101828",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "JetBrains Mono",
+                "text": "naos-ubuntu-24.04 \u00b7 v1.4.2"
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-jetbrains-mono",
+            "fontSize": "12",
+            "fontWeight": "500",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "500",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#101828",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "JetBrains Mono"
+          }
+        ]
+      }
+    ]
+  },
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 3276,
+      "y": 311.5,
+      "width": 187.2045440673828,
+      "height": 16,
+      "x1": 0,
+      "y1": 0,
+      "x2": 187.2045440673828,
+      "y2": 16,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#101828",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"JetBrains Mono\"",
+      "text": "naos-ubuntu-24.04 \u00b7 v1.4.2"
+    }
+  ],
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b"
+}

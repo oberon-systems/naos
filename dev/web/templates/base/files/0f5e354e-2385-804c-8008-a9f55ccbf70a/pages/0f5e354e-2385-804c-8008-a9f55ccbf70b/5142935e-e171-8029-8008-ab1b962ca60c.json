@@ -1,0 +1,107 @@
+{
+  "id": "5142935e-e171-8029-8008-ab1b962ca60c",
+  "name": "Card Current runs",
+  "type": "frame",
+  "x": 5840,
+  "y": 240.00000000000009,
+  "width": 356,
+  "height": 116.00000000000003,
+  "rotation": 0,
+  "selrect": {
+    "x": 5840,
+    "y": 240.00000000000009,
+    "width": 356,
+    "height": 116.00000000000003,
+    "x1": 5840,
+    "y1": 240.00000000000009,
+    "x2": 6196,
+    "y2": 356.0000000000001
+  },
+  "points": [
+    {
+      "x": 5840,
+      "y": 240.00000000000006
+    },
+    {
+      "x": 6196,
+      "y": 240.00000000000006
+    },
+    {
+      "x": 6196,
+      "y": 356.0000000000001
+    },
+    {
+      "x": 5840,
+      "y": 356.0000000000001
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "5142935e-e171-8029-8008-ab1b91dfc71f",
+  "frameId": "5142935e-e171-8029-8008-ab1b91dfc71f",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 10,
+  "layoutItemHSizing": "fix",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "auto",
+  "r3": 10,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 10,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [
+    {
+      "strokeColor": "#e4e7ec",
+      "strokeOpacity": 1,
+      "strokeAlignment": "inner",
+      "strokeWidth": 1
+    }
+  ],
+  "proportion": 1,
+  "r4": 10,
+  "fills": [
+    {
+      "fillColor": "#ffffff",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "5142935e-e171-8029-8008-ab1b96591dd8",
+    "5142935e-e171-8029-8008-ab1b963964a4"
+  ]
+}

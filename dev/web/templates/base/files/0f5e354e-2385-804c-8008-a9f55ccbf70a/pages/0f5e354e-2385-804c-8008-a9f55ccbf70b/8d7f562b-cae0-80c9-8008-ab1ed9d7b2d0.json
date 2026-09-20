@@ -1,0 +1,69 @@
+{
+  "id": "8d7f562b-cae0-80c9-8008-ab1ed9d7b2d0",
+  "name": "gap",
+  "type": "rect",
+  "x": 1580,
+  "y": 1335,
+  "width": 1,
+  "height": 6,
+  "rotation": 0,
+  "selrect": {
+    "x": 1580,
+    "y": 1335,
+    "width": 1,
+    "height": 6,
+    "x1": 1580,
+    "y1": 1335,
+    "x2": 1581,
+    "y2": 1341
+  },
+  "points": [
+    {
+      "x": 1580,
+      "y": 1335
+    },
+    {
+      "x": 1581,
+      "y": 1335
+    },
+    {
+      "x": 1581,
+      "y": 1341
+    },
+    {
+      "x": 1580,
+      "y": 1341
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "8d7f562b-cae0-80c9-8008-ab1ed90511ad",
+  "frameId": "8d7f562b-cae0-80c9-8008-ab1ed90511ad",
+  "flipX": null,
+  "flipY": null,
+  "r2": 0,
+  "proportionLock": false,
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "r3": 0,
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": []
+}

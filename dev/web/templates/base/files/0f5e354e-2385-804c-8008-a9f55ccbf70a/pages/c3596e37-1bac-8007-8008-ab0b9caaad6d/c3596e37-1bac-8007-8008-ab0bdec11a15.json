@@ -115,35 +115,35 @@
     ]
   },
   "layoutItemHSizing": "fill",
+  "pageId": "c3596e37-1bac-8007-8008-ab0b9caaad6d",
   "layoutItemVSizing": "fix",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 1012,
       "y": 527.199999809265,
-      "width": 163.9375,
-      "height": 11.199999809265137,
-      "x1": 0,
-      "y1": 0,
-      "x2": 163.9375,
-      "y2": 11.199999809265137,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "9px",
       "fontWeight": "600",
+      "y1": 0,
+      "width": 163.9375,
       "textDecoration": "none",
       "letterSpacing": "0.6px",
+      "x": 1012,
+      "x1": 0,
+      "y2": 11.199999809265137,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 163.9375,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 11.199999809265137,
       "text": "POLICIES \u00b7 RESOLVED DOCUMENTS"
     }
-  ],
-  "pageId": "c3596e37-1bac-8007-8008-ab0b9caaad6d"
+  ]
 }

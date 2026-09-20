@@ -114,34 +114,34 @@
       }
     ]
   },
+  "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 550,
       "y": 558.6000003814697,
-      "width": 162.0124969482422,
-      "height": 13.600000381469727,
-      "x1": 0,
-      "y1": 0,
-      "x2": 162.0124969482422,
-      "y2": 13.600000381469727,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "10px",
       "fontWeight": "400",
+      "y1": 0,
+      "width": 162.0124969482422,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 550,
+      "x1": 0,
+      "y2": 13.600000381469727,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 162.0124969482422,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
+      "height": 13.600000381469727,
       "text": "/naos/gamma-2026.08.4.qcow2"
     }
-  ],
-  "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d"
+  ]
 }

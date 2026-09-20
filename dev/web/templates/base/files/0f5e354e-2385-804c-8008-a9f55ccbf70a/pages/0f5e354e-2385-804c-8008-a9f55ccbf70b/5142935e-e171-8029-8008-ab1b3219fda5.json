@@ -1,0 +1,107 @@
+{
+  "id": "5142935e-e171-8029-8008-ab1b3219fda5",
+  "name": "Card Policy",
+  "type": "frame",
+  "x": 2824,
+  "y": 431.00000000000006,
+  "width": 656,
+  "height": 247.9999999999999,
+  "rotation": 0,
+  "selrect": {
+    "x": 2824,
+    "y": 431.00000000000006,
+    "width": 656,
+    "height": 247.9999999999999,
+    "x1": 2824,
+    "y1": 431.00000000000006,
+    "x2": 3480,
+    "y2": 679
+  },
+  "points": [
+    {
+      "x": 2824,
+      "y": 431
+    },
+    {
+      "x": 3480,
+      "y": 431
+    },
+    {
+      "x": 3480,
+      "y": 678.9999999999999
+    },
+    {
+      "x": 2824,
+      "y": 678.9999999999999
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "5142935e-e171-8029-8008-ab1b308831d1",
+  "frameId": "5142935e-e171-8029-8008-ab1b308831d1",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 10,
+  "layoutItemHSizing": "fix",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "auto",
+  "r3": 10,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 10,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [
+    {
+      "strokeColor": "#e4e7ec",
+      "strokeOpacity": 1,
+      "strokeAlignment": "inner",
+      "strokeWidth": 1
+    }
+  ],
+  "proportion": 1,
+  "r4": 10,
+  "fills": [
+    {
+      "fillColor": "#ffffff",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "5142935e-e171-8029-8008-ab1b323f9593",
+    "5142935e-e171-8029-8008-ab1b322407a9"
+  ]
+}

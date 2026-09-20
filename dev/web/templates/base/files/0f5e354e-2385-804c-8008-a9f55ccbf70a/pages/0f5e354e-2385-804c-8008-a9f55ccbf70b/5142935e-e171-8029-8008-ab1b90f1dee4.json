@@ -1,0 +1,115 @@
+{
+  "id": "5142935e-e171-8029-8008-ab1b90f1dee4",
+  "name": "close",
+  "type": "frame",
+  "x": 6168,
+  "y": 23.5,
+  "width": 28,
+  "height": 28,
+  "rotation": 0,
+  "selrect": {
+    "x": 6168,
+    "y": 23.5,
+    "width": 28,
+    "height": 28,
+    "x1": 6168,
+    "y1": 23.5,
+    "x2": 6196,
+    "y2": 51.5
+  },
+  "points": [
+    {
+      "x": 6168,
+      "y": 23.5
+    },
+    {
+      "x": 6196,
+      "y": 23.5
+    },
+    {
+      "x": 6196,
+      "y": 51.5
+    },
+    {
+      "x": 6168,
+      "y": 51.5
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "5142935e-e171-8029-8008-ab1b90e32350",
+  "frameId": "5142935e-e171-8029-8008-ab1b90e32350",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 6,
+  "layoutItemHSizing": "fix",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "fix",
+  "r3": 6,
+  "layoutJustifyContent": "center",
+  "constraintsV": "top",
+  "interactions": [
+    {
+      "eventType": "click",
+      "actionType": "close-overlay",
+      "destination": "5142935e-e171-8029-8008-ab1b904cc503",
+      "positionRelativeTo": null,
+      "preserveScroll": false
+    },
+    {
+      "eventType": "click",
+      "actionType": "close-overlay",
+      "destination": null,
+      "positionRelativeTo": null,
+      "preserveScroll": false
+    }
+  ],
+  "constraintsH": "left",
+  "r1": 6,
+  "layoutFlexDir": "row",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 6,
+  "fills": [
+    {
+      "fillColor": "#f2f4f7",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "5142935e-e171-8029-8008-ab1b91025b45"
+  ]
+}

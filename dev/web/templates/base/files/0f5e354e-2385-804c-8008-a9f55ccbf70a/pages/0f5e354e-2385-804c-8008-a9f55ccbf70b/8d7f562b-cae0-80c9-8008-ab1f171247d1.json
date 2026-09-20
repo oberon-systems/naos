@@ -1,0 +1,147 @@
+{
+  "id": "8d7f562b-cae0-80c9-8008-ab1f171247d1",
+  "name": "Text",
+  "type": "text",
+  "x": 2992,
+  "y": 1160,
+  "width": 317,
+  "height": 18,
+  "rotation": 0,
+  "selrect": {
+    "x": 2992,
+    "y": 1160,
+    "width": 317,
+    "height": 18,
+    "x1": 2992,
+    "y1": 1160,
+    "x2": 3309,
+    "y2": 1178
+  },
+  "points": [
+    {
+      "x": 2992,
+      "y": 1160
+    },
+    {
+      "x": 3309,
+      "y": 1160
+    },
+    {
+      "x": 3309,
+      "y": 1178
+    },
+    {
+      "x": 2992,
+      "y": 1178
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "8d7f562b-cae0-80c9-8008-ab1f16f4ad0a",
+  "frameId": "8d7f562b-cae0-80c9-8008-ab1f16f4ad0a",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-width",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.5",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.5",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-jetbrains-mono",
+                "fontSize": "12",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#e2e8f0",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "JetBrains Mono",
+                "text": "      -H \"Authorization: Bearer $NAOS_TOKEN\""
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-jetbrains-mono",
+            "fontSize": "12",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#e2e8f0",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "JetBrains Mono"
+          }
+        ]
+      }
+    ]
+  },
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 2992,
+      "y": 1176.7272746562958,
+      "width": 316.80682373046875,
+      "height": 16.000001907348633,
+      "x1": 0,
+      "y1": 0.7272727489471436,
+      "x2": 316.80682373046875,
+      "y2": 16.727274656295776,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#e2e8f0",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"JetBrains Mono\"",
+      "text": "      -H \"Authorization: Bearer $NAOS_TOKEN\""
+    }
+  ],
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b"
+}

@@ -2,5 +2,12 @@
   "id": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
   "name": "Runs",
   "background": "#2d2e2f",
+  "flows": {
+    "5142935e-e171-8029-8008-ab1baf707f00": {
+      "id": "5142935e-e171-8029-8008-ab1baf707f00",
+      "name": "Flow 1",
+      "startingFrame": "82f9a714-2547-80ed-8008-a9f74a1ffe3f"
+    }
+  },
   "index": 0
 }

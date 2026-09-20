@@ -1,0 +1,115 @@
+{
+  "id": "8d7f562b-cae0-80c9-8008-ab1efe268da8",
+  "name": "button open in new window",
+  "type": "frame",
+  "x": 2584,
+  "y": 167,
+  "width": 30,
+  "height": 30,
+  "rotation": 0,
+  "selrect": {
+    "x": 2584,
+    "y": 167,
+    "width": 30,
+    "height": 30,
+    "x1": 2584,
+    "y1": 167,
+    "x2": 2614,
+    "y2": 197
+  },
+  "points": [
+    {
+      "x": 2584,
+      "y": 167
+    },
+    {
+      "x": 2614,
+      "y": 167
+    },
+    {
+      "x": 2614,
+      "y": 197
+    },
+    {
+      "x": 2584,
+      "y": 197
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "5142935e-e171-8029-8008-ab1aea42b8cc",
+  "frameId": "5142935e-e171-8029-8008-ab1aea42b8cc",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 6,
+  "layoutItemHSizing": "fix",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "fix",
+  "r3": 6,
+  "layoutJustifyContent": "center",
+  "constraintsV": "top",
+  "interactions": [
+    {
+      "eventType": "click",
+      "actionType": "navigate",
+      "destination": "8d7f562b-cae0-80c9-8008-ab1ed80d1996",
+      "positionRelativeTo": null,
+      "preserveScroll": false
+    }
+  ],
+  "constraintsH": "left",
+  "r1": 6,
+  "layoutFlexDir": "row",
+  "layoutAlignContent": "stretch",
+  "strokes": [
+    {
+      "strokeColor": "#d0d5dd",
+      "strokeOpacity": 1,
+      "strokeAlignment": "inner",
+      "strokeWidth": 1
+    }
+  ],
+  "proportion": 1,
+  "r4": 6,
+  "fills": [
+    {
+      "fillColor": "#ffffff",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "8d7f562b-cae0-80c9-8008-ab1efe3a9105"
+  ]
+}
