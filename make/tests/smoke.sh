@@ -52,6 +52,14 @@ booted() {
     grep -qs naos-ready "$TEMP_DIR"/runs/*/boot.log && grep -qs 'naos-probe ok' "$TEMP_DIR"/runs/*/boot.log
 }
 
+enrolled() {
+    curl -fsS "${auth[@]}" "$api/api/v1/runners" | "$VENV/bin/python" -c '
+import json, sys
+rows = json.load(sys.stdin)
+sys.exit(0 if [(row["name"], row["status"]) for row in rows] == [("alpha", "live")] else 1)
+'
+}
+
 collected() {
     local status
     status="$(run_status)"
@@ -342,6 +350,7 @@ EOF
 
 echo "starting agent..."
 start_agent
+wait_for 60 enrolled
 
 wait_for 900 booted
 for event in network_policy_configured shell_policy_configured mcp_policy_configured mcp_attached workspace_shared; do
@@ -365,6 +374,7 @@ echo "restarting agent with the vm running..."
 kill -- "-$agent"
 wait_for 30 agent_gone
 start_agent
+wait_for 60 enrolled
 wait_for 120 reattached
 if [ "$(run_status)" != STARTED ] || [ "$(events vm_created)" -ne 1 ]; then
     echo "the restarted agent did not keep the running vm" >&2

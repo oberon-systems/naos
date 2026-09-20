@@ -80,6 +80,31 @@ def _live_lease(session: Session, runner_id: str) -> Lease | None:
     return session.exec(statement).first()
 
 
+@dataclass(frozen=True)
+class RunnerState:
+    runner: Runner
+    lease: Lease | None
+    runs: int
+
+
+def list_runners(session: Session, now: int, limit: int, offset: int) -> list[RunnerState]:
+    statement = (
+        select(Runner)
+        .order_by(col(Runner.created_at).desc(), col(Runner.id))
+        .offset(offset)
+        .limit(limit)
+    )
+    states: list[RunnerState] = []
+    for runner in session.exec(statement).all():
+        lease = _live_lease(session, runner.id)
+        # A lease is only marked expired by the sweep, so its deadline decides here.
+        if lease is not None and lease.expires_at <= now:
+            lease = None
+        runs = _held(session, lease.id) if lease is not None else 0
+        states.append(RunnerState(runner=runner, lease=lease, runs=runs))
+    return states
+
+
 def register_runner(
     session: Session, name: str, now: int, token_ttl: int, lease_ttl: int
 ) -> tuple[Runner, IssuedToken, Lease]:
@@ -279,13 +304,17 @@ def _candidates(session: Session, limit: int) -> Sequence[str]:
     return session.exec(statement).all()
 
 
-def _assign(session: Session, lease_id: str, capacity: int, now: int) -> None:
-    held = session.exec(
+def _held(session: Session, lease_id: str) -> int:
+    count = session.exec(
         select(func.count())
         .select_from(Run)
         .where(col(Run.lease_id) == lease_id, col(Run.status).not_in(TERMINAL))
     ).one()
-    free = capacity - held
+    return int(count)
+
+
+def _assign(session: Session, lease_id: str, capacity: int, now: int) -> None:
+    free = capacity - _held(session, lease_id)
     if free <= 0:
         return
     for run_id in _candidates(session, free):
