@@ -1,0 +1,20 @@
+---
+commitizen:
+  allowed_prefixes:
+  - Merge
+  - Revert
+  - Pull request
+  - fixup!
+  - squash!
+  - amend!
+  - 'bump:'
+  bump_message: 'bump: api $current_version -> $new_version'
+  changelog_file: CHANGELOG.md
+  changelog_paths:
+  - packages/api
+  major_version_zero: true
+  name: wyld_cz
+  tag_format: naos-api-$version
+  update_changelog_on_bump: true
+  version_provider: pep621
+  version_scheme: semver

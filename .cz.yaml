@@ -1,3 +1,5 @@
+# Commits only. Naos has no stack-wide version: every package carries its own
+# .cz.yaml, and `cz bump` here fails on the version this file does not hold.
 commitizen:
   allowed_prefixes:
     - Merge
@@ -7,11 +9,5 @@ commitizen:
     - squash!
     - amend!
     - 'bump:'
-  bump_message: 'bump: version $current_version -> $new_version'
   major_version_zero: true
   name: wyld_cz
-  tag_format: $version
-  update_changelog_on_bump: true
-  version_provider: pep621
-  version_scheme: semver
-  version: 0.0.0

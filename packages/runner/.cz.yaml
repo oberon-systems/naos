@@ -1,0 +1,24 @@
+---
+commitizen:
+  allowed_prefixes:
+  - Merge
+  - Revert
+  - Pull request
+  - fixup!
+  - squash!
+  - amend!
+  - 'bump:'
+  bump_message: 'bump: runner $current_version -> $new_version'
+  changelog_file: CHANGELOG.md
+  changelog_paths:
+  - packages/runner
+  major_version_zero: true
+  name: wyld_cz
+  # cz rewrites this package's Cargo.toml only; the workspace lock is one level
+  # up, and the hook runs before the bump commit takes it along.
+  pre_bump_hooks:
+  - cargo update --offline --workspace --manifest-path ../../Cargo.toml
+  tag_format: runner-$version
+  update_changelog_on_bump: true
+  version_provider: cargo
+  version_scheme: semver
