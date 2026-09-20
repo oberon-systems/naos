@@ -53,7 +53,7 @@ write_env() {
         check_hash NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256 enrollment
         return
     fi
-    if [ -d "$compose/data/db" ]; then
+    if [ -n "$(ls -A "$compose/data/db" 2>/dev/null)" ]; then
         fail "$compose/data/db is a cluster of an older $env_file:" \
             "remove that directory, or write the .env it belongs to yourself"
     fi
@@ -145,17 +145,34 @@ foreground() {
     exec "$runner"
 }
 
+# The cluster belongs to root inside the container, so it is emptied from
+# there; the second down drops the network `run` brought back up.
+wipe_db() {
+    cd "$compose"
+    docker compose down
+    docker compose run --rm --no-deps -T --entrypoint sh db \
+        -c 'find /var/lib/postgresql/data -mindepth 1 -maxdepth 1 -exec rm -rf {} +'
+    docker compose down
+}
+
 down() {
     if pid="$(agent_pid)"; then
         kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
     fi
     rm -f "$LOCAL/agent.pid"
-    if [ -f "$env_file" ]; then "$MAKE" -C "$compose" down; fi
+    if [ -f "$env_file" ]; then (wipe_db); fi
+}
+
+clean() {
+    down
+    rm -f "$env_file"
+    rm -rf "$LOCAL"
 }
 
 case "${1:-kickstart}" in
 kickstart) kickstart ;;
 runner) foreground ;;
 down) down ;;
-*) fail "usage: kickstart.sh [kickstart|runner|down]" ;;
+clean) clean ;;
+*) fail "usage: kickstart.sh [kickstart|runner|down|clean]" ;;
 esac

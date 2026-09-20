@@ -8,8 +8,5 @@ LOCAL := $(CURDIR)/local
 
 
 # stack
-kickstart runner down:
+kickstart runner down clean:
 	ROOT=$(ROOT) LOCAL=$(LOCAL) MAKE=$(MAKE) bash kickstart.sh $@
-
-clean: down
-	rm -rf $(LOCAL)

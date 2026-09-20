@@ -34,9 +34,9 @@ configured by hand keeps its own credentials: put those tokens into
 `local/operator` and `local/enrollment`, or start over with `make clean`.
 
 For the same reason it refuses to write a new `docker/.env` while
-`docker/data/db` already holds a database: postgres keeps the password of its
-first start, and a generated one would never match it. Delete that directory to
-start clean, or bring back the `.env` it was created with.
+`docker/data/db` still holds a cluster: postgres keeps the password of its first
+start, and a generated one would never match it. `make -C dev/stack clean`
+empties both, or bring back the `.env` that cluster was created with.
 
 Nothing is left half up: when the api does not answer within five seconds or
 the runner does not enroll, kickstart prints the api log, stops the stack and
@@ -51,16 +51,21 @@ printed urls follow `NAOS_BIND`, `NAOS_API_PORT` and `NAOS_WEB_PORT`.
 | ------------------------------- | ------------------------------------------- |
 | `make kickstart`                | Tokens, images, compose and the runner      |
 | `make -C dev/stack runner`      | Run the runner in the foreground            |
-| `make -C dev/stack down`        | Stop the runner and the compose stack       |
-| `make -C dev/stack clean`       | `down`, then delete `local/`                |
+| `make -C dev/stack down`        | Stop everything and empty the database      |
+| `make -C dev/stack clean`       | `down`, then delete `local/` and `.env`     |
 
 `runner` is the same agent with the same environment, attached to the terminal:
 use it when you want its output live instead of tailing the log. Stop the
 background one with `down` first.
 
-`down` leaves `local/` and `docker/.env` alone, so the next `kickstart` comes
-back on the same tokens and the same database. `clean` drops the tokens and the
-agent state; the database lives in `docker/data/` and survives both.
+`down` stops the runner and compose and then empties the database from inside a
+container, because the cluster belongs to root: `docker/data/db` stays as an
+empty directory. Tokens and `docker/.env` are left alone, so the next
+`kickstart` comes back on the same credentials and a schema the api creates
+again.
+
+`clean` is `down` plus the tokens, the agent state and `docker/.env`, which
+leaves nothing behind for the next `kickstart` to reuse.
 
 ## What it writes
 
