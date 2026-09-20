@@ -33,6 +33,11 @@ in it against the tokens in `local/` and stops when they differ, so a stack you
 configured by hand keeps its own credentials: put those tokens into
 `local/operator` and `local/enrollment`, or start over with `make clean`.
 
+For the same reason it refuses to write a new `docker/.env` while
+`docker/data/db` already holds a database: postgres keeps the password of its
+first start, and a generated one would never match it. Delete that directory to
+start clean, or bring back the `.env` it was created with.
+
 All settings come from `docker/.env`, the same file compose reads, so the
 printed urls follow `NAOS_BIND`, `NAOS_API_PORT` and `NAOS_WEB_PORT`.
 

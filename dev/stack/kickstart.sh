@@ -45,11 +45,17 @@ check_hash() {
         fail "$env_file holds another $1: put its token in $LOCAL/$2, or run make clean"
 }
 
+# Postgres keeps the password of its first start, so a generated one and a
+# cluster from an older .env never match.
 write_env() {
     if [ -f "$env_file" ]; then
         check_hash NAOS_OPERATOR_TOKEN_SHA256 operator
         check_hash NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256 enrollment
         return
+    fi
+    if [ -d "$compose/data/db" ]; then
+        fail "$compose/data/db is a cluster of an older $env_file:" \
+            "remove that directory, or write the .env it belongs to yourself"
     fi
     sed -e "s|^NAOS_TAG=.*|NAOS_TAG=local|" \
         -e "s|^NAOS_DB_PASSWORD=.*|NAOS_DB_PASSWORD=$(token)|" \
@@ -97,7 +103,10 @@ kickstart() {
     settings
     "$MAKE" -C "$compose" images
     "$MAKE" -C "$compose" up
-    wait_for 60 curl -fs -o /dev/null "$api/healthz" || fail "the api did not answer at $api/healthz"
+    if ! wait_for 60 curl -fs -o /dev/null "$api/healthz"; then
+        (cd "$compose" && docker compose logs --tail 20 api) >&2
+        fail "the api did not answer at $api/healthz"
+    fi
     if pid="$(agent_pid)"; then
         echo "the runner is already up, pid $pid"
     else
