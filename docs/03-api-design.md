@@ -8,7 +8,7 @@ Implement the control-plane API as a thin HTTP layer over application/domain ser
 
 Python 3.12+, FastAPI, Pydantic, SQLModel. `NAOS_DATABASE_URL` names any
 database SQLAlchemy supports. The schema is plain tables with no triggers,
-stored procedures or foreign keys, so the same SQL runs everywhere. The task
+stored procedures or foreign keys, so the same SQL runs everywhere. The Run
 lifecycle is a [transitions](https://github.com/pytransitions/transitions)
 state machine.
 
@@ -16,8 +16,8 @@ state machine.
 
 - Every timestamp, in the database and on the wire, is an integer count of
   seconds since the Unix epoch, UTC.
-- Tasks carry a unique, increasing `seq`. Runners receive PENDING tasks in
-  `seq` order, and `GET /tasks` lists them newest first.
+- Runs carry a unique, increasing `seq`. Runners receive PENDING Runs in
+  `seq` order, and `GET /runs` lists them newest first.
 
 ## Settings
 
@@ -49,18 +49,18 @@ Own Agents, Images, Profiles, Policies, Runs, Runners, Leases, audit records, an
 ## Suggested endpoints
 
 ```text
-POST /api/v1/tasks
-GET /api/v1/tasks
-GET /api/v1/tasks/{task_id}
-POST /api/v1/tasks/{task_id}/stop
+POST /api/v1/runs
+GET /api/v1/runs
+GET /api/v1/runs/{run_id}
+POST /api/v1/runs/{run_id}/stop
 POST /api/v1/runners/register
 POST /api/v1/runners/{runner_id}/heartbeat
-GET /api/v1/runners/{runner_id}/tasks
-GET /api/v1/tasks/{task_id}/console
-GET /api/v1/tasks/{task_id}/events
-GET /api/v1/tasks/{task_id}/merge
-POST /api/v1/tasks/{task_id}/merge
-POST /api/v1/tasks/{task_id}/merge/reject
+GET /api/v1/runners/{runner_id}/runs
+GET /api/v1/runs/{run_id}/console
+GET /api/v1/runs/{run_id}/events
+GET /api/v1/runs/{run_id}/merge
+POST /api/v1/runs/{run_id}/merge
+POST /api/v1/runs/{run_id}/merge/reject
 POST /api/v1/policies
 GET /api/v1/policies/{policy_id}
 POST /api/v1/images
@@ -77,9 +77,9 @@ Use transactions for atomic transitions and design mutations to be idempotent.
 
 ## Idempotency
 
-- `POST /tasks` requires an `Idempotency-Key` header. The same key with the same
+- `POST /runs` requires an `Idempotency-Key` header. The same key with the same
   spec returns the existing Run with 200; with another spec it returns 409.
-- `POST /tasks/{task_id}/stop` returns the current Run when there is nothing to
+- `POST /runs/{run_id}/stop` returns the current Run when there is nothing to
   stop.
 - `POST /policies` deduplicates by content: the same document returns
   the existing policy with 200.
@@ -134,25 +134,25 @@ in [packer/README.md](../packer/README.md).
   422.
 - `id`, `version`, `digest` and `url` are immutable and image rows are never
   deleted: no endpoint or service writes them, like the Run spec.
-- `POST /tasks` requires a registered image with the same `id` and `digest`,
+- `POST /runs` requires a registered image with the same `id` and `digest`,
   otherwise it returns 422.
 
 ## Merge
 
-The operator side of a WAITING_MERGE Run. All three answer with `task_id`,
+The operator side of a WAITING_MERGE Run. All three answer with `run_id`,
 `entries`, `decision`, `conflicts`, `report` and `updated_at`.
 
-- `GET /api/v1/tasks/{task_id}/merge` returns the collected diff and where
+- `GET /api/v1/runs/{run_id}/merge` returns the collected diff and where
   the merge stands, or 404 before the diff arrives.
-- `POST /api/v1/tasks/{task_id}/merge` takes `paths` and optional
+- `POST /api/v1/runs/{run_id}/merge` takes `paths` and optional
   `resolutions`, a map of a selected path to `skip`, `take` or `export`. A
   selection that does not fit the diff gets 422, and a Run that is not
   waiting or already has a pending decision gets 409.
-- `POST /api/v1/tasks/{task_id}/merge/reject` is a decision with no paths:
+- `POST /api/v1/runs/{run_id}/merge/reject` is a decision with no paths:
   the Run completes and the workspace stays as it is.
 
 ```bash
-curl -fsS "$api/api/v1/tasks/$task/merge" -d '{"paths": ["notes.txt"], "resolutions": {"notes.txt": "take"}}'
+curl -fsS "$api/api/v1/runs/$run/merge" -d '{"paths": ["notes.txt"], "resolutions": {"notes.txt": "take"}}'
 ```
 
 ## Runner interface
@@ -163,10 +163,10 @@ operator principal and opens nothing outside its own runner.
 ```text
 POST /api/v1/runners/register                                enrollment token
 POST /api/v1/runners/{runner_id}/heartbeat                   runner token
-GET  /api/v1/runners/{runner_id}/tasks                       runner token
-POST /api/v1/runners/{runner_id}/tasks/{task_id}/transition  runner token
-POST /api/v1/runners/{runner_id}/tasks/{task_id}/diff        runner token
-POST /api/v1/runners/{runner_id}/tasks/{task_id}/merge       runner token
+GET  /api/v1/runners/{runner_id}/runs                       runner token
+POST /api/v1/runners/{runner_id}/runs/{run_id}/transition  runner token
+POST /api/v1/runners/{runner_id}/runs/{run_id}/diff        runner token
+POST /api/v1/runners/{runner_id}/runs/{run_id}/merge       runner token
 POST /api/v1/runners/{runner_id}/events                      runner token
 ```
 
@@ -196,7 +196,7 @@ POST /api/v1/runners/{runner_id}/events                      runner token
 - A heartbeat assigns unassigned PENDING Runs up to the capacity the runner
   reports. Each assignment is compare-and-swap, so a Run never lands on two
   leases.
-- `GET .../tasks` returns the desired state: every non-terminal Run on the
+- `GET .../runs` returns the desired state: every non-terminal Run on the
   live lease, with its spec, the `image_url` of its image, the resolved
   policy documents, `credentials` and `merge`, the merge decision of a
   WAITING_MERGE Run or null.
@@ -237,7 +237,7 @@ and the API moves the Run ([09](09-overlay-and-merge.md#merge)).
 
 ### Audit events
 
-`GET /api/v1/tasks/{task_id}/events` and `GET /api/v1/audit` read the audit
+`GET /api/v1/runs/{run_id}/events` and `GET /api/v1/audit` read the audit
 trail, and `POST .../events` takes the runner's own events; the catalogue and
 the schemas are in [11](11-observability.md#audit-trail).
 

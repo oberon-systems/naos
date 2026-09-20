@@ -105,8 +105,8 @@ what happens next:
 | `ask` | the operator decides, the default |
 
 An `always` diff with a sensitive entry waits for the operator like `ask`.
-The operator reads the diff with `GET /api/v1/tasks/{task_id}/merge` and
-selects paths with `POST /api/v1/tasks/{task_id}/merge`, or merges nothing
+The operator reads the diff with `GET /api/v1/runs/{run_id}/merge` and
+selects paths with `POST /api/v1/runs/{run_id}/merge`, or merges nothing
 with `POST .../merge/reject` ([03](03-api-design.md#merge)). A selection
 names whole paths: a `rejected` path, a deleted directory without the
 deleted entries under it or the renames out of it, and an entry inside a

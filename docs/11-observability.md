@@ -49,9 +49,9 @@ describe, so a change and its event land or fail together.
 
 | Event | Actor | Data |
 |---|---|---|
-| `task_created` | operator | none |
-| `task_transition` | operator, runner, system | `from`, `to`, `reason` |
-| `task_stop_requested` | operator | `status` |
+| `run_created` | operator | none |
+| `run_transition` | operator, runner, system | `from`, `to`, `reason` |
+| `run_stop_requested` | operator | `status` |
 | `runner_registered` | runner | none |
 | `lease_acquired` | runner | `lease_id` |
 | `lease_expired` | system | `lease_id` |
@@ -66,7 +66,7 @@ describe, so a change and its event land or fail together.
 | `secret_created` | operator | `name` only |
 
 A lease that expires fails its active Runs, and each of those is a
-`task_transition` by `system` with the reason `runner lease expired`.
+`run_transition` by `system` with the reason `runner lease expired`.
 
 ## Runner events
 
@@ -104,16 +104,16 @@ available, with `audit.lock` next to it serialising both processes.
 
 Both endpoints need the operator token.
 
-- `GET /api/v1/tasks/{task_id}/events` is the timeline of one Run, ordered by
+- `GET /api/v1/runs/{run_id}/events` is the timeline of one Run, ordered by
   `at` and then `seq`, up to `limit` rows (1000 by default, at most 10000).
-  An unknown task gets 404.
+  An unknown Run gets 404.
 - `GET /api/v1/audit` lists every event in `seq` order, filtered by
   `runner_id`, `event` and `since` (an `at` in seconds), `limit` rows at a
   time (100 by default, at most 1000). Pass the last `seq` as `after` for the
   next page.
 
 ```bash
-curl -fsS -H "Authorization: Bearer $operator" "$api/api/v1/tasks/$task/events"
+curl -fsS -H "Authorization: Bearer $operator" "$api/api/v1/runs/$run/events"
 curl -fsS -H "Authorization: Bearer $operator" "$api/api/v1/audit?event=network_denied&limit=100"
 ```
 
