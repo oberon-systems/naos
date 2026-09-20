@@ -21,6 +21,22 @@ fn raw() -> RawConfig {
     }
 }
 
+fn config_with(state_dir: &Path) -> Config {
+    let runtime = RawRuntimeConfig {
+        image_dir: Some("/srv/naos/vms".into()),
+        vm_dir: Some("/srv/naos/runs".into()),
+        ..RawRuntimeConfig::default()
+    };
+    Config {
+        api_url: parse_api_url(API_URL).expect("url"),
+        name: "alpha".into(),
+        capacity: DEFAULT_CAPACITY,
+        state_dir: state_dir.to_path_buf(),
+        enrollment_token_file: TOKEN_FILE.into(),
+        runtime: RuntimeConfig::resolve(runtime, &UserDirs::default()).expect("runtime"),
+    }
+}
+
 fn full_env(env: &mut EnvSetter) {
     env.set("NAOS_AGENT_API_URL", API_URL);
     env.set("NAOS_AGENT_NAME", "alpha");
@@ -131,6 +147,22 @@ fn private_dirs_are_created_and_shared_ones_refused() {
     let link = dir.path().join("link");
     symlink(&fresh, &link).expect("symlink");
     assert!(prepare_private_dir(&link).is_err());
+}
+
+#[test]
+fn the_state_directory_is_prepared_at_start() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let state = dir.path().join("agent/state");
+
+    config_with(&state).prepare().expect("created");
+    assert_eq!(
+        fs::metadata(&state).expect("meta").permissions().mode() & 0o777,
+        0o700
+    );
+
+    let link = dir.path().join("link");
+    symlink(&state, &link).expect("symlink");
+    assert!(config_with(&link).prepare().is_err());
 }
 
 #[test]

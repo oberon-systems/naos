@@ -58,6 +58,7 @@ fn run() -> Result<(), AgentError> {
 }
 
 async fn serve(config: Config) -> Result<(), AgentError> {
+    config.prepare()?;
     audit::install(Spool::new(&config.state_dir));
     let api = HttpApi::new(config.api_url.clone())?;
     let runtime = QemuRuntime::new(&config.runtime)?;

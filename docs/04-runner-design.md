@@ -71,9 +71,9 @@ working directory could otherwise redirect the API URL the agent trusts.
 The agent runs as an unprivileged user, typically a systemd user unit, so its
 default directories are that user's. Runtime paths must be absolute and free of
 commas and control characters, because they end up inside QEMU options. The
-image and VM directories are created with mode 0700, and the agent refuses to
-start when either is a symlink or writable by group or others. Without `HOME`
-and without explicit directories, it refuses to start as well.
+image, VM and state directories are created with mode 0700, and the agent
+refuses to start when any of them is a symlink or writable by group or others.
+Without `HOME` and without explicit directories, it refuses to start as well.
 
 A systemd unit needs `KillMode=process`: QEMU runs in its own process group
 but in the unit's cgroup, and stopping the agent must leave VMs running for the

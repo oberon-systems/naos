@@ -98,6 +98,11 @@ impl Config {
             runtime: runtime()?,
         })
     }
+
+    // The runtime prepares the image and vm directories; the state one is nobody else's.
+    pub fn prepare(&self) -> Result<(), AgentError> {
+        prepare_private_dir(&self.state_dir)
+    }
 }
 
 impl RuntimeConfig {
