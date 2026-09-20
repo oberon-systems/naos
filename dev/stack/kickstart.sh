@@ -91,6 +91,8 @@ agent_env() {
     export NAOS_AGENT_NAME="$name"
     export NAOS_AGENT_STATE_DIR="$LOCAL/agent"
     export NAOS_AGENT_ENROLLMENT_TOKEN_FILE="$LOCAL/enrollment"
+    # The runner creates its image and vm directories, but not the state one.
+    [ -d "$LOCAL/agent" ] || mkdir -m 700 "$LOCAL/agent"
     [ -x "$runner" ] || cargo build --release -p naos-runner --manifest-path "$ROOT/Cargo.toml"
 }
 
