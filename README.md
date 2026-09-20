@@ -6,9 +6,11 @@ The agent works on a read-only share of the host workspace, its changes land on
 a separate disk instead of the host, and network, shell and MCP access go
 through host-side gates. Anything not granted is denied.
 
-The control plane is a Python API that owns Runs and their immutable policies.
-A Rust runner on each host leases Runs, boots them from a
-[Packer](https://www.packer.io/)-built image and enforces the policies.
+The control plane is a [Python API](packages/api/README.md) that owns Runs and
+their immutable policies, with an [operator interface](packages/web/README.md)
+in front of it. A [Rust runner](packages/runner/README.md) on each host leases
+Runs, boots them from a [Packer](https://www.packer.io/)-built
+[image](packer/README.md) and enforces the policies.
 [docs/00-architecture.md](docs/00-architecture.md) describes the whole design.
 
 ## Requirements
