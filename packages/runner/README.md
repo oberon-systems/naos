@@ -31,14 +31,23 @@ Every setting is an environment variable with the `NAOS_AGENT_` prefix, read
 once at start; `NAOS_AGENT_ENV_FILE` names a `.env` file loaded before them.
 The runner refuses to start on a setting it cannot use.
 
+The runner is an unprivileged user process, so its paths are that user's own.
+`NAOS_AGENT_STATE_DIR` and `NAOS_AGENT_ENROLLMENT_TOKEN_FILE` have no defaults
+and the rest can stay unset; the token file must be 0600 and the state
+directory is created 0700.
+
 ```bash
 export NAOS_AGENT_API_URL=https://api.example.com
 export NAOS_AGENT_NAME=alpha
 export NAOS_AGENT_CAPACITY=2
-export NAOS_AGENT_STATE_DIR=/var/lib/naos-agent
-export NAOS_AGENT_ENROLLMENT_TOKEN_FILE=/etc/naos-agent/enrollment
+export NAOS_AGENT_STATE_DIR="$HOME/.local/state/naos/agent"
+export NAOS_AGENT_ENROLLMENT_TOKEN_FILE="$HOME/.config/naos/enrollment"
 runner
 ```
+
+The enrollment token is what the api checks once, at registration; afterwards
+the runner uses the token the api issued it and keeps it in
+`credentials.json` in the state directory.
 
 The full table, the state layout and the console protocol are in
 [docs/04-runner-design.md](https://github.com/oberon-systems/naos/blob/main/docs/04-runner-design.md).

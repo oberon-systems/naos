@@ -12,7 +12,7 @@ export PATH := $(CURDIR)/.packer/bin:$(PATH)
 export PACKER_PLUGIN_PATH := $(CURDIR)/.packer/plugins
 
 .DEFAULT_GOAL := shell
-.PHONY: install shell test test-api test-image test-web smoke lint run-api run-web
+.PHONY: install shell test test-api test-image test-web smoke lint run-api run-web kickstart
 
 
 # common targets
@@ -43,6 +43,9 @@ run-api:
 
 run-web:
 	$(VENV)/bin/uvicorn --factory naos_web.app:create_app --host 127.0.0.1 --port 8001
+
+kickstart:
+	$(MAKE) -C dev/stack kickstart
 
 
 # defaults

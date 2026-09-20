@@ -24,13 +24,25 @@ cp .env.example .env
 chmod 600 .env
 ```
 
-Generate the operator token and the runner enrollment token, keep the tokens
-somewhere safe, and write only their hashes into `.env`:
+The api authenticates two different callers, so there are two tokens and two
+hashes:
+
+| Variable | Whose token | Who presents it | What it closes |
+|---|---|---|---|
+| `NAOS_OPERATOR_TOKEN_SHA256` | operator token | you, curl or CI, as `Authorization: Bearer` | everything under `/api/v1` except `/api/v1/runners` |
+| `NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256` | enrollment token | a runner once, at `POST /api/v1/runners/register` | registering new runners |
+
+Generate both, keep the tokens somewhere safe and write only their hashes into
+`.env`. `printf %s` matters: a trailing newline hashes to something else.
 
 ```bash
 python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
 printf %s TOKEN | sha256sum | cut -d' ' -f1
 ```
+
+A runner never sees the operator token, and the enrollment token is spent at
+registration: from then on the runner uses the runner token the api issued it.
+Either hash left unset closes its routes, it does not open them.
 
 For a deployment, also pin `NAOS_TAG` to a released version instead of
 `latest`, set `NAOS_ALLOWED_MOUNT_ROOTS` to the directories a Run may mount,
@@ -45,6 +57,19 @@ docker compose pull
 docker compose up -d
 docker compose ps
 ```
+
+To run the images built from this working tree instead of the published ones,
+set `NAOS_TAG` in `.env` to a tag of your own, `local` for instance, and build
+them:
+
+```bash
+make -C docker images
+make -C docker up
+```
+
+`images` reads the same `.env`, so it tags exactly what compose then starts.
+For a local stack with the runner and the tokens already wired up, use
+[dev/stack](../dev/stack/README.md) instead.
 
 The api waits for the database to report healthy and creates its schema on
 startup. Check both services:
@@ -72,15 +97,32 @@ curl -fsS -H "Authorization: Bearer $NAOS_OPERATOR_TOKEN" \
 
 Point the [runner](https://github.com/oberon-systems/naos/blob/main/packages/runner/README.md)
 on the host at the published api and give it the file holding the enrollment
-token:
+token. The runner is an unprivileged user process, so both paths are that
+user's own; the token file is 0600 and the state directory is created 0700:
 
 ```bash
 export NAOS_AGENT_API_URL=http://127.0.0.1:8000
 export NAOS_AGENT_NAME=alpha
-export NAOS_AGENT_STATE_DIR=/var/lib/naos-agent
-export NAOS_AGENT_ENROLLMENT_TOKEN_FILE=/etc/naos-agent/enrollment
+export NAOS_AGENT_STATE_DIR="$HOME/.local/state/naos/agent"
+export NAOS_AGENT_ENROLLMENT_TOKEN_FILE="$HOME/.config/naos/enrollment"
 runner
 ```
+
+Leave `NAOS_AGENT_IMAGE_DIR` and `NAOS_AGENT_VM_DIR` alone unless you want them
+elsewhere: they default to `~/.local/share/naos/vms` and
+`~/.local/state/naos/runs`.
+
+A registered runner shows up in three places: its own log, the
+`credentials.json` the api issued it in the state directory, and a
+`runner_registered` record in the audit trail.
+
+```bash
+curl -fsS -H "Authorization: Bearer $NAOS_OPERATOR_TOKEN" \
+    http://127.0.0.1:8000/api/v1/audit
+```
+
+There is no operator route listing runners yet, and the web ui is still a shell
+that makes no api calls, so the audit trail is the place to look.
 
 Upgrading is a new tag and a restart; the schema follows the api image:
 

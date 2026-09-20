@@ -22,6 +22,9 @@ packer_cache/
 build/
 *.egg-info/
 
+# Local stack, tokens and agent state
+dev/stack/local/
+
 # Local databases
 docker/data/
 *.db
