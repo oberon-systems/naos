@@ -5,6 +5,8 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "naos-web"
 version = "0.0.0"
+description = "Operator interface for naos: runs, runners, images, profiles and the audit trail"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi",
@@ -12,6 +14,10 @@ dependencies = [
   "naos-common",
   "pydantic-settings",
 ]
+
+[project.urls]
+Homepage = "https://github.com/oberon-systems/naos"
+Repository = "https://github.com/oberon-systems/naos"
 
 [project.optional-dependencies]
 # What serves the app in a container; the library itself needs neither.
