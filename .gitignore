@@ -23,6 +23,7 @@ build/
 *.egg-info/
 
 # Local databases
+docker/data/
 *.db
 *.sqlite3
 

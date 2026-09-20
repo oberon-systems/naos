@@ -1,0 +1,47 @@
+# The stack for a local test run and for a deployment alike: the images come
+# from the registry, everything host-specific comes from .env (see .env.example).
+name: naos
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${NAOS_DB_NAME:-naos}
+      POSTGRES_USER: ${NAOS_DB_USER:-naos}
+      POSTGRES_PASSWORD: ${NAOS_DB_PASSWORD:?set NAOS_DB_PASSWORD in .env}
+    volumes:
+      - ${NAOS_DB_DATA:-./data/db}:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U ${NAOS_DB_USER:-naos} -d ${NAOS_DB_NAME:-naos}
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  api:
+    image: ${NAOS_REGISTRY:-ghcr.io/oberon-systems}/naos-api:${NAOS_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      NAOS_DATABASE_URL: postgresql+psycopg://${NAOS_DB_USER:-naos}:${NAOS_DB_PASSWORD:?set NAOS_DB_PASSWORD in .env}@${NAOS_DB_HOST:-db}:${NAOS_DB_PORT:-5432}/${NAOS_DB_NAME:-naos}
+      NAOS_OPERATOR_TOKEN_SHA256: ${NAOS_OPERATOR_TOKEN_SHA256:?sha256 of the operator token}
+      NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256: ${NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256:?sha256 of the runner enrollment token}
+      # Host paths as the runner sees them; the api only validates the strings.
+      NAOS_ALLOWED_MOUNT_ROOTS: '${NAOS_ALLOWED_MOUNT_ROOTS:-[]}'
+    ports:
+      - "${NAOS_BIND:-127.0.0.1}:${NAOS_API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  web:
+    image: ${NAOS_REGISTRY:-ghcr.io/oberon-systems}/naos-web:${NAOS_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      NAOS_WEB_API_BASE_URL: ${NAOS_WEB_API_BASE_URL:-http://127.0.0.1:8000}
+    ports:
+      - "${NAOS_BIND:-127.0.0.1}:${NAOS_WEB_PORT:-8001}:8000"

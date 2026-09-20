@@ -94,6 +94,16 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false
+      # The three required variables are only interpolated, never used, so the
+      # dummy values keep `config` from failing on an operator's empty .env.
+      - id: compose-config
+        name: docker compose config
+        entry: env NAOS_DB_PASSWORD=x NAOS_OPERATOR_TOKEN_SHA256=x
+          NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256=x
+          docker compose --file docker/compose.yaml config --quiet
+        language: system
+        files: ^docker/compose\.yaml$
+        pass_filenames: false
       - id: packer-fmt
         name: packer fmt
         entry: packer fmt -recursive packer
