@@ -5,7 +5,7 @@ from transitions import Machine
 from naos_api.errors import InvalidTransitionError
 
 
-class TaskStatus(StrEnum):
+class RunStatus(StrEnum):
     PENDING = "PENDING"
     STARTING = "STARTING"
     STARTED = "STARTED"
@@ -17,11 +17,11 @@ class TaskStatus(StrEnum):
     CANCELLED = "CANCELLED"
 
 
-S = TaskStatus
+S = RunStatus
 
 LIFECYCLE = Machine(
     model=None,
-    states=TaskStatus,
+    states=RunStatus,
     initial=S.PENDING,
     auto_transitions=False,
     transitions=[
@@ -41,18 +41,18 @@ LIFECYCLE = Machine(
 )
 
 
-def targets(current: TaskStatus) -> frozenset[TaskStatus]:
+def targets(current: RunStatus) -> frozenset[RunStatus]:
     return frozenset(
-        TaskStatus(transition.dest)
+        RunStatus(transition.dest)
         for transition in LIFECYCLE.get_transitions(source=current.name)
         if transition.dest is not None
     )
 
 
-TERMINAL = frozenset(status for status in TaskStatus if not targets(status))
-ACTIVE = frozenset(TaskStatus) - TERMINAL - {TaskStatus.PENDING}
+TERMINAL = frozenset(status for status in RunStatus if not targets(status))
+ACTIVE = frozenset(RunStatus) - TERMINAL - {RunStatus.PENDING}
 
 
-def ensure_transition(current: TaskStatus, target: TaskStatus) -> None:
+def ensure_transition(current: RunStatus, target: RunStatus) -> None:
     if target not in targets(current):
         raise InvalidTransitionError(f"transition {current} -> {target} is not allowed")

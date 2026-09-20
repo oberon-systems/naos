@@ -82,9 +82,9 @@ def test_unknown_image_is_not_found(client: TestClient) -> None:
         {"id": "image_alpha", "digest": OTHER_DIGEST},
     ],
 )
-def test_task_needs_a_registered_image(
+def test_run_needs_a_registered_image(
     client: TestClient, spec_body: dict[str, Any], image: dict[str, str]
 ) -> None:
     spec_body["image"] = image
 
-    assert client.post("/api/v1/tasks", json=spec_body, headers=KEY).status_code == 422
+    assert client.post("/api/v1/runs", json=spec_body, headers=KEY).status_code == 422

@@ -6,8 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, create_model, mode
 from sqlmodel import Session, col, select
 
 from naos_api.clock import now_ts
-from naos_api.lifecycle import TaskStatus
-from naos_api.models import AuditEvent, Lease, Task
+from naos_api.lifecycle import RunStatus
+from naos_api.models import AuditEvent, Lease, Run
 
 Actor = Literal["operator", "runner", "system"]
 EventId = Annotated[str, Field(pattern=r"^evt_[0-9a-f]{32}$")]
@@ -18,9 +18,9 @@ GuestPath = Annotated[str, Field(max_length=4096)]
 Count = Annotated[StrictInt, Field(ge=0)]
 
 API_EVENTS: dict[str, frozenset[str]] = {
-    "task_created": frozenset(),
-    "task_transition": frozenset({"from", "to", "reason"}),
-    "task_stop_requested": frozenset({"status"}),
+    "run_created": frozenset(),
+    "run_transition": frozenset({"from", "to", "reason"}),
+    "run_stop_requested": frozenset({"status"}),
     "runner_registered": frozenset(),
     "lease_acquired": frozenset({"lease_id"}),
     "lease_expired": frozenset({"lease_id"}),
@@ -140,9 +140,9 @@ def record(
 
 def transitioned(
     session: Session,
-    task_id: str,
-    expected: TaskStatus,
-    target: TaskStatus,
+    run_id: str,
+    expected: RunStatus,
+    target: RunStatus,
     reason: str | None,
     *,
     actor: Actor,
@@ -151,9 +151,9 @@ def transitioned(
     moved = {"from": str(expected), "to": str(target), "reason": reason}
     record(
         session,
-        "task_transition",
+        "run_transition",
         actor=actor,
-        run_id=task_id,
+        run_id=run_id,
         runner_id=runner_id,
         **moved,
     )
@@ -163,9 +163,9 @@ def _held(session: Session, runner_id: str, run_ids: set[str]) -> set[str]:
     if not run_ids:
         return set()
     statement = (
-        select(Task.id)
-        .join(Lease, col(Task.lease_id) == col(Lease.id))
-        .where(col(Lease.runner_id) == runner_id, col(Task.id).in_(run_ids))
+        select(Run.id)
+        .join(Lease, col(Run.lease_id) == col(Lease.id))
+        .where(col(Lease.runner_id) == runner_id, col(Run.id).in_(run_ids))
     )
     return set(session.exec(statement).all())
 
@@ -213,10 +213,10 @@ def ingest(
     raise AssertionError("unreachable")
 
 
-def timeline(session: Session, task_id: str, limit: int) -> Sequence[AuditEvent]:
+def timeline(session: Session, run_id: str, limit: int) -> Sequence[AuditEvent]:
     statement = (
         select(AuditEvent)
-        .where(col(AuditEvent.run_id) == task_id)
+        .where(col(AuditEvent.run_id) == run_id)
         .order_by(col(AuditEvent.at), col(AuditEvent.seq))
         .limit(limit)
     )

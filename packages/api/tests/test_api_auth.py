@@ -46,4 +46,4 @@ def test_operator_token_guards_v1_routes(
     configure(operator_token_sha256=configured and hashlib.sha256(configured.encode()).hexdigest())
     headers = {"Authorization": f"Bearer {sent}"} if sent else {}
 
-    assert TestClient(create_app()).get("/api/v1/tasks", headers=headers).status_code == status
+    assert TestClient(create_app()).get("/api/v1/runs", headers=headers).status_code == status

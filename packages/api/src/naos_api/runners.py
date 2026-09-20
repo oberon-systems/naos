@@ -7,15 +7,15 @@ from uuid import uuid4
 
 from sqlmodel import Session, col, func, or_, select, update
 
-from naos_api import audit, tasks
+from naos_api import audit, runs
 from naos_api.errors import InvalidTransitionError, LeaseError, NotFoundError
 from naos_api.images.service import check_image
-from naos_api.lifecycle import TERMINAL, TaskStatus
-from naos_api.models import Lease, Merge, Policy, Runner, Task
+from naos_api.lifecycle import TERMINAL, RunStatus
+from naos_api.models import Lease, Merge, Policy, Run, Runner
 from naos_api.secrets import IssuedCredential, issue_credentials
 from naos_api.spec import PolicyKind, RunSpec
 
-S = TaskStatus
+S = RunStatus
 LEASE_EXPIRED_REASON = "runner lease expired"
 LEASE_BOUND = frozenset({S.STARTING, S.STARTED, S.STOPPING, S.COLLECTING})
 CREDENTIAL_BOUND = frozenset({S.PENDING, S.STARTING, S.STARTED})
@@ -65,8 +65,8 @@ class Heartbeat:
 
 
 @dataclass(frozen=True)
-class DesiredTask:
-    task: Task
+class DesiredRun:
+    run: Run
     image_url: str
     policies: dict[PolicyKind, dict[str, Any] | None]
     credentials: dict[str, IssuedCredential]
@@ -130,18 +130,18 @@ def authenticate(session: Session, token: str, now: int) -> RunnerPrincipal | No
 
 
 def _fail_bound(session: Session, lease_id: str, runner_id: str, now: int) -> None:
-    bound = col(Task.lease_id) == lease_id
-    statement = select(Task.id, Task.status).where(bound, col(Task.status).in_(LEASE_BOUND))
-    for task_id, status in session.exec(statement).all():
+    bound = col(Run.lease_id) == lease_id
+    statement = select(Run.id, Run.status).where(bound, col(Run.status).in_(LEASE_BOUND))
+    for run_id, status in session.exec(statement).all():
         failed = session.exec(
-            update(Task)
-            .where(col(Task.id) == task_id, col(Task.status) == status, bound)
+            update(Run)
+            .where(col(Run.id) == run_id, col(Run.status) == status, bound)
             .values(status=S.FAILED, status_reason=LEASE_EXPIRED_REASON, updated_at=now)
         )
         if failed.rowcount == 1:
             audit.transitioned(
                 session,
-                task_id,
+                run_id,
                 S(status),
                 S.FAILED,
                 LEASE_EXPIRED_REASON,
@@ -166,8 +166,8 @@ def expire_leases(session: Session, now: int) -> list[str]:
             session, "lease_expired", actor="system", runner_id=runner_id, lease_id=lease_id
         )
         session.exec(
-            update(Task)
-            .where(col(Task.lease_id) == lease_id, col(Task.status) == S.PENDING)
+            update(Run)
+            .where(col(Run.lease_id) == lease_id, col(Run.status) == S.PENDING)
             .values(lease_id=None, updated_at=now)
         )
         _fail_bound(session, lease_id, runner_id, now)
@@ -222,11 +222,11 @@ def _rebind_waiting(session: Session, runner_id: str, lease_id: str, now: int) -
     lapsed = select(Lease.id).where(
         col(Lease.runner_id) == runner_id, col(Lease.expired_at).is_not(None)
     )
-    waiting = (col(Task.status) == S.WAITING_MERGE, col(Task.lease_id).in_(lapsed))
-    for task_id in session.exec(select(Task.id).where(*waiting)).all():
+    waiting = (col(Run.status) == S.WAITING_MERGE, col(Run.lease_id).in_(lapsed))
+    for run_id in session.exec(select(Run.id).where(*waiting)).all():
         rebound = session.exec(
-            update(Task)
-            .where(col(Task.id) == task_id, *waiting)
+            update(Run)
+            .where(col(Run.id) == run_id, *waiting)
             .values(lease_id=lease_id, updated_at=now)
         )
         if rebound.rowcount == 1:
@@ -234,7 +234,7 @@ def _rebind_waiting(session: Session, runner_id: str, lease_id: str, now: int) -
                 session,
                 "waiting_rebound",
                 actor="system",
-                run_id=task_id,
+                run_id=run_id,
                 runner_id=runner_id,
                 lease_id=lease_id,
             )
@@ -271,9 +271,9 @@ def _rotate_token(
 
 def _candidates(session: Session, limit: int) -> Sequence[str]:
     statement = (
-        select(Task.id)
-        .where(col(Task.status) == S.PENDING, col(Task.lease_id).is_(None))
-        .order_by(col(Task.seq))
+        select(Run.id)
+        .where(col(Run.status) == S.PENDING, col(Run.lease_id).is_(None))
+        .order_by(col(Run.seq))
         .limit(limit)
     )
     return session.exec(statement).all()
@@ -282,18 +282,16 @@ def _candidates(session: Session, limit: int) -> Sequence[str]:
 def _assign(session: Session, lease_id: str, capacity: int, now: int) -> None:
     held = session.exec(
         select(func.count())
-        .select_from(Task)
-        .where(col(Task.lease_id) == lease_id, col(Task.status).not_in(TERMINAL))
+        .select_from(Run)
+        .where(col(Run.lease_id) == lease_id, col(Run.status).not_in(TERMINAL))
     ).one()
     free = capacity - held
     if free <= 0:
         return
-    for task_id in _candidates(session, free):
+    for run_id in _candidates(session, free):
         session.exec(
-            update(Task)
-            .where(
-                col(Task.id) == task_id, col(Task.status) == S.PENDING, col(Task.lease_id).is_(None)
-            )
+            update(Run)
+            .where(col(Run.id) == run_id, col(Run.status) == S.PENDING, col(Run.lease_id).is_(None))
             .values(lease_id=lease_id, updated_at=now)
         )
     session.commit()
@@ -321,12 +319,12 @@ def heartbeat(
     return Heartbeat(lease=lease, token=token)
 
 
-def _policies(session: Session, task: Task) -> dict[PolicyKind, dict[str, Any] | None]:
+def _policies(session: Session, run: Run) -> dict[PolicyKind, dict[str, Any] | None]:
     refs = {
-        PolicyKind.MOUNT: task.mount_policy_id,
-        PolicyKind.NETWORK: task.network_policy_id,
-        PolicyKind.SHELL: task.shell_policy_id,
-        PolicyKind.MCP: task.mcp_policy_id,
+        PolicyKind.MOUNT: run.mount_policy_id,
+        PolicyKind.NETWORK: run.network_policy_id,
+        PolicyKind.SHELL: run.shell_policy_id,
+        PolicyKind.MCP: run.mcp_policy_id,
     }
     policies: dict[PolicyKind, dict[str, Any] | None] = {}
     for kind, policy_id in refs.items():
@@ -338,12 +336,12 @@ def _policies(session: Session, task: Task) -> dict[PolicyKind, dict[str, Any] |
 def _credentials(
     session: Session,
     runner_id: str,
-    task: Task,
+    run: Run,
     mcp: dict[str, Any] | None,
     now: int,
     ttl: int,
 ) -> dict[str, IssuedCredential]:
-    if mcp is None or task.status not in CREDENTIAL_BOUND:
+    if mcp is None or run.status not in CREDENTIAL_BOUND:
         return {}
     names = {server["credential"] for server in mcp["servers"] if server["credential"]}
     issued = issue_credentials(session, names, now, ttl)
@@ -352,78 +350,78 @@ def _credentials(
             session,
             "credentials_issued",
             actor="runner",
-            run_id=task.id,
+            run_id=run.id,
             runner_id=runner_id,
             names=sorted(issued),
         )
     return issued
 
 
-def _decision(session: Session, task: Task) -> dict[str, Any] | None:
-    if task.status is not S.WAITING_MERGE:
+def _decision(session: Session, run: Run) -> dict[str, Any] | None:
+    if run.status is not S.WAITING_MERGE:
         return None
-    merge = session.get(Merge, task.id)
+    merge = session.get(Merge, run.id)
     return merge.decision if merge else None
 
 
 def desired_state(
     session: Session, runner_id: str, now: int, credential_ttl: int
-) -> tuple[str, list[DesiredTask]]:
+) -> tuple[str, list[DesiredRun]]:
     expire_leases(session, now)
     lease = _live_lease(session, runner_id)
     if lease is None:
         raise LeaseError(f"runner {runner_id} holds no live lease")
     statement = (
-        select(Task)
-        .where(col(Task.lease_id) == lease.id, col(Task.status).not_in(TERMINAL))
-        .order_by(col(Task.seq))
+        select(Run)
+        .where(col(Run.lease_id) == lease.id, col(Run.status).not_in(TERMINAL))
+        .order_by(col(Run.seq))
     )
     assigned = session.exec(statement).all()
-    desired: list[DesiredTask] = []
-    for task in assigned:
-        policies = _policies(session, task)
+    desired: list[DesiredRun] = []
+    for run in assigned:
+        policies = _policies(session, run)
         desired.append(
-            DesiredTask(
-                task=task,
-                image_url=check_image(session, RunSpec.model_validate(task.spec).image).url,
+            DesiredRun(
+                run=run,
+                image_url=check_image(session, RunSpec.model_validate(run.spec).image).url,
                 policies=policies,
                 credentials=_credentials(
-                    session, runner_id, task, policies[PolicyKind.MCP], now, credential_ttl
+                    session, runner_id, run, policies[PolicyKind.MCP], now, credential_ttl
                 ),
-                merge=_decision(session, task),
+                merge=_decision(session, run),
             )
         )
     session.commit()
     return lease.id, desired
 
 
-def owned_task(session: Session, runner_id: str, task_id: str, lease_id: str, now: int) -> Task:
+def owned_run(session: Session, runner_id: str, run_id: str, lease_id: str, now: int) -> Run:
     expire_leases(session, now)
-    task = session.get(Task, task_id)
-    owner = session.get(Lease, task.lease_id) if task is not None and task.lease_id else None
-    if task is None or owner is None or owner.runner_id != runner_id:
-        raise NotFoundError(f"task {task_id} does not exist")
-    if task.lease_id != lease_id or owner.expired_at is not None:
-        raise LeaseError(f"lease {lease_id} does not hold task {task_id}")
-    return task
+    run = session.get(Run, run_id)
+    owner = session.get(Lease, run.lease_id) if run is not None and run.lease_id else None
+    if run is None or owner is None or owner.runner_id != runner_id:
+        raise NotFoundError(f"run {run_id} does not exist")
+    if run.lease_id != lease_id or owner.expired_at is not None:
+        raise LeaseError(f"lease {lease_id} does not hold run {run_id}")
+    return run
 
 
 def transition(
     session: Session,
     runner_id: str,
-    task_id: str,
+    run_id: str,
     lease_id: str,
-    expected: TaskStatus,
-    target: TaskStatus,
+    expected: RunStatus,
+    target: RunStatus,
     reason: str | None,
     now: int,
-) -> Task:
+) -> Run:
     if (expected, target) not in RUNNER_TRANSITIONS:
-        raise InvalidTransitionError(f"a runner may not move a task {expected} -> {target}")
-    owned_task(session, runner_id, task_id, lease_id, now)
-    return tasks.transition_task(
+        raise InvalidTransitionError(f"a runner may not move a run {expected} -> {target}")
+    owned_run(session, runner_id, run_id, lease_id, now)
+    return runs.transition_run(
         session,
-        task_id,
+        run_id,
         expected,
         target,
         reason,

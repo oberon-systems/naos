@@ -1,9 +1,9 @@
 import pytest
 
 from naos_api.errors import InvalidTransitionError
-from naos_api.lifecycle import ACTIVE, TERMINAL, TaskStatus, ensure_transition, targets
+from naos_api.lifecycle import ACTIVE, TERMINAL, RunStatus, ensure_transition, targets
 
-S = TaskStatus
+S = RunStatus
 EXPECTED = {
     S.PENDING: {S.STARTING, S.CANCELLED, S.FAILED},
     S.STARTING: {S.STARTED, S.STOPPING, S.FAILED},
@@ -16,20 +16,20 @@ EXPECTED = {
     S.CANCELLED: set(),
 }
 ALLOWED = [(current, target) for current, targets in EXPECTED.items() for target in targets]
-FORBIDDEN = [(c, t) for c in TaskStatus for t in TaskStatus if t not in EXPECTED[c]]
+FORBIDDEN = [(c, t) for c in RunStatus for t in RunStatus if t not in EXPECTED[c]]
 
 
 def test_machine_matches_lifecycle() -> None:
-    assert {status: set(targets(status)) for status in TaskStatus} == EXPECTED
+    assert {status: set(targets(status)) for status in RunStatus} == EXPECTED
 
 
 @pytest.mark.parametrize(("current", "target"), ALLOWED)
-def test_allowed_transition_passes(current: TaskStatus, target: TaskStatus) -> None:
+def test_allowed_transition_passes(current: RunStatus, target: RunStatus) -> None:
     ensure_transition(current, target)
 
 
 @pytest.mark.parametrize(("current", "target"), FORBIDDEN)
-def test_forbidden_transition_fails(current: TaskStatus, target: TaskStatus) -> None:
+def test_forbidden_transition_fails(current: RunStatus, target: RunStatus) -> None:
     with pytest.raises(InvalidTransitionError):
         ensure_transition(current, target)
 

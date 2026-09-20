@@ -90,7 +90,7 @@ def test_runner_token_opens_only_its_own_runner(client: TestClient, register: Re
     assert _heartbeat(client, beta["runner_id"], alpha["token"]).status_code == 403
     assert (
         client.get(
-            f"/api/v1/runners/{beta['runner_id']}/tasks", headers=_bearer(alpha["token"])
+            f"/api/v1/runners/{beta['runner_id']}/runs", headers=_bearer(alpha["token"])
         ).status_code
         == 403
     )
@@ -126,8 +126,8 @@ def test_runner_token_is_not_an_operator_principal(
 ) -> None:
     token = register()["token"]
 
-    assert raw_client.get("/api/v1/tasks", headers=_bearer(token)).status_code == 401
-    assert raw_client.post("/api/v1/tasks/run_x/stop", headers=_bearer(token)).status_code == 401
+    assert raw_client.get("/api/v1/runs", headers=_bearer(token)).status_code == 401
+    assert raw_client.post("/api/v1/runs/run_x/stop", headers=_bearer(token)).status_code == 401
 
 
 def test_expired_token_is_rejected(

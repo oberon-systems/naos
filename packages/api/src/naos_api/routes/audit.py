@@ -3,7 +3,7 @@ from typing import Annotated, Any, Self
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
-from naos_api import audit, tasks
+from naos_api import audit, runs
 from naos_api.models import AuditEvent
 from naos_api.routes.deps import SessionDep
 
@@ -28,14 +28,14 @@ class AuditEventRead(BaseModel):
 router = APIRouter()
 
 
-@router.get("/tasks/{task_id}/events")
-def task_events(
-    task_id: str,
+@router.get("/runs/{run_id}/events")
+def run_events(
+    run_id: str,
     session: SessionDep,
     limit: Annotated[int, Query(ge=1, le=10_000)] = 1000,
 ) -> list[AuditEventRead]:
-    tasks.get_task(session, task_id)
-    return [AuditEventRead.of(event) for event in audit.timeline(session, task_id, limit)]
+    runs.get_run(session, run_id)
+    return [AuditEventRead.of(event) for event in audit.timeline(session, run_id, limit)]
 
 
 @router.get("/audit")

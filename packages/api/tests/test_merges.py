@@ -7,9 +7,9 @@ from httpx import Response
 from sqlmodel import Session
 
 from naos_api import runners
-from naos_api.lifecycle import TaskStatus
+from naos_api.lifecycle import RunStatus
 
-S = TaskStatus
+S = RunStatus
 LEASE_TTL = 60
 Register = Callable[..., dict[str, str]]
 Advance = Callable[[float], None]
@@ -72,10 +72,10 @@ def _heartbeat(client: TestClient, runner: dict[str, str]) -> None:
 
 
 def _runner_post(
-    client: TestClient, runner: dict[str, str], task_id: str, action: str, body: dict[str, Any]
+    client: TestClient, runner: dict[str, str], run_id: str, action: str, body: dict[str, Any]
 ) -> Response:
     response: Response = client.post(
-        f"/api/v1/runners/{runner['runner_id']}/tasks/{task_id}/{action}",
+        f"/api/v1/runners/{runner['runner_id']}/runs/{run_id}/{action}",
         json={"lease_id": runner["lease_id"], **body},
         headers=_bearer(runner),
     )
@@ -83,9 +83,9 @@ def _runner_post(
 
 
 def _desired(client: TestClient, runner: dict[str, str]) -> dict[str, Any]:
-    response = client.get(f"/api/v1/runners/{runner['runner_id']}/tasks", headers=_bearer(runner))
+    response = client.get(f"/api/v1/runners/{runner['runner_id']}/runs", headers=_bearer(runner))
     assert response.status_code == 200, response.text
-    return {task["id"]: task for task in response.json()["tasks"]}
+    return {run["id"]: run for run in response.json()["runs"]}
 
 
 def _collecting(
@@ -95,18 +95,18 @@ def _collecting(
     policy: str | None = None,
 ) -> tuple[dict[str, str], str]:
     body = {**spec_body, "merge": {"policy": policy}} if policy else spec_body
-    created = client.post("/api/v1/tasks", json=body, headers={"Idempotency-Key": "key-1"})
+    created = client.post("/api/v1/runs", json=body, headers={"Idempotency-Key": "key-1"})
     assert created.status_code == 201, created.text
-    task_id: str = created.json()["id"]
+    run_id: str = created.json()["id"]
     runner = register()
     _heartbeat(client, runner)
     walk = [S.PENDING, S.STARTING, S.STARTED, S.STOPPING, S.COLLECTING]
     for expected, target in zip(walk, walk[1:], strict=False):
         moved = _runner_post(
-            client, runner, task_id, "transition", {"expected": expected, "target": target}
+            client, runner, run_id, "transition", {"expected": expected, "target": target}
         )
         assert moved.status_code == 200, moved.text
-    return runner, task_id
+    return runner, run_id
 
 
 def _waiting(
@@ -116,97 +116,97 @@ def _waiting(
     policy: str | None = None,
     entries: list[dict[str, Any]] | None = None,
 ) -> tuple[dict[str, str], str]:
-    runner, task_id = _collecting(client, register, spec_body, policy)
-    reported = _runner_post(client, runner, task_id, "diff", {"entries": entries or ENTRIES})
+    runner, run_id = _collecting(client, register, spec_body, policy)
+    reported = _runner_post(client, runner, run_id, "diff", {"entries": entries or ENTRIES})
     assert reported.status_code == 200, reported.text
     assert reported.json()["status"] == S.WAITING_MERGE
-    return runner, task_id
+    return runner, run_id
 
 
-def _decide(client: TestClient, task_id: str, body: dict[str, Any]) -> Response:
-    response: Response = client.post(f"/api/v1/tasks/{task_id}/merge", json=body)
+def _decide(client: TestClient, run_id: str, body: dict[str, Any]) -> Response:
+    response: Response = client.post(f"/api/v1/runs/{run_id}/merge", json=body)
     return response
 
 
 def test_ask_waits_for_an_operator_decision(
     client: TestClient, register: Register, spec_body: dict[str, Any]
 ) -> None:
-    runner, task_id = _waiting(client, register, spec_body)
+    runner, run_id = _waiting(client, register, spec_body)
 
-    assert _desired(client, runner)[task_id]["merge"] is None
-    shown = client.get(f"/api/v1/tasks/{task_id}/merge").json()
+    assert _desired(client, runner)[run_id]["merge"] is None
+    shown = client.get(f"/api/v1/runs/{run_id}/merge").json()
     assert [entry["path"] for entry in shown["entries"]] == [*MERGEABLE, "pipe"]
-    assert _decide(client, task_id, {"paths": ["notes.txt"]}).status_code == 200
-    assert _desired(client, runner)[task_id]["merge"] == {
+    assert _decide(client, run_id, {"paths": ["notes.txt"]}).status_code == 200
+    assert _desired(client, runner)[run_id]["merge"] == {
         "paths": ["notes.txt"],
         "resolutions": {},
     }
 
     done = _runner_post(
-        client, runner, task_id, "merge", {"outcome": "applied", "applied": ["notes.txt"]}
+        client, runner, run_id, "merge", {"outcome": "applied", "applied": ["notes.txt"]}
     )
 
     assert done.status_code == 200, done.text
     assert done.json()["status"] == S.COMPLETED
-    report = client.get(f"/api/v1/tasks/{task_id}/merge").json()["report"]
+    report = client.get(f"/api/v1/runs/{run_id}/merge").json()["report"]
     assert report == {"applied": ["notes.txt"], "skipped": [], "exported": [], "backed_up": []}
 
 
 def test_always_decides_every_mergeable_path(
     client: TestClient, register: Register, spec_body: dict[str, Any]
 ) -> None:
-    runner, task_id = _waiting(client, register, spec_body, "always")
+    runner, run_id = _waiting(client, register, spec_body, "always")
 
-    assert _desired(client, runner)[task_id]["merge"] == {"paths": MERGEABLE, "resolutions": {}}
+    assert _desired(client, runner)[run_id]["merge"] == {"paths": MERGEABLE, "resolutions": {}}
 
 
 def test_always_waits_when_a_sensitive_path_changed(
     client: TestClient, register: Register, spec_body: dict[str, Any]
 ) -> None:
-    runner, task_id = _waiting(client, register, spec_body, "always", [*ENTRIES, SENSITIVE])
+    runner, run_id = _waiting(client, register, spec_body, "always", [*ENTRIES, SENSITIVE])
 
-    assert _desired(client, runner)[task_id]["merge"] is None
+    assert _desired(client, runner)[run_id]["merge"] is None
 
 
 def test_never_merges_nothing_and_completes(
     client: TestClient, register: Register, spec_body: dict[str, Any]
 ) -> None:
-    runner, task_id = _waiting(client, register, spec_body, "never")
+    runner, run_id = _waiting(client, register, spec_body, "never")
 
-    assert _desired(client, runner)[task_id]["merge"] == {"paths": [], "resolutions": {}}
-    done = _runner_post(client, runner, task_id, "merge", {"outcome": "applied"})
+    assert _desired(client, runner)[run_id]["merge"] == {"paths": [], "resolutions": {}}
+    done = _runner_post(client, runner, run_id, "merge", {"outcome": "applied"})
     assert done.json()["status"] == S.COMPLETED
 
 
 def test_reject_merges_nothing(
     client: TestClient, register: Register, spec_body: dict[str, Any]
 ) -> None:
-    runner, task_id = _waiting(client, register, spec_body)
+    runner, run_id = _waiting(client, register, spec_body)
 
-    assert client.post(f"/api/v1/tasks/{task_id}/merge/reject").status_code == 200
-    assert _desired(client, runner)[task_id]["merge"] == {"paths": [], "resolutions": {}}
+    assert client.post(f"/api/v1/runs/{run_id}/merge/reject").status_code == 200
+    assert _desired(client, runner)[run_id]["merge"] == {"paths": [], "resolutions": {}}
 
 
 def test_a_conflict_keeps_the_run_waiting_for_a_new_decision(
     client: TestClient, register: Register, spec_body: dict[str, Any]
 ) -> None:
-    runner, task_id = _waiting(client, register, spec_body)
-    assert _decide(client, task_id, {"paths": ["notes.txt"]}).status_code == 200
-    assert _decide(client, task_id, {"paths": ["notes.txt"]}).status_code == 409
+    runner, run_id = _waiting(client, register, spec_body)
+    assert _decide(client, run_id, {"paths": ["notes.txt"]}).status_code == 200
+    assert _decide(client, run_id, {"paths": ["notes.txt"]}).status_code == 409
     conflict = {"path": "notes.txt", "reason": "the host changed since collection"}
 
     reported = _runner_post(
-        client, runner, task_id, "merge", {"outcome": "conflict", "conflicts": [conflict]}
+        client, runner, run_id, "merge", {"outcome": "conflict", "conflicts": [conflict]}
     )
 
     assert reported.json()["status"] == S.WAITING_MERGE
-    shown = client.get(f"/api/v1/tasks/{task_id}/merge").json()
+    shown = client.get(f"/api/v1/runs/{run_id}/merge").json()
     assert shown["decision"] is None
     assert shown["conflicts"] == [conflict]
-    assert _desired(client, runner)[task_id]["merge"] is None
+    assert _desired(client, runner)[run_id]["merge"] is None
     retry = {"paths": ["notes.txt"], "resolutions": {"notes.txt": "take"}}
-    assert _decide(client, task_id, retry).status_code == 200
-    assert _desired(client, runner)[task_id]["merge"] == retry
+    assert _decide(client, run_id, retry).status_code == 200
+    assert _desired(client, runner)[run_id]["merge"] == retry
 
 
 @pytest.mark.parametrize(
@@ -223,10 +223,10 @@ def test_a_conflict_keeps_the_run_waiting_for_a_new_decision(
 def test_a_selection_must_fit_the_diff(
     client: TestClient, register: Register, spec_body: dict[str, Any], body: dict[str, Any]
 ) -> None:
-    _, task_id = _waiting(client, register, spec_body)
+    _, run_id = _waiting(client, register, spec_body)
 
-    assert _decide(client, task_id, body).status_code == 422
-    assert client.get(f"/api/v1/tasks/{task_id}/merge").json()["decision"] is None
+    assert _decide(client, run_id, body).status_code == 422
+    assert client.get(f"/api/v1/runs/{run_id}/merge").json()["decision"] is None
 
 
 def test_a_deleted_directory_needs_the_rename_out_of_it(
@@ -243,36 +243,36 @@ def test_a_deleted_directory_needs_the_rename_out_of_it(
         "base_mode": 0o644,
     }
     entries = [ENTRIES[0], renamed]
-    _, task_id = _waiting(client, register, spec_body, entries=entries)
+    _, run_id = _waiting(client, register, spec_body, entries=entries)
 
-    refused = _decide(client, task_id, {"paths": ["docs"]})
+    refused = _decide(client, run_id, {"paths": ["docs"]})
 
     assert refused.status_code == 422
     assert "moved.md" in refused.json()["detail"]
-    assert _decide(client, task_id, {"paths": ["docs", "moved.md"]}).status_code == 200
+    assert _decide(client, run_id, {"paths": ["docs", "moved.md"]}).status_code == 200
 
 
 def test_a_decision_needs_a_waiting_run(
     client: TestClient, register: Register, spec_body: dict[str, Any]
 ) -> None:
-    _, task_id = _collecting(client, register, spec_body)
+    _, run_id = _collecting(client, register, spec_body)
 
-    assert _decide(client, task_id, {"paths": []}).status_code == 409
-    assert client.get(f"/api/v1/tasks/{task_id}/merge").status_code == 404
+    assert _decide(client, run_id, {"paths": []}).status_code == 409
+    assert client.get(f"/api/v1/runs/{run_id}/merge").status_code == 404
 
 
 def test_the_diff_report_is_idempotent_and_owned(
     client: TestClient, register: Register, spec_body: dict[str, Any]
 ) -> None:
-    runner, task_id = _collecting(client, register, spec_body)
+    runner, run_id = _collecting(client, register, spec_body)
     other = register("beta")
     _heartbeat(client, other)
 
-    assert _runner_post(client, other, task_id, "diff", {"entries": ENTRIES}).status_code == 404
+    assert _runner_post(client, other, run_id, "diff", {"entries": ENTRIES}).status_code == 404
     stale = {**runner, "lease_id": "lease_" + "0" * 32}
-    assert _runner_post(client, stale, task_id, "diff", {"entries": ENTRIES}).status_code == 409
+    assert _runner_post(client, stale, run_id, "diff", {"entries": ENTRIES}).status_code == 409
     for _ in range(2):
-        reported = _runner_post(client, runner, task_id, "diff", {"entries": ENTRIES})
+        reported = _runner_post(client, runner, run_id, "diff", {"entries": ENTRIES})
         assert reported.status_code == 200, reported.text
     assert reported.json()["status"] == S.WAITING_MERGE
 
@@ -280,10 +280,10 @@ def test_the_diff_report_is_idempotent_and_owned(
 def test_a_merge_report_needs_a_waiting_run_and_names_its_conflicts(
     client: TestClient, register: Register, spec_body: dict[str, Any]
 ) -> None:
-    runner, task_id = _collecting(client, register, spec_body)
+    runner, run_id = _collecting(client, register, spec_body)
 
-    early = _runner_post(client, runner, task_id, "merge", {"outcome": "applied"})
-    empty = _runner_post(client, runner, task_id, "merge", {"outcome": "conflict"})
+    early = _runner_post(client, runner, run_id, "merge", {"outcome": "applied"})
+    empty = _runner_post(client, runner, run_id, "merge", {"outcome": "conflict"})
 
     assert early.status_code == 409
     assert empty.status_code == 422
@@ -297,7 +297,7 @@ def test_a_waiting_run_follows_its_runner_to_the_next_lease(
     clock: Callable[[], int],
     advance: Advance,
 ) -> None:
-    runner, task_id = _waiting(client, register, spec_body)
+    runner, run_id = _waiting(client, register, spec_body)
     old_lease = runner["lease_id"]
 
     advance(LEASE_TTL)
@@ -305,21 +305,21 @@ def test_a_waiting_run_follows_its_runner_to_the_next_lease(
     _heartbeat(client, runner)
 
     assert runner["lease_id"] != old_lease
-    assert task_id in _desired(client, runner)
-    assert _decide(client, task_id, {"paths": []}).status_code == 200
-    done = _runner_post(client, runner, task_id, "merge", {"outcome": "applied"})
+    assert run_id in _desired(client, runner)
+    assert _decide(client, run_id, {"paths": []}).status_code == 200
+    done = _runner_post(client, runner, run_id, "merge", {"outcome": "applied"})
     assert done.json()["status"] == S.COMPLETED
 
 
 def test_a_runner_can_fail_a_waiting_run(
     client: TestClient, register: Register, spec_body: dict[str, Any]
 ) -> None:
-    runner, task_id = _waiting(client, register, spec_body)
+    runner, run_id = _waiting(client, register, spec_body)
 
     failed = _runner_post(
         client,
         runner,
-        task_id,
+        run_id,
         "transition",
         {"expected": S.WAITING_MERGE, "target": S.FAILED, "reason": "vm lost"},
     )

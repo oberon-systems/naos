@@ -7,13 +7,13 @@ from naos_api import audit, merges, runners
 from naos_api.audit import RunnerEventIn
 from naos_api.auth import require_enrollment, require_runner
 from naos_api.clock import NowDep
-from naos_api.lifecycle import TaskStatus
+from naos_api.lifecycle import RunStatus
 from naos_api.models import Lease
 from naos_api.routes.deps import CredentialTtlDep, LeaseTtlDep, SessionDep, TokenTtlDep
-from naos_api.routes.tasks import TaskRead
+from naos_api.routes.runs import RunRead
 from naos_api.runners import IssuedToken, RunnerPrincipal
+from naos_api.runs import MAX_REASON_LENGTH
 from naos_api.spec import PolicyKind, RunSpec, StrictModel
-from naos_api.tasks import MAX_REASON_LENGTH
 
 PrincipalDep = Annotated[RunnerPrincipal, Depends(require_runner)]
 
@@ -32,13 +32,13 @@ class HeartbeatIn(StrictModel):
 
 class TransitionIn(StrictModel):
     lease_id: Annotated[str, Field(max_length=64)]
-    expected: TaskStatus
-    target: TaskStatus
+    expected: RunStatus
+    target: RunStatus
     reason: Reason | None = None
 
     @model_validator(mode="after")
     def _failure_needs_reason(self) -> Self:
-        if self.target is TaskStatus.FAILED and self.reason is None:
+        if self.target is RunStatus.FAILED and self.reason is None:
             raise ValueError("a FAILED transition requires a reason")
         return self
 
@@ -137,9 +137,9 @@ class HeartbeatOut(BaseModel):
     token: TokenOut | None
 
 
-class DesiredTaskOut(BaseModel):
+class DesiredRunOut(BaseModel):
     id: str
-    status: TaskStatus
+    status: RunStatus
     spec: RunSpec
     image_url: str
     policies: dict[PolicyKind, dict[str, Any] | None]
@@ -149,7 +149,7 @@ class DesiredTaskOut(BaseModel):
 
 class DesiredStateOut(BaseModel):
     lease_id: str
-    tasks: list[DesiredTaskOut]
+    runs: list[DesiredRunOut]
 
 
 router = APIRouter(prefix="/runners")
@@ -183,18 +183,18 @@ def heartbeat(
     )
 
 
-@router.get("/{runner_id}/tasks")
-def desired_tasks(
+@router.get("/{runner_id}/runs")
+def desired_runs(
     principal: PrincipalDep, session: SessionDep, now: NowDep, credential_ttl: CredentialTtlDep
 ) -> DesiredStateOut:
     lease_id, desired = runners.desired_state(session, principal.runner_id, now, credential_ttl)
     return DesiredStateOut(
         lease_id=lease_id,
-        tasks=[
-            DesiredTaskOut(
-                id=item.task.id,
-                status=item.task.status,
-                spec=RunSpec.model_validate(item.task.spec),
+        runs=[
+            DesiredRunOut(
+                id=item.run.id,
+                status=item.run.status,
+                spec=RunSpec.model_validate(item.run.spec),
                 image_url=item.image_url,
                 policies=item.policies,
                 credentials={
@@ -208,51 +208,51 @@ def desired_tasks(
     )
 
 
-@router.post("/{runner_id}/tasks/{task_id}/transition")
+@router.post("/{runner_id}/runs/{run_id}/transition")
 def transition(
-    task_id: str, body: TransitionIn, principal: PrincipalDep, session: SessionDep, now: NowDep
-) -> TaskRead:
-    task = runners.transition(
+    run_id: str, body: TransitionIn, principal: PrincipalDep, session: SessionDep, now: NowDep
+) -> RunRead:
+    run = runners.transition(
         session,
         principal.runner_id,
-        task_id,
+        run_id,
         body.lease_id,
         body.expected,
         body.target,
         body.reason,
         now,
     )
-    return TaskRead.of(task)
+    return RunRead.of(run)
 
 
-@router.post("/{runner_id}/tasks/{task_id}/diff")
+@router.post("/{runner_id}/runs/{run_id}/diff")
 def report_diff(
-    task_id: str, body: DiffIn, principal: PrincipalDep, session: SessionDep, now: NowDep
-) -> TaskRead:
+    run_id: str, body: DiffIn, principal: PrincipalDep, session: SessionDep, now: NowDep
+) -> RunRead:
     entries = [
         entry.model_dump(mode="json", by_alias=True, exclude_none=True) for entry in body.entries
     ]
-    task = merges.report_diff(session, principal.runner_id, task_id, body.lease_id, entries, now)
-    return TaskRead.of(task)
+    run = merges.report_diff(session, principal.runner_id, run_id, body.lease_id, entries, now)
+    return RunRead.of(run)
 
 
-@router.post("/{runner_id}/tasks/{task_id}/merge")
+@router.post("/{runner_id}/runs/{run_id}/merge")
 def report_merge(
-    task_id: str, body: MergeResultIn, principal: PrincipalDep, session: SessionDep, now: NowDep
-) -> TaskRead:
+    run_id: str, body: MergeResultIn, principal: PrincipalDep, session: SessionDep, now: NowDep
+) -> RunRead:
     applied = body.outcome == "applied"
     report = body.model_dump(include={"applied", "skipped", "exported", "backed_up"})
     conflicts = [conflict.model_dump() for conflict in body.conflicts]
-    task = merges.report_merge(
+    run = merges.report_merge(
         session,
         principal.runner_id,
-        task_id,
+        run_id,
         body.lease_id,
         report if applied else None,
         None if applied else conflicts,
         now,
     )
-    return TaskRead.of(task)
+    return RunRead.of(run)
 
 
 @router.post("/{runner_id}/events")

@@ -3,7 +3,7 @@ from typing import Any
 from sqlmodel import JSON, Column, Field, SQLModel, UniqueConstraint
 
 from naos_api.clock import now_ts
-from naos_api.lifecycle import TaskStatus
+from naos_api.lifecycle import RunStatus
 from naos_api.spec import PolicyKind
 
 
@@ -45,12 +45,12 @@ class Lease(SQLModel, table=True):
     expired_at: int | None = None
 
 
-class Task(SQLModel, table=True):
-    __tablename__ = "tasks"
+class Run(SQLModel, table=True):
+    __tablename__ = "runs"
 
     id: str = Field(primary_key=True)
     seq: int = Field(unique=True)
-    status: TaskStatus = Field(default=TaskStatus.PENDING, index=True)
+    status: RunStatus = Field(default=RunStatus.PENDING, index=True)
     status_reason: str | None = None
     spec: dict[str, Any] = Field(sa_column=Column(JSON, nullable=False))
     mount_policy_id: str | None = None
@@ -67,7 +67,7 @@ class Task(SQLModel, table=True):
 class Merge(SQLModel, table=True):
     __tablename__ = "merges"
 
-    task_id: str = Field(primary_key=True)
+    run_id: str = Field(primary_key=True)
     entries: list[dict[str, Any]] = Field(sa_column=Column(JSON, nullable=False))
     decision: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON(none_as_null=True)))
     conflicts: list[dict[str, Any]] | None = Field(

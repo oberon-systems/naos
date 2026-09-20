@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 KEY = {"Idempotency-Key": "key-1"}
-CreateTask = Callable[[str], str]
+CreateRun = Callable[[str], str]
 
 
 @pytest.mark.parametrize("method", ["PUT", "PATCH", "DELETE"])
@@ -34,20 +34,20 @@ def test_image_has_no_mutation_endpoints(
     assert client.get(path).json() == before
 
 
-def test_stop_keeps_the_task_spec(client: TestClient, create_task: CreateTask) -> None:
-    task_id = create_task("key-1")
-    before = client.get(f"/api/v1/tasks/{task_id}").json()
+def test_stop_keeps_the_run_spec(client: TestClient, create_run: CreateRun) -> None:
+    run_id = create_run("key-1")
+    before = client.get(f"/api/v1/runs/{run_id}").json()
 
-    stopped = client.post(f"/api/v1/tasks/{task_id}/stop").json()
+    stopped = client.post(f"/api/v1/runs/{run_id}/stop").json()
 
     assert stopped["spec"] == before["spec"]
 
 
 def test_replay_cannot_swap_the_spec(
-    client: TestClient, create_task: CreateTask, spec_body: dict[str, Any]
+    client: TestClient, create_run: CreateRun, spec_body: dict[str, Any]
 ) -> None:
-    task_id = create_task("key-1")
+    run_id = create_run("key-1")
     spec_body["timeout"] = 60
 
-    assert client.post("/api/v1/tasks", json=spec_body, headers=KEY).status_code == 409
-    assert client.get(f"/api/v1/tasks/{task_id}").json()["spec"]["timeout"] == 3600
+    assert client.post("/api/v1/runs", json=spec_body, headers=KEY).status_code == 409
+    assert client.get(f"/api/v1/runs/{run_id}").json()["spec"]["timeout"] == 3600

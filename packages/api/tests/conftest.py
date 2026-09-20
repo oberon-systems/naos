@@ -138,12 +138,12 @@ def register(
 
 
 @pytest.fixture
-def create_task(client: TestClient, spec_body: dict[str, Any]) -> Callable[[str], str]:
+def create_run(client: TestClient, spec_body: dict[str, Any]) -> Callable[[str], str]:
     def _create(key: str) -> str:
-        response = client.post("/api/v1/tasks", json=spec_body, headers={"Idempotency-Key": key})
+        response = client.post("/api/v1/runs", json=spec_body, headers={"Idempotency-Key": key})
         assert response.status_code == 201, response.text
-        task_id: str = response.json()["id"]
-        return task_id
+        run_id: str = response.json()["id"]
+        return run_id
 
     return _create
 
