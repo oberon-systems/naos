@@ -36,3 +36,17 @@ them by default. Debian 13 and Ubuntu 26.04 ship virtiofsd 1.13 or newer. Where
 `--version` reports an older one, as on Ubuntu 24.04, build it with
 [docs/host/build-virtiofsd.md](docs/host/build-virtiofsd.md); the runner
 refuses a Run with a workspace until then.
+
+## Runner Install
+
+The install script takes the newest `runner-<version>` release, checks the
+binary against the release `SHA256SUMS` and links it as `runner`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/oberon-systems/naos/main/packages/runner/install.sh | sh
+```
+
+It installs into `${XDG_DATA_HOME:-$HOME/.local/share}/naos/bin` as
+`runner-<version>` with `runner` pointing at it, so an older version stays next
+to the new one. `NAOS_VERSION` pins a version, `NAOS_PREFIX` installs it
+somewhere else.
