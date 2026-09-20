@@ -51,4 +51,4 @@ shell:
 	echo 'export PATH="$(CURDIR)/.packer/bin:$$PATH"' >> "$$rc"; \
 	echo 'export PACKER_PLUGIN_PATH="$(PACKER_PLUGIN_PATH)"' >> "$$rc"; \
 	echo 'source $(CURDIR)/$(VENV)/bin/activate' >> "$$rc"; \
-	bash --rcfile "$$rc" -i
+	bash --rcfile "$$rc" -i || true
