@@ -62,7 +62,7 @@ async fn heartbeat_and_transition_use_the_runner_token() {
         .mount(&server)
         .await;
     Mock::given(method("POST"))
-        .and(path(format!("{RUNNER}/tasks/run_a/transition")))
+        .and(path(format!("{RUNNER}/runs/run_a/transition")))
         .and(body_json(json!({
             "lease_id": "lease_alpha", "expected": "PENDING", "target": "STARTING",
         })))
@@ -89,7 +89,7 @@ async fn heartbeat_and_transition_use_the_runner_token() {
 async fn statuses_map_to_typed_errors() {
     let server = MockServer::start().await;
     for (code, run) in [(401, "run_a"), (409, "run_b"), (500, "run_c")] {
-        Mock::given(path(format!("{RUNNER}/tasks/{run}/transition")))
+        Mock::given(path(format!("{RUNNER}/runs/{run}/transition")))
             .respond_with(ResponseTemplate::new(code).set_body_string("nope"))
             .mount(&server)
             .await;
@@ -123,7 +123,7 @@ async fn claim(api: &HttpApi, run_id: &str) -> Result<(), AgentError> {
 #[tokio::test]
 async fn redirects_are_not_followed() {
     let server = MockServer::start().await;
-    Mock::given(path(format!("{RUNNER}/tasks")))
+    Mock::given(path(format!("{RUNNER}/runs")))
         .respond_with(
             ResponseTemplate::new(307).insert_header("location", "http://192.0.2.10/steal"),
         )
@@ -138,10 +138,10 @@ async fn redirects_are_not_followed() {
 #[tokio::test]
 async fn unknown_run_status_fails_closed() {
     let server = MockServer::start().await;
-    Mock::given(path(format!("{RUNNER}/tasks")))
+    Mock::given(path(format!("{RUNNER}/runs")))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
             "lease_id": "lease_alpha",
-            "tasks": [{ "id": "run_a", "status": "EXPLODED", "spec": {}, "policies": {} }],
+            "runs": [{ "id": "run_a", "status": "EXPLODED", "spec": {}, "policies": {} }],
         })))
         .mount(&server)
         .await;
@@ -158,10 +158,10 @@ fn digest() -> String {
 #[tokio::test]
 async fn desired_runs_carry_spec_image_url_and_policies() {
     let server = MockServer::start().await;
-    Mock::given(path(format!("{RUNNER}/tasks")))
+    Mock::given(path(format!("{RUNNER}/runs")))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
             "lease_id": "lease_alpha",
-            "tasks": [{
+            "runs": [{
                 "id": "run_a",
                 "status": "PENDING",
                 "spec": {
@@ -190,10 +190,10 @@ async fn desired_runs_carry_spec_image_url_and_policies() {
 #[tokio::test]
 async fn unknown_runtime_fields_fail_closed() {
     let server = MockServer::start().await;
-    Mock::given(path(format!("{RUNNER}/tasks")))
+    Mock::given(path(format!("{RUNNER}/runs")))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
             "lease_id": "lease_alpha",
-            "tasks": [{
+            "runs": [{
                 "id": "run_a",
                 "status": "PENDING",
                 "spec": {
@@ -232,7 +232,7 @@ async fn unsafe_path_segments_never_reach_the_network() {
 #[tokio::test]
 async fn events_are_posted_as_one_flat_batch() {
     let server = MockServer::start().await;
-    let fields = json!({ "run_id": "task_alpha", "vm_id": "vm_alpha" });
+    let fields = json!({ "run_id": "run_alpha", "vm_id": "vm_alpha" });
     let event = Event::new("vm_created", fields.as_object().cloned().expect("object")).expect("id");
     Mock::given(method("POST"))
         .and(path(format!("{RUNNER}/events")))
@@ -241,7 +241,7 @@ async fn events_are_posted_as_one_flat_batch() {
             "id": event.id,
             "at": event.at,
             "event": "vm_created",
-            "run_id": "task_alpha",
+            "run_id": "run_alpha",
             "vm_id": "vm_alpha",
         }] })))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
