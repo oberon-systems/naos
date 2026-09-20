@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% from "components.html" import page_header, tiles %}
+{% block page %}
+    {% if page.header %}{{ page_header(page, summary.subtitle) }}{% endif %}
+    {{ tiles(page.tiles, summary.values) }}
+    {% block content %}{% endblock %}
+{% endblock %}

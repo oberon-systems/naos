@@ -14,13 +14,13 @@ select = ["E", "F", "I", "B", "UP", "S", "SIM"]
 "**/tests/**" = ["S101"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["naos_api", "naos_common"]
+known-first-party = ["naos_api", "naos_common", "naos_web"]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
-mypy_path = "packages/common/src:packages/api/src"
+mypy_path = "packages/common/src:packages/api/src:packages/web/src"
 explicit_package_bases = true
 
 [tool.pytest.ini_options]

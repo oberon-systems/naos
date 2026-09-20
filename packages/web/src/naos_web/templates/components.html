@@ -1,0 +1,81 @@
+{% macro dot(tone="grey", small=false) -%}
+    <span class="dot tone-{{ tone }}{{ " dot--sm" if small }}"></span>
+{%- endmacro %}
+{% macro chip(label, tone="grey", mono=false, dotted=false) -%}
+    <span class="chip tone-{{ tone }}{{ " chip--mono" if mono }}">
+        {% if dotted %}{{ dot(tone, small=true) }}{% endif %}{{ label }}
+    </span>
+{%- endmacro %}
+{% macro pill(label, tone="grey") -%}
+    <span class="pill tone-{{ tone }}">{{ label }}</span>
+{%- endmacro %}
+{% macro tag(label, tone="grey") -%}
+    <span class="tag tone-{{ tone }}">{{ label }}</span>
+{%- endmacro %}
+{% macro count(label) -%}
+    <span class="count">{{ label }}</span>
+{%- endmacro %}
+{% macro badge(label) -%}
+    <span class="badge">{{ label }}</span>
+{%- endmacro %}
+{% macro button(label, href) -%}
+    <a class="button" href="{{ href }}">{{ label }}</a>
+{%- endmacro %}
+{% macro filter(label, href, active=false, target="#page") -%}
+    <a class="filter{{ " filter--active" if active }}"
+       href="{{ href }}"
+       hx-get="{{ href }}"
+       hx-target="{{ target }}"
+       hx-push-url="true">{{ label }}</a>
+{%- endmacro %}
+{% macro search(placeholder, name, href, target="#page") -%}
+    <input class="search"
+           type="search"
+           name="{{ name }}"
+           placeholder="{{ placeholder }}"
+           hx-get="{{ href }}"
+           hx-target="{{ target }}"
+           hx-trigger="input changed delay:300ms"
+           hx-push-url="true">
+{%- endmacro %}
+{% macro tile(spec, value=none) -%}
+    <div class="tile">
+        <div class="tile__head">
+            {{ dot(spec.tone) }}
+            <span class="tile__label">{{ spec.label }}{% if spec.qualifier %} · {{ spec.qualifier }}{% endif %}</span>
+        </div>
+        <div class="tile__value">
+            {% if value %}
+                <span class="tile__number">{{ value.number }}</span>
+                {% if value.note %}<span class="tile__note">{{ value.note }}</span>{% endif %}
+            {% endif %}
+        </div>
+    </div>
+{%- endmacro %}
+{% macro tiles(specs, values) -%}
+    <div class="tiles">{% for spec in specs %}{{ tile(spec, values.get(spec.key)) }}{% endfor %}</div>
+{%- endmacro %}
+{% macro page_header(page, subtitle="") -%}
+    <header class="page-header">
+        <div>
+            <h1 class="page-header__title">{{ page.title }}</h1>
+            {% if subtitle %}<p class="page-header__subtitle">{{ subtitle }}</p>{% endif %}
+        </div>
+        {% if page.chip or page.action %}
+            <div class="page-header__actions">
+                {% if page.chip %}{{ chip(page.chip.label, page.chip.tone, dotted=true) }}{% endif %}
+                {% if page.action %}{{ button(page.action.label, page.action.href) }}{% endif %}
+            </div>
+        {% endif %}
+    </header>
+{%- endmacro %}
+{% macro footer_note(note) -%}
+    <div class="card__footer">{{ note }}</div>
+{%- endmacro %}
+{% macro column_header(columns) -%}
+    <thead>
+        <tr>
+            {% for column in columns %}<th>{{ column }}</th>{% endfor %}
+        </tr>
+    </thead>
+{%- endmacro %}

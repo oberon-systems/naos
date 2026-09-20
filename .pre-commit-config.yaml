@@ -59,9 +59,13 @@ repos:
   - repo: https://github.com/djlint/djLint
     rev: v1.46.1
     hooks:
+      # The hooks ship types_or: [jinja], a tag identify never puts on a
+      # .html file, so without this override both silently match nothing.
       - id: djlint-reformat-jinja
+        types_or: [html, jinja]
         files: ^packages/web/.*\.html$
       - id: djlint-jinja
+        types_or: [html, jinja]
         files: ^packages/web/.*\.html$
 
   - repo: https://github.com/gitleaks/gitleaks
@@ -99,8 +103,9 @@ repos:
     rev: 3.0.0
     hooks:
       - id: forbid-binary
+      # Templates carry the separators and dashes the mockups show.
       - id: require-ascii
-        exclude: .*\.md$
+        exclude: (.*\.md$|^packages/web/.*\.html$)
       - id: shellcheck
         args: [-e, SC2086]
       # -i 4 overrides shfmt's tab indentation, which the forbid-tabs hook

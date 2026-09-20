@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "naos-web"
+version = "0.0.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi",
+  "jinja2",
+  "naos-common",
+  "pydantic-settings",
+]
+
+[tool.setuptools.package-data]
+naos_web = ["py.typed", "templates/*.html", "static/*.css", "static/vendor/*.js"]
+
+[tool.djlint]
+profile = "jinja"
+# url_for() renders an absolute URL under Starlette, so the shell keeps
+# root-relative paths and both url_for rules stay off.
+ignore = "J004,J018"

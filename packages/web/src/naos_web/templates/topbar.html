@@ -1,0 +1,18 @@
+{% from "components.html" import button %}
+<header class="topbar">
+    <div class="topbar__brand">
+        <a class="brand" href="/runs">naos</a>
+        <nav class="nav" hx-boost="true">
+            {% for item in nav %}
+                <a class="nav__item{{ " nav__item--active" if item.key == page.key }}"
+                   href="{{ item.href }}">{{ item.title }}</a>
+            {% endfor %}
+        </nav>
+    </div>
+    <div class="topbar__actions">
+        <span class="chip chip--mono tone-grey">
+            <span>api</span><span>{{ api_endpoint }}</span>
+        </span>
+        {{ button('New Run', '/runs/new') }}
+    </div>
+</header>

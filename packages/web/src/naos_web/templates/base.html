@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>{{ page.title }} · naos</title>
+        <link rel="stylesheet" href="/static/naos.css">
+        <script src="/static/vendor/htmx.min.js" defer></script>
+    </head>
+    <body>
+        {% include "topbar.html" %}
+        <main class="content" id="page">
+            {% block page %}{% endblock %}
+        </main>
+    </body>
+</html>
