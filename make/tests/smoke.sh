@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-api=http://127.0.0.1:8000
-web=http://127.0.0.1:8001
+api=http://127.0.0.1:8080
+web=http://127.0.0.1:8000
 version="$(sed -n 's/^  version: //p' "$ROOT/packer/.cz.yaml")"
 repo="$(git -C "$ROOT" remote get-url origin | sed -E 's#^(git@github\.com:|https://github\.com/)##; s#\.git$##')"
 release="https://github.com/$repo/releases/download/image-$version"

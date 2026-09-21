@@ -30,6 +30,12 @@ keep_token() {
     fi
 }
 
+# The web container reads the operator token as nobody, so the file cannot stay
+# 0600 for this user. local/ is 0700, and that is what keeps it off other accounts.
+share_with_web() {
+    chmod 644 "$LOCAL/operator"
+}
+
 wait_for() {
     local seconds="$1"
     shift
@@ -45,14 +51,26 @@ check_hash() {
         fail "$env_file holds another $1: put its token in $LOCAL/$2, or run make clean"
 }
 
+# An .env written before the web ui needed a token gets the key added in place.
+# Nothing else in it is touched: an .env is edited by hand and must survive that.
+fill_web_token_file() {
+    local key=NAOS_WEB_OPERATOR_TOKEN_FILE
+    if [ -n "$(sed -n "s/^$key=//p" "$env_file")" ]; then return; fi
+    if grep -q "^$key=" "$env_file"; then
+        sed -i "s|^$key=.*|$key=$LOCAL/operator|" "$env_file"
+    else
+        printf '%s\n' "$key=$LOCAL/operator" >>"$env_file"
+    fi
+    echo "pointed the web ui at $LOCAL/operator in $env_file"
+}
+
 # Postgres keeps the password of its first start, so a generated one and a
 # cluster from an older .env never match.
 write_env() {
     if [ -f "$env_file" ]; then
         check_hash NAOS_OPERATOR_TOKEN_SHA256 operator
         check_hash NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256 enrollment
-        grep -qx "NAOS_WEB_OPERATOR_TOKEN_FILE=$LOCAL/operator" "$env_file" ||
-            fail "$env_file points the web ui at another operator token file: fix it, or run make clean"
+        fill_web_token_file
         return
     fi
     if [ -n "$(ls -A "$compose/data/db" 2>/dev/null)" ]; then
@@ -76,8 +94,8 @@ settings() {
     # shellcheck disable=SC1090
     . "$env_file"
     set +a
-    api="http://${NAOS_BIND:-127.0.0.1}:${NAOS_API_PORT:-8000}"
-    web="http://${NAOS_BIND:-127.0.0.1}:${NAOS_WEB_PORT:-8001}"
+    api="http://${NAOS_BIND:-127.0.0.1}:${NAOS_API_PORT:-8080}"
+    web="http://${NAOS_BIND:-127.0.0.1}:${NAOS_WEB_PORT:-8000}"
     name="${NAOS_AGENT_NAME:-alpha}"
 }
 
@@ -94,7 +112,18 @@ agent_env() {
     export NAOS_AGENT_NAME="$name"
     export NAOS_AGENT_STATE_DIR="$LOCAL/agent"
     export NAOS_AGENT_ENROLLMENT_TOKEN_FILE="$LOCAL/enrollment"
-    [ -x "$runner" ] || cargo build --release -p naos-runner --manifest-path "$ROOT/Cargo.toml"
+}
+
+# Everything the stack runs is built from this tree every time. Docker caches its
+# layers and cargo its crates, so an unchanged tree costs a moment - while a binary
+# kept because it merely exists is a stack running code nobody has in front of them.
+build_runner() {
+    cargo build --release -p naos-runner --manifest-path "$ROOT/Cargo.toml"
+}
+
+build() {
+    "$MAKE" -C "$compose" images
+    build_runner
 }
 
 # Half a stack is worse than none: anything that fails after compose is up
@@ -111,9 +140,10 @@ kickstart() {
     [ -d "$LOCAL" ] || mkdir -m 700 "$LOCAL"
     keep_token operator
     keep_token enrollment
+    share_with_web
     write_env
     settings
-    "$MAKE" -C "$compose" images
+    build
     "$MAKE" -C "$compose" up
     trap rollback EXIT
     if ! wait_for 5 curl -fs -o /dev/null "$api/healthz"; then
@@ -142,6 +172,7 @@ REPORT
 
 foreground() {
     settings
+    build_runner
     agent_env
     exec "$runner"
 }

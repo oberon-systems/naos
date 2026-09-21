@@ -75,8 +75,8 @@ The api waits for the database to report healthy and creates its schema on
 startup. Check both services:
 
 ```bash
-curl -fsS http://127.0.0.1:8000/healthz
-curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8001/runs
+curl -fsS http://127.0.0.1:8080/healthz
+curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/runs
 ```
 
 Expected output:
@@ -90,7 +90,7 @@ The api answers 401 to everything under `/api/v1` without the operator token:
 
 ```bash
 curl -fsS -H "Authorization: Bearer $NAOS_OPERATOR_TOKEN" \
-    http://127.0.0.1:8000/api/v1/runs
+    http://127.0.0.1:8080/api/v1/runs
 ```
 
 ## Operate
@@ -101,7 +101,7 @@ token. The runner is an unprivileged user process, so both paths are that
 user's own; the token file is 0600 and the state directory is created 0700:
 
 ```bash
-export NAOS_AGENT_API_URL=http://127.0.0.1:8000
+export NAOS_AGENT_API_URL=http://127.0.0.1:8080
 export NAOS_AGENT_NAME=alpha
 export NAOS_AGENT_STATE_DIR="$HOME/.local/state/naos/agent"
 export NAOS_AGENT_ENROLLMENT_TOKEN_FILE="$HOME/.config/naos/enrollment"
@@ -118,7 +118,7 @@ A registered runner shows up in three places: its own log, the
 
 ```bash
 curl -fsS -H "Authorization: Bearer $NAOS_OPERATOR_TOKEN" \
-    http://127.0.0.1:8000/api/v1/audit
+    http://127.0.0.1:8080/api/v1/audit
 ```
 
 There is no operator route listing runners yet, and the web ui is still a shell

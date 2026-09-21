@@ -39,10 +39,10 @@ lint:
 
 # runs
 run-api:
-	$(VENV)/bin/uvicorn --factory naos_api.app:create_app --host 127.0.0.1
+	$(VENV)/bin/uvicorn --factory naos_api.app:create_app --host 127.0.0.1 --port 8080
 
 run-web:
-	$(VENV)/bin/uvicorn --factory naos_web.app:create_app --host 127.0.0.1 --port 8001
+	$(VENV)/bin/uvicorn --factory naos_web.app:create_app --host 127.0.0.1 --port 8000
 
 kickstart:
 	$(MAKE) -C dev/stack kickstart

@@ -26,8 +26,8 @@ docker pull ghcr.io/oberon-systems/naos-web
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `NAOS_WEB_API_BASE_URL` | `http://127.0.0.1:8000` | The API endpoint shown in the top bar, as a browser reaches it |
-| `NAOS_WEB_API_URL` | `http://127.0.0.1:8000` | The API this process calls, which may be a private address |
+| `NAOS_WEB_API_BASE_URL` | `http://127.0.0.1:8080` | The API endpoint shown in the top bar, as a browser reaches it |
+| `NAOS_WEB_API_URL` | `http://127.0.0.1:8080` | The API this process calls, which may be a private address |
 | `NAOS_WEB_OPERATOR_TOKEN_FILE` | unset | File holding the operator token; unset leaves every page unauthorized |
 | `NAOS_WEB_API_TIMEOUT_SECONDS` | `10` | How long a page waits for the API |
 
@@ -42,9 +42,9 @@ The screens and what each one shows are in
 
 ```bash
 export NAOS_WEB_API_BASE_URL=https://api.example.com
-export NAOS_WEB_API_URL=http://192.0.2.10:8000
+export NAOS_WEB_API_URL=http://192.0.2.10:8080
 export NAOS_WEB_OPERATOR_TOKEN_FILE=/run/secrets/operator
-uvicorn --factory naos_web.app:create_app --host 127.0.0.1 --port 8001
+uvicorn --factory naos_web.app:create_app --host 127.0.0.1 --port 8000
 ```
 
 `/healthz` answers `{"status": "ok"}` without touching the API.

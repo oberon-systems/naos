@@ -28,7 +28,7 @@ services:
       # Host paths as the runner sees them; the api only validates the strings.
       NAOS_ALLOWED_MOUNT_ROOTS: '${NAOS_ALLOWED_MOUNT_ROOTS:-[]}'
     ports:
-      - "${NAOS_BIND:-127.0.0.1}:${NAOS_API_PORT:-8000}:8000"
+      - "${NAOS_BIND:-127.0.0.1}:${NAOS_API_PORT:-8080}:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -42,14 +42,14 @@ services:
     image: ${NAOS_REGISTRY:-ghcr.io/oberon-systems}/naos-web:${NAOS_TAG:-latest}
     restart: unless-stopped
     environment:
-      NAOS_WEB_API_BASE_URL: ${NAOS_WEB_API_BASE_URL:-http://127.0.0.1:8000}
+      NAOS_WEB_API_BASE_URL: ${NAOS_WEB_API_BASE_URL:-http://127.0.0.1:8080}
       NAOS_WEB_API_URL: ${NAOS_WEB_API_URL:-http://api:8000}
       NAOS_WEB_OPERATOR_TOKEN_FILE: /run/secrets/operator
     volumes:
       # No file named, no token: the api then refuses the web ui like any other caller.
       - ${NAOS_WEB_OPERATOR_TOKEN_FILE:-/dev/null}:/run/secrets/operator:ro
     ports:
-      - "${NAOS_BIND:-127.0.0.1}:${NAOS_WEB_PORT:-8001}:8000"
+      - "${NAOS_BIND:-127.0.0.1}:${NAOS_WEB_PORT:-8000}:8000"
     depends_on:
       api:
         condition: service_healthy

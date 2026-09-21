@@ -24,14 +24,24 @@ make kickstart
 ```
 
 The first run writes both tokens, fills `docker/.env` from `.env.example` with
-their hashes and `NAOS_TAG=local`, builds the two images, starts compose, waits
-for `/healthz`, builds `naos-runner` and starts it in the background. Every
-later run reuses the same tokens and skips whatever is already up.
+their hashes and `NAOS_TAG=local`, builds the two images and `naos-runner`,
+starts compose, waits for `/healthz` and starts the runner in the background.
+Every later run reuses the same tokens and skips whatever is already up.
+
+Every run builds all three from this tree, before anything starts. Docker caches
+its layers and cargo its crates, so an unchanged tree costs a moment, and the
+stack never runs a binary older than the code in front of you.
 
 An existing `docker/.env` is never rewritten. Kickstart compares the two hashes
 in it against the tokens in `local/` and stops when they differ, so a stack you
 configured by hand keeps its own credentials: put those tokens into
 `local/operator` and `local/enrollment`, or start over with `make clean`.
+
+The one key it does add is `NAOS_WEB_OPERATOR_TOKEN_FILE`, and only when the
+`.env` has no value for it, so an `.env` from before the web ui read the API
+keeps every line you edited. `local/operator` is 0644 because the web container
+reads it as `nobody`; `local/` is 0700, and that is what keeps it off other
+accounts on this machine.
 
 For the same reason it refuses to write a new `docker/.env` while
 `docker/data/db` still holds a cluster: postgres keeps the password of its first
@@ -89,7 +99,7 @@ last one against the api url kickstart printed:
 tail dev/stack/local/agent.log
 cat dev/stack/local/agent/credentials.json
 curl -fsS -H "Authorization: Bearer $(cat dev/stack/local/operator)" \
-    http://127.0.0.1:8000/api/v1/audit
+    http://127.0.0.1:8080/api/v1/audit
 ```
 
 The audit trail holds a `runner_registered` record with the runner id. There is
