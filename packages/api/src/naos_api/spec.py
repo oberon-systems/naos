@@ -21,6 +21,7 @@ class PolicyKind(StrEnum):
 PolicyId = Annotated[str, Field(pattern=r"^[a-z]+_[0-9a-f]{32}$")]
 ImageId = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")]
 Digest = Annotated[str, Field(pattern=r"^sha256:[0-9a-f]{64}$")]
+RunnerId = Annotated[str, Field(pattern=r"^[A-Za-z0-9_]{1,64}$")]
 
 
 class ImageRef(StrictModel):
@@ -42,8 +43,7 @@ class MergeSpec(StrictModel):
     policy: Literal["always", "ask", "never"] = "ask"
 
 
-class RunSpec(StrictModel):
-    image: ImageRef
+class ProfileSpec(StrictModel):
     runtime: RuntimeSpec
     mounts: PolicyRef = PolicyRef()
     network: PolicyRef = PolicyRef()
@@ -59,6 +59,12 @@ class RunSpec(StrictModel):
             PolicyKind.SHELL: self.shell.policy,
             PolicyKind.MCP: self.mcp.policy,
         }
+
+
+class RunSpec(ProfileSpec):
+    image: ImageRef
+    # Unset lets any runner claim the Run.
+    runner: RunnerId | None = None
 
 
 def digest_of(document: Mapping[str, Any]) -> str:

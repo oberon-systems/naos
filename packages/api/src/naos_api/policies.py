@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from typing import Any
 from uuid import uuid4
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from naos_api import audit
 from naos_api.errors import NotFoundError, PolicyError
@@ -11,7 +11,7 @@ from naos_api.models import Policy
 from naos_api.mounts import MountPolicyIn, resolve_mount_policy
 from naos_api.network import NetworkPolicyIn, resolve_network_policy
 from naos_api.shell import ShellPolicyIn, resolve_shell_policy
-from naos_api.spec import PolicyKind, RunSpec, digest_of
+from naos_api.spec import PolicyKind, ProfileSpec, digest_of
 
 ID_PREFIX = {
     PolicyKind.MOUNT: "mntpol",
@@ -70,6 +70,13 @@ def create_mcp_policy(session: Session, policy: McpPolicyIn) -> tuple[Policy, bo
     return _store(session, PolicyKind.MCP, resolved.model_dump(mode="json"))
 
 
+def list_policies(session: Session, kind: PolicyKind | None = None) -> Sequence[Policy]:
+    statement = select(Policy)
+    if kind is not None:
+        statement = statement.where(col(Policy.kind) == kind)
+    return session.exec(statement.order_by(col(Policy.created_at).desc(), col(Policy.id))).all()
+
+
 def get_policy(session: Session, policy_id: str) -> Policy:
     policy = session.get(Policy, policy_id)
     if policy is None:
@@ -77,7 +84,7 @@ def get_policy(session: Session, policy_id: str) -> Policy:
     return policy
 
 
-def check_refs(session: Session, spec: RunSpec) -> None:
+def check_refs(session: Session, spec: ProfileSpec) -> None:
     for kind, policy_id in spec.policy_refs().items():
         if policy_id is None:
             continue

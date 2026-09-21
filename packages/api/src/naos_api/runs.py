@@ -9,7 +9,12 @@ from sqlmodel import Session, col, func, select, update
 from naos_api import audit
 from naos_api.audit import Actor
 from naos_api.clock import now_ts
-from naos_api.errors import IdempotencyConflictError, InvalidTransitionError, NotFoundError
+from naos_api.errors import (
+    IdempotencyConflictError,
+    InvalidTransitionError,
+    NotFoundError,
+    PolicyError,
+)
 from naos_api.images.service import check_image
 from naos_api.lifecycle import ACTIVE, TERMINAL, RunStatus, ensure_transition
 from naos_api.models import Lease, Merge, Policy, Run, Runner
@@ -47,15 +52,26 @@ def _replay(run: Run, request_digest: str) -> Run:
     return run
 
 
-def create_run(session: Session, spec: RunSpec, idempotency_key: str) -> tuple[Run, bool]:
+def _check_runner(session: Session, runner_id: str | None) -> None:
+    if runner_id is None:
+        return
+    runner = session.get(Runner, runner_id)
+    if runner is None or runner.revoked_at is not None:
+        raise PolicyError(f"runner {runner_id} does not exist or is revoked")
+
+
+def create_run(
+    session: Session, spec: RunSpec, idempotency_key: str, profile_id: str | None = None
+) -> tuple[Run, bool]:
     document = spec.model_dump(mode="json")
-    request_digest = digest_of(document)
+    request_digest = digest_of({"spec": document, "profile_id": profile_id})
     existing = _by_key(session, idempotency_key)
     if existing is not None:
         return _replay(existing, request_digest), False
 
     check_refs(session, spec)
     check_image(session, spec.image)
+    _check_runner(session, spec.runner)
     refs = spec.policy_refs()
     for attempt in range(CREATE_ATTEMPTS):
         run = Run(
@@ -66,6 +82,8 @@ def create_run(session: Session, spec: RunSpec, idempotency_key: str) -> tuple[R
             network_policy_id=refs[PolicyKind.NETWORK],
             shell_policy_id=refs[PolicyKind.SHELL],
             mcp_policy_id=refs[PolicyKind.MCP],
+            profile_id=profile_id,
+            runner_id=spec.runner,
             idempotency_key=idempotency_key,
             request_digest=request_digest,
         )

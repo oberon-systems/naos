@@ -77,6 +77,11 @@ def create_policy(
     return PolicyRead.of(policy)
 
 
+@router.get("/policies")
+def list_policies(session: SessionDep, kind: PolicyKind | None = None) -> list[PolicyRead]:
+    return [PolicyRead.of(policy) for policy in policies.list_policies(session, kind)]
+
+
 @router.get("/policies/{policy_id}")
 def get_policy(policy_id: str, session: SessionDep) -> PolicyRead:
     return PolicyRead.of(policies.get_policy(session, policy_id))

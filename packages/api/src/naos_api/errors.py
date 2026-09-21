@@ -32,3 +32,11 @@ class SecretConflictError(DomainError):
 
 class MergeError(DomainError):
     """The merge selection does not fit the collected diff."""
+
+
+class ProfileConflictError(DomainError):
+    """A profile with this name already exists with another spec."""
+
+
+class ProfileBusyError(DomainError):
+    """The profile cannot change while a Run copied from it is active."""

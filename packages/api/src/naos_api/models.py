@@ -60,6 +60,8 @@ class Run(SQLModel, table=True):
     network_policy_id: str | None = None
     shell_policy_id: str | None = None
     mcp_policy_id: str | None = None
+    profile_id: str | None = Field(default=None, index=True)
+    runner_id: str | None = Field(default=None, index=True)
     lease_id: str | None = Field(default=None, index=True)
     idempotency_key: str = Field(unique=True)
     request_digest: str
@@ -67,6 +69,17 @@ class Run(SQLModel, table=True):
     updated_at: int = Field(default_factory=now_ts)
     started_at: int | None = None
     finished_at: int | None = None
+
+
+class Profile(SQLModel, table=True):
+    __tablename__ = "profiles"
+
+    id: str = Field(primary_key=True)
+    name: str = Field(unique=True)
+    spec: dict[str, Any] = Field(sa_column=Column(JSON, nullable=False))
+    digest: str
+    created_at: int = Field(default_factory=now_ts)
+    updated_at: int = Field(default_factory=now_ts)
 
 
 class Merge(SQLModel, table=True):

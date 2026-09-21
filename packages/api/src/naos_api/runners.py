@@ -318,10 +318,11 @@ def _rotate_token(
     return token if rotated.rowcount == 1 else None
 
 
-def _candidates(session: Session, limit: int) -> Sequence[str]:
+def _candidates(session: Session, runner_id: str, limit: int) -> Sequence[str]:
+    pinned = or_(col(Run.runner_id).is_(None), col(Run.runner_id) == runner_id)
     statement = (
         select(Run.id)
-        .where(col(Run.status) == S.PENDING, col(Run.lease_id).is_(None))
+        .where(col(Run.status) == S.PENDING, col(Run.lease_id).is_(None), pinned)
         .order_by(col(Run.seq))
         .limit(limit)
     )
@@ -337,11 +338,11 @@ def _held(session: Session, lease_id: str) -> int:
     return int(count)
 
 
-def _assign(session: Session, lease_id: str, capacity: int, now: int) -> None:
+def _assign(session: Session, runner_id: str, lease_id: str, capacity: int, now: int) -> None:
     free = capacity - _held(session, lease_id)
     if free <= 0:
         return
-    for run_id in _candidates(session, free):
+    for run_id in _candidates(session, runner_id, free):
         session.exec(
             update(Run)
             .where(col(Run.id) == run_id, col(Run.status) == S.PENDING, col(Run.lease_id).is_(None))
@@ -367,7 +368,7 @@ def heartbeat(
         .values(last_heartbeat_at=now, capacity=capacity)
     )
     session.commit()
-    _assign(session, lease_id, capacity, now)
+    _assign(session, principal.runner_id, lease_id, capacity, now)
     lease = session.get(Lease, lease_id)
     if lease is None:
         raise LeaseError(f"lease {lease_id} disappeared")

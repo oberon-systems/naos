@@ -64,7 +64,13 @@ GET /api/v1/runs/{run_id}/merge
 POST /api/v1/runs/{run_id}/merge
 POST /api/v1/runs/{run_id}/merge/reject
 POST /api/v1/policies
+GET /api/v1/policies
 GET /api/v1/policies/{policy_id}
+GET /api/v1/profiles
+POST /api/v1/profiles
+GET /api/v1/profiles/{profile_id}
+PUT /api/v1/profiles/{profile_id}
+POST /api/v1/profiles/{profile_id}/runs
 POST /api/v1/images
 GET /api/v1/images
 GET /api/v1/images/{image_id}
@@ -121,6 +127,12 @@ hash, current or previous, is part of the answer.
   stop.
 - `POST /policies` deduplicates by content: the same document returns
   the existing policy with 200.
+- `POST /profiles/{profile_id}/runs` takes an `Idempotency-Key` like
+  `POST /runs`; the key also covers the profile, so reusing it for another
+  profile returns 409.
+- `POST /profiles` with a taken name and the same spec returns the existing
+  profile with 200, with another spec 409. `PUT /profiles/{profile_id}` with
+  the stored spec is a no-op.
 - Transitions are compare-and-swap on the expected status. A repeated
   transition that already happened is a no-op.
 - `POST /images` with the same `id`, `version`, `digest` and `url` returns the
@@ -145,6 +157,32 @@ and `spec.mcp`, and the reference is immutable once the Run starts. The runner
 receives the resolved document as a snapshot rather than the id. The network
 document is described in [06](06-network-gate.md), the shell document in
 [07](07-shell-gate.md), the MCP document in [08](08-mcp-gate.md).
+
+`GET /policies` lists every policy newest first; `kind` narrows it to one
+kind. The web form reads it to offer a policy per kind.
+
+## Profiles
+
+A profile is a named, reusable Run spec without `image` and `runner`: the
+`runtime`, the four policy references, `merge` and `timeout`. A Run copies the
+profile and never references it, so a later update reaches no started Run.
+
+- `POST /profiles` takes `name` and `spec`; `name` matches
+  `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$` and is unique. The policies it names
+  must exist, otherwise it returns 422.
+- `GET /profiles` lists by name; `q` matches a substring of the name or the id,
+  ignoring case. Each profile carries `active_runs`, the Runs copied from it
+  that are not terminal, `active_run` with `id`, `seq` and `status` of the
+  oldest of them, and `last_run_at`, null when it never ran.
+- `PUT /profiles/{profile_id}` takes a new `spec`. While any Run copied from
+  the profile is not terminal it returns 409 naming that Run; the check and
+  the write are one statement.
+- `POST /profiles/{profile_id}/runs` takes `image` and an optional `runner`
+  and creates a PENDING Run from the stored spec. The Run records the profile
+  it was copied from.
+
+A Run spec may name a `runner` id. The Run is then offered to that runner only;
+unset lets any runner claim it. An unknown or revoked runner returns 422.
 
 ## Secrets
 

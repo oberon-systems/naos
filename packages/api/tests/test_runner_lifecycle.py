@@ -254,7 +254,7 @@ def test_stale_candidate_is_not_reassigned(
     run_id = create_run("key-1")
     alpha, beta = register("alpha"), register("beta")
     _heartbeat(client, alpha, capacity=1)
-    monkeypatch.setattr(runners, "_candidates", lambda s, limit: [run_id])
+    monkeypatch.setattr(runners, "_candidates", lambda s, runner_id, limit: [run_id])
 
     _heartbeat(client, beta, capacity=1)
 
