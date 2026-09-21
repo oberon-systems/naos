@@ -1,4 +1,7 @@
 from collections.abc import Sequence
+from dataclasses import dataclass
+from pathlib import PurePosixPath
+from typing import Any
 from uuid import uuid4
 
 from sqlmodel import Session, col, func, select, update
@@ -8,13 +11,24 @@ from naos_api.audit import Actor
 from naos_api.clock import now_ts
 from naos_api.errors import IdempotencyConflictError, InvalidTransitionError, NotFoundError
 from naos_api.images.service import check_image
-from naos_api.lifecycle import RunStatus, ensure_transition
-from naos_api.models import Lease, Run
+from naos_api.lifecycle import ACTIVE, TERMINAL, RunStatus, ensure_transition
+from naos_api.models import Lease, Merge, Policy, Run, Runner
 from naos_api.policies import check_refs
 from naos_api.spec import PolicyKind, RunSpec, digest_of
 
 MAX_REASON_LENGTH = 500
 CREATE_ATTEMPTS = 3
+DAY = 86400
+
+RunState = str
+# The states an operator filters by, disjoint by construction: a run waiting for a
+# merge decision is no longer running, even though ACTIVE still counts its slot.
+STATES: dict[RunState, frozenset[RunStatus]] = {
+    "active": frozenset(ACTIVE) - {RunStatus.WAITING_MERGE},
+    "queued": frozenset({RunStatus.PENDING}),
+    "waiting_merge": frozenset({RunStatus.WAITING_MERGE}),
+    "failed": frozenset({RunStatus.FAILED}),
+}
 
 _STOP_TARGETS = {
     RunStatus.PENDING: RunStatus.CANCELLED,
@@ -79,13 +93,132 @@ def get_run(session: Session, run_id: str) -> Run:
 
 
 def list_runs(
-    session: Session, status: RunStatus | None = None, limit: int = 50, offset: int = 0
+    session: Session,
+    status: RunStatus | None = None,
+    state: RunState | None = None,
+    limit: int = 50,
+    offset: int = 0,
 ) -> Sequence[Run]:
     statement = select(Run)
     if status is not None:
         statement = statement.where(Run.status == status)
+    if state is not None:
+        statement = statement.where(col(Run.status).in_(STATES[state]))
     statement = statement.order_by(col(Run.seq).desc()).offset(offset).limit(limit)
     return session.exec(statement).all()
+
+
+@dataclass(frozen=True)
+class RunView:
+    run: Run
+    runner: Runner | None
+    workspace: str | None
+    changed: int | None
+    conflicts: int | None
+
+
+def _runners_of(session: Session, runs: Sequence[Run]) -> dict[str, Runner]:
+    leases = {run.lease_id for run in runs if run.lease_id}
+    if not leases:
+        return {}
+    pairs = session.exec(
+        select(Lease.id, Runner)
+        .join(Runner, col(Runner.id) == col(Lease.runner_id))
+        .where(col(Lease.id).in_(leases))
+    ).all()
+    return {lease_id: runner for lease_id, runner in pairs}
+
+
+def _workspaces_of(session: Session, runs: Sequence[Run]) -> dict[str, str]:
+    policies = {run.mount_policy_id for run in runs if run.mount_policy_id}
+    if not policies:
+        return {}
+    rows = session.exec(
+        select(Policy.id, Policy.document).where(col(Policy.id).in_(policies))
+    ).all()
+    return {policy_id: PurePosixPath(document["workdir"]).name for policy_id, document in rows}
+
+
+def _entries(entries: Sequence[dict[str, Any]]) -> int:
+    return sum(1 for entry in entries if entry["change"] != "rejected")
+
+
+def _merges_of(session: Session, runs: Sequence[Run]) -> dict[str, tuple[int, int]]:
+    ids = [run.id for run in runs]
+    if not ids:
+        return {}
+    rows = session.exec(
+        select(Merge.run_id, Merge.entries, Merge.conflicts).where(col(Merge.run_id).in_(ids))
+    ).all()
+    return {
+        run_id: (_entries(entries), len(conflicts or [])) for run_id, entries, conflicts in rows
+    }
+
+
+def view_runs(session: Session, runs: Sequence[Run]) -> list[RunView]:
+    """Decorate a page of runs with what the operator sees beside them.
+
+    Three queries for the whole page, so a longer list costs no more round trips.
+    """
+    runners = _runners_of(session, runs)
+    workspaces = _workspaces_of(session, runs)
+    merges = _merges_of(session, runs)
+    views: list[RunView] = []
+    for run in runs:
+        changed, conflicts = merges.get(run.id, (None, None))
+        views.append(
+            RunView(
+                run=run,
+                runner=runners.get(run.lease_id) if run.lease_id else None,
+                workspace=workspaces.get(run.mount_policy_id) if run.mount_policy_id else None,
+                changed=changed,
+                conflicts=conflicts,
+            )
+        )
+    return views
+
+
+@dataclass(frozen=True)
+class RunSummary:
+    counts: dict[RunStatus, int]
+    open: int
+    oldest_pending_at: int | None
+    failed_24h: int
+    last_failure_reason: str | None
+
+
+def summary(session: Session) -> RunSummary:
+    """The fleet at a glance. Reads the row clock, the one that wrote finished_at."""
+    now = now_ts()
+    counts = {
+        RunStatus(status): int(count)
+        for status, count in session.exec(
+            select(Run.status, func.count()).group_by(col(Run.status))
+        ).all()
+    }
+    oldest = session.exec(
+        select(func.min(Run.created_at)).where(col(Run.status) == RunStatus.PENDING)
+    ).one()
+    since = now - DAY
+    failed = (col(Run.status) == RunStatus.FAILED, col(Run.finished_at) >= since)
+    failed_24h = int(session.exec(select(func.count()).select_from(Run).where(*failed)).one())
+    reason = session.exec(
+        select(Run.status_reason).where(*failed).order_by(col(Run.finished_at).desc()).limit(1)
+    ).first()
+    return RunSummary(
+        counts=counts,
+        open=sum(count for status, count in counts.items() if status not in TERMINAL),
+        oldest_pending_at=oldest,
+        failed_24h=failed_24h,
+        last_failure_reason=reason,
+    )
+
+
+def stamps(target: RunStatus, now: int) -> dict[str, int]:
+    """When a run started and when it stopped, so a duration is never the queue time."""
+    if target is RunStatus.STARTING:
+        return {"started_at": now}
+    return {"finished_at": now} if target in TERMINAL else {}
 
 
 def transition_run(
@@ -103,11 +236,14 @@ def transition_run(
     if target is RunStatus.FAILED and not (reason and len(reason) <= MAX_REASON_LENGTH):
         raise ValueError(f"FAILED requires a reason of 1..{MAX_REASON_LENGTH} characters")
 
+    now = now_ts()
     statement = update(Run).where(col(Run.id) == run_id, col(Run.status) == expected)
     if lease_id is not None:
         live = select(Lease.id).where(col(Lease.id) == lease_id, col(Lease.expired_at).is_(None))
         statement = statement.where(col(Run.lease_id) == lease_id, live.exists())
-    statement = statement.values(status=target, status_reason=reason, updated_at=now_ts())
+    statement = statement.values(
+        status=target, status_reason=reason, updated_at=now, **stamps(target, now)
+    )
     result = session.exec(statement)
     if result.rowcount == 1:
         audit.transitioned(

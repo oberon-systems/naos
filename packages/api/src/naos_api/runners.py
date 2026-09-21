@@ -81,10 +81,29 @@ def _live_lease(session: Session, runner_id: str) -> Lease | None:
 
 
 @dataclass(frozen=True)
+class HeldRun:
+    id: str
+    seq: int
+    status: RunStatus
+
+
+@dataclass(frozen=True)
 class RunnerState:
     runner: Runner
     lease: Lease | None
-    runs: int
+    runs: list[HeldRun]
+
+
+def _holding(session: Session, lease_id: str) -> list[HeldRun]:
+    statement = (
+        select(Run.id, Run.seq, Run.status)
+        .where(col(Run.lease_id) == lease_id, col(Run.status).not_in(TERMINAL))
+        .order_by(col(Run.seq))
+    )
+    return [
+        HeldRun(id=run_id, seq=seq, status=S(status))
+        for run_id, seq, status in session.exec(statement).all()
+    ]
 
 
 def list_runners(session: Session, now: int, limit: int, offset: int) -> list[RunnerState]:
@@ -100,8 +119,8 @@ def list_runners(session: Session, now: int, limit: int, offset: int) -> list[Ru
         # A lease is only marked expired by the sweep, so its deadline decides here.
         if lease is not None and lease.expires_at <= now:
             lease = None
-        runs = _held(session, lease.id) if lease is not None else 0
-        states.append(RunnerState(runner=runner, lease=lease, runs=runs))
+        held = _holding(session, lease.id) if lease is not None else []
+        states.append(RunnerState(runner=runner, lease=lease, runs=held))
     return states
 
 
@@ -161,7 +180,12 @@ def _fail_bound(session: Session, lease_id: str, runner_id: str, now: int) -> No
         failed = session.exec(
             update(Run)
             .where(col(Run.id) == run_id, col(Run.status) == status, bound)
-            .values(status=S.FAILED, status_reason=LEASE_EXPIRED_REASON, updated_at=now)
+            .values(
+                status=S.FAILED,
+                status_reason=LEASE_EXPIRED_REASON,
+                updated_at=now,
+                **runs.stamps(S.FAILED, now),
+            )
         )
         if failed.rowcount == 1:
             audit.transitioned(
@@ -338,7 +362,9 @@ def heartbeat(
     lease_id = _renew_lease(session, principal.runner_id, now, lease_ttl)
     token = _rotate_token(session, principal, now, token_ttl)
     session.exec(
-        update(Runner).where(col(Runner.id) == principal.runner_id).values(last_heartbeat_at=now)
+        update(Runner)
+        .where(col(Runner.id) == principal.runner_id)
+        .values(last_heartbeat_at=now, capacity=capacity)
     )
     session.commit()
     _assign(session, lease_id, capacity, now)

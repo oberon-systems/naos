@@ -29,6 +29,9 @@ class Runner(SQLModel, table=True):
     prev_token_expires_at: int | None = None
     created_at: int = Field(default_factory=now_ts)
     last_heartbeat_at: int | None = None
+    # The capacity of the last heartbeat, kept so the slots of a runner whose
+    # lease has lapsed are still known.
+    capacity: int | None = None
     revoked_at: int | None = None
 
 
@@ -62,6 +65,8 @@ class Run(SQLModel, table=True):
     request_digest: str
     created_at: int = Field(default_factory=now_ts)
     updated_at: int = Field(default_factory=now_ts)
+    started_at: int | None = None
+    finished_at: int | None = None
 
 
 class Merge(SQLModel, table=True):

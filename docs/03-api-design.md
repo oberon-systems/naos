@@ -51,8 +51,10 @@ Own Agents, Images, Profiles, Policies, Runs, Runners, Leases, audit records, an
 ```text
 POST /api/v1/runs
 GET /api/v1/runs
+GET /api/v1/runs/summary
 GET /api/v1/runs/{run_id}
 POST /api/v1/runs/{run_id}/stop
+GET /api/v1/runners
 POST /api/v1/runners/register
 POST /api/v1/runners/{runner_id}/heartbeat
 GET /api/v1/runners/{runner_id}/runs
@@ -74,6 +76,42 @@ GET /api/v1/audit
 Do not allow clients to arbitrarily set Run status. Validate legal transitions centrally.
 
 Use transactions for atomic transitions and design mutations to be idempotent.
+
+## Reading runs
+
+`GET /runs` lists newest first and answers with what an operator screen shows
+beside the Run itself, resolved by the API rather than by the caller:
+
+| Field | Meaning |
+|---|---|
+| `seq` | The Run number, unique and increasing |
+| `workspace` | The workspace the mount policy names, or null |
+| `runner` | `id` and `name` of the runner holding the lease, or null |
+| `merge` | `changed` and `conflicts` of the collected diff, or null |
+| `started_at` | When the Run reached STARTING, or null while it queues |
+| `finished_at` | When it reached a terminal state, or null |
+
+`started_at` and `finished_at` bracket the Run; `created_at` is when it was
+queued, so the two never have to be told apart afterwards. The whole page
+costs a fixed number of queries, whatever its length.
+
+`status` filters by one status and `state` by the set a screen offers:
+`active` is STARTING, STARTED, STOPPING and COLLECTING, `queued` is PENDING,
+`waiting_merge` and `failed` are themselves. CANCELLED belongs to no state and
+shows up unfiltered.
+
+`GET /runs/summary` is the fleet at a glance, in one call: `counts` per
+status, `open` for the non-terminal ones, `oldest_pending_at`, `failed_24h`
+and `last_failure_reason`, the reason of the newest failure in that window.
+
+## Listing runners
+
+`GET /runners` answers with every runner, newest first: its `status` (`live`,
+`stale` or `revoked`), the `capacity` of its last heartbeat, the `runs` it
+holds as `id`, `seq` and `status`, `last_heartbeat_at`, the `lease_acquired_at`
+and `lease_expires_at` window and `revoked_at`. `capacity` outlives the lease,
+so the slots of a runner that stopped answering are still known. No token
+hash, current or previous, is part of the answer.
 
 ## Idempotency
 
@@ -194,8 +232,8 @@ POST /api/v1/runners/{runner_id}/events                      runner token
   the next lease of the same runner takes them over, since only that runner
   holds their changes.
 - A heartbeat assigns unassigned PENDING Runs up to the capacity the runner
-  reports. Each assignment is compare-and-swap, so a Run never lands on two
-  leases.
+  reports, and that capacity is kept on the runner. Each assignment is
+  compare-and-swap, so a Run never lands on two leases.
 - `GET .../runs` returns the desired state: every non-terminal Run on the
   live lease, with its spec, the `image_url` of its image, the resolved
   policy documents, `credentials` and `merge`, the merge decision of a

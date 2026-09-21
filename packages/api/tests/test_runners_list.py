@@ -43,17 +43,23 @@ def test_a_registered_runner_is_live_and_carries_no_secret(
         "id",
         "name",
         "status",
+        "capacity",
         "runs",
         "created_at",
         "last_heartbeat_at",
+        "lease_acquired_at",
         "lease_expires_at",
+        "revoked_at",
     }
     assert row["id"] == runner["runner_id"]
     assert row["name"] == "alpha"
     assert row["status"] == "live"
-    assert row["runs"] == 0
+    assert row["capacity"] is None
+    assert row["runs"] == []
     assert row["last_heartbeat_at"] is None
+    assert row["lease_acquired_at"] is not None
     assert row["lease_expires_at"] is not None
+    assert row["revoked_at"] is None
 
 
 def test_a_runner_whose_lease_ran_out_is_stale(
@@ -65,8 +71,9 @@ def test_a_runner_whose_lease_ran_out_is_stale(
     (row,) = _list(client)
 
     assert row["status"] == "stale"
+    assert row["lease_acquired_at"] is None
     assert row["lease_expires_at"] is None
-    assert row["runs"] == 0
+    assert row["runs"] == []
 
 
 def test_a_revoked_runner_says_so(client: TestClient, register: Register, session: Session) -> None:
@@ -80,19 +87,33 @@ def test_a_revoked_runner_says_so(client: TestClient, register: Register, sessio
     (row,) = _list(client)
 
     assert row["status"] == "revoked"
+    assert row["revoked_at"] == stored.created_at + 1
 
 
-def test_the_runs_a_runner_holds_are_counted(
+def test_the_runs_a_runner_holds_are_named(
     client: TestClient, register: Register, create_run: CreateRun
 ) -> None:
     runner = register()
-    create_run("counted")
+    run_id = create_run("held")
     _heartbeat(client, runner, capacity=1)
 
     (row,) = _list(client)
 
-    assert row["runs"] == 1
+    assert row["runs"] == [{"id": run_id, "seq": 1, "status": "PENDING"}]
     assert row["last_heartbeat_at"] is not None
+
+
+def test_the_reported_capacity_outlives_the_lease(
+    client: TestClient, register: Register, advance: Advance
+) -> None:
+    runner = register()
+    _heartbeat(client, runner, capacity=2)
+    advance(LEASE_TTL + 1)
+
+    (row,) = _list(client)
+
+    assert row["status"] == "stale"
+    assert row["capacity"] == 2
 
 
 def test_the_newest_runner_comes_first(

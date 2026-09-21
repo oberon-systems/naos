@@ -5,19 +5,29 @@ from pydantic import BaseModel
 
 from naos_api import runners
 from naos_api.clock import NowDep
+from naos_api.lifecycle import RunStatus
 from naos_api.routes.deps import SessionDep
 
 RunnerStatus = Literal["live", "stale", "revoked"]
+
+
+class HeldRunRead(BaseModel):
+    id: str
+    seq: int
+    status: RunStatus
 
 
 class RunnerRead(BaseModel):
     id: str
     name: str
     status: RunnerStatus
-    runs: int
+    capacity: int | None
+    runs: list[HeldRunRead]
     created_at: int
     last_heartbeat_at: int | None
+    lease_acquired_at: int | None
     lease_expires_at: int | None
+    revoked_at: int | None
 
     @classmethod
     def of(cls, state: runners.RunnerState) -> Self:
@@ -25,10 +35,13 @@ class RunnerRead(BaseModel):
             id=state.runner.id,
             name=state.runner.name,
             status=_status(state),
-            runs=state.runs,
+            capacity=state.runner.capacity,
+            runs=[HeldRunRead(id=run.id, seq=run.seq, status=run.status) for run in state.runs],
             created_at=state.runner.created_at,
             last_heartbeat_at=state.runner.last_heartbeat_at,
+            lease_acquired_at=state.lease.acquired_at if state.lease else None,
             lease_expires_at=state.lease.expires_at if state.lease else None,
+            revoked_at=state.runner.revoked_at,
         )
 
 

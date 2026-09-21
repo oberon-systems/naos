@@ -155,6 +155,77 @@ mcp_calls() {
         grep -c "\"server\":\"$1\",\"tool\":\"$2\",.*\"decision\":\"$3\"" || true
 }
 
+# The read model the operator screens render, rather than the raw row.
+check_run_view() {
+    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run" | "$VENV/bin/python" -c '
+import json, sys
+status, finished = sys.argv[1], sys.argv[2] == "finished"
+row = json.load(sys.stdin)
+seen = {"seq": row["seq"], "status": row["status"], "workspace": row["workspace"]}
+wanted = {"seq": 1, "status": status, "workspace": "alpha"}
+if seen != wanted:
+    sys.exit(f"the run reads {seen}, expected {wanted}")
+if (row["runner"] or {}).get("name") != "alpha":
+    sys.exit(f"the run names the runner {row["runner"]}, expected alpha")
+if row["started_at"] is None:
+    sys.exit("the run carries no started_at")
+if (row["finished_at"] is not None) != finished:
+    sys.exit(f"finished_at is {row["finished_at"]} while the run is {sys.argv[2]}")
+' "$1" "$2"
+}
+
+check_merge_summary() {
+    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run" | "$VENV/bin/python" -c '
+import json, sys
+merge = json.load(sys.stdin)["merge"]
+if not merge or merge["changed"] < 1:
+    sys.exit(f"the waiting run summarises its merge as {merge}")
+'
+}
+
+listed() {
+    curl -fsS "${auth[@]}" "$api/api/v1/runs?state=$1" | "$VENV/bin/python" -c '
+import json, sys
+sys.exit(0 if sys.argv[1] in [row["id"] for row in json.load(sys.stdin)] else 1)
+' "$run"
+}
+
+check_states() {
+    listed "$1" || fail "the run is missing from state=$1"
+    for state in active queued waiting_merge failed; do
+        if [ "$state" != "$1" ] && listed "$state"; then
+            fail "the run shows up under state=$state as well as state=$1"
+        fi
+    done
+}
+
+check_summary() {
+    curl -fsS "${auth[@]}" "$api/api/v1/runs/summary" | "$VENV/bin/python" -c '
+import json, sys
+status, opened = sys.argv[1], int(sys.argv[2])
+body = json.load(sys.stdin)
+if body["counts"].get(status) != 1:
+    sys.exit(f"the summary counts {body["counts"]}, expected one {status}")
+if body["open"] != opened:
+    sys.exit(f"the summary says {body["open"]} open, expected {opened}")
+' "$1" "$2"
+}
+
+# capacity outlives a lease, so it is stored rather than counted per request.
+check_runner_slots() {
+    curl -fsS "${auth[@]}" "$api/api/v1/runners" | "$VENV/bin/python" -c '
+import json, sys
+(row,) = json.load(sys.stdin)
+if row["capacity"] is None:
+    sys.exit("the runner reports no capacity")
+held = [held["seq"] for held in row["runs"]]
+if held != [1]:
+    sys.exit(f"the runner holds {held}, expected the smoke run")
+if row["lease_acquired_at"] is None or row["lease_expires_at"] is None:
+    sys.exit("the live runner names no lease window")
+'
+}
+
 check_gates() {
     grep -q NAOS-SMOKE-DONE "$TEMP_DIR/console.log" || fail "the guest commands did not finish"
     for tool in read_file list_dir grep http_request; do
@@ -380,6 +451,11 @@ if [ "$(run_status)" != STARTED ] || [ "$(events vm_created)" -ne 1 ]; then
     echo "the restarted agent did not keep the running vm" >&2
     exit 1
 fi
+echo "checking what the operator screens read..."
+check_run_view STARTED running
+check_states active
+check_runner_slots
+check_summary STARTED 1
 echo "editing the workspace and calling the gates from the console..."
 guest \
     "cd /naos/alpha" \
@@ -407,6 +483,8 @@ check_gates
 echo "run $run booted, stopping it..."
 curl -fsS "${auth[@]}" -X POST "$api/api/v1/runs/$run/stop" -o /dev/null
 wait_for 120 collected
+check_states waiting_merge
+check_merge_summary
 wait_for 10 share_gone
 if [ "$(workspace_tree)" != "$tree_before" ]; then
     echo "the guest changed the host workspace" >&2
@@ -421,6 +499,8 @@ wait_for 60 conflicted
 echo "taking the agent's version of notes.txt..."
 decide '{"notes.txt": "take"}'
 wait_for 120 completed
+check_run_view COMPLETED finished
+check_summary COMPLETED 0
 check_merge
 echo "checking the audit timeline of the run..."
 wait_for 60 audited
