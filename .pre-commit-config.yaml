@@ -7,6 +7,7 @@ repos:
     rev: v6.0.0
     hooks:
       - id: check-added-large-files
+        exclude: ^docs/videos/
       - id: check-ast
       - id: check-case-conflict
       - id: check-executables-have-shebangs
@@ -121,6 +122,7 @@ repos:
     rev: 3.0.0
     hooks:
       - id: forbid-binary
+        exclude: ^docs/videos/
       # Templates carry the separators and dashes the mockups show; vendored code stays as shipped.
       - id: require-ascii
         exclude: (.*\.md$|^packages/web/.*\.html$|^packages/web/src/naos_web/static/vendor/)
