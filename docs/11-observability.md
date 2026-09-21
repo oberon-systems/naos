@@ -64,6 +64,7 @@ describe, so a change and its event land or fail together.
 | `policy_created` | operator | `policy_id`, `kind` |
 | `image_registered` | operator | `image_id`, `version`, `digest` |
 | `secret_created` | operator | `name` only |
+| `console_attached` | operator | none; the Run is `run_id` |
 
 A lease that expires fails its active Runs, and each of those is a
 `run_transition` by `system` with the reason `runner lease expired`.

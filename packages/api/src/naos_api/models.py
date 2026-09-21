@@ -1,6 +1,6 @@
 from typing import Any
 
-from sqlmodel import JSON, Column, Field, SQLModel, UniqueConstraint
+from sqlmodel import JSON, Column, Field, LargeBinary, SQLModel, UniqueConstraint
 
 from naos_api.clock import now_ts
 from naos_api.lifecycle import RunStatus
@@ -119,6 +119,18 @@ class AuditEvent(SQLModel, table=True):
     vm_id: str | None = None
     runner_id: str | None = Field(default=None, index=True)
     data: dict[str, Any] = Field(sa_column=Column(JSON, nullable=False))
+
+
+class ConsoleChunk(SQLModel, table=True):
+    __tablename__ = "console_chunks"
+    __table_args__ = (UniqueConstraint("run_id", "offset"),)
+
+    seq: int | None = Field(default=None, primary_key=True)
+    run_id: str = Field(index=True)
+    offset: int
+    end: int
+    data: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
+    at: int
 
 
 class Image(SQLModel, table=True):

@@ -10,7 +10,7 @@ from naos_api.auth import require_principal
 from naos_api.clock import now_ts
 from naos_api.db import Database
 from naos_api.errors import DomainError
-from naos_api.routes import api_router, domain_error_handler, runner_router
+from naos_api.routes import api_router, console_router, domain_error_handler, runner_router
 from naos_api.runners import expire_leases
 from naos_api.settings import get_settings
 
@@ -66,4 +66,6 @@ def create_app() -> FastAPI:
 
     app.include_router(build_v1_router(api_router))
     app.include_router(runner_router, prefix="/api/v1")
+    # A websocket cannot pass the HTTP bearer check of the v1 router, so it carries its own.
+    app.include_router(console_router, prefix="/api/v1")
     return app

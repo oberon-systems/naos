@@ -40,3 +40,7 @@ class ProfileConflictError(DomainError):
 
 class ProfileBusyError(DomainError):
     """The profile cannot change while a Run copied from it is active."""
+
+
+class ConsoleFullError(DomainError):
+    """The run's console log reached its size limit."""

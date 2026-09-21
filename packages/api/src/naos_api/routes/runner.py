@@ -1,15 +1,21 @@
 from typing import Annotated, Any, Literal, Self
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends, Query
 from pydantic import BaseModel, Field, StrictInt, model_validator
 
-from naos_api import audit, merges, runners
+from naos_api import audit, consoles, merges, runners
 from naos_api.audit import RunnerEventIn
 from naos_api.auth import require_enrollment, require_runner
 from naos_api.clock import NowDep
 from naos_api.lifecycle import RunStatus
 from naos_api.models import Lease
-from naos_api.routes.deps import CredentialTtlDep, LeaseTtlDep, SessionDep, TokenTtlDep
+from naos_api.routes.deps import (
+    ConsoleLimitDep,
+    CredentialTtlDep,
+    LeaseTtlDep,
+    SessionDep,
+    TokenTtlDep,
+)
 from naos_api.routes.runs import RunRead
 from naos_api.runners import IssuedToken, RunnerPrincipal
 from naos_api.runs import MAX_REASON_LENGTH
@@ -100,6 +106,10 @@ class EventsIn(StrictModel):
 class EventsOut(BaseModel):
     accepted: int
     refused: list[str]
+
+
+class ConsoleOut(BaseModel):
+    offset: int
 
 
 class TokenOut(BaseModel):
@@ -259,3 +269,17 @@ def report_merge(
 def report_events(body: EventsIn, principal: PrincipalDep, session: SessionDep) -> EventsOut:
     accepted, refused = audit.ingest(session, principal.runner_id, body.events)
     return EventsOut(accepted=accepted, refused=refused)
+
+
+@router.post("/{runner_id}/runs/{run_id}/console")
+def report_console(
+    run_id: str,
+    offset: Annotated[int, Query(ge=0)],
+    data: Annotated[bytes, Body(media_type="application/octet-stream")],
+    principal: PrincipalDep,
+    session: SessionDep,
+    limit: ConsoleLimitDep,
+    now: NowDep,
+) -> ConsoleOut:
+    held = consoles.append(session, principal.runner_id, run_id, offset, data, limit, now)
+    return ConsoleOut(offset=held)

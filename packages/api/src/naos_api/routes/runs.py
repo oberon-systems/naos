@@ -3,7 +3,7 @@ from typing import Annotated, Any, Literal, Self
 from fastapi import APIRouter, Query, Response
 from pydantic import BaseModel, Field
 
-from naos_api import merges, runs
+from naos_api import consoles, merges, runs
 from naos_api.clock import NowDep
 from naos_api.lifecycle import RunStatus
 from naos_api.models import Merge, Run
@@ -169,3 +169,8 @@ def decide_merge(run_id: str, body: MergeDecisionIn, session: SessionDep, now: N
 @router.post("/runs/{run_id}/merge/reject")
 def reject_merge(run_id: str, session: SessionDep, now: NowDep) -> MergeRead:
     return MergeRead.of(merges.decide(session, run_id, [], {}, now))
+
+
+@router.get("/runs/{run_id}/console")
+def console_log(run_id: str, session: SessionDep) -> Response:
+    return Response(consoles.read(session, run_id, chunks=None), media_type="text/plain")

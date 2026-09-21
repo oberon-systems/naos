@@ -34,6 +34,7 @@ process. List values are JSON. Every route depends only on the values it uses.
 | `NAOS_LEASE_TTL_SECONDS` | `60` | Lease extension per heartbeat, 5 to 3600 |
 | `NAOS_LEASE_SWEEP_INTERVAL_SECONDS` | `15` | Background lease sweep period, 1 to 3600 |
 | `NAOS_RUN_CREDENTIAL_TTL_SECONDS` | `300` | Lifetime of a credential issued to a runner, 60 to 3600 |
+| `NAOS_CONSOLE_LIMIT_BYTES` | `8388608` | Console output kept per Run, 4096 to 1073741824 |
 
 ## Operator credentials
 
@@ -59,6 +60,8 @@ POST /api/v1/runners/register
 POST /api/v1/runners/{runner_id}/heartbeat
 GET /api/v1/runners/{runner_id}/runs
 GET /api/v1/runs/{run_id}/console
+WS /api/v1/runs/{run_id}/attach
+POST /api/v1/runners/{runner_id}/runs/{run_id}/console
 GET /api/v1/runs/{run_id}/events
 GET /api/v1/runs/{run_id}/merge
 POST /api/v1/runs/{run_id}/merge
@@ -111,6 +114,25 @@ shows up unfiltered.
 `GET /runs/summary` is the fleet at a glance, in one call: `counts` per
 status, `open` for the non-terminal ones, `oldest_pending_at`, `failed_24h`
 and `last_failure_reason`, the reason of the newest failure in that window.
+
+## Console
+
+The runner ships the output of a VM's `ttyS0` as it appears
+([04](04-runner-design.md#console)). The API keeps it per Run, up to
+`NAOS_CONSOLE_LIMIT_BYTES`, and accepts it only from the runner whose lease
+holds the Run. `GET /runs/{run_id}/console` answers with the whole log as
+`text/plain`.
+
+`WS /runs/{run_id}/attach` is the live, read-only view. It takes the operator
+token in the `Authorization` header, writes a `console_attached` audit event
+with actor `operator`, sends the log so far as binary frames, then follows
+it. Frames from the client are ignored. The socket closes once the Run has
+left STOPPING and every byte was sent.
+
+```bash
+wscat -c ws://api.example.com/api/v1/runs/run_0123456789abcdef0123456789abcdef/attach \
+  -H "Authorization: Bearer $NAOS_TOKEN"
+```
 
 ## Listing runners
 

@@ -37,6 +37,7 @@ API_EVENTS: dict[str, frozenset[str]] = {
     "secret_created": frozenset({"name"}),
     "profile_created": frozenset({"profile_id", "name"}),
     "profile_updated": frozenset({"profile_id", "name"}),
+    "console_attached": frozenset(),
 }
 
 _VM = {"vm_id": Id, "run_id": Id}

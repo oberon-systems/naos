@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     lease_ttl_seconds: Annotated[int, Field(ge=5, le=3600)] = 60
     runner_token_ttl_seconds: Annotated[int, Field(ge=60, le=604800)] = 86400
     run_credential_ttl_seconds: Annotated[int, Field(ge=60, le=3600)] = 300
+    console_limit_bytes: Annotated[int, Field(ge=4096, le=1 << 30)] = 8 << 20
     lease_sweep_interval_seconds: Annotated[int, Field(ge=1, le=3600)] = 15
 
 

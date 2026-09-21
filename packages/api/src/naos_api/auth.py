@@ -1,8 +1,9 @@
 import hmac
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, WebSocket, WebSocketException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security.utils import get_authorization_scheme_param
 from sqlmodel import Session
 
 from naos_api import runners
@@ -40,6 +41,19 @@ def require_principal(
 ) -> None:
     if not _matches(credentials, expected):
         raise _unauthorized("operator is not authorized")
+
+
+def require_operator_connection(
+    websocket: WebSocket, expected: Annotated[str | None, Depends(_operator_hash)]
+) -> None:
+    scheme, token = get_authorization_scheme_param(websocket.headers.get("authorization"))
+    credentials = (
+        HTTPAuthorizationCredentials(scheme=scheme, credentials=token)
+        if scheme.lower() == "bearer" and token
+        else None
+    )
+    if not _matches(credentials, expected):
+        raise WebSocketException(status.WS_1008_POLICY_VIOLATION, "operator is not authorized")
 
 
 def _enrollment_hash() -> str | None:
