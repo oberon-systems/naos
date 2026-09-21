@@ -808,6 +808,12 @@ body {
   overflow-y: auto;
 }
 
+.panel--dialog .panel__header,
+.dialog__body > *,
+.dialog__footer {
+  flex-shrink: 0;
+}
+
 .dialog__footer {
   display: flex;
   align-items: center;
