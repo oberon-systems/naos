@@ -90,8 +90,19 @@ def runs_page(
     )
 
 
+# hx-boost on the nav sends HX-Request too, but that swap replaces the whole body,
+# so only a request aimed inside the page may answer without the shell.
+def wants_fragment(request: Request) -> bool:
+    return (
+        request.headers.get("HX-Request") == "true" and request.headers.get("HX-Boosted") != "true"
+    )
+
+
+# A failure is rendered into whatever asked for it: the page, the swapped body, or
+# the overlay. Answering with the wrong one nests a whole document inside an element.
 def failed(request: Request, page: ListPage, err: ApiError) -> HTMLResponse:
-    return render(request, page, template="unreachable.html", reason=str(err))
+    template = "page_error.html" if wants_fragment(request) else "unreachable.html"
+    return render(request, page, template=template, reason=str(err))
 
 
 @router.get("/", include_in_schema=False)
@@ -102,7 +113,7 @@ def index() -> RedirectResponse:
 @router.get("/runs", response_class=HTMLResponse)
 async def runs(request: Request, now: NowDep, state: StateQuery = "all") -> HTMLResponse:
     api: ApiClient = request.app.state.api
-    fragment = request.headers.get("HX-Request") == "true"
+    fragment = wants_fragment(request)
     try:
         board = await api.dashboard(None if state == "all" else state)
     except ApiError as err:

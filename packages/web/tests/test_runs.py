@@ -189,3 +189,17 @@ def test_an_unreachable_api_says_so_instead_of_inventing_rows(offline: TestClien
     assert "the api did not answer" in response.text
     assert numbers(response.text) == []
     assert "tile__number" not in response.text
+
+
+def test_a_boosted_nav_click_keeps_the_shell(client: TestClient) -> None:
+    boosted = client.get("/runs", headers={"HX-Request": "true", "HX-Boosted": "true"}).text
+
+    assert '<header class="topbar">' in boosted
+    assert "<!DOCTYPE html>" in boosted
+    assert numbers(boosted) == numbers(client.get("/runs").text)
+
+
+def test_an_in_page_request_still_gets_the_fragment(client: TestClient) -> None:
+    fragment = client.get("/runs", headers=HX).text
+
+    assert '<header class="topbar">' not in fragment
