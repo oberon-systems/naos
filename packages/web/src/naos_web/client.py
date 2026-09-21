@@ -19,6 +19,13 @@ class Dashboard:
     runners: list[Row]
 
 
+@dataclass(frozen=True)
+class RunnerDetail:
+    runner: Row
+    runs: list[Row]
+    events: list[Row]
+
+
 def read_token(path: Path | None) -> str | None:
     if path is None:
         return None
@@ -70,6 +77,12 @@ class ApiClient:
         rows: list[Row] = await self._call("GET", "/runners")
         return rows
 
+    async def events(self, runner_id: str, limit: int = 5) -> list[Row]:
+        rows: list[Row] = await self._call(
+            "GET", "/audit", params={"runner_id": runner_id, "limit": limit}
+        )
+        return rows
+
     async def stop_run(self, run_id: str) -> Row:
         row: Row = await self._call("POST", f"/runs/{run_id}/stop")
         return row
@@ -80,3 +93,12 @@ class ApiClient:
             self.runs(state), self.summary(), self.runners()
         )
         return Dashboard(runs=runs, summary=summary, runners=runners)
+
+    async def runner(self, runner_id: str) -> RunnerDetail:
+        runners, runs, events = await asyncio.gather(
+            self.runners(), self.runs(limit=100), self.events(runner_id)
+        )
+        found = next((row for row in runners if row["id"] == runner_id), None)
+        if found is None:
+            raise ApiError(f"the api knows no runner {runner_id}")
+        return RunnerDetail(runner=found, runs=runs, events=events)

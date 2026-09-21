@@ -1,0 +1,14 @@
+<div class="overlay__scrim" hx-get="/overlay/close" hx-target="#overlay"></div>
+<section class="panel panel--slim" role="dialog">
+    <header class="panel__header">
+        <div class="panel__title">
+            <h2 class="panel__name">{{ page.title }}</h2>
+            <button class="panel__close"
+                    type="button"
+                    hx-get="/overlay/close"
+                    hx-target="#overlay"
+                    aria-label="Close">✕</button>
+        </div>
+    </header>
+    <p class="notice">{{ reason }}</p>
+</section>

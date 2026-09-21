@@ -226,6 +226,49 @@ def list_runners() -> list[Row]:
     return RUNNERS
 
 
+@stub.get("/api/v1/audit")
+def audit(runner_id: str | None = None, limit: int = Query(100)) -> list[Row]:
+    rows: list[Row] = [
+        {
+            "seq": 5,
+            "id": "ev_5",
+            "at": NOW - 120,
+            "source": "api",
+            "event": "run_claimed",
+            "actor": "runner",
+            "run_id": "run_9f21c4",
+            "vm_id": None,
+            "runner_id": runner_id,
+            "data": {"run_id": "run_9f21c4"},
+        },
+        {
+            "seq": 4,
+            "id": "ev_4",
+            "at": NOW - 720,
+            "source": "api",
+            "event": "token_rotated",
+            "actor": "runner",
+            "run_id": None,
+            "vm_id": None,
+            "runner_id": runner_id,
+            "data": {},
+        },
+        {
+            "seq": 3,
+            "id": "ev_3",
+            "at": NOW - 2460,
+            "source": "api",
+            "event": "lease_acquired",
+            "actor": "runner",
+            "run_id": None,
+            "vm_id": None,
+            "runner_id": runner_id,
+            "data": {"lease_id": "lease_5d2a91"},
+        },
+    ]
+    return rows[:limit]
+
+
 @stub.post("/api/v1/runs/{run_id}/stop")
 def stop(run_id: str) -> Row:
     for row in RUNS:

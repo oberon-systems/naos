@@ -109,6 +109,72 @@ def _lease(runner: Row, now: int) -> str:
     return format.lease_left(runner["lease_acquired_at"], runner["lease_expires_at"], now)
 
 
+@dataclass(frozen=True)
+class EventRow:
+    event: str
+    detail: str
+    at: str
+
+
+@dataclass(frozen=True)
+class RunnerDetailRow:
+    id: str
+    name: str
+    status: str
+    tone: Tone
+    enrolled: str
+    slots: str
+    busy: str
+    free: str
+    percent: int
+    lease: str
+    lease_percent: int
+    state: str
+    heartbeat: str
+    registered: str
+    runs: list[RunRow]
+    events: list[EventRow]
+
+
+# What the audit row says beside its name, from the fields that event actually carries.
+def _detail(event: Row) -> str:
+    data = event["data"]
+    for key in ("run_id", "lease_id", "names", "to", "reason"):
+        if key in data and data[key]:
+            value = data[key]
+            return ", ".join(value) if isinstance(value, list) else str(value)
+    return ""
+
+
+def runner_detail(runner: Row, runs: list[Row], events: list[Row], now: int) -> RunnerDetailRow:
+    held = {run["id"] for run in runner["runs"]}
+    capacity = runner["capacity"]
+    busy = len(runner["runs"])
+    return RunnerDetailRow(
+        id=runner["id"],
+        name=runner["name"],
+        status=runner["status"],
+        tone=RUNNER_TONE[runner["status"]],
+        enrolled=f"enrolled {format.ago(runner['created_at'], now)}",
+        slots=format.slots(capacity, busy),
+        busy=format.DASH if capacity is None else f"{busy} / {capacity} busy",
+        free=format.DASH if capacity is None else f"{capacity - busy} free",
+        percent=0 if not capacity else round(100 * busy / capacity),
+        lease=_lease(runner, now),
+        lease_percent=format.lease_percent(
+            runner["lease_acquired_at"], runner["lease_expires_at"], now
+        ),
+        state=runner["status"].upper(),
+        heartbeat=format.ago(runner["last_heartbeat_at"], now),
+        registered=format.ago(runner["created_at"], now),
+        runs=[row for row in run_rows([r for r in runs if r["id"] in held], [runner], now)],
+        events=[
+            EventRow(event=row["event"], detail=_detail(row), at=format.ago(row["at"], now))
+            for row in events
+        ],
+    )
+
+
 def runner_rows(runners: list[Row], now: int) -> list[RunnerRow]:
     return [
         RunnerRow(

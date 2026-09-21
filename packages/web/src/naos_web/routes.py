@@ -20,7 +20,7 @@ from naos_web.pages import (
     Summary,
     TileValue,
 )
-from naos_web.rows import run_rows, runner_rows
+from naos_web.rows import run_rows, runner_detail, runner_rows
 
 State = Literal["all", "active", "queued", "waiting_merge", "failed"]
 StateQuery = Annotated[State, Query()]
@@ -105,6 +105,11 @@ def failed(request: Request, page: ListPage, err: ApiError) -> HTMLResponse:
     return render(request, page, template=template, reason=str(err))
 
 
+def failed_overlay(request: Request, page: ListPage, err: ApiError) -> HTMLResponse:
+    template = "overlay_error.html" if wants_fragment(request) else "unreachable.html"
+    return render(request, page, template=template, reason=str(err))
+
+
 @router.get("/", include_in_schema=False)
 def index() -> RedirectResponse:
     return RedirectResponse("/runs", status_code=307)
@@ -137,6 +142,29 @@ async def cancel_run(
 @router.get("/runners", response_class=HTMLResponse)
 def runners(request: Request) -> HTMLResponse:
     return render(request, PAGES["runners"])
+
+
+# The overlay the board opens from a runner row. A plain request gets it inside the
+# shell, so the panel is reachable without htmx and a link to it can be shared.
+@router.get("/runners/{runner_id}", response_class=HTMLResponse)
+async def runner(request: Request, runner_id: str, now: NowDep) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        detail = await api.runner(runner_id)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["runners"], err)
+    return render(
+        request,
+        PAGES["runners"],
+        template="runner_overlay.html" if wants_fragment(request) else "runner_overlay_page.html",
+        runner=runner_detail(detail.runner, detail.runs, detail.events, now),
+        status_tone=STATUS_TONE,
+    )
+
+
+@router.get("/overlay/close", response_class=HTMLResponse)
+def close_overlay() -> HTMLResponse:
+    return HTMLResponse("")
 
 
 @router.get("/images", response_class=HTMLResponse)

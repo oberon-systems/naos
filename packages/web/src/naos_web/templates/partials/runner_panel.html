@@ -1,0 +1,93 @@
+{% from "components.html" import badge, dot, pill %}
+<div class="overlay__scrim" hx-get="/overlay/close" hx-target="#overlay"></div>
+<section class="panel" role="dialog" aria-label="Runner {{ runner.name }}">
+    <header class="panel__header">
+        <div class="panel__title">
+            {{ dot(runner.tone) }}
+            <h2 class="panel__name">{{ runner.name }}</h2>
+            {{ pill(runner.state, runner.tone) }}
+            <span class="table__id">{{ runner.id }}</span>
+            <button class="panel__close"
+                    type="button"
+                    hx-get="/overlay/close"
+                    hx-target="#overlay"
+                    aria-label="Close">✕</button>
+        </div>
+        <p class="panel__facts">
+            <span>{{ runner.enrolled }}</span><span class="lifecycle__note">·</span><span>{{ runner.slots }}</span>
+        </p>
+    </header>
+    <div class="panel__body">
+        <section class="card">
+            <div class="card__header">
+                <h3 class="card__title">Capacity</h3>
+                <span class="table__secondary">{{ runner.free }}</span>
+            </div>
+            <div class="panel__card">
+                <div class="panel__figure">{{ runner.busy }}</div>
+                <div class="lease">
+                    <div class="lease__left" style="width: {{ runner.percent }}%"></div>
+                </div>
+                <p class="table__secondary">a pending run waits until a slot frees</p>
+            </div>
+        </section>
+        <section class="card">
+            <div class="card__header">
+                <h3 class="card__title">Status</h3>
+            </div>
+            <div class="panel__card">
+                <div class="lease">
+                    <div class="lease__left" style="width: {{ runner.lease_percent }}%"></div>
+                </div>
+                <p class="table__secondary">{{ runner.lease }}</p>
+                <dl class="facts">
+                    <dt>State</dt>
+                    <dd>
+                        {{ runner.state }}
+                    </dd>
+                    <dt>Heartbeat</dt>
+                    <dd>
+                        {{ runner.heartbeat }}
+                    </dd>
+                    <dt>Registered</dt>
+                    <dd>
+                        {{ runner.registered }}
+                    </dd>
+                </dl>
+            </div>
+        </section>
+        <section class="card">
+            <div class="card__header">
+                <h3 class="card__title">Current runs</h3>
+            </div>
+            <ul class="panel__list">
+                {% for run in runner.runs %}
+                    <li class="panel__run">
+                        <span>#{{ run.seq }}</span>
+                        <span class="table__secondary">{{ run.workspace }}</span>
+                        {{ pill(run.status, run.tone) }}
+                    </li>
+                {% else %}
+                    <li class="panel__run table__secondary">no runs on this lease</li>
+                {% endfor %}
+            </ul>
+        </section>
+        <section class="card">
+            <div class="card__header">
+                <h3 class="card__title">Recent events</h3>
+                <a class="card__link" href="/audit">Audit</a>
+            </div>
+            <ul class="panel__list">
+                {% for event in runner.events %}
+                    <li class="panel__event">
+                        <span class="panel__event-name">{{ event.event }}</span>
+                        <span class="table__secondary">{{ event.detail }}</span>
+                        <span class="table__secondary">{{ event.at }}</span>
+                    </li>
+                {% else %}
+                    <li class="panel__event table__secondary">nothing recorded yet</li>
+                {% endfor %}
+            </ul>
+        </section>
+    </div>
+</section>

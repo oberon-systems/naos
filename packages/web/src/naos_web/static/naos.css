@@ -582,3 +582,149 @@ body {
   border-radius: 3px;
   background: var(--green-dot);
 }
+
+/* runner overlay */
+
+.runner--open {
+  cursor: pointer;
+}
+
+.runner--open:hover,
+.runner--open:focus-visible {
+  background: var(--strip);
+  outline: none;
+}
+
+.overlay__scrim {
+  position: fixed;
+  inset: 0;
+  background: rgb(16 24 40 / 35%);
+}
+
+.panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  width: min(940px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  transform: translate(-50%, -50%);
+  border-radius: 12px;
+  background: var(--page);
+  box-shadow: 0 24px 64px rgb(16 24 40 / 24%);
+  overflow: hidden;
+}
+
+.panel__header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.panel__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.panel__name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.panel__close {
+  margin-left: auto;
+  padding: 4px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--grey-bg);
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.panel__facts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--soft);
+}
+
+.panel__body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 16px;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.panel__card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 16px 16px;
+}
+
+.panel__figure {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.panel__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.panel__run,
+.panel__event {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  border-top: 1px solid var(--divider);
+  font-size: 12px;
+}
+
+.panel__event-name {
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+
+.panel__event span:last-child,
+.panel__run span:last-child {
+  margin-left: auto;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+.facts dt {
+  color: var(--soft);
+}
+
+.facts dd {
+  margin: 0;
+  color: var(--text);
+  text-align: right;
+}
+
+.panel--slim {
+  width: min(420px, calc(100vw - 48px));
+}

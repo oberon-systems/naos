@@ -5,7 +5,12 @@
 </div>
 <ul class="runners">
     {% for runner in runners %}
-        <li class="runner">
+        <li class="runner runner--open"
+            tabindex="0"
+            role="button"
+            hx-get="/runners/{{ runner.id }}"
+            hx-target="#overlay"
+            hx-trigger="click, keyup[key=='Enter']">
             <div class="runner__top">
                 <div class="runner__name">
                     {{ dot(runner.tone) }}
