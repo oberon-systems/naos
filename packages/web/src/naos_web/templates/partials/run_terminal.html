@@ -1,0 +1,29 @@
+{% from "components.html" import icon_open, icon_info %}
+<div class="run__body run__body--terminal">
+    <div class="terminal__toolbar">
+        <div class="terminal__tools">
+            <a class="terminal__icon"
+               href="{{ terminal.window }}"
+               target="_blank"
+               rel="noopener"
+               aria-label="Open in a new window">{{ icon_open() }}</a>
+            <button class="terminal__icon"
+                    type="button"
+                    popovertarget="terminal-hint"
+                    aria-label="Run this terminal on the host">{{ icon_info() }}</button>
+            <a class="terminal__download" href="{{ terminal.log }}">Download log</a>
+            <span class="terminal__endpoint">ws {{ terminal.attach_path }}</span>
+        </div>
+        {% include "partials/terminal_toggles.html" %}
+    </div>
+    <div class="terminal terminal--panel" data-stream="{{ terminal.stream }}"></div>
+    <div class="terminal__status">
+        <span>
+            <span class="run__mono">exit code —</span>
+            <span class="run__sep">·</span>
+            <span data-terminal-state>{{ terminal.state }}</span>
+        </span>
+        <span class="terminal__note">the terminal is a live view — the log is what the audit keeps</span>
+    </div>
+    {% include "partials/terminal_hint.html" %}
+</div>

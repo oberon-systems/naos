@@ -503,6 +503,44 @@ NAOS_WEB_API_URL="$api" \
 ui=$!
 wait_for 30 curl -fs -o /dev/null "$web/healthz"
 
+# The guest's console output travels runner -> api -> web without a port on the runner.
+console_shipped() {
+    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/console" | grep -q NAOS-SMOKE-DONE
+}
+
+check_terminal() {
+    curl -fsS "$web/runs/$run/terminal" | grep -qF "data-stream=\"/runs/$run/terminal/ws\"" ||
+        fail "the terminal tab does not attach"
+    curl -fsS "$web/runs/$run/terminal/log" | grep -q NAOS-SMOKE-DONE ||
+        fail "the terminal log misses the console output"
+    NAOS_TOKEN="$operator" "$VENV/bin/python" - "$api" "$run" <<'PY' || fail "the api attach did not stream the console"
+import os
+import sys
+
+import anyio
+import httpx
+from httpx_ws import aconnect_ws
+
+
+async def main() -> None:
+    headers = {"Authorization": f"Bearer {os.environ['NAOS_TOKEN']}"}
+    async with httpx.AsyncClient(headers=headers) as client:
+        async with aconnect_ws(f"{sys.argv[1]}/api/v1/runs/{sys.argv[2]}/attach", client) as ws:
+            seen = b""
+            while b"NAOS-SMOKE-DONE" not in seen:
+                seen += await ws.receive_bytes(timeout=10)
+
+
+anyio.run(main)
+PY
+    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/events?limit=10000" | "$VENV/bin/python" -c '
+import json, sys
+rows = [row for row in json.load(sys.stdin) if row["event"] == "console_attached" and row["source"] == "api"]
+if not rows or {row["actor"] for row in rows} != {"operator"}:
+    sys.exit("the api attach left no operator audit entry")
+'
+}
+
 echo "registering the image and creating a run..."
 curl -fsS "${auth[@]}" "$api/api/v1/images" -o /dev/null -d @- <<EOF
 {"id": "naos-agents", "version": "$version", "digest": "$digest", "url": "$release/$image"}
@@ -602,6 +640,9 @@ guest \
     "{ cat /tmp/rpc; sleep 20; } | naos-mcp" \
     "echo NAOS-SMOKE-DONE"
 check_gates
+echo "reading the console through the api and the terminal tab..."
+wait_for 30 console_shipped
+check_terminal
 echo "run $run booted, stopping it from the run overlay..."
 [ "$(web_post "$run" stop)" = "$web/runs/$run" ] || fail "stop did not return to the run"
 wait_for 120 collected

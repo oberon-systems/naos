@@ -1205,3 +1205,232 @@ body {
   font-weight: 600;
   color: var(--ink);
 }
+
+/* run terminal */
+
+.run__body--terminal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.terminal__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.terminal__tools,
+.terminal__toggles {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.terminal__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--disabled);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.terminal__download {
+  margin-left: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--blue-text);
+  text-decoration: none;
+}
+
+.terminal__endpoint {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.terminal__chip {
+  height: 24px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--grey-bg);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.terminal__chip--on {
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.terminal__chip:disabled {
+  color: var(--faint);
+  cursor: not-allowed;
+}
+
+.terminal {
+  overflow: hidden;
+  background: #0b1220;
+}
+
+.terminal--panel {
+  height: 456px;
+  padding: 12px 16px;
+  border-radius: 8px;
+}
+
+.terminal__status {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--soft);
+}
+
+.terminal__note {
+  color: var(--faint);
+}
+
+/* terminal hint */
+
+.hint {
+  width: min(520px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 24px 64px rgb(16 24 40 / 24%);
+}
+
+.hint__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+}
+
+.hint__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.hint__body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 4px 20px 20px;
+}
+
+.hint__label {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.hint__code {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #0b1220;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #e2e8f0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.hint__note {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--soft);
+}
+
+.hint__footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--strip);
+  font-size: 11px;
+  color: var(--soft);
+}
+
+/* detached terminal window */
+
+.window {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #0b1220;
+}
+
+.window__bar,
+.window__status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: #131c2e;
+  color: #94a3b8;
+}
+
+.window__bar {
+  height: 44px;
+}
+
+.window__status {
+  height: 40px;
+  font-size: 11px;
+}
+
+.window__title {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.window__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.window__actions .terminal__chip {
+  background: #1e293b;
+  color: #94a3b8;
+}
+
+.window__actions .terminal__chip--on {
+  background: #e2e8f0;
+  color: #0b1220;
+}
+
+.window__back {
+  font-size: 12px;
+  font-weight: 500;
+  color: #93c5fd;
+  text-decoration: none;
+}
+
+.window__sep {
+  color: #475569;
+}
+
+.terminal--window {
+  flex: 1;
+  padding: 12px 16px;
+}

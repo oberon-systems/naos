@@ -51,22 +51,32 @@
         </p>
     </header>
     <nav class="run__tabs">
-        <a class="run__tab run__tab--active" href="/runs/{{ run.id }}">Overview</a>
-        <a class="run__tab" href="/runs/{{ run.id }}/terminal">Terminal</a>
+        <a class="run__tab{{ " run__tab--active" if tab == "overview" }}"
+           href="/runs/{{ run.id }}"
+           hx-get="/runs/{{ run.id }}"
+           hx-target="#overlay">Overview</a>
+        <a class="run__tab{{ " run__tab--active" if tab == "terminal" }}"
+           href="/runs/{{ run.id }}/terminal"
+           hx-get="/runs/{{ run.id }}/terminal"
+           hx-target="#overlay">Terminal</a>
         <a class="run__tab" href="/runs/{{ run.id }}/logs">Logs &amp; Audit</a>
     </nav>
-    <div class="run__body">
-        <div class="run__column">
-            {% with title="Run", facts=run.run, link=none %}
-                {% include "partials/run_facts_card.html" %}
-            {% endwith %}
-            {% with title="Policy", facts=run.policy, link=("/profiles" if run.profile_id else none), label="Edit profile" %}
-                {% include "partials/run_facts_card.html" %}
-            {% endwith %}
+    {% if tab == "terminal" %}
+        {% include "partials/run_terminal.html" %}
+    {% else %}
+        <div class="run__body">
+            <div class="run__column">
+                {% with title="Run", facts=run.run, link=none %}
+                    {% include "partials/run_facts_card.html" %}
+                {% endwith %}
+                {% with title="Policy", facts=run.policy, link=("/profiles" if run.profile_id else none), label="Edit profile" %}
+                    {% include "partials/run_facts_card.html" %}
+                {% endwith %}
+            </div>
+            <div class="run__column">
+                {% include "partials/run_runner_card.html" %}
+                {% include "partials/run_lifecycle_card.html" %}
+            </div>
         </div>
-        <div class="run__column">
-            {% include "partials/run_runner_card.html" %}
-            {% include "partials/run_lifecycle_card.html" %}
-        </div>
-    </div>
+    {% endif %}
 </section>

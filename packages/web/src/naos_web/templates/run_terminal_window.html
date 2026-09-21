@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>{{ run.id }} — terminal · naos</title>
+        <link rel="stylesheet" href="/static/naos.css">
+        <link rel="stylesheet" href="/static/vendor/xterm.css">
+        <script src="/static/vendor/xterm.js" defer></script>
+        <script src="/static/vendor/xterm-addon-fit.js" defer></script>
+        <script src="/static/terminal.js" defer></script>
+    </head>
+    <body class="window">
+        <header class="window__bar">
+            <span class="window__title">{{ run.id }} — attach — {{ run.runner }}</span>
+            <div class="window__actions">
+                {% include "partials/terminal_toggles.html" %}
+                <a class="window__back" href="/runs/{{ run.id }}/terminal">Back to the run</a>
+            </div>
+        </header>
+        <div class="terminal terminal--window" data-stream="{{ terminal.stream }}"></div>
+        <footer class="window__status">
+            <span>
+                <span>attached · read-only</span>
+                <span class="window__sep">·</span>
+                <span class="run__mono">exit code —</span>
+                <span class="window__sep">·</span>
+                <span data-terminal-state>{{ terminal.state }}</span>
+            </span>
+            <span>
+                <span>{{ run.runner }}</span>
+                <span class="window__sep">·</span>
+                <span>slot —</span>
+                <span class="window__sep">·</span>
+                <span class="run__mono">{{ run.elapsed }}</span>
+            </span>
+        </footer>
+    </body>
+</html>

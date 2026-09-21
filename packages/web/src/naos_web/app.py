@@ -19,6 +19,12 @@ def api_endpoint(api_base_url: str) -> str:
     return urlsplit(api_base_url).netloc or api_base_url
 
 
+def api_attach_url(api_base_url: str) -> str:
+    parts = urlsplit(api_base_url.rstrip("/"))
+    scheme = "wss" if parts.scheme == "https" else "ws"
+    return parts._replace(scheme=scheme).geturl()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
@@ -36,6 +42,7 @@ def create_app() -> FastAPI:
     templates.env.globals["fmt"] = format
     app.state.templates = templates
     app.state.api_endpoint = api_endpoint(settings.api_base_url)
+    app.state.api_attach_url = api_attach_url(settings.api_base_url)
     # The token is read once, held by the client and never put in a template context.
     app.state.api = ApiClient(
         settings.api_url,

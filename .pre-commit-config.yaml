@@ -50,6 +50,7 @@ repos:
         additional_dependencies:
           - fastapi==0.141.1
           - httpx==0.28.1
+          - httpx-ws==0.9.0
           - pydantic==2.13.5
           - pydantic-settings==2.15.0
           - pytest==9.1.1
@@ -120,9 +121,9 @@ repos:
     rev: 3.0.0
     hooks:
       - id: forbid-binary
-      # Templates carry the separators and dashes the mockups show.
+      # Templates carry the separators and dashes the mockups show; vendored code stays as shipped.
       - id: require-ascii
-        exclude: (.*\.md$|^packages/web/.*\.html$)
+        exclude: (.*\.md$|^packages/web/.*\.html$|^packages/web/src/naos_web/static/vendor/)
       - id: shellcheck
         args: [-e, SC2086]
       # -i 4 overrides shfmt's tab indentation, which the forbid-tabs hook

@@ -8,7 +8,7 @@ import time
 from typing import Any
 
 from fastapi import FastAPI, Header, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 NOW = int(time.time())
 Row = dict[str, Any]
@@ -487,6 +487,16 @@ def get_run(run_id: str) -> Row | JSONResponse:
 @stub.get("/api/v1/runs/{run_id}/events")
 def run_events(run_id: str) -> list[Row]:
     return RUN_EVENTS if run_id == "run_9f21c4" else []
+
+
+CONSOLE = b"login: naos\r\n$ pytest -q\r\n"
+
+
+@stub.get("/api/v1/runs/{run_id}/console", response_model=None)
+def console_log(run_id: str) -> Response:
+    if not any(row["id"] == run_id for row in RUNS):
+        return _missing(f"run {run_id}")
+    return Response(CONSOLE, media_type="text/plain")
 
 
 @stub.get("/api/v1/policies/{policy_id}", response_model=None)

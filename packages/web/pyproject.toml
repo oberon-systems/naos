@@ -11,6 +11,7 @@ requires-python = ">=3.12"
 dependencies = [
   "fastapi",
   "httpx",
+  "httpx-ws",
   "jinja2",
   "naos-common",
   "pydantic-settings",
@@ -25,7 +26,7 @@ Repository = "https://github.com/oberon-systems/naos"
 server = ["uvicorn[standard]"]
 
 [tool.setuptools.package-data]
-naos_web = ["py.typed", "templates/*.html", "templates/partials/*.html", "static/*.css", "static/vendor/*.js"]
+naos_web = ["py.typed", "templates/*.html", "templates/partials/*.html", "static/*.css", "static/*.js", "static/vendor/*.css", "static/vendor/*.js"]
 
 [tool.djlint]
 profile = "jinja"

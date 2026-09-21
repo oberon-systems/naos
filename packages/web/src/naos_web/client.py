@@ -1,9 +1,11 @@
 import asyncio
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import httpx
+from httpx_ws import AsyncWebSocketSession, HTTPXWSException, WebSocketDisconnect, aconnect_ws
 
 Row = dict[str, Any]
 
@@ -78,7 +80,7 @@ class ApiClient:
     async def aclose(self) -> None:
         await self._http.aclose()
 
-    async def _call(self, method: str, path: str, **kwargs: Any) -> Any:
+    async def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         try:
             response = await self._http.request(method, path, **kwargs)
             response.raise_for_status()
@@ -87,7 +89,10 @@ class ApiClient:
             raise ApiError(f"the api answered {status} for {path}{_detail(err.response)}") from err
         except httpx.HTTPError as err:
             raise ApiError(f"the api did not answer {path}") from err
-        return response.json()
+        return response
+
+    async def _call(self, method: str, path: str, **kwargs: Any) -> Any:
+        return (await self._request(method, path, **kwargs)).json()
 
     async def runs(self, state: str | None = None, limit: int = 50) -> list[Row]:
         params: dict[str, Any] = {"limit": limit}
@@ -117,6 +122,21 @@ class ApiClient:
     async def run_events(self, run_id: str) -> list[Row]:
         rows: list[Row] = await self._call("GET", f"/runs/{run_id}/events")
         return rows
+
+    async def console_log(self, run_id: str) -> bytes:
+        return (await self._request("GET", f"/runs/{run_id}/console")).content
+
+    # The api ends the stream once the run is over; a refused attach is an ApiError.
+    async def attach(self, run_id: str) -> AsyncIterator[bytes]:
+        path = f"/runs/{run_id}/attach"
+        try:
+            async with aconnect_ws(path, self._http, session_class=AsyncWebSocketSession) as ws:
+                while True:
+                    yield await ws.receive_bytes()
+        except WebSocketDisconnect:
+            return
+        except (HTTPXWSException, httpx.HTTPError) as err:
+            raise ApiError(f"the api refused {path}") from err
 
     async def policy(self, policy_id: str) -> Row:
         row: Row = await self._call("GET", f"/policies/{policy_id}")

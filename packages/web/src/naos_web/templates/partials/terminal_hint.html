@@ -1,0 +1,27 @@
+{% from "components.html" import icon_info %}
+<div class="hint" id="terminal-hint" popover>
+    <header class="hint__header">
+        <h3 class="hint__title">{{ icon_info() }} Run this terminal on the host</h3>
+        <button class="panel__close"
+                type="button"
+                popovertarget="terminal-hint"
+                popovertargetaction="hide"
+                aria-label="Close">✕</button>
+    </header>
+    <div class="hint__body">
+        <section class="hint__block">
+            <h4 class="hint__label">On the runner host</h4>
+            <pre class="hint__code">{{ terminal.host_command }}</pre>
+            <p class="hint__note">for an operator on the box; the runner spools its own console_attached entry to the api</p>
+        </section>
+        <section class="hint__block">
+            <h4 class="hint__label">Raw websocket</h4>
+            <pre class="hint__code">wscat -c {{ terminal.attach_url }} \
+      -H "Authorization: Bearer $NAOS_TOKEN"</pre>
+            <p class="hint__note">the operator token of the api; this page never shows it</p>
+        </section>
+    </div>
+    <footer class="hint__footer">
+        The runner never exposes a shell port — every attach goes through the api and lands in the audit.
+    </footer>
+</div>
