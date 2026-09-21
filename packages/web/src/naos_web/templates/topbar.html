@@ -1,4 +1,3 @@
-{% from "components.html" import button %}
 <header class="topbar">
     <div class="topbar__brand">
         <a class="brand" href="/runs">naos</a>
@@ -13,6 +12,9 @@
         <span class="chip chip--mono tone-grey">
             <span>api</span><span>{{ api_endpoint }}</span>
         </span>
-        {{ button('New Run', '/runs/new') }}
+        <a class="button"
+           href="/runs/new"
+           hx-get="/runs/new"
+           hx-target="#overlay">New Run</a>
     </div>
 </header>

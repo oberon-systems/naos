@@ -7,7 +7,8 @@ page; the shapes are the ones packages/api returns.
 import time
 from typing import Any
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Header, Query
+from fastapi.responses import JSONResponse
 
 NOW = int(time.time())
 Row = dict[str, Any]
@@ -278,3 +279,149 @@ def stop(run_id: str) -> Row:
             row["finished_at"] = NOW
             return row
     return RUNS[0]
+
+
+def profile(pid: str, name: str, cpu: int, memory: int, active: Row | None, used: bool) -> Row:
+    return {
+        "id": pid,
+        "name": name,
+        "spec": {
+            "runtime": {"cpu": cpu, "memory_mib": memory, "disk_gib": 20},
+            "mounts": {"policy": None},
+            "network": {"policy": "netpol_9a07" + "0" * 28},
+            "shell": {"policy": None},
+            "mcp": {"policy": None},
+            "merge": {"policy": "ask"},
+            "timeout": 3600,
+        },
+        "active_runs": 1 if active else 0,
+        "active_run": active,
+        "last_run_at": NOW - 600 if used else None,
+        "created_at": NOW - 9000,
+        "updated_at": NOW - 9000,
+    }
+
+
+PROFILES: list[Row] = [
+    profile(
+        "prof_7a1c30",
+        "build-small",
+        2,
+        4096,
+        {"id": "run_9f21c4", "seq": 128, "status": "STARTED"},
+        True,
+    ),
+    profile("prof_a93e07", "docs", 1, 2048, None, True),
+    profile("prof_91ba35", "sandbox", 4, 8192, None, False),
+]
+POLICIES: list[Row] = [
+    {
+        "id": "netpol_9a07" + "0" * 28,
+        "kind": "network",
+        "digest": "0" * 64,
+        "document": {
+            "allow": [
+                {"protocol": "https", "host": f"{name}.example.com"}
+                for name in ("alpha", "beta", "gamma")
+            ],
+            "deny": [],
+        },
+        "created_at": NOW - 9000,
+    },
+    {
+        "id": "mntpol_4c1e" + "0" * 28,
+        "kind": "mount",
+        "digest": "1" * 64,
+        "document": {
+            "workdir": "/naos/api",
+            "mounts": [
+                {"host_path": "/srv/projects/alpha/api", "guest_path": "/naos/api", "mode": "rw"}
+            ],
+        },
+        "created_at": NOW - 9000,
+    },
+    {
+        "id": "mcppol_5b2d" + "0" * 28,
+        "kind": "mcp",
+        "digest": "2" * 64,
+        "document": {
+            "servers": [
+                {
+                    "name": "alpha",
+                    "url": "https://mcp.example.com/mcp",
+                    "tools": [],
+                    "resources": [],
+                    "credential": "alpha-token",
+                    "timeout_seconds": 30,
+                    "max_calls_per_minute": 60,
+                }
+            ]
+        },
+        "created_at": NOW - 9000,
+    },
+]
+IMAGES: list[Row] = [
+    {
+        "id": "naos-agents",
+        "version": "1.4.2",
+        "digest": "sha256:3f9a" + "0" * 56 + "c21e",
+        "url": "https://images.example.com/a.qcow2",
+        "created_at": NOW - 100,
+    },
+    {
+        "id": "naos-agents-old",
+        "version": "1.3.0",
+        "digest": "sha256:" + "b" * 64,
+        "url": "https://images.example.com/b.qcow2",
+        "created_at": NOW - 9000,
+    },
+]
+# Every write the dialog sends, in order, so a test reads what reached the api.
+WRITES: list[tuple[str, str, Row, str | None]] = []
+
+
+def _found(pid: str) -> Row:
+    return next(row for row in PROFILES if row["id"] == pid)
+
+
+@stub.get("/api/v1/profiles")
+def list_profiles(q: str | None = None) -> list[Row]:
+    needle = (q or "").lower()
+    return [row for row in PROFILES if needle in row["name"].lower() or needle in row["id"]]
+
+
+@stub.get("/api/v1/profiles/{pid}")
+def get_profile(pid: str) -> Row:
+    return _found(pid)
+
+
+@stub.post("/api/v1/profiles")
+def create_profile(body: Row) -> Row:
+    WRITES.append(("POST", "/profiles", body, None))
+    return profile("prof_new001", body["name"], 1, 1024, None, False) | {"spec": body["spec"]}
+
+
+@stub.put("/api/v1/profiles/{pid}", response_model=None)
+def update_profile(pid: str, body: Row) -> Row | JSONResponse:
+    WRITES.append(("PUT", f"/profiles/{pid}", body, None))
+    found = _found(pid)
+    if found["active_run"]:
+        detail = f"profile {found['name']} cannot change: #128 is STARTED on it"
+        return JSONResponse({"detail": detail}, 409)
+    return found | {"spec": body["spec"]}
+
+
+@stub.post("/api/v1/profiles/{pid}/runs")
+def run_from_profile(pid: str, body: Row, idempotency_key: str = Header()) -> Row:
+    WRITES.append(("POST", f"/profiles/{pid}/runs", body, idempotency_key))
+    return RUNS[0]
+
+
+@stub.get("/api/v1/policies")
+def list_policies() -> list[Row]:
+    return POLICIES
+
+
+@stub.get("/api/v1/images")
+def list_images() -> list[Row]:
+    return IMAGES

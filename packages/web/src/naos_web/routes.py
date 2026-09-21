@@ -1,10 +1,13 @@
+from dataclasses import replace
 from typing import Annotated, Literal
+from urllib.parse import parse_qsl
 
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from naos_web.client import ApiClient, ApiError, Dashboard, Row
+from naos_web import new_run
+from naos_web.client import ApiClient, ApiError, Choices, Dashboard, Row
 from naos_web.clock import NowDep
 from naos_web.format import ago
 from naos_web.pages import (
@@ -137,6 +140,205 @@ async def cancel_run(
     except ApiError as err:
         return failed(request, PAGES["runs"], err)
     return runs_page(request, board, state, now, fragment=True)
+
+
+NEW_RUN_STEPS = ("Profile", "Configure", "Save & run")
+PROFILE_LIST = "new-run-profiles"
+
+
+def _dialog(
+    request: Request, step: int, draft: new_run.Draft, template: str = "", **context: object
+) -> HTMLResponse:
+    fragment = wants_fragment(request)
+    return render(
+        request,
+        PAGES["runs"],
+        None,
+        template=template or ("new_run_overlay.html" if fragment else "new_run_page.html"),
+        step=step,
+        steps=NEW_RUN_STEPS,
+        draft=draft,
+        **context,
+    )
+
+
+# The dialog posts urlencoded forms only, so the stdlib parser spares a multipart dependency.
+async def _form(request: Request) -> dict[str, str]:
+    return dict(parse_qsl((await request.body()).decode(), keep_blank_values=True))
+
+
+async def _profile(api: ApiClient, draft: new_run.Draft) -> Row | None:
+    return await api.profile(draft.profile) if draft.profile else None
+
+
+def _profile_step(
+    request: Request,
+    draft: new_run.Draft,
+    profiles: list[Row],
+    query: str = "",
+    template: str = "",
+    back: bool = False,
+) -> HTMLResponse:
+    return _dialog(
+        request,
+        1,
+        draft,
+        template,
+        back=back,
+        profiles=[
+            {**row, "usage": new_run.usage(row), "line": new_run.runtime_line(row["spec"])}
+            for row in profiles
+        ],
+        query=query,
+    )
+
+
+def _configure_step(
+    request: Request,
+    draft: new_run.Draft,
+    profile: Row | None,
+    choices: Choices,
+    notice: str = "",
+) -> HTMLResponse:
+    return _dialog(
+        request,
+        2,
+        draft,
+        profile=profile,
+        fields=new_run.configure_fields(draft, profile, choices),
+        image=new_run.image_field(draft, choices.images),
+        runner=new_run.runner_field(draft, choices.runners),
+        edited=len(draft.edited(profile)),
+        notice=notice,
+    )
+
+
+def _profile_label(draft: new_run.Draft, profile: Row | None) -> str:
+    if draft.mode == "new" and draft.name:
+        return draft.name
+    return str(profile["name"]) if profile else "new profile"
+
+
+def _review_step(
+    request: Request,
+    draft: new_run.Draft,
+    profile: Row | None,
+    choices: Choices,
+    notice: str = "",
+) -> HTMLResponse:
+    lock = new_run.update_lock(profile)
+    if profile is None or lock:
+        draft = replace(draft, mode="new")
+    image = new_run.resolve_image(choices.images, draft.image)
+    runner = next((r for r in choices.runners if r["id"] == draft.runner), None)
+    edited = draft.edited(profile)
+    return _dialog(
+        request,
+        3,
+        draft,
+        profile=profile,
+        lock=lock,
+        saves=profile is None or bool(edited),
+        changes=new_run.changes(draft, profile, choices.policies),
+        image_label=new_run.image_label(image) if image else "no registered image",
+        runner_label=runner["name"] if runner else new_run.AUTO,
+        profile_label=_profile_label(draft, profile),
+        notice=notice,
+    )
+
+
+@router.get("/runs/new", response_class=HTMLResponse)
+async def new_run_dialog(
+    request: Request, q: Annotated[str, Query(max_length=128)] = ""
+) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        profiles = await api.profiles(q or None)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["runs"], err)
+    listing = request.headers.get("HX-Target") == PROFILE_LIST
+    template = "partials/new_run_profiles.html" if listing else ""
+    return _profile_step(request, new_run.Draft.fresh(), profiles, q, template)
+
+
+@router.post("/runs/new/profile", response_class=HTMLResponse)
+async def new_run_profile(request: Request) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    draft = new_run.Draft.of(await _form(request))
+    try:
+        profiles = await api.profiles()
+    except ApiError as err:
+        return failed_overlay(request, PAGES["runs"], err)
+    return _profile_step(request, draft, profiles, back=True)
+
+
+@router.post("/runs/new/configure", response_class=HTMLResponse)
+async def new_run_configure(request: Request) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    form = await _form(request)
+    draft = new_run.Draft.of(form)
+    try:
+        profile = await _profile(api, draft)
+        choices = await api.choices()
+    except ApiError as err:
+        return failed_overlay(request, PAGES["runs"], err)
+    if "cpu" not in form:
+        draft = draft.based_on(profile)
+    return _configure_step(request, draft, profile, choices)
+
+
+@router.post("/runs/new/review", response_class=HTMLResponse)
+async def new_run_review(request: Request) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    draft = new_run.Draft.of(await _form(request))
+    try:
+        profile = await _profile(api, draft)
+        choices = await api.choices()
+    except ApiError as err:
+        return failed_overlay(request, PAGES["runs"], err)
+    try:
+        new_run.spec_of(draft.values)
+    except new_run.FormError as err:
+        return _configure_step(request, draft, profile, choices, notice=str(err))
+    return _review_step(request, draft, profile, choices)
+
+
+async def _save(api: ApiClient, draft: new_run.Draft, profile: Row | None) -> str:
+    spec = new_run.spec_of(draft.values)
+    if profile is not None and not draft.edited(profile):
+        return str(profile["id"])
+    if profile is not None and draft.mode == "update":
+        await api.update_profile(profile["id"], spec)
+        return str(profile["id"])
+    if not draft.name:
+        raise new_run.FormError("a new profile needs a name")
+    saved = await api.create_profile(draft.name, spec)
+    return str(saved["id"])
+
+
+# Every write carries the dialog's key and replays, so a second submit lands on the same Run.
+@router.post("/runs/new", response_class=HTMLResponse)
+async def new_run_submit(request: Request) -> Response:
+    api: ApiClient = request.app.state.api
+    draft = new_run.Draft.of(await _form(request))
+    try:
+        profile = await _profile(api, draft)
+        choices = await api.choices()
+    except ApiError as err:
+        return failed_overlay(request, PAGES["runs"], err)
+    image = new_run.resolve_image(choices.images, draft.image)
+    try:
+        if image is None:
+            raise new_run.FormError("no registered image to run")
+        profile_id = await _save(api, draft, profile)
+        runner = None if draft.runner == new_run.AUTO else draft.runner
+        ref = {"id": image["id"], "digest": image["digest"]}
+        await api.run_from_profile(profile_id, ref, runner, draft.key)
+    except (ApiError, new_run.FormError) as err:
+        return _review_step(request, draft, profile, choices, notice=str(err))
+    if wants_fragment(request):
+        return Response(headers={"HX-Redirect": "/runs"})
+    return RedirectResponse("/runs", status_code=303)
 
 
 @router.get("/runners", response_class=HTMLResponse)

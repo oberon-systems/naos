@@ -1,0 +1,68 @@
+{% from "components.html" import chip %}
+{% from "partials/new_run_fields.html" import number, segmented, select %}
+<input type="hidden" name="key" value="{{ draft.key }}">
+<input type="hidden" name="profile" value="{{ draft.profile }}">
+<div class="dialog__body">
+    <section class="card">
+        <div class="card__header dialog__card-header">
+            <h3 class="dialog__card-title">From profile</h3>
+            {% if edited %}{{ chip("edited · " ~ edited ~ " fields", "amber") }}{% endif %}
+        </div>
+        <p class="dialog__card-body">
+            {% if profile %}
+                <strong>{{ profile.name }}</strong> <span class="table__id">{{ profile.id }}</span>
+                <span class="table__secondary">· values are copied into the run; edited fields are marked</span>
+            {% else %}
+                <strong>new profile</strong>
+                <span class="table__secondary">· saved as a profile before the run starts</span>
+            {% endif %}
+        </p>
+    </section>
+    <section class="card">
+        <div class="card__header dialog__card-header">
+            <h3 class="dialog__card-title">Image &amp; runtime</h3>
+        </div>
+        <div class="dialog__card-body dialog__fields">
+            {{ select(image) }}
+            {{ select(runner) }}
+            <div class="dialog__row">
+                {{ number(fields.cpu, 1, 64) }}
+                {{ number(fields.memory_mib, 256, 262144) }}
+                {{ number(fields.disk_gib, 1, 2048) }}
+            </div>
+            {{ number(fields.timeout, 60, 86400) }}
+        </div>
+    </section>
+    <section class="card">
+        <div class="card__header dialog__card-header">
+            <h3 class="dialog__card-title">Policies</h3>
+        </div>
+        <div class="dialog__card-body dialog__grid">
+            {{ select(fields.mounts) }}
+            {{ select(fields.network) }}
+            {{ select(fields.shell) }}
+            {{ select(fields.mcp) }}
+        </div>
+    </section>
+    <section class="card">
+        <div class="card__header dialog__card-header">
+            <h3 class="dialog__card-title">Merge</h3>
+        </div>
+        <div class="dialog__card-body dialog__merge{{ " field--edited" if fields.merge.edited }}">
+            {{ segmented("merge", fields.merge.options) }}
+            <span class="table__secondary">{{ fields.merge.hint }}</span>
+        </div>
+    </section>
+    {% if notice %}<p class="notice">{{ notice }}</p>{% endif %}
+</div>
+<footer class="dialog__footer">
+    <span class="table__secondary">Image and runner belong to the run, the rest to the profile</span>
+    <div class="dialog__actions">
+        <button class="button button--secondary"
+                type="submit"
+                formaction="/runs/new/profile"
+                formnovalidate
+                hx-post="/runs/new/profile">Back</button>
+        <button class="button" type="submit">Next: save &amp; run</button>
+    </div>
+</footer>

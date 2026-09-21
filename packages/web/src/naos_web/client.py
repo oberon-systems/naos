@@ -12,10 +12,26 @@ class ApiError(Exception):
     """The api refused or never answered, so the page says so instead of inventing data."""
 
 
+# A domain refusal carries a sentence meant for the operator; a validation error does not.
+def _detail(response: httpx.Response) -> str:
+    try:
+        detail = response.json().get("detail")
+    except ValueError:
+        return ""
+    return f": {detail}" if isinstance(detail, str) else ""
+
+
 @dataclass(frozen=True)
 class Dashboard:
     runs: list[Row]
     summary: Row
+    runners: list[Row]
+
+
+@dataclass(frozen=True)
+class Choices:
+    policies: list[Row]
+    images: list[Row]
     runners: list[Row]
 
 
@@ -57,7 +73,8 @@ class ApiClient:
             response = await self._http.request(method, path, **kwargs)
             response.raise_for_status()
         except httpx.HTTPStatusError as err:
-            raise ApiError(f"the api answered {err.response.status_code} for {path}") from err
+            status = err.response.status_code
+            raise ApiError(f"the api answered {status} for {path}{_detail(err.response)}") from err
         except httpx.HTTPError as err:
             raise ApiError(f"the api did not answer {path}") from err
         return response.json()
@@ -87,6 +104,42 @@ class ApiClient:
         row: Row = await self._call("POST", f"/runs/{run_id}/stop")
         return row
 
+    async def profiles(self, query: str | None = None) -> list[Row]:
+        params = {"q": query} if query else {}
+        rows: list[Row] = await self._call("GET", "/profiles", params=params)
+        return rows
+
+    async def profile(self, profile_id: str) -> Row:
+        row: Row = await self._call("GET", f"/profiles/{profile_id}")
+        return row
+
+    async def create_profile(self, name: str, spec: Row) -> Row:
+        row: Row = await self._call("POST", "/profiles", json={"name": name, "spec": spec})
+        return row
+
+    async def update_profile(self, profile_id: str, spec: Row) -> Row:
+        row: Row = await self._call("PUT", f"/profiles/{profile_id}", json={"spec": spec})
+        return row
+
+    async def run_from_profile(
+        self, profile_id: str, image: Row, runner: str | None, idempotency_key: str
+    ) -> Row:
+        row: Row = await self._call(
+            "POST",
+            f"/profiles/{profile_id}/runs",
+            json={"image": image, "runner": runner},
+            headers={"Idempotency-Key": idempotency_key},
+        )
+        return row
+
+    async def policies(self) -> list[Row]:
+        rows: list[Row] = await self._call("GET", "/policies")
+        return rows
+
+    async def images(self) -> list[Row]:
+        rows: list[Row] = await self._call("GET", "/images")
+        return rows
+
     # One page, three independent reads: fetch them together rather than in turn.
     async def dashboard(self, state: str | None = None) -> Dashboard:
         runs, summary, runners = await asyncio.gather(
@@ -102,3 +155,9 @@ class ApiClient:
         if found is None:
             raise ApiError(f"the api knows no runner {runner_id}")
         return RunnerDetail(runner=found, runs=runs, events=events)
+
+    async def choices(self) -> Choices:
+        policies, images, runners = await asyncio.gather(
+            self.policies(), self.images(), self.runners()
+        )
+        return Choices(policies=policies, images=images, runners=runners)

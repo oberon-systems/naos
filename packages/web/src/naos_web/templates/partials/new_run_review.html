@@ -1,0 +1,89 @@
+{% from "components.html" import chip %}
+{% from "partials/new_run_fields.html" import segmented %}
+{% for name, value in draft.hidden.items() %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+<div class="dialog__body">
+    {% if changes %}
+        <section class="card">
+            <div class="card__header dialog__card-header">
+                <h3 class="dialog__card-title">Changes to {{ profile.name }}</h3>
+                {{ chip(changes | length ~ " fields", "amber") }}
+            </div>
+            <dl class="facts dialog__card-body">
+                {% for change in changes %}
+                    <dt>{{ change.label }}</dt>
+                    <dd>
+                        {{ change.change }}
+                    </dd>
+                {% endfor %}
+            </dl>
+        </section>
+    {% endif %}
+    {% if saves %}
+        <section class="card">
+            <div class="card__header dialog__card-header">
+                <h3 class="dialog__card-title">Save profile</h3>
+            </div>
+            <div class="dialog__card-body dialog__fields">
+                {% set modes = [{"value": "new", "label": "Save as new", "selected": draft.mode == "new", "disabled": false}] %}
+                {% if profile %}
+                    {% set modes = [{"value": "update", "label": "Update " ~ profile.name, "selected": draft.mode == "update", "disabled": lock != ""}] + modes %}
+                {% endif %}
+                {{ segmented("mode", modes) }}
+                <label class="field">
+                    <span class="field__label">Name</span>
+                    <span class="field__box">
+                        <input class="field__input"
+                               type="text"
+                               name="name"
+                               value="{{ draft.name }}"
+                               maxlength="64"
+                               pattern="[A-Za-z0-9][A-Za-z0-9._\-]*">
+                    </span>
+                    <span class="field__hint">unique; an existing name is updated only when no run on it is active</span>
+                </label>
+                {% if lock %}<p class="dialog__lock">{{ lock }}</p>{% endif %}
+            </div>
+        </section>
+    {% endif %}
+    <section class="card">
+        <div class="card__header dialog__card-header">
+            <h3 class="dialog__card-title">Run</h3>
+        </div>
+        <dl class="facts dialog__card-body">
+            <dt>Profile</dt>
+            <dd>
+                {{ profile_label }}
+            </dd>
+            <dt>Image</dt>
+            <dd>
+                {{ image_label }}
+            </dd>
+            <dt>Runner</dt>
+            <dd>
+                {{ runner_label }}
+            </dd>
+            <dt>Starts as</dt>
+            <dd>
+                PENDING
+            </dd>
+        </dl>
+    </section>
+    {% if notice %}<p class="notice">{{ notice }}</p>{% endif %}
+</div>
+<footer class="dialog__footer">
+    <span class="table__secondary">
+        {% if saves %}
+            Saves the profile first, then creates the run from it
+        {% else %}
+            The profile is unchanged, so the run is created from it as is
+        {% endif %}
+    </span>
+    <div class="dialog__actions">
+        <button class="button button--secondary"
+                type="submit"
+                formaction="/runs/new/configure"
+                formnovalidate
+                hx-post="/runs/new/configure">Back</button>
+        <button class="button" type="submit">{{ "Save & run" if saves else "Run" }}</button>
+    </div>
+</footer>

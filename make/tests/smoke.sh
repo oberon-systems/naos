@@ -365,6 +365,64 @@ check_secrets() {
     done
 }
 
+# The dialog is driven as a browser without htmx drives it: open it, take its key,
+# post the last step. The same form posted twice must land on one Run.
+new_run() {
+    [ -n "${dialog_key:-}" ] ||
+        dialog_key="$(curl -fsS "$web/runs/new" | sed -n 's/.*name="key" value="\([0-9a-f]*\)".*/\1/p')"
+    [ -n "$dialog_key" ] || fail "the new run dialog carries no key"
+    local location
+    location="$(curl -fsS -o /dev/null -w '%{redirect_url}' "$web/runs/new" \
+        --data-urlencode "key=$dialog_key" \
+        --data-urlencode "profile=" \
+        --data-urlencode "mode=new" \
+        --data-urlencode "name=smoke" \
+        --data-urlencode "cpu=2" \
+        --data-urlencode "memory_mib=2048" \
+        --data-urlencode "disk_gib=8" \
+        --data-urlencode "timeout=3600" \
+        --data-urlencode "merge=ask" \
+        --data-urlencode "mounts=$mount_policy" \
+        --data-urlencode "network=$network_policy" \
+        --data-urlencode "shell=$shell_policy" \
+        --data-urlencode "mcp=$mcp_policy" \
+        --data-urlencode "image=auto" \
+        --data-urlencode "runner=auto")"
+    [ "$location" = "$web/runs" ] || fail "the new run dialog did not create the run"
+}
+
+only_run() {
+    "$VENV/bin/python" -c '
+import json, sys
+runs = json.load(sys.stdin)
+if len(runs) != 1 or runs[0]["status"] != "PENDING":
+    sys.exit(f"the dialog should have created one PENDING run, got {runs}")
+spec = runs[0]["spec"]
+if spec["runtime"] != {"cpu": 2, "memory_mib": 2048, "disk_gib": 8} or spec["runner"] is not None:
+    sys.exit(f"the run does not carry the spec of the dialog: {spec}")
+print(runs[0]["id"])
+'
+}
+
+only_profile() {
+    "$VENV/bin/python" -c '
+import json, sys
+profiles = json.load(sys.stdin)
+if len(profiles) != 1 or profiles[0]["active_runs"] != 1:
+    sys.exit(f"the dialog should have saved one profile with its run, got {profiles}")
+print(profiles[0]["id"])
+'
+}
+
+# The api, not only the form, refuses to change a profile while its run is active.
+check_profile_locked() {
+    local code
+    code="$(curl -sS "${auth[@]}" -o /dev/null -w '%{http_code}' -X PUT \
+        "$api/api/v1/profiles/$profile" \
+        -d '{"spec": {"runtime": {"cpu": 4, "memory_mib": 2048, "disk_gib": 8}, "timeout": 3600}}')"
+    [ "$code" = 409 ] || fail "a profile with an active run was updated ($code)"
+}
+
 share_gone() {
     ! pgrep -f -- "--socket-path=$TEMP_DIR/runs" >/dev/null
 }
@@ -451,11 +509,11 @@ mcp_policy="$(
 {"kind": "mcp", "document": {"servers": [{"name": "alpha", "url": "https://example.com/mcp", "tools": ["search"], "resources": [], "credential": "alpha-token"}]}}
 EOF
 )"
-run="$(
-    curl -fsS "${auth[@]}" -H "Idempotency-Key: smoke" "$api/api/v1/runs" -d @- <<EOF | field id
-{"image": {"id": "naos-agents", "digest": "$digest"}, "runtime": {"cpu": 2, "memory_mib": 2048, "disk_gib": 8}, "mounts": {"policy": "$mount_policy"}, "network": {"policy": "$network_policy"}, "shell": {"policy": "$shell_policy"}, "mcp": {"policy": "$mcp_policy"}, "timeout": 3600}
-EOF
-)"
+echo "creating the run from the new run dialog..."
+new_run
+new_run
+run="$(curl -fsS "${auth[@]}" "$api/api/v1/runs" | only_run)"
+profile="$(curl -fsS "${auth[@]}" "$api/api/v1/profiles?q=smoke" | only_profile)"
 
 echo "starting agent..."
 start_agent
@@ -496,6 +554,7 @@ check_runner_slots
 check_summary STARTED 1
 check_page STARTED
 check_page_filters active
+check_profile_locked
 echo "editing the workspace and calling the gates from the console..."
 guest \
     "cd /naos/alpha" \

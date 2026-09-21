@@ -1,0 +1,45 @@
+{% macro field_hint(field) -%}
+    {% if field.hint %}<span class="field__hint">{{ field.hint }}</span>{% endif %}
+{%- endmacro %}
+{% macro number(field, low, high) -%}
+    <label class="field{{ " field--edited" if field.edited }}">
+        <span class="field__label">{{ field.label }}</span>
+        <span class="field__box">
+            <input class="field__input"
+                   type="number"
+                   name="{{ field.name }}"
+                   value="{{ field.value }}"
+                   min="{{ low }}"
+                   max="{{ high }}"
+                   required>
+            <span class="field__unit">{{ field.unit }}</span>
+        </span>
+        {{ field_hint(field) }}
+    </label>
+{%- endmacro %}
+{% macro select(field) -%}
+    <label class="field{{ " field--edited" if field.edited }}">
+        <span class="field__label">{{ field.label }}</span>
+        <select class="field__box field__select" name="{{ field.name }}">
+            {% for option in field.options %}
+                <option value="{{ option.value }}"
+                        {% if option.selected %}selected{% endif %}>{{ option.label }}</option>
+            {% endfor %}
+        </select>
+        {{ field_hint(field) }}
+    </label>
+{%- endmacro %}
+{% macro segmented(name, options) -%}
+    <div class="segmented" role="radiogroup">
+        {% for option in options %}
+            <label class="segmented__option{{ " segmented__option--off" if option.disabled }}">
+                <input type="radio"
+                       name="{{ name }}"
+                       value="{{ option.value }}"
+                       {% if option.selected %}checked{% endif %}
+                       {% if option.disabled %}disabled{% endif %}>
+                <span>{{ option.label }}</span>
+            </label>
+        {% endfor %}
+    </div>
+{%- endmacro %}

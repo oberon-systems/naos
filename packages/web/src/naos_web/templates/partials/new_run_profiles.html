@@ -1,0 +1,24 @@
+<div id="new-run-profiles">
+    <div class="card__header dialog__card-header">
+        <h3 class="dialog__card-title">Profiles · {{ profiles | length }}</h3>
+        <span class="table__secondary">a run copies it, never references it</span>
+    </div>
+    <div class="choices">
+        {% for profile in profiles %}
+            <label class="choice">
+                <input type="radio"
+                       name="profile"
+                       value="{{ profile.id }}"
+                       required
+                       {% if profile.id == draft.profile %}checked{% endif %}>
+                <span class="choice__info">
+                    <span class="choice__name">{{ profile.name }} <span class="table__id">{{ profile.id }}</span></span>
+                    <span class="table__secondary">{{ profile.line }}</span>
+                </span>
+                <span class="choice__usage">{{ profile.usage }}</span>
+            </label>
+        {% else %}
+            <p class="choice table__secondary">no profile matches</p>
+        {% endfor %}
+    </div>
+</div>

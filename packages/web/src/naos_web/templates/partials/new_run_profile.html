@@ -1,0 +1,38 @@
+<input type="hidden" name="key" value="{{ draft.key }}">
+<div class="dialog__body">
+    <input class="search dialog__search"
+           type="search"
+           name="q"
+           value="{{ query }}"
+           placeholder="Search profile name or id…"
+           aria-label="Search profiles"
+           hx-get="/runs/new"
+           hx-target="#new-run-profiles"
+           hx-swap="outerHTML"
+           hx-trigger="input changed delay:300ms">
+    <section class="card">
+        {% include "partials/new_run_profiles.html" %}
+        <label class="choice choice--create">
+            <input type="radio"
+                   name="profile"
+                   value=""
+                   required
+                   {% if back and not draft.profile %}checked{% endif %}>
+            <span class="choice__info">
+                <span class="choice__name">Create new profile</span>
+                <span class="table__secondary">start from scratch; saved as a profile before the run starts</span>
+            </span>
+            <span class="choice__usage">+</span>
+        </label>
+    </section>
+</div>
+<footer class="dialog__footer">
+    <span class="table__secondary">Pick one to edit, or create a new one</span>
+    <div class="dialog__actions">
+        <a class="button button--secondary"
+           href="/runs"
+           hx-get="/overlay/close"
+           hx-target="#overlay">Cancel</a>
+        <button class="button" type="submit">Next: configure</button>
+    </div>
+</footer>

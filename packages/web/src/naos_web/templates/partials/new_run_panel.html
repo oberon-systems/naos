@@ -1,0 +1,38 @@
+{% from "components.html" import chip %}
+{% set actions = {1: '/runs/new/configure', 2: '/runs/new/review', 3: '/runs/new'} %}
+<div class="overlay__scrim" hx-get="/overlay/close" hx-target="#overlay"></div>
+<section class="panel panel--dialog" role="dialog" aria-label="New run">
+    <header class="panel__header">
+        <div class="panel__title">
+            <h2 class="panel__name">New run</h2>
+            {{ chip("PENDING on create", mono=true) }}
+            <a class="panel__close"
+               href="/runs"
+               hx-get="/overlay/close"
+               hx-target="#overlay"
+               aria-label="Close">✕</a>
+        </div>
+        <ol class="stepper">
+            {% for label in steps %}
+                {% set number = loop.index %}
+                {% if not loop.first %}<li class="stepper__line" aria-hidden="true"></li>{% endif %}
+                <li class="stepper__step{{ " stepper__step--done" if number < step }}{{ " stepper__step--current" if number == step }}">
+                    <span class="stepper__dot">{{ "✓" if number < step else number }}</span>{{ label }}
+                </li>
+            {% endfor %}
+        </ol>
+    </header>
+    <form class="dialog"
+          method="post"
+          action="{{ actions[step] }}"
+          hx-post="{{ actions[step] }}"
+          hx-target="#overlay">
+        {% if step == 1 %}
+            {% include "partials/new_run_profile.html" %}
+        {% elif step == 2 %}
+            {% include "partials/new_run_configure.html" %}
+        {% else %}
+            {% include "partials/new_run_review.html" %}
+        {% endif %}
+    </form>
+</section>
