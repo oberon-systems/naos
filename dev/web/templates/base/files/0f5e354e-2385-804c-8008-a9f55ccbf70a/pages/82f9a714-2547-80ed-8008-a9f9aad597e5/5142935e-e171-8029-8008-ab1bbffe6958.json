@@ -115,34 +115,34 @@
     ]
   },
   "shapeRef": "5142935e-e171-8029-8008-ab1b913e6289",
+  "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 2382.999999999998,
       "y": 44.72727346420288,
-      "width": 42.772727966308594,
-      "height": 15.272727966308594,
-      "x1": 0,
-      "y1": 1.454545497894287,
-      "x2": 42.772727966308594,
-      "y2": 16.72727346420288,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "600",
+      "y1": 1.454545497894287,
+      "width": 42.772727966308594,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 2382.999999999998,
+      "x1": 0,
+      "y2": 16.72727346420288,
       "fills": [
         {
           "fillColor": "#b42318",
           "fillOpacity": 1
         }
       ],
+      "x2": 42.772727966308594,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 15.272727966308594,
       "text": "Revoke"
     }
-  ],
-  "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5"
+  ]
 }

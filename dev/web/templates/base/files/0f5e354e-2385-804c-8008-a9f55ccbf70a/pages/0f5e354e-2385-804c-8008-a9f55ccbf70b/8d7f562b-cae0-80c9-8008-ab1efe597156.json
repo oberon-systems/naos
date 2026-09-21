@@ -57,6 +57,7 @@
   "flipY": null,
   "svgAttrs": {},
   "proportionLock": false,
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
   "svgViewbox": {
     "x": -0.7999999999999998,
     "y": -3.55,
@@ -74,6 +75,5 @@
     {
       "fillColor": "#475467"
     }
-  ],
-  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b"
+  ]
 }

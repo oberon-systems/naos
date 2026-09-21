@@ -115,34 +115,34 @@
     ]
   },
   "shapeRef": "5142935e-e171-8029-8008-ab1b916c4d94",
+  "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 1691,
       "y": 82.5,
-      "width": 129.602294921875,
-      "height": 16,
-      "x1": 0,
-      "y1": 0,
-      "x2": 129.602294921875,
-      "y2": 16,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "400",
+      "y1": 0,
+      "width": 129.602294921875,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 1691,
+      "x1": 0,
+      "y2": 16,
       "fills": [
         {
           "fillColor": "#667085",
           "fillOpacity": 1
         }
       ],
+      "x2": 129.602294921875,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
+      "height": 16,
       "text": "naos-runner v0.9.4"
     }
-  ],
-  "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5"
+  ]
 }

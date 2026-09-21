@@ -115,34 +115,34 @@
     ]
   },
   "shapeRef": "5142935e-e171-8029-8008-ab1b987f9aaa",
+  "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 2136,
       "y": 543.5454549789431,
-      "width": 112.09091186523438,
-      "height": 14.545454978942871,
-      "x1": 0,
-      "y1": 0,
-      "x2": 112.09091186523438,
-      "y2": 14.545454978942871,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "500",
+      "y1": 0,
+      "width": 112.09091186523438,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 2136,
+      "x1": 0,
+      "y2": 14.545454978942871,
       "fills": [
         {
           "fillColor": "#101828",
           "fillOpacity": 1
         }
       ],
+      "x2": 112.09091186523438,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
+      "height": 14.545454978942871,
       "text": "runner_registered"
     }
-  ],
-  "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5"
+  ]
 }

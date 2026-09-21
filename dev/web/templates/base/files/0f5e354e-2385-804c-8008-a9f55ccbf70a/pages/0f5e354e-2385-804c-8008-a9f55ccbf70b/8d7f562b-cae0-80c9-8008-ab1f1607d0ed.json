@@ -59,6 +59,7 @@
     "fill": "none"
   },
   "proportionLock": false,
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
   "svgViewbox": {
     "x": -5.85,
     "y": -5.85,
@@ -78,6 +79,5 @@
     }
   ],
   "proportion": 1,
-  "fills": [],
-  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b"
+  "fills": []
 }
