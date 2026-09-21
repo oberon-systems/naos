@@ -1,0 +1,72 @@
+{% from "components.html" import dot, pill %}
+<div class="overlay__scrim" hx-get="/overlay/close" hx-target="#overlay"></div>
+<section class="panel panel--run"
+         role="dialog"
+         aria-label="Run #{{ run.seq }}">
+    <header class="panel__header run__header">
+        <div class="panel__title">
+            <h2 class="panel__name">Run #{{ run.seq }}</h2>
+            {{ pill(run.status, run.tone) }}
+            <span class="table__id">{{ run.id }}</span>
+            <div class="run__actions">
+                {% if run.stoppable %}
+                    <form method="post"
+                          action="/runs/{{ run.id }}/stop"
+                          hx-post="/runs/{{ run.id }}/stop"
+                          hx-target="#overlay"
+                          hx-confirm="Stop run #{{ run.seq }}?">
+                        <button class="button button--secondary" type="submit">Stop run</button>
+                    </form>
+                {% endif %}
+                <form method="post"
+                      action="/runs/{{ run.id }}/rerun"
+                      hx-post="/runs/{{ run.id }}/rerun"
+                      hx-target="#overlay"
+                      hx-confirm="Start a new run with the spec of #{{ run.seq }}?">
+                    <input type="hidden" name="key" value="{{ rerun_key }}">
+                    <button class="button button--secondary" type="submit">Rerun</button>
+                </form>
+                <a class="panel__close"
+                   href="/runs"
+                   hx-get="/overlay/close"
+                   hx-target="#overlay"
+                   aria-label="Close">✕</a>
+            </div>
+        </div>
+        <p class="panel__facts">
+            <span class="run__strong">{{ run.workspace }}</span>
+            <span class="run__sep">·</span>
+            <span class="run__mono">{{ run.image }}</span>
+            <span class="run__sep">·</span>
+            <span class="run__strong">
+                {% if run.runner_tone %}{{ dot(run.runner_tone, small=true) }}{% endif %}
+                {{ run.runner }}
+            </span>
+            <span class="run__sep">·</span>
+            <span>{{ run.started }}</span>
+            <span class="run__sep">·</span>
+            <span class="run__mono">{{ run.elapsed }}</span>
+            <span class="run__sep">·</span>
+            <span>{{ run.attempt }}</span>
+        </p>
+    </header>
+    <nav class="run__tabs">
+        <a class="run__tab run__tab--active" href="/runs/{{ run.id }}">Overview</a>
+        <a class="run__tab" href="/runs/{{ run.id }}/terminal">Terminal</a>
+        <a class="run__tab" href="/runs/{{ run.id }}/logs">Logs &amp; Audit</a>
+    </nav>
+    <div class="run__body">
+        <div class="run__column">
+            {% with title="Run", facts=run.run, link=none %}
+                {% include "partials/run_facts_card.html" %}
+            {% endwith %}
+            {% with title="Policy", facts=run.policy, link=("/profiles" if run.profile_id else none), label="Edit profile" %}
+                {% include "partials/run_facts_card.html" %}
+            {% endwith %}
+        </div>
+        <div class="run__column">
+            {% include "partials/run_runner_card.html" %}
+            {% include "partials/run_lifecycle_card.html" %}
+        </div>
+    </div>
+</section>

@@ -1,6 +1,7 @@
 from dataclasses import replace
 from typing import Annotated, Literal
 from urllib.parse import parse_qsl
+from uuid import uuid4
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -23,7 +24,7 @@ from naos_web.pages import (
     Summary,
     TileValue,
 )
-from naos_web.rows import run_rows, runner_detail, runner_rows
+from naos_web.rows import run_detail, run_rows, runner_detail, runner_rows
 
 State = Literal["all", "active", "queued", "waiting_merge", "failed"]
 StateQuery = Annotated[State, Query()]
@@ -339,6 +340,62 @@ async def new_run_submit(request: Request) -> Response:
     if wants_fragment(request):
         return Response(headers={"HX-Redirect": "/runs"})
     return RedirectResponse("/runs", status_code=303)
+
+
+# Declared after /runs/new, which this path would otherwise take for a run id.
+@router.get("/runs/{run_id}", response_class=HTMLResponse)
+async def run(request: Request, run_id: str, now: NowDep) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        detail = await api.run_detail(run_id)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["runs"], err)
+    return render(
+        request,
+        PAGES["runs"],
+        template="run_overlay.html" if wants_fragment(request) else "run_overlay_page.html",
+        run=run_detail(
+            detail.run,
+            detail.events,
+            detail.runner,
+            detail.policies,
+            detail.images,
+            detail.profile,
+            now,
+        ),
+        rerun_key=uuid4().hex,
+    )
+
+
+def _reopen(request: Request, run_id: str) -> Response:
+    if wants_fragment(request):
+        return Response(headers={"HX-Redirect": f"/runs/{run_id}"})
+    return RedirectResponse(f"/runs/{run_id}", status_code=303)
+
+
+@router.post("/runs/{run_id}/stop", response_class=HTMLResponse)
+async def stop_run(request: Request, run_id: str, now: NowDep) -> Response:
+    api: ApiClient = request.app.state.api
+    try:
+        await api.stop_run(run_id)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["runs"], err)
+    if wants_fragment(request):
+        return await run(request, run_id, now)
+    return _reopen(request, run_id)
+
+
+# The key is rendered with the overlay, so a double submit replays onto the same new Run.
+@router.post("/runs/{run_id}/rerun", response_class=HTMLResponse)
+async def rerun(request: Request, run_id: str) -> Response:
+    api: ApiClient = request.app.state.api
+    key = (await _form(request)).get("key") or uuid4().hex
+    try:
+        source = await api.run(run_id)
+        created = await api.create_run(source["spec"], key)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["runs"], err)
+    return _reopen(request, created["id"])
 
 
 @router.get("/runners", response_class=HTMLResponse)

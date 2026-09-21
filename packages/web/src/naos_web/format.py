@@ -4,7 +4,7 @@ HOUR = 3600
 DAY = 86400
 
 
-def _coarse(seconds: int) -> str:
+def coarse(seconds: int) -> str:
     if seconds < MINUTE:
         return f"{seconds}s"
     if seconds < HOUR:
@@ -17,7 +17,7 @@ def _coarse(seconds: int) -> str:
 def ago(then: int | None, now: int) -> str:
     if then is None:
         return DASH
-    return f"{_coarse(max(now - then, 0))} ago"
+    return f"{coarse(max(now - then, 0))} ago"
 
 
 # A heartbeat is read in seconds while it is still recent; past that the age is the point.
@@ -25,7 +25,7 @@ def heartbeat_ago(then: int | None, now: int) -> str:
     if then is None:
         return "no heartbeat"
     seconds = max(now - then, 0)
-    return f"hb {seconds}s ago" if seconds < 10 * MINUTE else f"hb {_coarse(seconds)} ago"
+    return f"hb {seconds}s ago" if seconds < 10 * MINUTE else f"hb {coarse(seconds)} ago"
 
 
 def duration(started_at: int | None, finished_at: int | None, now: int) -> str:

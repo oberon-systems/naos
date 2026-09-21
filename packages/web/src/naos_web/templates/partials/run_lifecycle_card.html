@@ -1,0 +1,14 @@
+<section class="card run__card">
+    <div class="run__card-header">
+        <h3 class="run__card-title">Lifecycle</h3>
+    </div>
+    <ol class="timeline">
+        {% for step in run.steps %}
+            <li class="timeline__step timeline__step--{{ step.mark }}">
+                <span class="timeline__dot"></span>
+                <span class="timeline__name">{{ step.name }}</span>
+                <span class="timeline__at">{{ step.at }}</span>
+            </li>
+        {% endfor %}
+    </ol>
+</section>

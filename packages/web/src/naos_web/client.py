@@ -36,6 +36,16 @@ class Choices:
 
 
 @dataclass(frozen=True)
+class RunDetail:
+    run: Row
+    events: list[Row]
+    runner: Row | None
+    policies: dict[str, Row]
+    images: list[Row]
+    profile: Row | None
+
+
+@dataclass(frozen=True)
 class RunnerDetail:
     runner: Row
     runs: list[Row]
@@ -100,6 +110,24 @@ class ApiClient:
         )
         return rows
 
+    async def run(self, run_id: str) -> Row:
+        row: Row = await self._call("GET", f"/runs/{run_id}")
+        return row
+
+    async def run_events(self, run_id: str) -> list[Row]:
+        rows: list[Row] = await self._call("GET", f"/runs/{run_id}/events")
+        return rows
+
+    async def policy(self, policy_id: str) -> Row:
+        row: Row = await self._call("GET", f"/policies/{policy_id}")
+        return row
+
+    async def create_run(self, spec: Row, idempotency_key: str) -> Row:
+        row: Row = await self._call(
+            "POST", "/runs", json=spec, headers={"Idempotency-Key": idempotency_key}
+        )
+        return row
+
     async def stop_run(self, run_id: str) -> Row:
         row: Row = await self._call("POST", f"/runs/{run_id}/stop")
         return row
@@ -155,6 +183,28 @@ class ApiClient:
         if found is None:
             raise ApiError(f"the api knows no runner {runner_id}")
         return RunnerDetail(runner=found, runs=runs, events=events)
+
+    # The policies are the ones the spec names, so the card shows what this Run was given.
+    async def run_detail(self, run_id: str) -> RunDetail:
+        run = await self.run(run_id)
+        spec = run["spec"]
+        named = [spec[kind]["policy"] for kind in ("network", "mcp") if spec[kind]["policy"]]
+        events, runners, images, policies = await asyncio.gather(
+            self.run_events(run_id),
+            self.runners(),
+            self.images(),
+            asyncio.gather(*(self.policy(policy_id) for policy_id in named)),
+        )
+        profile = await self.profile(run["profile_id"]) if run.get("profile_id") else None
+        holder = run["runner"]["id"] if run["runner"] else spec.get("runner")
+        return RunDetail(
+            run=run,
+            events=events,
+            runner=next((row for row in runners if row["id"] == holder), None),
+            policies={policy["kind"]: policy for policy in policies},
+            images=images,
+            profile=profile,
+        )
 
     async def choices(self) -> Choices:
         policies, images, runners = await asyncio.gather(

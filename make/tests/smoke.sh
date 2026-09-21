@@ -365,6 +365,28 @@ check_secrets() {
     done
 }
 
+# The overlay opened as a plain page: the run, its bound secret counted and never shown.
+check_run_detail() {
+    curl -fsS "$web/runs/$run" | "$VENV/bin/python" -c '
+import sys
+body = sys.stdin.read()
+wanted = ["Run #1</h2>", f">{sys.argv[1]}</span>", "1 bound", "Lease fencing", "Stop run</button>"]
+missing = [text for text in wanted if text not in body]
+if missing:
+    sys.exit(f"the run overlay is missing {missing}")
+for value in sys.argv[2:]:
+    if value in body:
+        sys.exit("the run overlay carries a credential")
+' "$1" "$secret" "$operator" "Bearer"
+}
+
+# Stop and rerun go through the web as a browser without htmx posts them.
+web_post() {
+    local data=()
+    [ -z "${3:-}" ] || data=(--data-urlencode "key=$3")
+    curl -fsS -o /dev/null -w '%{redirect_url}' -X POST "$web/runs/$1/$2" "${data[@]}"
+}
+
 # The dialog is driven as a browser without htmx drives it: open it, take its key,
 # post the last step. The same form posted twice must land on one Run.
 new_run() {
@@ -555,6 +577,7 @@ check_summary STARTED 1
 check_page STARTED
 check_page_filters active
 check_profile_locked
+check_run_detail STARTED
 echo "editing the workspace and calling the gates from the console..."
 guest \
     "cd /naos/alpha" \
@@ -579,8 +602,8 @@ guest \
     "{ cat /tmp/rpc; sleep 20; } | naos-mcp" \
     "echo NAOS-SMOKE-DONE"
 check_gates
-echo "run $run booted, stopping it..."
-curl -fsS "${auth[@]}" -X POST "$api/api/v1/runs/$run/stop" -o /dev/null
+echo "run $run booted, stopping it from the run overlay..."
+[ "$(web_post "$run" stop)" = "$web/runs/$run" ] || fail "stop did not return to the run"
 wait_for 120 collected
 check_states waiting_merge
 check_merge_summary
@@ -606,4 +629,10 @@ check_merge
 echo "checking the audit timeline of the run..."
 wait_for 60 audited
 check_secrets
+echo "rerunning the run from its overlay, then stopping the copy..."
+rerun_key="$(curl -fsS "$web/runs/$run" | sed -n 's/.*name="key" value="\([0-9a-f]*\)".*/\1/p')"
+copy="$(web_post "$run" rerun "$rerun_key")"
+[ "$(web_post "$run" rerun "$rerun_key")" = "$copy" ] || fail "one rerun key made two runs"
+case "$copy" in "$web/runs/run_"*) ;; *) fail "rerun did not open a new run" ;; esac
+web_post "${copy##*/}" stop >/dev/null
 echo "smoke test passed"

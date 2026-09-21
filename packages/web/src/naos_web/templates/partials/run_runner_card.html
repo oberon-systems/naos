@@ -1,0 +1,38 @@
+{% from "components.html" import dot %}
+<section class="card run__card">
+    <div class="run__card-header">
+        <h3 class="run__card-title">Runner</h3>
+        {% if run.holder %}
+            <a class="card__link"
+               href="/runners/{{ run.holder.id }}"
+               hx-get="/runners/{{ run.holder.id }}"
+               hx-target="#overlay">Open runner</a>
+        {% endif %}
+    </div>
+    {% if run.holder %}
+        <div class="run__card-body">
+            <div class="runner__top">
+                <div class="runner__name">
+                    {{ dot(run.holder.tone) }}
+                    <span>{{ run.holder.name }}</span>
+                    <span class="table__id">{{ run.holder.id }}</span>
+                </div>
+                <span class="runner__slots">{{ run.holder.slots }}</span>
+            </div>
+            <div class="lease">
+                <div class="lease__left" style="width: {{ run.holder.percent }}%"></div>
+            </div>
+            <p class="table__secondary">{{ run.holder.lease }}</p>
+        </div>
+        <dl class="run__facts">
+            {% for fact in run.holder.facts %}
+                <dt>{{ fact.label }}</dt>
+                <dd>
+                    {{ fact.value }}
+                </dd>
+            {% endfor %}
+        </dl>
+    {% else %}
+        <p class="run__card-body table__secondary">no runner has claimed this run</p>
+    {% endif %}
+</section>

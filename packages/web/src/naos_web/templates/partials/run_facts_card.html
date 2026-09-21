@@ -1,0 +1,12 @@
+<section class="card run__card">
+    <div class="run__card-header">
+        <h3 class="run__card-title">{{ title }}</h3>
+        {% if link %}<a class="card__link" href="{{ link }}">{{ label }}</a>{% endif %}
+    </div>
+    <dl class="run__facts">
+        {% for fact in facts %}
+            <dt>{{ fact.label }}</dt>
+            <dd {% if fact.mono %}class="run__mono"{% endif %}>{{ fact.value }}</dd>
+        {% endfor %}
+    </dl>
+</section>

@@ -25,6 +25,8 @@ def run(
     finished: int | None = None,
     merge: Row | None = None,
     created: int | None = None,
+    policies: Row | None = None,
+    extra: Row | None = None,
 ) -> Row:
     return {
         "id": rid,
@@ -40,7 +42,11 @@ def run(
             "mcp": {"policy": None},
             "merge": {"policy": "ask"},
             "timeout": 3600,
-        },
+            "runner": None,
+        }
+        | (policies or {}),
+        "profile_id": None,
+        "lease_id": None,
         "workspace": workspace,
         "runner": runner,
         "merge": merge,
@@ -48,15 +54,26 @@ def run(
         "updated_at": NOW,
         "started_at": started,
         "finished_at": finished,
-    }
+    } | (extra or {})
 
 
+NETPOL = "netpol_9a07" + "0" * 28
+MCPPOL = "mcppol_5b2d" + "0" * 28
 ALPHA = {"id": "rnr_8c1f42aa", "name": "alpha"}
 BETA = {"id": "rnr_4ad907bb", "name": "beta"}
 GAMMA = {"id": "rnr_2e77b0cc", "name": "gamma"}
 
 RUNS: list[Row] = [
-    run(128, "run_9f21c4", "STARTED", runner=ALPHA, started=NOW - 134, created=NOW - 140),
+    run(
+        128,
+        "run_9f21c4",
+        "STARTED",
+        runner=ALPHA,
+        started=NOW - 134,
+        created=NOW - 140,
+        policies={"network": {"policy": NETPOL}, "mcp": {"policy": MCPPOL}},
+        extra={"profile_id": "prof_7a1c30", "lease_id": "lease_5d2a91"},
+    ),
     run(127, "run_7c08ab", "COLLECTING", runner=BETA, started=NOW - 348, created=NOW - 360),
     run(
         126,
@@ -270,13 +287,21 @@ def audit(runner_id: str | None = None, limit: int = Query(100)) -> list[Row]:
     return rows[:limit]
 
 
+# The transitions POST /runs/{id}/stop makes; any other state answers unchanged.
+STOPS = {
+    "PENDING": ("CANCELLED", "cancelled while pending"),
+    "STARTING": ("STOPPING", "stop requested by operator"),
+    "STARTED": ("STOPPING", "stop requested by operator"),
+}
+
+
 @stub.post("/api/v1/runs/{run_id}/stop")
 def stop(run_id: str) -> Row:
+    WRITES.append(("POST", f"/runs/{run_id}/stop", {}, None))
     for row in RUNS:
-        if row["id"] == run_id:
-            row["status"] = "CANCELLED"
-            row["status_reason"] = "cancelled while pending"
-            row["finished_at"] = NOW
+        if row["id"] == run_id and row["status"] in STOPS:
+            row["status"], row["status_reason"] = STOPS[row["status"]]
+            row["finished_at"] = NOW if row["status"] == "CANCELLED" else None
             return row
     return RUNS[0]
 
@@ -288,7 +313,7 @@ def profile(pid: str, name: str, cpu: int, memory: int, active: Row | None, used
         "spec": {
             "runtime": {"cpu": cpu, "memory_mib": memory, "disk_gib": 20},
             "mounts": {"policy": None},
-            "network": {"policy": "netpol_9a07" + "0" * 28},
+            "network": {"policy": NETPOL},
             "shell": {"policy": None},
             "mcp": {"policy": None},
             "merge": {"policy": "ask"},
@@ -316,7 +341,7 @@ PROFILES: list[Row] = [
 ]
 POLICIES: list[Row] = [
     {
-        "id": "netpol_9a07" + "0" * 28,
+        "id": NETPOL,
         "kind": "network",
         "digest": "0" * 64,
         "document": {
@@ -341,7 +366,7 @@ POLICIES: list[Row] = [
         "created_at": NOW - 9000,
     },
     {
-        "id": "mcppol_5b2d" + "0" * 28,
+        "id": MCPPOL,
         "kind": "mcp",
         "digest": "2" * 64,
         "document": {
@@ -425,3 +450,52 @@ def list_policies() -> list[Row]:
 @stub.get("/api/v1/images")
 def list_images() -> list[Row]:
     return IMAGES
+
+
+def _event(seq: int, at: int, event: str, data: Row) -> Row:
+    return {
+        "seq": seq,
+        "id": f"evt_{seq:032x}",
+        "at": at,
+        "source": "api",
+        "event": event,
+        "actor": "system",
+        "run_id": "run_9f21c4",
+        "vm_id": None,
+        "runner_id": None,
+        "data": data,
+    }
+
+
+RUN_EVENTS: list[Row] = [
+    _event(1, NOW - 140, "run_created", {}),
+    _event(2, NOW - 134, "run_transition", {"from": "PENDING", "to": "STARTING", "reason": None}),
+    _event(3, NOW - 120, "run_transition", {"from": "STARTING", "to": "STARTED", "reason": None}),
+]
+
+
+def _missing(what: str) -> JSONResponse:
+    return JSONResponse({"detail": f"{what} not found"}, 404)
+
+
+@stub.get("/api/v1/runs/{run_id}", response_model=None)
+def get_run(run_id: str) -> Row | JSONResponse:
+    found = next((row for row in RUNS if row["id"] == run_id), None)
+    return found if found else _missing(f"run {run_id}")
+
+
+@stub.get("/api/v1/runs/{run_id}/events")
+def run_events(run_id: str) -> list[Row]:
+    return RUN_EVENTS if run_id == "run_9f21c4" else []
+
+
+@stub.get("/api/v1/policies/{policy_id}", response_model=None)
+def get_policy(policy_id: str) -> Row | JSONResponse:
+    found = next((row for row in POLICIES if row["id"] == policy_id), None)
+    return found if found else _missing(f"policy {policy_id}")
+
+
+@stub.post("/api/v1/runs")
+def create_run(body: Row, idempotency_key: str = Header()) -> Row:
+    WRITES.append(("POST", "/runs", body, idempotency_key))
+    return run(129, "run_a0c311", "PENDING", created=NOW)

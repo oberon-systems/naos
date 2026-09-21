@@ -184,3 +184,11 @@ EXITS: tuple[tuple[str, str], ...] = (
     ("PENDING", "CANCELLED"),
 )
 FENCING = "an expired lease fences its runs"
+
+# The states POST /runs/{id}/stop moves; the api answers the rest with the Run unchanged.
+STOPPABLE = frozenset({"PENDING", "STARTING", "STARTED"})
+MERGE_MEANING: dict[str, str] = {
+    "ask": "manual approval",
+    "always": "automatic unless sensitive",
+    "never": "workspace untouched",
+}

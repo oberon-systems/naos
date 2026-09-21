@@ -93,7 +93,7 @@ def test_the_tiles_carry_the_summary(client: TestClient) -> None:
 
 def test_each_state_gets_the_action_the_board_gives_it(client: TestClient) -> None:
     body = client.get("/runs").text
-    rows = [row for row in body.split("<tr>") if 'class="pill' in row]
+    rows = [row for row in body.split("<tr") if 'class="pill' in row]
     actions = {
         re.findall(r'class="pill [^"]*">([A-Z_]+)</span>', row)[0]: re.findall(
             r'class="action"[\s\S]*?>([A-Za-z]+)</', row

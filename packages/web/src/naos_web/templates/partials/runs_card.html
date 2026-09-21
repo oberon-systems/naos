@@ -9,7 +9,11 @@
     {{ column_header(run_columns) }}
     <tbody>
         {% for run in runs %}
-            <tr>
+            <tr class="runs-table__row"
+                tabindex="0"
+                hx-get="/runs/{{ run.id }}"
+                hx-target="#overlay"
+                hx-trigger="click[!event.target.closest('.action')], keyup[key=='Enter'&&!event.target.closest('.action')]">
                 <td>
                     <div>#{{ run.seq }}</div>
                     <div class="table__id">{{ run.id }}</div>
