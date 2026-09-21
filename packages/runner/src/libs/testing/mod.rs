@@ -9,8 +9,9 @@ use std::time::Duration;
 use sha2::{Digest, Sha256};
 
 use crate::libs::api::{
-    Api, DesiredRun, DesiredState, DiffReport, EventsReply, HeartbeatReply, ImageRef, IssuedToken,
-    LeaseGrant, MergeReport, Registration, RunSpec, RunStatus, RuntimeSpec, Transition,
+    Api, ConsoleReply, DesiredRun, DesiredState, DiffReport, EventsReply, HeartbeatReply, ImageRef,
+    IssuedToken, LeaseGrant, MergeReport, Registration, RunSpec, RunStatus, RuntimeSpec,
+    Transition,
 };
 use crate::libs::audit::Event;
 use crate::libs::credentials::Credentials;
@@ -136,6 +137,8 @@ pub struct FakeApi {
     reject_heartbeats: AtomicUsize,
     events: Mutex<Vec<Event>>,
     events_down: AtomicBool,
+    consoles: Mutex<BTreeMap<String, Vec<u8>>>,
+    console_limit: Mutex<Option<usize>>,
     pub registrations: AtomicUsize,
 }
 
@@ -183,6 +186,21 @@ impl FakeApi {
 
     pub fn merges(&self) -> Vec<(String, Outcome)> {
         lock(&self.merges).clone()
+    }
+
+    pub fn console(&self, run_id: &str) -> Vec<u8> {
+        lock(&self.consoles)
+            .get(run_id)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    pub fn hold_console(&self, run_id: &str, data: &[u8]) {
+        lock(&self.consoles).insert(run_id.into(), data.to_vec());
+    }
+
+    pub fn limit_console(&self, bytes: usize) {
+        *lock(&self.console_limit) = Some(bytes);
     }
 
     pub fn capacities(&self) -> Vec<u32> {
@@ -280,6 +298,34 @@ impl Api for FakeApi {
         lock(&self.events).extend_from_slice(events);
         Ok(EventsReply {
             refused: Vec::new(),
+        })
+    }
+
+    async fn report_console(
+        &self,
+        _: &Credentials,
+        run_id: &str,
+        offset: u64,
+        data: &[u8],
+    ) -> Result<ConsoleReply, AgentError> {
+        let limit = lock(&self.console_limit).unwrap_or(usize::MAX);
+        let mut consoles = lock(&self.consoles);
+        let held = consoles.entry(run_id.into()).or_default();
+        let skip = usize::try_from(offset)
+            .ok()
+            .and_then(|offset| held.len().checked_sub(offset));
+        if let Some(fresh) = skip.and_then(|skip| data.get(skip..)) {
+            if !fresh.is_empty() && held.len() >= limit {
+                return Err(AgentError::Api {
+                    status: 413,
+                    detail: "console log is full".into(),
+                });
+            }
+            let room = limit - held.len();
+            held.extend_from_slice(&fresh[..fresh.len().min(room)]);
+        }
+        Ok(ConsoleReply {
+            offset: held.len() as u64,
         })
     }
 }

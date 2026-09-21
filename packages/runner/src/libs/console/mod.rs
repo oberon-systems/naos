@@ -1,3 +1,5 @@
+pub mod ship;
+
 use std::io::{self, IsTerminal, Read, Write};
 use std::net::Shutdown;
 use std::os::unix::net::UnixStream;

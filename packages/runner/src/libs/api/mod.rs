@@ -160,6 +160,11 @@ pub struct EventReport<'a> {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct ConsoleReply {
+    pub offset: u64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct EventsReply {
     pub refused: Vec<String>,
 }
@@ -208,6 +213,15 @@ pub trait Api {
         credentials: &Credentials,
         events: &[Event],
     ) -> impl Future<Output = Result<EventsReply, AgentError>> + Send;
+
+    /// Appends console output at `offset`; the reply is how far the API now holds it.
+    fn report_console(
+        &self,
+        credentials: &Credentials,
+        run_id: &str,
+        offset: u64,
+        data: &[u8],
+    ) -> impl Future<Output = Result<ConsoleReply, AgentError>> + Send;
 }
 
 pub struct HttpApi {
@@ -362,6 +376,25 @@ impl Api for HttpApi {
             .bearer_auth(&credentials.token)
             .timeout(REPORT_TIMEOUT)
             .json(&EventReport { events });
+        Self::send(request).await
+    }
+
+    async fn report_console(
+        &self,
+        credentials: &Credentials,
+        run_id: &str,
+        offset: u64,
+        data: &[u8],
+    ) -> Result<ConsoleReply, AgentError> {
+        let mut url = self.url(&[&credentials.runner_id, "runs", run_id, "console"])?;
+        url.query_pairs_mut()
+            .append_pair("offset", &offset.to_string());
+        let request = self
+            .client
+            .post(url)
+            .bearer_auth(&credentials.token)
+            .header(reqwest::header::CONTENT_TYPE, "application/octet-stream")
+            .body(data.to_vec());
         Self::send(request).await
     }
 }

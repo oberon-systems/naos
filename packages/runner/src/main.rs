@@ -10,6 +10,8 @@ use libs::api::HttpApi;
 use libs::audit::{self, Spool};
 use libs::config::{self, Config};
 use libs::console;
+use libs::console::ship::{Shipper, SHIP_INTERVAL};
+use libs::credentials::CredentialStore;
 use libs::error::AgentError;
 use libs::image::HttpImages;
 use libs::runtime::QemuRuntime;
@@ -63,6 +65,19 @@ async fn serve(config: Config) -> Result<(), AgentError> {
     let api = HttpApi::new(config.api_url.clone())?;
     let runtime = QemuRuntime::new(&config.runtime)?;
     let mut agent = Agent::new(&config, api, runtime, Box::new(HttpImages::new()?));
+    let mut shipper = Shipper::new(
+        HttpApi::new(config.api_url.clone())?,
+        CredentialStore::new(&config.state_dir),
+        config.runtime.vm_dir.clone(),
+    );
+    tokio::spawn(async move {
+        loop {
+            if let Err(err) = shipper.tick().await {
+                tracing::warn!(error = %err, "console shipping failed");
+            }
+            tokio::time::sleep(SHIP_INTERVAL).await;
+        }
+    });
     let mut terminate = signal(SignalKind::terminate())?;
     tracing::info!(name = %config.name, capacity = config.capacity, "naos-runner started");
 

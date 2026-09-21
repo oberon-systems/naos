@@ -165,6 +165,7 @@ $NAOS_AGENT_VM_DIR/vm_<32 hex>/
   overlay.qcow2  the guest's writable disk
   qmp.sock       QEMU monitor
   console.sock   guest ttyS0
+  console.log    what the guest wrote to ttyS0, shipped to the API
   mcp.sock       guest virtio-serial port naos.mcp
   boot.log       guest ttyS1
   qemu.log       QEMU stderr, mode 0600
@@ -214,8 +215,16 @@ naos-runner console run_0123456789abcdef0123456789abcdef
 The command reads only the runtime settings above, connects to
 `console.sock`, puts the terminal in raw mode and detaches on `Ctrl-]`. It
 writes a `console_attached` audit event. The socket sits in a 0700 directory,
-so only the runner's user can open it. Forwarding the console to the web UI
-through the API is a later step.
+so only the runner's user can open it.
+
+QEMU also appends everything the guest writes to `ttyS0` to `console.log`.
+Once a second the agent posts what the API does not hold yet to
+`POST /api/v1/runners/{runner_id}/runs/{run_id}/console?offset=N`, raw bytes
+in the body, and moves on to the offset the API answers with. A restarted
+agent starts at 0 and the API skips what it already has. When the API
+refuses a run as full (413) or not held (409), the agent stops shipping it.
+The runner never listens for an attach: operators read the console from the
+API ([03](03-api-design.md#console)).
 
 ## Lease fencing
 

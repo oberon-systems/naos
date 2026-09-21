@@ -54,6 +54,10 @@ impl VmPaths {
         self.dir.join("console.sock")
     }
 
+    pub fn console_log(&self) -> PathBuf {
+        self.dir.join("console.log")
+    }
+
     pub fn mcp(&self) -> PathBuf {
         self.dir.join("mcp.sock")
     }
@@ -142,8 +146,9 @@ pub fn argv(
         "virtio-blk-pci,drive=disk".into(),
         "-chardev".into(),
         format!(
-            "socket,id=console,path={},server=on,wait=off",
-            text(paths.console())
+            "socket,id=console,path={},server=on,wait=off,logfile={},logappend=on",
+            text(paths.console()),
+            text(paths.console_log())
         ),
         "-serial".into(),
         "chardev:console".into(),

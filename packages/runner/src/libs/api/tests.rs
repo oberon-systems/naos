@@ -4,7 +4,7 @@ use crate::libs::config::parse_api_url;
 use crate::libs::credentials::Credentials;
 use crate::libs::error::AgentError;
 use serde_json::json;
-use wiremock::matchers::{body_json, header, method, path};
+use wiremock::matchers::{body_bytes, body_json, header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 const RUNNER: &str = "/api/v1/runners/rnr_alpha";
@@ -258,4 +258,26 @@ async fn events_are_posted_as_one_flat_batch() {
         .expect("reported");
 
     assert_eq!(reply.refused, vec![event.id]);
+}
+
+#[tokio::test]
+async fn console_output_is_posted_raw_at_its_offset() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path(format!("{RUNNER}/runs/run_alpha/console")))
+        .and(header("authorization", "Bearer token-alpha"))
+        .and(header("content-type", "application/octet-stream"))
+        .and(query_param("offset", "7"))
+        .and(body_bytes(b"naos\r\n".to_vec()))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "offset": 13 })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let reply = api(&server)
+        .report_console(&credentials(), "run_alpha", 7, b"naos\r\n")
+        .await
+        .expect("reported");
+
+    assert_eq!(reply.offset, 13);
 }
