@@ -1,0 +1,29 @@
+{% from "components.html" import badge, count, dot %}
+<div class="card__header">
+    <h2 class="card__title">Runners{{ count(live_runners ~ " live", "green") }}</h2>
+    <a class="card__link" href="/runners">Manage</a>
+</div>
+<ul class="runners">
+    {% for runner in runners %}
+        <li class="runner">
+            <div class="runner__top">
+                <div class="runner__name">
+                    {{ dot(runner.tone) }}
+                    <span>{{ runner.name }}</span>
+                    <span class="table__id">{{ runner.id }}</span>
+                </div>
+                <span class="runner__slots">{{ runner.slots }}</span>
+            </div>
+            <div class="lease">
+                <div class="lease__left" style="width: {{ runner.percent }}%"></div>
+            </div>
+            <div class="runner__meta">
+                <span class="table__secondary">{{ runner.lease }}</span>
+                <span class="runner__runs">
+                    {% for held in runner.held %}{{ badge("#" ~ held.seq) }}{% endfor %}
+                    <span class="table__secondary">{{ runner.heartbeat }}</span>
+                </span>
+            </div>
+        </li>
+    {% endfor %}
+</ul>

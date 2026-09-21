@@ -43,5 +43,13 @@ services:
     restart: unless-stopped
     environment:
       NAOS_WEB_API_BASE_URL: ${NAOS_WEB_API_BASE_URL:-http://127.0.0.1:8000}
+      NAOS_WEB_API_URL: ${NAOS_WEB_API_URL:-http://api:8000}
+      NAOS_WEB_OPERATOR_TOKEN_FILE: /run/secrets/operator
+    volumes:
+      # No file named, no token: the api then refuses the web ui like any other caller.
+      - ${NAOS_WEB_OPERATOR_TOKEN_FILE:-/dev/null}:/run/secrets/operator:ro
     ports:
       - "${NAOS_BIND:-127.0.0.1}:${NAOS_WEB_PORT:-8001}:8000"
+    depends_on:
+      api:
+        condition: service_healthy

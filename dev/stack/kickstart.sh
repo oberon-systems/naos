@@ -51,6 +51,8 @@ write_env() {
     if [ -f "$env_file" ]; then
         check_hash NAOS_OPERATOR_TOKEN_SHA256 operator
         check_hash NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256 enrollment
+        grep -qx "NAOS_WEB_OPERATOR_TOKEN_FILE=$LOCAL/operator" "$env_file" ||
+            fail "$env_file points the web ui at another operator token file: fix it, or run make clean"
         return
     fi
     if [ -n "$(ls -A "$compose/data/db" 2>/dev/null)" ]; then
@@ -61,6 +63,7 @@ write_env() {
         -e "s|^NAOS_DB_PASSWORD=.*|NAOS_DB_PASSWORD=$(token)|" \
         -e "s|^NAOS_OPERATOR_TOKEN_SHA256=.*|NAOS_OPERATOR_TOKEN_SHA256=$(digest "$LOCAL/operator")|" \
         -e "s|^NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256=.*|NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256=$(digest "$LOCAL/enrollment")|" \
+        -e "s|^NAOS_WEB_OPERATOR_TOKEN_FILE=.*|NAOS_WEB_OPERATOR_TOKEN_FILE=$LOCAL/operator|" \
         "$env_file.example" >"$env_file"
     chmod 600 "$env_file"
     echo "wrote $env_file"

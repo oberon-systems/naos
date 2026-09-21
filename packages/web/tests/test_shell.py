@@ -4,6 +4,8 @@ from fastapi.testclient import TestClient
 from naos_web.pages import NAV
 
 PATHS = [page.href for page in NAV]
+# Every page but Runs is still the bare shell 10a built; those tiles stay empty.
+UNFILLED = [page.href for page in NAV if page.key != "runs"]
 
 
 @pytest.mark.parametrize("path", PATHS)
@@ -55,7 +57,7 @@ def test_page_header_follows_the_board(client: TestClient, page) -> None:  # typ
     assert f">{page.action.label}</a>" in body
 
 
-@pytest.mark.parametrize("path", PATHS)
+@pytest.mark.parametrize("path", UNFILLED)
 def test_no_tile_values_are_invented(client: TestClient, path: str) -> None:
     body = client.get(path).text
     assert "tile__number" not in body

@@ -12,8 +12,8 @@
 {% macro tag(label, tone="grey") -%}
     <span class="tag tone-{{ tone }}">{{ label }}</span>
 {%- endmacro %}
-{% macro count(label) -%}
-    <span class="count">{{ label }}</span>
+{% macro count(label, tone="grey") -%}
+    <span class="count tone-{{ tone }}">{{ label }}</span>
 {%- endmacro %}
 {% macro badge(label) -%}
     <span class="badge">{{ label }}</span>

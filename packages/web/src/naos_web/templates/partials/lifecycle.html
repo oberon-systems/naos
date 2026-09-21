@@ -1,0 +1,18 @@
+{% from "components.html" import tag %}
+<div class="card__footer lifecycle">
+    <div class="lifecycle__line">
+        <span class="lifecycle__label">LIFECYCLE</span>
+        {% for status in lifecycle %}
+            {% if not loop.first %}<span class="lifecycle__arrow">→</span>{% endif %}
+            {{ tag(status, status_tone[status]) }}
+        {% endfor %}
+    </div>
+    <div class="lifecycle__line">
+        <span class="lifecycle__label">EXITS</span>
+        {% for source, target in exits %}
+            <span>{{ source }}</span><span class="lifecycle__arrow">→</span>{{ tag(target, status_tone[target]) }}
+            <span class="lifecycle__note">·</span>
+        {% endfor %}
+        <span class="lifecycle__note">{{ fencing }}</span>
+    </div>
+</div>

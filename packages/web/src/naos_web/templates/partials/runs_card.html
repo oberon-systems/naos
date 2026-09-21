@@ -1,0 +1,34 @@
+{% from "components.html" import column_header, count, dot, filter, pill %}
+<div class="card__header">
+    <h2 class="card__title">Runs{{ count(open_runs ~ " open") }}</h2>
+    <div class="filters">
+        {% for item in run_filters %}{{ filter(item.label, item.href, item.key == state) }}{% endfor %}
+    </div>
+</div>
+<table class="table runs-table">
+    {{ column_header(run_columns) }}
+    <tbody>
+        {% for run in runs %}
+            <tr>
+                <td>
+                    <div>#{{ run.seq }}</div>
+                    <div class="table__id">{{ run.id }}</div>
+                </td>
+                <td>{{ pill(run.status, run.tone) }}</td>
+                <td>
+                    <div>{{ run.workspace }}</div>
+                    <div class="table__secondary">{{ run.image }}</div>
+                    {% if run.secondary %}<div class="table__secondary">{{ run.secondary }}</div>{% endif %}
+                </td>
+                <td>
+                    {% if run.runner_tone %}{{ dot(run.runner_tone, small=true) }}{% endif %}
+                    <span {% if not run.runner_tone %}class="table__secondary"{% endif %}>{{ run.runner }}</span>
+                </td>
+                <td>{{ run.started }}</td>
+                <td>{{ run.duration }}</td>
+                <td>{% include "partials/row_action.html" %}</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% include "partials/lifecycle.html" %}

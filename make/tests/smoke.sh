@@ -2,13 +2,14 @@
 set -euo pipefail
 
 api=http://127.0.0.1:8000
+web=http://127.0.0.1:8001
 version="$(sed -n 's/^  version: //p' "$ROOT/packer/.cz.yaml")"
 repo="$(git -C "$ROOT" remote get-url origin | sed -E 's#^(git@github\.com:|https://github\.com/)##; s#\.git$##')"
 release="https://github.com/$repo/releases/download/image-$version"
 image="naos-agents-$version.qcow2"
 
 cleanup() {
-    for group in "${agent:-}" "${server:-}"; do
+    for group in "${agent:-}" "${server:-}" "${ui:-}"; do
         if [ -n "$group" ]; then kill -- "-$group" 2>/dev/null || true; fi
     done
     if [ -n "${logs:-}" ]; then kill "$logs" 2>/dev/null || true; fi
@@ -226,6 +227,34 @@ if row["lease_acquired_at"] is None or row["lease_expires_at"] is None:
 '
 }
 
+page() {
+    curl -fsS "$web/runs${1:+?state=$1}"
+}
+
+# The page is read as an operator reads it: the run number, the state it is in and
+# the runner it landed on, rendered rather than fetched.
+check_page() {
+    page | "$VENV/bin/python" -c '
+import sys
+body = sys.stdin.read()
+wanted = ["<div>#1</div>", f">{sys.argv[1]}</span>", ">alpha</span>", ">1 live</span>"]
+missing = [text for text in wanted if text not in body]
+if missing:
+    sys.exit(f"the runs page is missing {missing}")
+if "Bearer" in body or "Authorization" in body:
+    sys.exit("the runs page carries the operator credential")
+' "$1"
+}
+
+# Exactly one filter holds the run, and it is the one its state belongs to.
+check_page_filters() {
+    local found=""
+    for state in active queued waiting_merge failed; do
+        if page "$state" | grep -q "<div>#1</div>"; then found="$found $state"; fi
+    done
+    [ "$found" = " $1" ] || fail "the page lists the run under '\''$found'\'', expected $1"
+}
+
 check_gates() {
     grep -q NAOS-SMOKE-DONE "$TEMP_DIR/console.log" || fail "the guest commands did not finish"
     for tool in read_file list_dir grep http_request; do
@@ -372,8 +401,8 @@ operator="$(token)"
 token >"$TEMP_DIR/enrollment"
 chmod 600 "$TEMP_DIR/enrollment"
 auth=(-H "Authorization: Bearer $operator" -H "Content-Type: application/json")
-touch "$TEMP_DIR/api.log" "$TEMP_DIR/agent.log" "$TEMP_DIR/console.log"
-tail -f "$TEMP_DIR/api.log" "$TEMP_DIR/agent.log" &
+touch "$TEMP_DIR/api.log" "$TEMP_DIR/web.log" "$TEMP_DIR/agent.log" "$TEMP_DIR/console.log"
+tail -f "$TEMP_DIR/api.log" "$TEMP_DIR/web.log" "$TEMP_DIR/agent.log" &
 logs=$!
 
 echo "starting api..."
@@ -384,6 +413,15 @@ NAOS_ALLOWED_MOUNT_ROOTS="[\"$TEMP_DIR/workspaces\"]" \
     setsid "$MAKE" -C "$ROOT" run-api >"$TEMP_DIR/api.log" 2>&1 &
 server=$!
 wait_for 30 curl -fs -o /dev/null "$api/healthz"
+
+echo "starting web..."
+printf '%s' "$operator" >"$TEMP_DIR/operator"
+chmod 600 "$TEMP_DIR/operator"
+NAOS_WEB_API_URL="$api" \
+    NAOS_WEB_OPERATOR_TOKEN_FILE="$TEMP_DIR/operator" \
+    setsid "$MAKE" -C "$ROOT" run-web >"$TEMP_DIR/web.log" 2>&1 &
+ui=$!
+wait_for 30 curl -fs -o /dev/null "$web/healthz"
 
 echo "registering the image and creating a run..."
 curl -fsS "${auth[@]}" "$api/api/v1/images" -o /dev/null -d @- <<EOF
@@ -456,6 +494,8 @@ check_run_view STARTED running
 check_states active
 check_runner_slots
 check_summary STARTED 1
+check_page STARTED
+check_page_filters active
 echo "editing the workspace and calling the gates from the console..."
 guest \
     "cd /naos/alpha" \
@@ -485,6 +525,8 @@ curl -fsS "${auth[@]}" -X POST "$api/api/v1/runs/$run/stop" -o /dev/null
 wait_for 120 collected
 check_states waiting_merge
 check_merge_summary
+check_page WAITING_MERGE
+check_page_filters waiting_merge
 wait_for 10 share_gone
 if [ "$(workspace_tree)" != "$tree_before" ]; then
     echo "the guest changed the host workspace" >&2

@@ -115,3 +115,72 @@ class TileValue:
 class Summary:
     subtitle: str = ""
     values: dict[str, TileValue] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class Filter:
+    key: str
+    label: str
+
+    @property
+    def href(self) -> str:
+        return "/runs" if self.key == "all" else f"/runs?state={self.key}"
+
+
+RUN_FILTERS: tuple[Filter, ...] = (
+    Filter("all", "All"),
+    Filter("active", "Active"),
+    Filter("queued", "Queued"),
+    Filter("waiting_merge", "Waiting merge"),
+    Filter("failed", "Failed"),
+)
+
+STATUS_TONE: dict[str, Tone] = {
+    "PENDING": "grey",
+    "STARTING": "blue",
+    "STARTED": "blue",
+    "STOPPING": "blue",
+    "COLLECTING": "blue",
+    "WAITING_MERGE": "amber",
+    "COMPLETED": "green",
+    "FAILED": "red",
+    "CANCELLED": "grey",
+}
+
+RUNNER_TONE: dict[str, Tone] = {"live": "green", "stale": "amber", "revoked": "red"}
+
+
+@dataclass(frozen=True)
+class RowAction:
+    label: str
+    href: str
+    post: bool = False
+    confirm: str = ""
+
+
+# Cancel is the one action that changes a Run, so it asks first; the api authorizes it either way.
+ROW_ACTIONS: dict[str, RowAction] = {
+    "PENDING": RowAction("Cancel", "/runs/{id}/cancel", post=True, confirm="Cancel run #{seq}?"),
+    "WAITING_MERGE": RowAction("Review", "/runs/{id}"),
+    "COMPLETED": RowAction("Diff", "/runs/{id}"),
+    "FAILED": RowAction("Logs", "/runs/{id}/logs"),
+}
+OPEN_ACTION = RowAction("Open", "/runs/{id}")
+
+RUN_COLUMNS = ("RUN", "STATUS", "SPEC", "RUNNER", "STARTED", "DURATION", "")
+
+# The lifecycle of AGENTS.md, which the api enforces and this footer only states.
+LIFECYCLE: tuple[str, ...] = (
+    "PENDING",
+    "STARTING",
+    "STARTED",
+    "STOPPING",
+    "COLLECTING",
+    "WAITING_MERGE",
+    "COMPLETED",
+)
+EXITS: tuple[tuple[str, str], ...] = (
+    ("any state before COMPLETED", "FAILED"),
+    ("PENDING", "CANCELLED"),
+)
+FENCING = "an expired lease fences its runs"

@@ -1,0 +1,9 @@
+{% if run.action.post %}
+    <button class="action"
+            type="button"
+            hx-post="{{ run.action.href }}?state={{ state }}"
+            hx-target="#page"
+            hx-confirm="{{ run.action.confirm }}">{{ run.action.label }}</button>
+{% else %}
+    <a class="action" href="{{ run.action.href }}">{{ run.action.label }}</a>
+{% endif %}

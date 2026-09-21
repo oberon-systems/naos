@@ -1,0 +1,9 @@
+{% extends "list_page.html" %}
+{% block content %}
+    <div class="card">
+        <div class="card__header">
+            <h2 class="card__title">{{ page.title }}</h2>
+        </div>
+        <p class="notice">{{ reason }}</p>
+    </div>
+{% endblock %}
