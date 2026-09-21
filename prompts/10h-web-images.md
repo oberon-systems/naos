@@ -1,4 +1,4 @@
-# Prompt 10g — Images
+# Prompt 10h — Images
 
 Read `AGENTS.md`, `docs/10-web-ui.md`, `docs/05-vm-and-qemu.md`, and the
 board `Images — List` on page `Images` in `dev/web/templates/base`.

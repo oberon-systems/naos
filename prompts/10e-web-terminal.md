@@ -1,4 +1,4 @@
-# Prompt 10d — Run Terminal
+# Prompt 10e — Run Terminal
 
 Read `AGENTS.md`, `docs/10-web-ui.md`, `docs/01-security-model.md`, and the
 boards `Run detail — Terminal`, `Terminal — Detached window` and `Terminal

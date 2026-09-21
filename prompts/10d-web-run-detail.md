@@ -1,4 +1,4 @@
-# Prompt 10c — Run Detail
+# Prompt 10d — Run Detail
 
 Read `AGENTS.md`, `docs/10-web-ui.md`, `docs/03-api-design.md`, and the board
 `Run detail — Overview` on page `Runs` in `dev/web/templates/base`.
