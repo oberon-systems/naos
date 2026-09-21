@@ -13,13 +13,6 @@ Runs, boots them from a [Packer](https://www.packer.io/)-built
 [image](packer/README.md) and enforces the policies.
 [docs/00-architecture.md](docs/00-architecture.md) describes the whole design.
 
-## Pre-Alpha Footage, Stage 1
-
-<video src="docs/videos/pre-alpha-footage-stage-1.webm" controls width="100%"></video>
-
-If the player does not load, open
-[the recording](docs/videos/pre-alpha-footage-stage-1.webm) directly.
-
 ## Requirements
 
 A runner host needs Linux on x86_64 with [KVM](https://linux-kvm.org/),
