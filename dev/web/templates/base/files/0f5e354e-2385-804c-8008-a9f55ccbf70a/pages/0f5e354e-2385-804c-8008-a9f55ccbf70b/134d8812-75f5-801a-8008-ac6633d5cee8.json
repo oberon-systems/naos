@@ -1,0 +1,98 @@
+{
+  "id": "134d8812-75f5-801a-8008-ac6633d5cee8",
+  "name": "card body",
+  "type": "frame",
+  "x": 4464,
+  "y": 1060.9999999999998,
+  "width": 672,
+  "height": 354.0000000000002,
+  "rotation": 0,
+  "selrect": {
+    "x": 4464,
+    "y": 1060.9999999999998,
+    "width": 672,
+    "height": 354.0000000000002,
+    "x1": 4464,
+    "y1": 1060.9999999999998,
+    "x2": 5136,
+    "y2": 1415
+  },
+  "points": [
+    {
+      "x": 4464,
+      "y": 1060.9999999999995
+    },
+    {
+      "x": 5136,
+      "y": 1060.9999999999995
+    },
+    {
+      "x": 5136,
+      "y": 1414.9999999999998
+    },
+    {
+      "x": 4464,
+      "y": 1414.9999999999998
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "134d8812-75f5-801a-8008-ac66338b8e5d",
+  "frameId": "134d8812-75f5-801a-8008-ac66338b8e5d",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 4,
+    "p2": 16,
+    "p3": 16,
+    "p4": 16
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "showContent": true,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 14,
+    "columnGap": 14
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "auto",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": [],
+  "shapes": [
+    "134d8812-75f5-801a-8008-ac6636862d6c",
+    "134d8812-75f5-801a-8008-ac6635c35746",
+    "134d8812-75f5-801a-8008-ac668cf68b8b",
+    "134d8812-75f5-801a-8008-ac6634323051"
+  ]
+}

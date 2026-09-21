@@ -1,0 +1,97 @@
+{
+  "id": "134d8812-75f5-801a-8008-ac66348269f2",
+  "name": "field CPU",
+  "type": "frame",
+  "x": 4480,
+  "y": 1238.9999999999995,
+  "width": 205.33333333333394,
+  "height": 73,
+  "rotation": 0,
+  "selrect": {
+    "x": 4480,
+    "y": 1238.9999999999995,
+    "width": 205.33333333333394,
+    "height": 73,
+    "x1": 4480,
+    "y1": 1238.9999999999995,
+    "x2": 4685.333333333334,
+    "y2": 1311.9999999999995
+  },
+  "points": [
+    {
+      "x": 4480,
+      "y": 1238.9999999999995
+    },
+    {
+      "x": 4685.333333333334,
+      "y": 1238.9999999999995
+    },
+    {
+      "x": 4685.333333333334,
+      "y": 1311.9999999999995
+    },
+    {
+      "x": 4480,
+      "y": 1311.9999999999995
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "134d8812-75f5-801a-8008-ac6635c35746",
+  "frameId": "134d8812-75f5-801a-8008-ac6635c35746",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "showContent": true,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 6,
+    "columnGap": 6
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "auto",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": [],
+  "shapes": [
+    "134d8812-75f5-801a-8008-ac6714c29890",
+    "134d8812-75f5-801a-8008-ac66345d0772",
+    "134d8812-75f5-801a-8008-ac6634940142"
+  ]
+}
