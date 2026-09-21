@@ -127,6 +127,19 @@ def test_expired_lease_fails_active_runs_and_releases_pending(
     assert client.get(f"/api/v1/runs/{started}").json()["status"] == "FAILED"
 
 
+def test_a_run_shows_the_lease_that_fences_it(
+    client: TestClient, register: Register, create_run: CreateRun
+) -> None:
+    run_id = create_run("key-1")
+    assert client.get(f"/api/v1/runs/{run_id}").json()["lease_id"] is None
+
+    runner = register()
+    _heartbeat(client, runner, capacity=1)
+    _walk(client, runner, run_id, [S.PENDING, S.STARTING])
+
+    assert client.get(f"/api/v1/runs/{run_id}").json()["lease_id"] == runner["lease_id"]
+
+
 def test_lease_expiry_is_detected_on_the_next_runner_call(
     client: TestClient, register: Register, create_run: CreateRun, advance: Advance
 ) -> None:

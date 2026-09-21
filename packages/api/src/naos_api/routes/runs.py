@@ -30,6 +30,8 @@ class RunRead(BaseModel):
     status: RunStatus
     status_reason: str | None
     spec: RunSpec
+    profile_id: str | None = None
+    lease_id: str | None = None
     workspace: str | None = None
     runner: RunnerRef | None = None
     merge: MergeSummary | None = None
@@ -46,6 +48,8 @@ class RunRead(BaseModel):
             status=run.status,
             status_reason=run.status_reason,
             spec=RunSpec.model_validate(run.spec),
+            profile_id=run.profile_id,
+            lease_id=run.lease_id,
             created_at=run.created_at,
             updated_at=run.updated_at,
             started_at=run.started_at,

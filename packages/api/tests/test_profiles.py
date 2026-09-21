@@ -114,6 +114,7 @@ def test_a_run_copies_the_profile_and_records_it(
     assert run["spec"]["runner"] is None
     stored = session.get(Run, run["id"])
     assert stored is not None and stored.profile_id == profile["id"]
+    assert client.get(f"/api/v1/runs/{run['id']}").json()["profile_id"] == profile["id"]
     listed = client.get(f"/api/v1/profiles/{profile['id']}").json()
     assert listed["active_runs"] == 1
     assert listed["active_run"] == {"id": run["id"], "seq": run["seq"], "status": "PENDING"}

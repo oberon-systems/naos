@@ -93,6 +93,8 @@ beside the Run itself, resolved by the API rather than by the caller:
 | `seq` | The Run number, unique and increasing |
 | `workspace` | The workspace the mount policy names, or null |
 | `runner` | `id` and `name` of the runner holding the lease, or null |
+| `lease_id` | The lease that fences the Run, or null while it queues |
+| `profile_id` | The profile the spec was copied from, or null |
 | `merge` | `changed` and `conflicts` of the collected diff, or null |
 | `started_at` | When the Run reached STARTING, or null while it queues |
 | `finished_at` | When it reached a terminal state, or null |
