@@ -13,6 +13,13 @@ Runs, boots them from a [Packer](https://www.packer.io/)-built
 [image](packer/README.md) and enforces the policies.
 [docs/00-architecture.md](docs/00-architecture.md) describes the whole design.
 
+## Demo
+
+[The first demonstration](https://youtu.be/ReOokJ831M4) of what naos does,
+recorded on the smoke stand at a very early pre-alpha stage.
+
+[![naos pre-alpha demo](https://img.youtube.com/vi/ReOokJ831M4/hqdefault.jpg)](https://youtu.be/ReOokJ831M4)
+
 ## Requirements
 
 A runner host needs Linux on x86_64 with [KVM](https://linux-kvm.org/),
