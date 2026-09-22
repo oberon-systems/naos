@@ -3,36 +3,36 @@
   "name": "Text",
   "type": "text",
   "x": 2980,
-  "y": 1195,
-  "width": 214,
+  "y": 1076,
+  "width": 254,
   "height": 16,
   "rotation": 0,
   "selrect": {
     "x": 2980,
-    "y": 1195,
-    "width": 214,
+    "y": 1076,
+    "width": 254,
     "height": 16,
     "x1": 2980,
-    "y1": 1195,
-    "x2": 3194,
-    "y2": 1211
+    "y1": 1076,
+    "x2": 3234,
+    "y2": 1092
   },
   "points": [
     {
       "x": 2980,
-      "y": 1195
+      "y": 1076
     },
     {
-      "x": 3194,
-      "y": 1195
+      "x": 3234,
+      "y": 1076
     },
     {
-      "x": 3194,
-      "y": 1211
+      "x": 3234,
+      "y": 1092
     },
     {
       "x": 2980,
-      "y": 1211
+      "y": 1092
     }
   ],
   "transform": {
@@ -87,7 +87,7 @@
                   }
                 ],
                 "fontFamily": "Inter Tight",
-                "text": "the token is the one the api issued for this run"
+                "text": "the operator token of the api; this page never shows it"
               }
             ],
             "typographyRefId": null,
@@ -119,29 +119,29 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 1209.5454547405243,
+      "x": 2980,
+      "y": 1089.6000002026558,
+      "width": 253.3874969482422,
+      "height": 12.800000190734863,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 253.3874969482422,
+      "y2": 13.600000202655792,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
-      "y1": 0.7272727489471436,
-      "width": 213.18182373046875,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 2980,
-      "x1": 0,
-      "y2": 14.545454740524292,
       "fills": [
         {
           "fillColor": "#667085",
           "fillOpacity": 1
         }
       ],
-      "x2": 213.18182373046875,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "height": 13.818181991577148,
-      "text": "the token is the one the api issued for this run"
+      "text": "the operator token of the api; this page never shows it"
     }
   ]
 }

@@ -3,36 +3,36 @@
   "name": "Text",
   "type": "text",
   "x": 2992,
-  "y": 1139,
-  "width": 382,
+  "y": 1020,
+  "width": 411,
   "height": 18,
   "rotation": 0,
   "selrect": {
     "x": 2992,
-    "y": 1139,
-    "width": 382,
+    "y": 1020,
+    "width": 411,
     "height": 18,
     "x1": 2992,
-    "y1": 1139,
-    "x2": 3374,
-    "y2": 1157
+    "y1": 1020,
+    "x2": 3403,
+    "y2": 1038
   },
   "points": [
     {
       "x": 2992,
-      "y": 1139
+      "y": 1020
     },
     {
-      "x": 3374,
-      "y": 1139
+      "x": 3403,
+      "y": 1020
     },
     {
-      "x": 3374,
-      "y": 1157
+      "x": 3403,
+      "y": 1038
     },
     {
       "x": 2992,
-      "y": 1157
+      "y": 1038
     }
   ],
   "transform": {
@@ -87,7 +87,7 @@
                   }
                 ],
                 "fontFamily": "JetBrains Mono",
-                "text": "wscat -c wss://192.0.2.10/v1/runs/run_9f21c4/attach \\"
+                "text": "wscat -c wss://192.0.2.10/api/v1/runs/run_9f21c4/attach \\"
               }
             ],
             "typographyRefId": null,
@@ -119,29 +119,29 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 1155.7272746562958,
+      "x": 2992,
+      "y": 1036.8000019192696,
+      "width": 410.4125061035156,
+      "height": 16.000001907348633,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 410.4125061035156,
+      "y2": 16.80000191926956,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "400",
-      "y1": 0.7272727489471436,
-      "width": 381.602294921875,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 2992,
-      "x1": 0,
-      "y2": 16.727274656295776,
       "fills": [
         {
           "fillColor": "#e2e8f0",
           "fillOpacity": 1
         }
       ],
-      "x2": 381.602294921875,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
-      "height": 16.000001907348633,
-      "text": "wscat -c wss://192.0.2.10/v1/runs/run_9f21c4/attach \\"
+      "text": "wscat -c wss://192.0.2.10/api/v1/runs/run_9f21c4/attach \\"
     }
   ]
 }

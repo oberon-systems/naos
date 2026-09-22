@@ -3,36 +3,36 @@
   "name": "Text",
   "type": "text",
   "x": 2980,
-  "y": 1108,
+  "y": 989,
   "width": 93,
   "height": 14,
   "rotation": 0,
   "selrect": {
     "x": 2980,
-    "y": 1108,
+    "y": 989,
     "width": 93,
     "height": 14,
     "x1": 2980,
-    "y1": 1108,
+    "y1": 989,
     "x2": 3073,
-    "y2": 1122
+    "y2": 1003
   },
   "points": [
     {
       "x": 2980,
-      "y": 1108
+      "y": 989
     },
     {
       "x": 3073,
-      "y": 1108
+      "y": 989
     },
     {
       "x": 3073,
-      "y": 1122
+      "y": 1003
     },
     {
       "x": 2980,
-      "y": 1122
+      "y": 1003
     }
   ],
   "transform": {
@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 1120.3636367321014,
+      "x": 2980,
+      "y": 1001.8000000119209,
+      "width": 92.4375,
+      "height": 12,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 92.4375,
+      "y2": 12.800000011920929,
       "fontStyle": "normal",
       "textTransform": "uppercase",
       "fontSize": "10px",
       "fontWeight": "600",
-      "y1": 0.7272727489471436,
-      "width": 92.44318389892578,
       "textDecoration": "none",
       "letterSpacing": "0.6px",
-      "x": 2980,
-      "x1": 0,
-      "y2": 12.36363673210144,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
-      "x2": 92.44318389892578,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "height": 11.636363983154297,
       "text": "Raw websocket"
     }
   ]

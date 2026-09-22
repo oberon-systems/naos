@@ -115,35 +115,35 @@
     ]
   },
   "layoutItemHSizing": "fill",
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
   "layoutItemVSizing": "fix",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 1584,
       "y": 1831.4000007510185,
-      "width": 413.3500061035156,
-      "height": 15.200000762939453,
-      "x1": 0,
-      "y1": -0.800000011920929,
-      "x2": 413.3500061035156,
-      "y2": 14.400000751018524,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "400",
+      "y1": -0.800000011920929,
+      "width": 413.3500061035156,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 1584,
+      "x1": 0,
+      "y2": 14.400000751018524,
       "fills": [
         {
           "fillColor": "#667085",
           "fillOpacity": 1
         }
       ],
+      "x2": 413.3500061035156,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 15.200000762939453,
       "text": "The runner shuts the VM down and the run ends as STOPPED. Nothing is retried."
     }
-  ],
-  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b"
+  ]
 }

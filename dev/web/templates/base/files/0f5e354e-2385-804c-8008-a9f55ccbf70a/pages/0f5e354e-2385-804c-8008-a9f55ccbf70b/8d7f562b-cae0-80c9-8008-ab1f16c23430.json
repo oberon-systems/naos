@@ -3,36 +3,36 @@
   "name": "Text",
   "type": "text",
   "x": 2992,
-  "y": 1041,
-  "width": 252,
+  "y": 922,
+  "width": 217,
   "height": 18,
   "rotation": 0,
   "selrect": {
     "x": 2992,
-    "y": 1041,
-    "width": 252,
+    "y": 922,
+    "width": 217,
     "height": 18,
     "x1": 2992,
-    "y1": 1041,
-    "x2": 3244,
-    "y2": 1059
+    "y1": 922,
+    "x2": 3209,
+    "y2": 940
   },
   "points": [
     {
       "x": 2992,
-      "y": 1041
+      "y": 922
     },
     {
-      "x": 3244,
-      "y": 1041
+      "x": 3209,
+      "y": 922
     },
     {
-      "x": 3244,
-      "y": 1059
+      "x": 3209,
+      "y": 940
     },
     {
       "x": 2992,
-      "y": 1059
+      "y": 940
     }
   ],
   "transform": {
@@ -87,7 +87,7 @@
                   }
                 ],
                 "fontFamily": "JetBrains Mono",
-                "text": "naos-runner attach run_9f21c4 --tty"
+                "text": "naos-runner console run_9f21c4"
               }
             ],
             "typographyRefId": null,
@@ -119,29 +119,29 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 1057.7272746562958,
+      "x": 2992,
+      "y": 938.8000019192696,
+      "width": 216.0124969482422,
+      "height": 16.000001907348633,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 216.0124969482422,
+      "y2": 16.80000191926956,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "400",
-      "y1": 0.7272727489471436,
-      "width": 252,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 2992,
-      "x1": 0,
-      "y2": 16.727274656295776,
       "fills": [
         {
           "fillColor": "#e2e8f0",
           "fillOpacity": 1
         }
       ],
-      "x2": 252,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
-      "height": 16.000001907348633,
-      "text": "naos-runner attach run_9f21c4 --tty"
+      "text": "naos-runner console run_9f21c4"
     }
   ]
 }

@@ -7,11 +7,11 @@
     "components/v2",
     "fdata/shape-data-type"
   ],
-  "teamId": "6af00fae-2428-8062-8008-adda703b463f",
+  "teamId": "0469f316-e872-81d0-8008-ade1ab0df4a0",
   "hasMediaTrimmed": false,
   "name": "base",
-  "revn": 80,
-  "modifiedAt": "2026-09-22T18:50:54.948269Z",
+  "revn": 81,
+  "modifiedAt": "2026-09-22T18:56:28.201853Z",
   "vern": 0,
   "id": "0f5e354e-2385-804c-8008-a9f55ccbf70a",
   "isShared": false,
@@ -102,6 +102,6 @@
     "0024b-fix-stroke-cap-placement"
   ],
   "version": 67,
-  "projectId": "6af00fae-2428-8062-8008-adda703ded65",
-  "createdAt": "2026-09-22T18:20:50.127328Z"
+  "projectId": "0469f316-e872-81d0-8008-ade1ab105237",
+  "createdAt": "2026-09-22T18:52:25.328001Z"
 }
