@@ -67,6 +67,18 @@ def test_console_output_is_appended_in_order(
     assert log.content == b"login: naos\r\n"
 
 
+def test_a_quiet_run_ships_an_empty_body(
+    client: TestClient, register: Register, create_run: CreateRun
+) -> None:
+    runner, run_id = _leased(client, register, create_run)
+    _ship(client, runner, run_id, 0, b"login: ")
+
+    empty = _ship(client, runner, run_id, 7, b"")
+
+    assert empty.status_code == 200
+    assert empty.json() == {"offset": 7}
+
+
 def test_a_full_console_log_refuses_more(
     client: TestClient,
     register: Register,

@@ -277,11 +277,12 @@ def report_events(body: EventsIn, principal: PrincipalDep, session: SessionDep) 
 def report_console(
     run_id: str,
     offset: Annotated[int, Query(ge=0)],
-    data: Annotated[bytes, Body(media_type="application/octet-stream")],
     principal: PrincipalDep,
     session: SessionDep,
     limit: ConsoleLimitDep,
     now: NowDep,
+    # A quiet run ships an empty body once a tick to collect the size.
+    data: Annotated[bytes, Body(media_type="application/octet-stream")] = b"",
 ) -> ConsoleOut:
     held = consoles.append(session, principal.runner_id, run_id, offset, data, limit, now)
     wanted = consoles.size(session, run_id)
