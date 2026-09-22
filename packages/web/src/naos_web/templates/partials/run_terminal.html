@@ -1,7 +1,10 @@
 {% from "components.html" import icon_open, icon_info %}
 <div class="run__body run__body--terminal">
     <div class="terminal__toolbar">
+        {% include "partials/terminal_toggles.html" %}
         <div class="terminal__tools">
+            <span class="terminal__endpoint">ws {{ terminal.attach_path }}</span>
+            <a class="terminal__download" href="{{ terminal.log }}">Download log</a>
             <a class="terminal__icon"
                href="{{ terminal.window }}"
                target="_blank"
@@ -11,10 +14,7 @@
                     type="button"
                     popovertarget="terminal-hint"
                     aria-label="Run this terminal on the host">{{ icon_info() }}</button>
-            <a class="terminal__download" href="{{ terminal.log }}">Download log</a>
-            <span class="terminal__endpoint">ws {{ terminal.attach_path }}</span>
         </div>
-        {% include "partials/terminal_toggles.html" %}
     </div>
     <div class="terminal terminal--panel" data-stream="{{ terminal.stream }}"></div>
     <div class="terminal__status">

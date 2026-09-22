@@ -1255,6 +1255,8 @@ body {
 
 .terminal__tools {
   flex: 1 1 auto;
+  justify-content: flex-end;
+  gap: 12px;
   min-width: 0;
 }
 
@@ -1277,7 +1279,6 @@ body {
 }
 
 .terminal__download {
-  margin-left: 4px;
   font-size: 12px;
   font-weight: 500;
   color: var(--blue-text);
