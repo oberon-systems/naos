@@ -1,3 +1,4 @@
+import asyncio
 import re
 from collections.abc import AsyncIterator
 
@@ -22,6 +23,14 @@ def test_the_terminal_tab_attaches_through_the_web(client: TestClient) -> None:
     assert f'href="/runs/{STARTED}/terminal/log">Download log</a>' in body
     assert f'href="/runs/{STARTED}/terminal?window=1"' in body
     assert "still running" in body
+
+
+def test_only_the_terminal_tab_gives_the_panel_a_height(client: TestClient) -> None:
+    terminal = client.get(f"/runs/{STARTED}/terminal", headers=HX).text
+    overview = client.get(f"/runs/{STARTED}", headers=HX).text
+
+    assert "panel--terminal" in terminal
+    assert "panel--terminal" not in overview
 
 
 def test_a_pending_run_has_not_started_its_terminal(client: TestClient) -> None:
@@ -62,7 +71,7 @@ def test_the_log_downloads_through_the_api(client: TestClient) -> None:
 def test_the_stream_relays_what_the_api_sends(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    async def attach(run_id: str) -> AsyncIterator[bytes]:
+    async def attach(run_id: str, outbox: "asyncio.Queue[str]") -> AsyncIterator[bytes]:
         yield f"{run_id}\r\n".encode()
         yield CONSOLE
 
@@ -80,7 +89,7 @@ def test_the_stream_relays_what_the_api_sends(
 def test_a_refused_attach_closes_the_stream_with_the_reason(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    async def attach(run_id: str) -> AsyncIterator[bytes]:
+    async def attach(run_id: str, outbox: "asyncio.Queue[str]") -> AsyncIterator[bytes]:
         raise ApiError(f"the api refused /runs/{run_id}/attach")
         yield b""
 

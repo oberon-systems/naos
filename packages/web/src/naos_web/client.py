@@ -10,6 +10,11 @@ from httpx_ws import AsyncWebSocketSession, HTTPXWSException, WebSocketDisconnec
 Row = dict[str, Any]
 
 
+async def _send(ws: AsyncWebSocketSession, outbox: "asyncio.Queue[str]") -> None:
+    while True:
+        await ws.send_text(await outbox.get())
+
+
 class ApiError(Exception):
     """The api refused or never answered, so the page says so instead of inventing data."""
 
@@ -127,12 +132,23 @@ class ApiClient:
         return (await self._request("GET", f"/runs/{run_id}/console")).content
 
     # The api ends the stream once the run is over; a refused attach is an ApiError.
-    async def attach(self, run_id: str) -> AsyncIterator[bytes]:
+    # Console output comes down as bytes, the size the viewer asked for goes up
+    # and its answer comes back down as text.
+    async def attach(
+        self, run_id: str, outbox: "asyncio.Queue[str] | None" = None
+    ) -> AsyncIterator[bytes | str]:
         path = f"/runs/{run_id}/attach"
         try:
             async with aconnect_ws(path, self._http, session_class=AsyncWebSocketSession) as ws:
-                while True:
-                    yield await ws.receive_bytes()
+                sender = asyncio.create_task(_send(ws, outbox)) if outbox is not None else None
+                try:
+                    while True:
+                        frame = getattr(await ws.receive(), "data", None)
+                        if isinstance(frame, (bytes, str)):
+                            yield frame
+                finally:
+                    if sender is not None:
+                        sender.cancel()
         except WebSocketDisconnect:
             return
         except (HTTPXWSException, httpx.HTTPError) as err:

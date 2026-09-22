@@ -1,6 +1,6 @@
 {% from "components.html" import dot, pill %}
 <div class="overlay__scrim" hx-get="/overlay/close" hx-target="#overlay"></div>
-<section class="panel panel--run"
+<section class="panel panel--run{{ " panel--terminal" if tab == "terminal" }}"
          role="dialog"
          aria-label="Run #{{ run.seq }}">
     <header class="panel__header run__header">
