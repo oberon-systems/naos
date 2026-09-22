@@ -23,8 +23,11 @@ install -m 0644 "$files/gemini/settings.json" /etc/gemini-cli/settings.json
 
 install -m 0755 "$files/naos-session" /etc/init.d/naos-session
 install -m 0755 "$files/naos-mcp" /usr/local/bin/naos-mcp
+install -m 0755 "$files/naos-resize" /etc/init.d/naos-resize
+install -m 0755 "$files/naos-resize.sh" /usr/local/bin/naos-resize
 install -m 0644 "$files/naos-console.sh" /etc/profile.d/naos-console.sh
 rc-update add naos-session default
+rc-update add naos-resize default
 
 # The agents keep their state in these directories, so they stay naos-owned;
 # only the shipped skill and instructions inside them belong to root.

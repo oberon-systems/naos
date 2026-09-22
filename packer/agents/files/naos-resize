@@ -1,0 +1,17 @@
+#!/sbin/openrc-run
+# shellcheck shell=sh
+# shellcheck disable=SC2034  # openrc reads $description itself
+#
+# The serial console negotiates no size, so the runner sends the viewer's grid
+# over the naos.ctl port and this applies it to ttyS0. tmux follows the winsize.
+
+description="Follow the size the console viewer asks for"
+
+command=/usr/local/bin/naos-resize
+command_background=true
+pidfile=/run/naos-resize.pid
+
+depend() {
+    need localmount
+    after naos-session
+}
