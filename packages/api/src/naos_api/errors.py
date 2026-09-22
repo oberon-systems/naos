@@ -44,3 +44,7 @@ class ProfileBusyError(DomainError):
 
 class ConsoleFullError(DomainError):
     """The run's console log reached its size limit."""
+
+
+class SizeError(DomainError):
+    """A console size outside what a terminal can be."""

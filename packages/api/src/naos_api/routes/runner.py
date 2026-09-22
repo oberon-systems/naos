@@ -110,6 +110,8 @@ class EventsOut(BaseModel):
 
 class ConsoleOut(BaseModel):
     offset: int
+    cols: int | None = None
+    rows: int | None = None
 
 
 class TokenOut(BaseModel):
@@ -271,7 +273,7 @@ def report_events(body: EventsIn, principal: PrincipalDep, session: SessionDep) 
     return EventsOut(accepted=accepted, refused=refused)
 
 
-@router.post("/{runner_id}/runs/{run_id}/console")
+@router.post("/{runner_id}/runs/{run_id}/console", response_model_exclude_none=True)
 def report_console(
     run_id: str,
     offset: Annotated[int, Query(ge=0)],
@@ -282,4 +284,7 @@ def report_console(
     now: NowDep,
 ) -> ConsoleOut:
     held = consoles.append(session, principal.runner_id, run_id, offset, data, limit, now)
-    return ConsoleOut(offset=held)
+    wanted = consoles.size(session, run_id)
+    if wanted is None:
+        return ConsoleOut(offset=held)
+    return ConsoleOut(offset=held, cols=wanted.cols, rows=wanted.rows)

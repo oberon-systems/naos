@@ -133,6 +133,17 @@ class ConsoleChunk(SQLModel, table=True):
     at: int
 
 
+class ConsoleSize(SQLModel, table=True):
+    __tablename__ = "console_sizes"
+
+    run_id: str = Field(primary_key=True)
+    cols: int
+    rows: int
+    owner: str
+    view: str
+    at: int
+
+
 class Image(SQLModel, table=True):
     __tablename__ = "images"
 

@@ -3,9 +3,9 @@ from dataclasses import dataclass
 from sqlmodel import Session, col, func, select
 
 from naos_api import audit
-from naos_api.errors import ConsoleFullError, LeaseError
+from naos_api.errors import ConsoleFullError, LeaseError, SizeError
 from naos_api.lifecycle import RunStatus
-from naos_api.models import ConsoleChunk, Lease, Run
+from naos_api.models import ConsoleChunk, ConsoleSize, Lease, Run
 from naos_api.runs import get_run
 
 LIVE = frozenset({RunStatus.PENDING, RunStatus.STARTING, RunStatus.STARTED, RunStatus.STOPPING})
@@ -61,6 +61,55 @@ def tail(session: Session, run_id: str, after: int) -> Tail:
     data = read(session, run_id, after)
     status = get_run(session, run_id).status
     return Tail(data=data, done=not data and status not in LIVE)
+
+
+# The serial console carries no resize signal, so the viewer's grid travels
+# to the runner in the reply to the next console report.
+COLS = range(20, 501)
+ROWS = range(5, 201)
+# The guest has one size, so one viewer holds it. A detached window outranks a
+# panel, and the claim ages out in case a socket dies without saying goodbye.
+CLAIM_SECONDS = 15
+RANK = {"panel": 1, "window": 2}
+
+
+def resize(
+    session: Session, run_id: str, cols: int, rows: int, owner: str, view: str, now: int
+) -> ConsoleSize:
+    get_run(session, run_id)
+    if cols not in COLS or rows not in ROWS:
+        raise SizeError(f"a console of {cols}x{rows} is out of range")
+    if view not in RANK:
+        raise SizeError(f"{view} is not a kind of viewer")
+    size = session.get(ConsoleSize, run_id)
+    if size is None:
+        size = ConsoleSize(run_id=run_id, cols=cols, rows=rows, owner=owner, view=view, at=now)
+    elif (
+        size.owner == owner
+        or not size.owner
+        or now - size.at > CLAIM_SECONDS
+        or RANK[view] > RANK.get(size.view, 0)
+    ):
+        size.cols, size.rows, size.owner, size.view, size.at = cols, rows, owner, view, now
+    else:
+        return size
+    session.add(size)
+    session.commit()
+    session.refresh(size)
+    return size
+
+
+def release(session: Session, run_id: str, owner: str) -> None:
+    size = session.get(ConsoleSize, run_id)
+    if size is None or size.owner != owner:
+        return
+    size.owner, size.at = "", 0
+    session.add(size)
+    session.commit()
+
+
+def size(session: Session, run_id: str) -> ConsoleSize | None:
+    return session.get(ConsoleSize, run_id)
 
 
 def attached(session: Session, run_id: str) -> None:

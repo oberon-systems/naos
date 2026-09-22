@@ -1,6 +1,9 @@
 import asyncio
+import json
+import time
 from collections.abc import Callable
 from functools import partial
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, WebSocketException, status
 from sqlmodel import Session
@@ -8,7 +11,7 @@ from sqlmodel import Session
 from naos_api import consoles
 from naos_api.auth import require_operator_connection
 from naos_api.db import Database
-from naos_api.errors import NotFoundError
+from naos_api.errors import DomainError, NotFoundError
 
 POLL_SECONDS = 0.5
 FRAME_BYTES = 32 * 1024
@@ -24,9 +27,33 @@ async def _in_session[T](db: Database, call: Callable[[Session], T]) -> T:
     return await asyncio.to_thread(run)
 
 
-async def _until_disconnect(websocket: WebSocket) -> None:
-    while (await websocket.receive())["type"] != "websocket.disconnect":
-        pass
+async def _until_disconnect(websocket: WebSocket, db: Database, run_id: str, owner: str) -> None:
+    while (message := await websocket.receive())["type"] != "websocket.disconnect":
+        # the only thing a viewer says is how big its grid is
+        try:
+            wanted = json.loads(message.get("text") or "")
+            cols, rows = int(wanted["cols"]), int(wanted["rows"])
+            view = str(wanted["view"])
+        except (TypeError, ValueError, KeyError):
+            continue
+        try:
+            size = await _in_session(
+                db,
+                partial(
+                    consoles.resize,
+                    run_id=run_id,
+                    cols=cols,
+                    rows=rows,
+                    owner=owner,
+                    view=view,
+                    now=int(time.time()),
+                ),
+            )
+        except DomainError:
+            continue
+        await websocket.send_text(
+            json.dumps({"driving": size.owner == owner, "cols": size.cols, "rows": size.rows})
+        )
 
 
 @router.websocket("/runs/{run_id}/attach")
@@ -37,7 +64,8 @@ async def attach(websocket: WebSocket, run_id: str) -> None:
     except NotFoundError as err:
         raise WebSocketException(status.WS_1008_POLICY_VIOLATION, str(err)) from err
     await websocket.accept()
-    listener = asyncio.create_task(_until_disconnect(websocket))
+    owner = uuid4().hex
+    listener = asyncio.create_task(_until_disconnect(websocket, db, run_id, owner))
     offset = 0
     try:
         while not listener.done():
@@ -55,3 +83,5 @@ async def attach(websocket: WebSocket, run_id: str) -> None:
         return
     finally:
         listener.cancel()
+        # the next viewer takes the size over at once, not after the claim ages
+        await _in_session(db, partial(consoles.release, run_id=run_id, owner=owner))
