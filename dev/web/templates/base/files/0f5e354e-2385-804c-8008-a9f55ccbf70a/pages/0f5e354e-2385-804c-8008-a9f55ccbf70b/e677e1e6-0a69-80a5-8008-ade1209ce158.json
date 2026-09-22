@@ -1,0 +1,107 @@
+{
+  "id": "e677e1e6-0a69-80a5-8008-ade1209ce158",
+  "name": "Card New run",
+  "type": "frame",
+  "x": 2144,
+  "y": 1848,
+  "width": 432,
+  "height": 175.99999999999955,
+  "rotation": 0,
+  "selrect": {
+    "x": 2144,
+    "y": 1848,
+    "width": 432,
+    "height": 175.99999999999955,
+    "x1": 2144,
+    "y1": 1848,
+    "x2": 2576,
+    "y2": 2023.9999999999995
+  },
+  "points": [
+    {
+      "x": 2144,
+      "y": 1848
+    },
+    {
+      "x": 2576,
+      "y": 1848
+    },
+    {
+      "x": 2576,
+      "y": 2023.9999999999995
+    },
+    {
+      "x": 2144,
+      "y": 2023.9999999999995
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "e677e1e6-0a69-80a5-8008-ade1204f3889",
+  "frameId": "e677e1e6-0a69-80a5-8008-ade1204f3889",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 10,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "auto",
+  "r3": 10,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 10,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [
+    {
+      "strokeColor": "#e4e7ec",
+      "strokeOpacity": 1,
+      "strokeAlignment": "inner",
+      "strokeWidth": 1
+    }
+  ],
+  "proportion": 1,
+  "r4": 10,
+  "fills": [
+    {
+      "fillColor": "#ffffff",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "e677e1e6-0a69-80a5-8008-ade120cc426c",
+    "e677e1e6-0a69-80a5-8008-ade120b17e60"
+  ]
+}

@@ -92,8 +92,8 @@
       "id": "134d8812-75f5-801a-8008-ac674d2ebe2b",
       "style": "drop-shadow",
       "color": {
-        "color": "#101828",
-        "opacity": 0.08
+        "opacity": 0.08,
+        "color": "#101828"
       },
       "offsetX": 0,
       "offsetY": 1,
