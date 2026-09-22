@@ -89,7 +89,6 @@
     const scope = element.closest(".run__body, .window") || document;
     const follow = scope.querySelector("[data-follow]");
     const state = scope.querySelector("[data-terminal-state]");
-    const note = scope.querySelector("[data-terminal-size]");
     let following = true;
     follow?.addEventListener("click", () => {
       following = !following;
@@ -117,9 +116,6 @@
           squeeze();
         } else if (!held) {
           refit();
-        }
-        if (note) {
-          note.textContent = driving ? "" : "the detached window sets the size";
         }
         return;
       }
