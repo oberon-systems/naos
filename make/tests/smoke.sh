@@ -370,7 +370,7 @@ check_run_detail() {
     curl -fsS "$web/runs/$run" | "$VENV/bin/python" -c '
 import sys
 body = sys.stdin.read()
-wanted = ["Run #1</h2>", f">{sys.argv[1]}</span>", "1 bound", "Lease fencing", "Stop run</button>"]
+wanted = ["Run #1</h2>", f">{sys.argv[1]}</span>", "1 bound", "Lease fencing", "Stop run</a>"]
 missing = [text for text in wanted if text not in body]
 if missing:
     sys.exit(f"the run overlay is missing {missing}")
@@ -378,6 +378,14 @@ for value in sys.argv[2:]:
     if value in body:
         sys.exit("the run overlay carries a credential")
 ' "$1" "$secret" "$operator" "Bearer"
+}
+
+# Both actions ask in a popup of their own before anything is posted.
+check_confirms() {
+    curl -fsS "$web/runs/$run/stop" | grep -qF "Are you sure you want to stop $run?" ||
+        fail "the stop confirm does not ask"
+    curl -fsS "$web/runs/$run/rerun" | grep -qF "A new run will be created with these options:" ||
+        fail "the rerun confirm does not list what the new run gets"
 }
 
 # Stop and rerun go through the web as a browser without htmx posts them.
@@ -616,6 +624,7 @@ check_page STARTED
 check_page_filters active
 check_profile_locked
 check_run_detail STARTED
+check_confirms
 echo "editing the workspace and calling the gates from the console..."
 guest \
     "cd /naos/alpha" \
@@ -671,7 +680,7 @@ echo "checking the audit timeline of the run..."
 wait_for 60 audited
 check_secrets
 echo "rerunning the run from its overlay, then stopping the copy..."
-rerun_key="$(curl -fsS "$web/runs/$run" | sed -n 's/.*name="key" value="\([0-9a-f]*\)".*/\1/p')"
+rerun_key="$(curl -fsS "$web/runs/$run/rerun" | sed -n 's/.*name="key" value="\([0-9a-f]*\)".*/\1/p')"
 copy="$(web_post "$run" rerun "$rerun_key")"
 [ "$(web_post "$run" rerun "$rerun_key")" = "$copy" ] || fail "one rerun key made two runs"
 case "$copy" in "$web/runs/run_"*) ;; *) fail "rerun did not open a new run" ;; esac
