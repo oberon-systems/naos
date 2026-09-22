@@ -51,13 +51,17 @@ body {
 /* top bar */
 
 .topbar {
+  height: 56px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar__inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 56px;
+  height: 100%;
   padding: 0 24px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
 }
 
 .topbar__brand {
@@ -103,11 +107,17 @@ body {
 
 /* shell */
 
+.topbar__inner,
+.content {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
 .content {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-width: 1440px;
   padding: 24px;
 }
 
