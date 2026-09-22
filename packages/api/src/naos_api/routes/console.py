@@ -70,10 +70,10 @@ async def attach(websocket: WebSocket, run_id: str) -> None:
     try:
         while not listener.done():
             tail = await _in_session(db, partial(consoles.tail, run_id=run_id, after=offset))
-            if tail.data:
+            if tail.end > offset:
                 for start in range(0, len(tail.data), FRAME_BYTES):
                     await websocket.send_bytes(tail.data[start : start + FRAME_BYTES])
-                offset += len(tail.data)
+                offset = tail.end
                 continue
             if tail.done:
                 await websocket.close()

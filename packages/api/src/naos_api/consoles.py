@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 
 from sqlmodel import Session, col, func, select
@@ -15,7 +16,26 @@ READ_CHUNKS = 256
 @dataclass(frozen=True)
 class Tail:
     data: bytes
+    end: int
     done: bool
+
+
+# An OSC string, a CSI sequence, whatever other escape is left, then the control
+# bytes a terminal reads and a reader cannot.
+ESCAPES = re.compile(
+    rb"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)"
+    rb"|\x1b\[[0-?]*[ -/]*[@-~]"
+    rb"|\x1b."
+    rb"|[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]"
+)
+
+
+# What a capture says, without the screen it drew: a tmux pane redraws itself
+# once a second while nothing happens, and none of that belongs in a log.
+def clean(data: bytes) -> bytes:
+    text = ESCAPES.sub(b"", data.replace(b"\r\n", b"\n").replace(b"\r", b"\n"))
+    lines = [line.rstrip() for line in text.split(b"\n")]
+    return b"\n".join(line for line in lines if line)
 
 
 def held(session: Session, run_id: str) -> int:
@@ -39,28 +59,46 @@ def append(
     if start >= limit:
         raise ConsoleFullError(f"the console log of run {run_id} is full")
     fresh = fresh[: limit - start]
+    # A chunk that drew the screen and said nothing is recorded as read and dropped,
+    # so the runner moves on and the log does not carry it.
+    kept = fresh if clean(fresh) else b""
     session.add(
-        ConsoleChunk(run_id=run_id, offset=start, end=start + len(fresh), data=fresh, at=now)
+        ConsoleChunk(run_id=run_id, offset=start, end=start + len(fresh), data=kept, at=now)
     )
     session.commit()
     return start + len(fresh)
 
 
-def read(session: Session, run_id: str, after: int = 0, chunks: int | None = READ_CHUNKS) -> bytes:
-    get_run(session, run_id)
-    rows = session.exec(
-        select(ConsoleChunk)
-        .where(col(ConsoleChunk.run_id) == run_id, col(ConsoleChunk.end) > after)
-        .order_by(col(ConsoleChunk.offset))
-        .limit(chunks)
-    ).all()
+def _chunks(session: Session, run_id: str, after: int, chunks: int | None) -> list[ConsoleChunk]:
+    return list(
+        session.exec(
+            select(ConsoleChunk)
+            .where(col(ConsoleChunk.run_id) == run_id, col(ConsoleChunk.end) > after)
+            .order_by(col(ConsoleChunk.offset))
+            .limit(chunks)
+        ).all()
+    )
+
+
+def _joined(rows: list[ConsoleChunk], after: int) -> bytes:
     return b"".join(row.data[max(after - row.offset, 0) :] for row in rows)
 
 
+def read(session: Session, run_id: str, after: int = 0, chunks: int | None = READ_CHUNKS) -> bytes:
+    get_run(session, run_id)
+    return _joined(_chunks(session, run_id, after, chunks), after)
+
+
+# The end travels with the tail: a dropped chunk carries no bytes, so a viewer
+# counting what it received would read it again forever.
 def tail(session: Session, run_id: str, after: int) -> Tail:
-    data = read(session, run_id, after)
+    rows = _chunks(session, run_id, after, READ_CHUNKS)
     status = get_run(session, run_id).status
-    return Tail(data=data, done=not data and status not in LIVE)
+    return Tail(
+        data=_joined(rows, after),
+        end=rows[-1].end if rows else after,
+        done=not rows and status not in LIVE,
+    )
 
 
 # The serial console carries no resize signal, so the viewer's grid travels

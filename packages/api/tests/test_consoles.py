@@ -9,13 +9,16 @@ from httpx import Response
 from sqlmodel import Session, select
 from starlette.websockets import WebSocketDisconnect
 
+from naos_api import consoles
 from naos_api.auth import require_operator_connection
-from naos_api.models import AuditEvent
+from naos_api.models import AuditEvent, ConsoleChunk
 from naos_api.settings import Settings
 
 Register = Callable[..., dict[str, str]]
 CreateRun = Callable[[str], str]
 OPERATOR_TOKEN = "operator-alpha-" + "0" * 32
+# what a tmux pane sends once a second while the guest says nothing
+REDRAW = b"\x1b[K\r\n" * 3 + b"\x1b[7m\x1b]0;naos\x07\x1b[m\x0f"
 
 
 def _bearer(runner: dict[str, str]) -> dict[str, str]:
@@ -64,7 +67,7 @@ def test_console_output_is_appended_in_order(
 
     log = client.get(f"/api/v1/runs/{run_id}/console")
     assert log.status_code == 200
-    assert log.content == b"login: naos\r\n"
+    assert log.content == b"login: naos\n"
 
 
 def test_a_quiet_run_ships_an_empty_body(
@@ -90,6 +93,48 @@ def test_a_full_console_log_refuses_more(
 
     assert _ship(client, runner, run_id, 0, b"x" * 5000).json() == {"offset": 4096}
     assert _ship(client, runner, run_id, 4096, b"y").status_code == 413
+
+
+def test_a_chunk_that_only_redraws_the_screen_is_not_stored(
+    client: TestClient, register: Register, create_run: CreateRun, session: Session
+) -> None:
+    runner, run_id = _leased(client, register, create_run)
+    _ship(client, runner, run_id, 0, b"login: naos\r\n")
+
+    reply = _ship(client, runner, run_id, 13, REDRAW)
+
+    assert reply.json() == {"offset": 13 + len(REDRAW)}
+    rows = session.exec(select(ConsoleChunk).where(ConsoleChunk.run_id == run_id)).all()
+    assert [bytes(row.data) for row in rows] == [b"login: naos\r\n", b""]
+    assert client.get(f"/api/v1/runs/{run_id}/console").content == b"login: naos\n"
+
+
+def test_attach_walks_past_a_dropped_chunk(
+    client: TestClient, register: Register, create_run: CreateRun
+) -> None:
+    runner, run_id = _leased(client, register, create_run)
+    _ship(client, runner, run_id, 0, REDRAW)
+    _ship(client, runner, run_id, len(REDRAW), b"ready\r\n")
+    client.post(f"/api/v1/runs/{run_id}/stop")
+    _as_operator(client)
+
+    with client.websocket_connect(f"/api/v1/runs/{run_id}/attach") as websocket:
+        assert websocket.receive_bytes() == b"ready\r\n"
+        with pytest.raises(WebSocketDisconnect):
+            websocket.receive_bytes()
+
+
+def test_the_log_carries_the_text_and_not_the_screen() -> None:
+    capture = (
+        b"\x1b[?1h\x1b=\x1b[H\x1b[J\x1b[K\r\n"
+        b"\x1b[K\r\n"
+        b"naos:/naos/alpha$ printf 'beta\\n' > notes.txt\r\n"
+        b"\x1b[7m[agent] 0:tmux*\x1b[m\x0f\r\n"
+    )
+
+    assert consoles.clean(capture) == (
+        b"naos:/naos/alpha$ printf 'beta\\n' > notes.txt\n[agent] 0:tmux*"
+    )
 
 
 def test_a_foreign_runner_cannot_write_the_console(

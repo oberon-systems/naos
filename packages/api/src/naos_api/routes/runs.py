@@ -171,6 +171,8 @@ def reject_merge(run_id: str, session: SessionDep, now: NowDep) -> MergeRead:
     return MergeRead.of(merges.decide(session, run_id, [], {}, now))
 
 
+# The log is read by people, so it carries the text and not the screen.
 @router.get("/runs/{run_id}/console")
 def console_log(run_id: str, session: SessionDep) -> Response:
-    return Response(consoles.read(session, run_id, chunks=None), media_type="text/plain")
+    text = consoles.clean(consoles.read(session, run_id, chunks=None))
+    return Response(text + b"\n" if text else text, media_type="text/plain")
