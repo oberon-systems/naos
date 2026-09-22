@@ -627,6 +627,23 @@ body {
   overflow: hidden;
 }
 
+.panel--confirm {
+  width: min(480px, calc(100vw - 48px));
+}
+
+.confirm__question {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.confirm__note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--soft);
+}
+
 .panel__header {
   display: flex;
   flex-direction: column;
@@ -750,6 +767,11 @@ body {
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
+}
+
+.button--danger {
+  background: var(--red-text);
+  color: var(--surface);
 }
 
 .stepper {

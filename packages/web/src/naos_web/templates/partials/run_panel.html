@@ -10,22 +10,15 @@
             <span class="table__id">{{ run.id }}</span>
             <div class="run__actions">
                 {% if run.stoppable %}
-                    <form method="post"
-                          action="/runs/{{ run.id }}/stop"
-                          hx-post="/runs/{{ run.id }}/stop"
-                          hx-target="#overlay"
-                          hx-confirm="Stop run #{{ run.seq }}?">
-                        <button class="button button--secondary" type="submit">Stop run</button>
-                    </form>
+                    <a class="button button--secondary"
+                       href="/runs/{{ run.id }}/stop"
+                       hx-get="/runs/{{ run.id }}/stop"
+                       hx-target="#overlay">Stop run</a>
                 {% endif %}
-                <form method="post"
-                      action="/runs/{{ run.id }}/rerun"
-                      hx-post="/runs/{{ run.id }}/rerun"
-                      hx-target="#overlay"
-                      hx-confirm="Start a new run with the spec of #{{ run.seq }}?">
-                    <input type="hidden" name="key" value="{{ rerun_key }}">
-                    <button class="button button--secondary" type="submit">Rerun</button>
-                </form>
+                <a class="button button--secondary"
+                   href="/runs/{{ run.id }}/rerun"
+                   hx-get="/runs/{{ run.id }}/rerun"
+                   hx-target="#overlay">Rerun</a>
                 <a class="panel__close"
                    href="/runs"
                    hx-get="/overlay/close"

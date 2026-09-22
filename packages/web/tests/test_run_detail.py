@@ -107,10 +107,39 @@ def test_only_a_stoppable_run_offers_stop_and_it_asks_first(client: TestClient) 
     started = client.get(f"/runs/{STARTED}", headers=HX).text
     failed = client.get(f"/runs/{FAILED}", headers=HX).text
 
-    assert 'hx-confirm="Stop run #128?"' in started
-    assert 'hx-post="/runs/run_9f21c4/stop"' in started
-    assert "Stop run</button>" not in failed
-    assert "Rerun</button>" in failed
+    assert 'hx-get="/runs/run_9f21c4/stop"' in started
+    assert "hx-confirm" not in started
+    assert 'hx-get="/runs/run_1e0c6b/stop"' not in failed
+    assert "Rerun</a>" in failed
+
+
+def test_the_stop_confirm_asks_before_it_posts(client: TestClient) -> None:
+    body = client.get(f"/runs/{STARTED}/stop", headers=HX).text
+
+    assert "Stop run?</h2>" in body
+    assert f"Are you sure you want to stop {STARTED}?" in body
+    assert f'hx-post="/runs/{STARTED}/stop"' in body
+    assert 'class="button button--danger" type="submit">Yes' in body
+    assert f'href="/runs/{STARTED}"' in body
+    assert ">No</a>" in body
+
+
+def test_the_rerun_confirm_lists_what_the_new_run_gets(client: TestClient) -> None:
+    body = client.get(f"/runs/{STARTED}/rerun", headers=HX).text
+
+    assert "Rerun?</h2>" in body
+    assert f"Are you sure you want to rerun {STARTED}?" in body
+    assert "A new run will be created with these options:" in body
+    facts = _facts(body)
+    assert list(facts) == ["Spec", "Image", "Profile", "Runner", "Timeouts"]
+    assert facts["Runner"] == "any live runner with a free slot"
+
+
+def test_a_confirm_without_htmx_comes_inside_the_shell(client: TestClient) -> None:
+    body = client.get(f"/runs/{STARTED}/stop").text
+
+    assert "<!DOCTYPE html>" in body
+    assert "Stop run?</h2>" in body
 
 
 def test_stopping_goes_through_the_api_and_shows_the_run_again(
@@ -133,7 +162,7 @@ def test_without_htmx_stop_comes_back_to_the_run(client: TestClient) -> None:
 def test_rerun_posts_the_spec_under_the_rendered_key(
     client: TestClient, writes: list[tuple[str, str, dict[str, object], str | None]]
 ) -> None:
-    body = client.get(f"/runs/{STARTED}", headers=HX).text
+    body = client.get(f"/runs/{STARTED}/rerun", headers=HX).text
     key = re.findall(r'name="key" value="(\w+)"', body)[0]
 
     first = client.post(f"/runs/{STARTED}/rerun", data={"key": key}, headers=HX)

@@ -1,0 +1,46 @@
+{% from "components.html" import chip %}
+<div class="overlay__scrim"
+     hx-get="{{ confirm.back }}"
+     hx-target="#overlay"></div>
+<section class="panel panel--confirm"
+         role="dialog"
+         aria-label="{{ confirm.title }}">
+    <header class="panel__header">
+        <div class="panel__title">
+            <h2 class="panel__name">{{ confirm.title }}</h2>
+            {{ chip(run.id, mono=true) }}
+            <a class="panel__close"
+               href="{{ confirm.back }}"
+               hx-get="{{ confirm.back }}"
+               hx-target="#overlay"
+               aria-label="Close">✕</a>
+        </div>
+    </header>
+    <form class="dialog"
+          method="post"
+          action="{{ confirm.action }}"
+          hx-post="{{ confirm.action }}"
+          hx-target="#overlay">
+        {% if confirm.key %}<input type="hidden" name="key" value="{{ confirm.key }}">{% endif %}
+        <div class="dialog__body">
+            <p class="confirm__question">{{ confirm.question }}</p>
+            {% if confirm.note %}<p class="confirm__note">{{ confirm.note }}</p>{% endif %}
+            {% if confirm.lead %}<p class="confirm__note">{{ confirm.lead }}</p>{% endif %}
+            {% if confirm.facts %}
+                {% with title="New run", facts=confirm.facts, link=none %}
+                    {% include "partials/run_facts_card.html" %}
+                {% endwith %}
+            {% endif %}
+        </div>
+        <div class="dialog__footer">
+            <span class="table__secondary">{{ confirm.footer }}</span>
+            <div class="dialog__actions">
+                <a class="button button--secondary"
+                   href="{{ confirm.back }}"
+                   hx-get="{{ confirm.back }}"
+                   hx-target="#overlay">No</a>
+                <button class="button{{ " button--danger" if confirm.danger }}" type="submit">Yes</button>
+            </div>
+        </div>
+    </form>
+</section>

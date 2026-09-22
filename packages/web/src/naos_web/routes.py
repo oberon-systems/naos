@@ -8,7 +8,7 @@ from fastapi import APIRouter, Query, Request, WebSocket, WebSocketException, st
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from naos_web import new_run, terminal
+from naos_web import confirm, new_run, terminal
 from naos_web.client import ApiClient, ApiError, Choices, Dashboard, Row, RunDetail
 from naos_web.clock import NowDep
 from naos_web.format import ago
@@ -371,7 +371,6 @@ async def _run_panel(request: Request, run_id: str, now: int, tab: Tab) -> HTMLR
         PAGES["runs"],
         template="run_overlay.html" if wants_fragment(request) else "run_overlay_page.html",
         run=_detail_row(detail, now),
-        rerun_key=uuid4().hex,
         tab=tab,
         terminal=terminal_view(request, run_id, detail.run["status"]),
     )
@@ -459,6 +458,34 @@ def _reopen(request: Request, run_id: str) -> Response:
     return RedirectResponse(f"/runs/{run_id}", status_code=303)
 
 
+async def _confirm(request: Request, run_id: str, now: int, ask: str) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        detail = await api.run_detail(run_id)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["runs"], err)
+    row = _detail_row(detail, now)
+    asked = confirm.stop(row) if ask == "stop" else confirm.rerun(row, uuid4().hex)
+    return render(
+        request,
+        PAGES["runs"],
+        template="run_confirm_overlay.html" if wants_fragment(request) else "run_confirm_page.html",
+        run=row,
+        confirm=asked,
+    )
+
+
+@router.get("/runs/{run_id}/stop", response_class=HTMLResponse)
+async def stop_confirm(request: Request, run_id: str, now: NowDep) -> HTMLResponse:
+    return await _confirm(request, run_id, now, "stop")
+
+
+# The key is rendered with the confirm, so a double submit replays onto the same new Run.
+@router.get("/runs/{run_id}/rerun", response_class=HTMLResponse)
+async def rerun_confirm(request: Request, run_id: str, now: NowDep) -> HTMLResponse:
+    return await _confirm(request, run_id, now, "rerun")
+
+
 @router.post("/runs/{run_id}/stop", response_class=HTMLResponse)
 async def stop_run(request: Request, run_id: str, now: NowDep) -> Response:
     api: ApiClient = request.app.state.api
@@ -471,7 +498,6 @@ async def stop_run(request: Request, run_id: str, now: NowDep) -> Response:
     return _reopen(request, run_id)
 
 
-# The key is rendered with the overlay, so a double submit replays onto the same new Run.
 @router.post("/runs/{run_id}/rerun", response_class=HTMLResponse)
 async def rerun(request: Request, run_id: str) -> Response:
     api: ApiClient = request.app.state.api
