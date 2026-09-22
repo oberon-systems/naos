@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use crate::libs::api::Api;
+use crate::libs::console::control;
 use crate::libs::credentials::{CredentialStore, Credentials};
 use crate::libs::error::AgentError;
 use crate::libs::qemu::VmPaths;
@@ -20,11 +21,18 @@ pub enum Shipped {
     Stopped,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Report {
+    pub shipped: Shipped,
+    pub size: Option<(u16, u16)>,
+}
+
 pub struct Shipper<A> {
     api: A,
     store: CredentialStore,
     vm_dir: PathBuf,
     shipped: HashMap<String, Shipped>,
+    sized: HashMap<String, (u16, u16)>,
 }
 
 impl<A: Api> Shipper<A> {
@@ -34,6 +42,7 @@ impl<A: Api> Shipper<A> {
             store,
             vm_dir,
             shipped: HashMap::new(),
+            sized: HashMap::new(),
         }
     }
 
@@ -47,35 +56,61 @@ impl<A: Api> Shipper<A> {
             .collect();
         self.shipped
             .retain(|vm_id, _| running.iter().any(|vm| &vm.vm_id == vm_id));
+        self.sized
+            .retain(|vm_id, _| running.iter().any(|vm| &vm.vm_id == vm_id));
         for vm in running {
-            let log = VmPaths::new(self.vm_dir.join(&vm.vm_id)).console_log();
+            let paths = VmPaths::new(self.vm_dir.join(&vm.vm_id));
             let state = self
                 .shipped
                 .get(&vm.vm_id)
                 .copied()
                 .unwrap_or(Shipped::At(0));
-            let next = ship(&self.api, &credentials, &vm.run_id, &log, state).await;
-            self.shipped.insert(vm.vm_id, next);
+            let report = ship(
+                &self.api,
+                &credentials,
+                &vm.run_id,
+                &paths.console_log(),
+                state,
+            )
+            .await;
+            if let Some(size) = report.size {
+                if self.sized.get(&vm.vm_id) != Some(&size) {
+                    match control::resize(&paths.control(), size.0, size.1) {
+                        Ok(()) => {
+                            self.sized.insert(vm.vm_id.clone(), size);
+                        }
+                        Err(err) => {
+                            tracing::debug!(error = %err, run_id = vm.run_id, "console stays its size")
+                        }
+                    }
+                }
+            }
+            self.shipped.insert(vm.vm_id, report.shipped);
         }
         Ok(())
     }
 }
 
-/// Sends what the API does not hold yet; its reply moves the offset, backwards too after a restart.
+/// Sends what the API does not hold yet; its reply moves the offset, backwards
+/// too after a restart, and carries the size the viewer wants. A quiet VM still
+/// reports once a tick, because the reply is the only way that size arrives.
 pub async fn ship<A: Api>(
     api: &A,
     credentials: &Credentials,
     run_id: &str,
     log: &Path,
     state: Shipped,
-) -> Shipped {
+) -> Report {
     let Shipped::At(mut offset) = state else {
-        return state;
+        return Report {
+            shipped: state,
+            size: None,
+        };
     };
+    let mut size = None;
     let mut buffer = vec![0u8; CHUNK];
     for _ in 0..CHUNKS_PER_TICK {
         let read = match read_at(log, offset, &mut buffer) {
-            Ok(0) => break,
             Ok(read) => read,
             Err(err) => {
                 tracing::warn!(error = %err, run_id, "cannot read the console log");
@@ -86,15 +121,23 @@ pub async fn ship<A: Api>(
             .report_console(credentials, run_id, offset, &buffer[..read])
             .await
         {
-            Ok(reply) if reply.offset == offset => break,
-            Ok(reply) => offset = reply.offset,
+            Ok(reply) => {
+                size = reply.cols.zip(reply.rows);
+                if reply.offset == offset {
+                    break;
+                }
+                offset = reply.offset;
+            }
             Err(AgentError::Api { status: 413, .. }) => {
                 tracing::warn!(
                     run_id,
                     offset,
                     "the API holds no more console output for this run"
                 );
-                return Shipped::Stopped;
+                return Report {
+                    shipped: Shipped::Stopped,
+                    size,
+                };
             }
             Err(AgentError::Conflict(detail)) => {
                 tracing::warn!(
@@ -102,15 +145,24 @@ pub async fn ship<A: Api>(
                     detail,
                     "the API refused console output for this run"
                 );
-                return Shipped::Stopped;
+                return Report {
+                    shipped: Shipped::Stopped,
+                    size,
+                };
             }
             Err(err) => {
                 tracing::debug!(error = %err, run_id, "console output stays unshipped");
                 break;
             }
         }
+        if read == 0 {
+            break;
+        }
     }
-    Shipped::At(offset)
+    Report {
+        shipped: Shipped::At(offset),
+        size,
+    }
 }
 
 fn read_at(log: &Path, offset: u64, buffer: &mut [u8]) -> io::Result<usize> {
@@ -141,9 +193,9 @@ mod tests {
         let (_dir, path) = log(&content);
         let api = FakeApi::default();
 
-        let state = ship(&api, &api.credentials(), "run_a", &path, Shipped::At(0)).await;
+        let report = ship(&api, &api.credentials(), "run_a", &path, Shipped::At(0)).await;
 
-        assert_eq!(state, Shipped::At(content.len() as u64));
+        assert_eq!(report.shipped, Shipped::At(content.len() as u64));
         assert_eq!(api.console("run_a"), content);
     }
 
@@ -153,9 +205,9 @@ mod tests {
         let api = FakeApi::default();
         api.hold_console("run_a", b"login: ");
 
-        let state = ship(&api, &api.credentials(), "run_a", &path, Shipped::At(0)).await;
+        let report = ship(&api, &api.credentials(), "run_a", &path, Shipped::At(0)).await;
 
-        assert_eq!(state, Shipped::At(15));
+        assert_eq!(report.shipped, Shipped::At(15));
         assert_eq!(api.console("run_a"), b"login: naos\r\n$ ");
     }
 
@@ -164,9 +216,9 @@ mod tests {
         let (_dir, path) = log(b"login: naos\r\n");
         let api = FakeApi::default();
 
-        let state = ship(&api, &api.credentials(), "run_a", &path, Shipped::At(7)).await;
+        let report = ship(&api, &api.credentials(), "run_a", &path, Shipped::At(7)).await;
 
-        assert_eq!(state, Shipped::At(13));
+        assert_eq!(report.shipped, Shipped::At(13));
         assert_eq!(api.console("run_a"), b"login: naos\r\n");
     }
 
@@ -176,10 +228,33 @@ mod tests {
         let api = FakeApi::default();
         api.limit_console(5);
 
-        let state = ship(&api, &api.credentials(), "run_a", &path, Shipped::At(0)).await;
+        let report = ship(&api, &api.credentials(), "run_a", &path, Shipped::At(0)).await;
 
-        assert_eq!(state, Shipped::Stopped);
+        assert_eq!(report.shipped, Shipped::Stopped);
         assert_eq!(api.console("run_a"), b"login");
+    }
+
+    #[tokio::test]
+    async fn the_size_the_viewer_wants_rides_back_on_the_reply() {
+        let (_dir, path) = log(b"login: naos\r\n");
+        let api = FakeApi::default();
+        api.want_console_size(190, 44);
+
+        let report = ship(&api, &api.credentials(), "run_a", &path, Shipped::At(0)).await;
+
+        assert_eq!(report.size, Some((190, 44)));
+    }
+
+    #[tokio::test]
+    async fn a_quiet_vm_still_hears_the_size() {
+        let (_dir, path) = log(b"");
+        let api = FakeApi::default();
+        api.want_console_size(120, 30);
+
+        let report = ship(&api, &api.credentials(), "run_a", &path, Shipped::At(0)).await;
+
+        assert_eq!(report.shipped, Shipped::At(0));
+        assert_eq!(report.size, Some((120, 30)));
     }
 
     #[tokio::test]
@@ -187,7 +262,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let api = FakeApi::default();
 
-        let state = ship(
+        let report = ship(
             &api,
             &api.credentials(),
             "run_a",
@@ -196,7 +271,7 @@ mod tests {
         )
         .await;
 
-        assert_eq!(state, Shipped::At(0));
+        assert_eq!(report.shipped, Shipped::At(0));
         assert!(api.console("run_a").is_empty());
     }
 }

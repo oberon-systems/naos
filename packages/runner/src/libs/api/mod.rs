@@ -162,6 +162,10 @@ pub struct EventReport<'a> {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ConsoleReply {
     pub offset: u64,
+    #[serde(default)]
+    pub cols: Option<u16>,
+    #[serde(default)]
+    pub rows: Option<u16>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

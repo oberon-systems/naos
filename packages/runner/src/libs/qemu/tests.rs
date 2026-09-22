@@ -109,7 +109,7 @@ fn base_is_read_only_under_a_writable_overlay() {
 }
 
 #[test]
-fn the_guest_gets_exactly_one_disk_and_one_mcp_port() {
+fn the_guest_gets_exactly_one_disk_and_the_two_ports_it_needs() {
     let args = args();
 
     assert_eq!(
@@ -118,10 +118,15 @@ fn the_guest_gets_exactly_one_disk_and_one_mcp_port() {
             "virtio-blk-pci,drive=disk",
             "virtio-serial-pci,id=naos-serial",
             "virtserialport,bus=naos-serial.0,chardev=mcp,name=naos.mcp",
+            "virtserialport,bus=naos-serial.0,chardev=control,name=naos.ctl",
         ]
     );
-    assert!(value_of(&args, "-chardev")
+    let chardevs = value_of(&args, "-chardev");
+    assert!(chardevs
         .contains(&format!("socket,id=mcp,path={VM_DIR}/mcp.sock,server=on,wait=off").as_str()));
+    assert!(chardevs.contains(
+        &format!("socket,id=control,path={VM_DIR}/control.sock,server=on,wait=off").as_str()
+    ));
 }
 
 #[test]

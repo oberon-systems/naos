@@ -13,6 +13,7 @@ pub const QMP_TIMEOUT: Duration = Duration::from_secs(10);
 pub const PROCESS_PREFIX: &str = "naos-";
 pub const SESSION_FW_CFG: &str = "opt/naos/session";
 pub const MCP_PORT: &str = "naos.mcp";
+pub const CONTROL_PORT: &str = "naos.ctl";
 pub const WORKSPACE_TAG: &str = "naos-workspace";
 pub const UPPER_SERIAL: &str = "naos-upper";
 const SANDBOX: &str = "on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny";
@@ -60,6 +61,10 @@ impl VmPaths {
 
     pub fn mcp(&self) -> PathBuf {
         self.dir.join("mcp.sock")
+    }
+
+    pub fn control(&self) -> PathBuf {
+        self.dir.join("control.sock")
     }
 
     pub fn boot_log(&self) -> PathBuf {
@@ -158,6 +163,13 @@ pub fn argv(
         format!("socket,id=mcp,path={},server=on,wait=off", text(paths.mcp())),
         "-device".into(),
         format!("virtserialport,bus=naos-serial.0,chardev=mcp,name={MCP_PORT}"),
+        "-chardev".into(),
+        format!(
+            "socket,id=control,path={},server=on,wait=off",
+            text(paths.control())
+        ),
+        "-device".into(),
+        format!("virtserialport,bus=naos-serial.0,chardev=control,name={CONTROL_PORT}"),
         "-chardev".into(),
         format!("file,id=boot,path={}", text(paths.boot_log())),
         "-serial".into(),

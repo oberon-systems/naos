@@ -139,6 +139,7 @@ pub struct FakeApi {
     events_down: AtomicBool,
     consoles: Mutex<BTreeMap<String, Vec<u8>>>,
     console_limit: Mutex<Option<usize>>,
+    console_size: Mutex<Option<(u16, u16)>>,
     pub registrations: AtomicUsize,
 }
 
@@ -201,6 +202,10 @@ impl FakeApi {
 
     pub fn limit_console(&self, bytes: usize) {
         *lock(&self.console_limit) = Some(bytes);
+    }
+
+    pub fn want_console_size(&self, cols: u16, rows: u16) {
+        *lock(&self.console_size) = Some((cols, rows));
     }
 
     pub fn capacities(&self) -> Vec<u32> {
@@ -324,8 +329,11 @@ impl Api for FakeApi {
             let room = limit - held.len();
             held.extend_from_slice(&fresh[..fresh.len().min(room)]);
         }
+        let wanted = *lock(&self.console_size);
         Ok(ConsoleReply {
             offset: held.len() as u64,
+            cols: wanted.map(|(cols, _)| cols),
+            rows: wanted.map(|(_, rows)| rows),
         })
     }
 }
