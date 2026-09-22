@@ -1,16 +1,12 @@
-{% from "components.html" import chip %}
+{% from "components.html" import chip, closer, scrim with context %}
 {% set actions = {1: '/runs/new/configure', 2: '/runs/new/review', 3: '/runs/new'} %}
-<div class="overlay__scrim" hx-get="/overlay/close" hx-target="#overlay"></div>
+{{ scrim("/runs") }}
 <section class="panel panel--dialog" role="dialog" aria-label="New run">
     <header class="panel__header">
         <div class="panel__title">
             <h2 class="panel__name">New run</h2>
             {{ chip("PENDING on create", mono=true) }}
-            <a class="panel__close"
-               href="/runs"
-               hx-get="/overlay/close"
-               hx-target="#overlay"
-               aria-label="Close">✕</a>
+            {{ closer("/runs") }}
         </div>
         <ol class="stepper">
             {% for label in steps %}

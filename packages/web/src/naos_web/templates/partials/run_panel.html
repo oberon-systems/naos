@@ -1,5 +1,5 @@
-{% from "components.html" import dot, pill %}
-<div class="overlay__scrim" hx-get="/overlay/close" hx-target="#overlay"></div>
+{% from "components.html" import closer, dot, pill, scrim with context %}
+{{ scrim("/runs") }}
 <section class="panel panel--run{{ " panel--terminal" if tab == "terminal" }}"
          role="dialog"
          aria-label="Run #{{ run.seq }}">
@@ -19,11 +19,7 @@
                    href="/runs/{{ run.id }}/rerun"
                    hx-get="/runs/{{ run.id }}/rerun"
                    hx-target="#overlay">Rerun</a>
-                <a class="panel__close"
-                   href="/runs"
-                   hx-get="/overlay/close"
-                   hx-target="#overlay"
-                   aria-label="Close">✕</a>
+                {{ closer("/runs") }}
             </div>
         </div>
         <p class="panel__facts">

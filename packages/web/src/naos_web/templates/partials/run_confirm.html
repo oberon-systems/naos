@@ -1,7 +1,5 @@
-{% from "components.html" import chip %}
-<div class="overlay__scrim"
-     hx-get="{{ confirm.back }}"
-     hx-target="#overlay"></div>
+{% from "components.html" import chip, closer, scrim with context %}
+{{ scrim(confirm.back, get=confirm.back) }}
 <section class="panel panel--confirm"
          role="dialog"
          aria-label="{{ confirm.title }}">
@@ -9,11 +7,7 @@
         <div class="panel__title">
             <h2 class="panel__name">{{ confirm.title }}</h2>
             {{ chip(run.id, mono=true) }}
-            <a class="panel__close"
-               href="{{ confirm.back }}"
-               hx-get="{{ confirm.back }}"
-               hx-target="#overlay"
-               aria-label="Close">✕</a>
+            {{ closer(confirm.back, get=confirm.back) }}
         </div>
     </header>
     <form class="dialog"
@@ -35,10 +29,7 @@
         <div class="dialog__footer">
             <span class="table__secondary">{{ confirm.footer }}</span>
             <div class="dialog__actions">
-                <a class="button button--secondary"
-                   href="{{ confirm.back }}"
-                   hx-get="{{ confirm.back }}"
-                   hx-target="#overlay">No</a>
+                {{ closer(confirm.back, get=confirm.back, label="No", klass="button button--secondary") }}
                 <button class="button{{ " button--danger" if confirm.danger }}" type="submit">Yes</button>
             </div>
         </div>

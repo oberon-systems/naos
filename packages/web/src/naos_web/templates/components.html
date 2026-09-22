@@ -1,3 +1,15 @@
+{% macro scrim(href, get="/overlay/close") -%}
+    <a class="overlay__scrim"
+       href="{{ href }}"
+       {% if not standalone %}hx-get="{{ get }}" hx-target="#overlay"{% endif %}
+       aria-label="Close"></a>
+{%- endmacro %}
+{% macro closer(href, get="/overlay/close", label="✕", klass="panel__close") -%}
+    <a class="{{ klass }}"
+       href="{{ href }}"
+       {% if not standalone %}hx-get="{{ get }}" hx-target="#overlay"{% endif %}
+       aria-label="Close">{{ label }}</a>
+{%- endmacro %}
 {% macro dot(tone="grey", small=false) -%}
     <span class="dot tone-{{ tone }}{{ " dot--sm" if small }}"></span>
 {%- endmacro %}

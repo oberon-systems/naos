@@ -1,5 +1,5 @@
-{% from "components.html" import badge, dot, pill %}
-<div class="overlay__scrim" hx-get="/overlay/close" hx-target="#overlay"></div>
+{% from "components.html" import badge, closer, dot, pill, scrim with context %}
+{{ scrim("/runners") }}
 <section class="panel" role="dialog" aria-label="Runner {{ runner.name }}">
     <header class="panel__header">
         <div class="panel__title">
@@ -7,11 +7,7 @@
             <h2 class="panel__name">{{ runner.name }}</h2>
             {{ pill(runner.state, runner.tone) }}
             <span class="table__id">{{ runner.id }}</span>
-            <button class="panel__close"
-                    type="button"
-                    hx-get="/overlay/close"
-                    hx-target="#overlay"
-                    aria-label="Close">✕</button>
+            {{ closer("/runners") }}
         </div>
         <p class="panel__facts">
             <span>{{ runner.enrolled }}</span><span class="lifecycle__note">·</span><span>{{ runner.slots }}</span>

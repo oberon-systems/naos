@@ -142,6 +142,24 @@ def test_a_confirm_without_htmx_comes_inside_the_shell(client: TestClient) -> No
     assert "Stop run?</h2>" in body
 
 
+def test_a_panel_asked_for_as_a_page_closes_back_to_the_list(client: TestClient) -> None:
+    page = client.get(f"/runs/{STARTED}").text
+    fragment = client.get(f"/runs/{STARTED}", headers=HX).text
+
+    assert 'hx-get="/overlay/close"' in fragment
+    assert 'hx-get="/overlay/close"' not in page
+    assert 'href="/runs"' in page
+
+
+def test_a_confirm_asked_for_as_a_page_closes_back_to_the_run(client: TestClient) -> None:
+    page = client.get(f"/runs/{STARTED}/stop").text
+    fragment = client.get(f"/runs/{STARTED}/stop", headers=HX).text
+
+    assert f'hx-get="/runs/{STARTED}"' in fragment
+    assert f'hx-get="/runs/{STARTED}"' not in page
+    assert f'href="/runs/{STARTED}"' in page
+
+
 def test_stopping_goes_through_the_api_and_shows_the_run_again(
     client: TestClient, writes: list[tuple[str, str, dict[str, object], str | None]]
 ) -> None:

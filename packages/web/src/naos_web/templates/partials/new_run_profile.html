@@ -1,3 +1,4 @@
+{% from "components.html" import closer with context %}
 <input type="hidden" name="key" value="{{ draft.key }}">
 <div class="dialog__body">
     <input class="search dialog__search"
@@ -29,10 +30,7 @@
 <footer class="dialog__footer">
     <span class="table__secondary">Pick one to edit, or create a new one</span>
     <div class="dialog__actions">
-        <a class="button button--secondary"
-           href="/runs"
-           hx-get="/overlay/close"
-           hx-target="#overlay">Cancel</a>
+        {{ closer("/runs", label="Cancel", klass="button button--secondary") }}
         <button class="button" type="submit">Next: configure</button>
     </div>
 </footer>

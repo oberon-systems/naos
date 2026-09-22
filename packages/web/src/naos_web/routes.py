@@ -47,6 +47,7 @@ def render(
             "page": page,
             "summary": summary or Summary(),
             "api_endpoint": request.app.state.api_endpoint,
+            "standalone": not wants_fragment(request),
             **context,
         },
     )
