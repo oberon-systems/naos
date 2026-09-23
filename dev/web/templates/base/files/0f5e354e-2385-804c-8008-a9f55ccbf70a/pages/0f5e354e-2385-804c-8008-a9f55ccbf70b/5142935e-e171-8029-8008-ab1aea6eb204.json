@@ -4,17 +4,17 @@
   "type": "text",
   "x": 1600,
   "y": 248,
-  "width": 454,
+  "width": 130,
   "height": 18,
   "rotation": 0,
   "selrect": {
     "x": 1600,
     "y": 248,
-    "width": 454,
+    "width": 130,
     "height": 18,
     "x1": 1600,
     "y1": 248,
-    "x2": 2054,
+    "x2": 1730,
     "y2": 266
   },
   "points": [
@@ -23,11 +23,11 @@
       "y": 248
     },
     {
-      "x": 2054,
+      "x": 1730,
       "y": 248
     },
     {
-      "x": 2054,
+      "x": 1730,
       "y": 266
     },
     {
@@ -87,7 +87,7 @@
                   }
                 ],
                 "fontFamily": "JetBrains Mono",
-                "text": "attached to runner alpha (rnr_8c1f42) \u00b7 slot 1 of 2 \u00b7 read-only"
+                "text": "Welcome to Alpine!"
               }
             ],
             "typographyRefId": null,
@@ -119,29 +119,29 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 264.7272746562958,
+      "x": 1600,
+      "y": 264.80000191926956,
+      "width": 129.6125030517578,
+      "height": 16.000001907348633,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 129.6125030517578,
+      "y2": 16.80000191926956,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "400",
-      "y1": 0.7272727489471436,
-      "width": 453.602294921875,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 1600,
-      "x1": 0,
-      "y2": 16.727274656295776,
       "fills": [
         {
           "fillColor": "#64748b",
           "fillOpacity": 1
         }
       ],
-      "x2": 453.602294921875,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
-      "height": 16.000001907348633,
-      "text": "attached to runner alpha (rnr_8c1f42) \u00b7 slot 1 of 2 \u00b7 read-only"
+      "text": "Welcome to Alpine!"
     }
   ]
 }
