@@ -2,36 +2,36 @@
   "id": "8d7f562b-cae0-80c9-8008-ab1eda30e2fb",
   "name": "Text",
   "type": "text",
-  "x": 1831,
+  "x": 1824.9999999999998,
   "y": 1552,
-  "width": 88,
+  "width": 54,
   "height": 16,
   "rotation": 0,
   "selrect": {
-    "x": 1831,
+    "x": 1824.9999999999998,
     "y": 1552,
-    "width": 88,
+    "width": 54,
     "height": 16,
-    "x1": 1831,
+    "x1": 1824.9999999999998,
     "y1": 1552,
-    "x2": 1919,
+    "x2": 1878.9999999999998,
     "y2": 1568
   },
   "points": [
     {
-      "x": 1831,
+      "x": 1824.9999999999998,
       "y": 1552
     },
     {
-      "x": 1919,
+      "x": 1878.9999999999998,
       "y": 1552
     },
     {
-      "x": 1919,
+      "x": 1878.9999999999998,
       "y": 1568
     },
     {
-      "x": 1831,
+      "x": 1824.9999999999998,
       "y": 1568
     }
   ],
@@ -87,7 +87,7 @@
                   }
                 ],
                 "fontFamily": "Inter Tight",
-                "text": "214 tests collected"
+                "text": "still running"
               }
             ],
             "typographyRefId": null,
@@ -114,34 +114,36 @@
       }
     ]
   },
+  "layoutItemHSizing": "fix",
   "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "fix",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 1566.5454547405243,
+      "x": 1824.9999999999998,
+      "y": 1565.6000002026558,
+      "width": 53.10000228881836,
+      "height": 12.800000190734863,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 53.10000228881836,
+      "y2": 13.600000202655792,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
-      "y1": 0.7272727489471436,
-      "width": 87.68182373046875,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 1831,
-      "x1": 0,
-      "y2": 14.545454740524292,
       "fills": [
         {
           "fillColor": "#64748b",
           "fillOpacity": 1
         }
       ],
-      "x2": 87.68182373046875,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "height": 13.818181991577148,
-      "text": "214 tests collected"
+      "text": "still running"
     }
   ]
 }

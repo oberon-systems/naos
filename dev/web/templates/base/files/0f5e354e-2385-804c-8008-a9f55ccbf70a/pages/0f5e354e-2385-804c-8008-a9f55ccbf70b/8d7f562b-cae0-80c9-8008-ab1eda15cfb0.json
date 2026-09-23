@@ -4,17 +4,17 @@
   "type": "text",
   "x": 1580,
   "y": 1552,
-  "width": 132,
+  "width": 125.99999999999977,
   "height": 16,
   "rotation": 0,
   "selrect": {
     "x": 1580,
     "y": 1552,
-    "width": 132,
+    "width": 125.99999999999977,
     "height": 16,
     "x1": 1580,
     "y1": 1552,
-    "x2": 1712,
+    "x2": 1705.9999999999998,
     "y2": 1568
   },
   "points": [
@@ -23,11 +23,11 @@
       "y": 1552
     },
     {
-      "x": 1712,
+      "x": 1705.9999999999998,
       "y": 1552
     },
     {
-      "x": 1712,
+      "x": 1705.9999999999998,
       "y": 1568
     },
     {
@@ -87,7 +87,7 @@
                   }
                 ],
                 "fontFamily": "JetBrains Mono",
-                "text": "attached \u00b7 read-only"
+                "text": "attached \u00b7 keyboard"
               }
             ],
             "typographyRefId": null,
@@ -114,34 +114,36 @@
       }
     ]
   },
+  "layoutItemHSizing": "fix",
   "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "fix",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 1566.5454549789429,
+      "x": 1580,
+      "y": 1566.4000005722046,
+      "width": 125.4124984741211,
+      "height": 14.40000057220459,
+      "x1": 0,
+      "y1": 0,
+      "x2": 125.4124984741211,
+      "y2": 14.40000057220459,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
-      "y1": 0,
-      "width": 131.8636474609375,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 1580,
-      "x1": 0,
-      "y2": 14.545454978942871,
       "fills": [
         {
           "fillColor": "#94a3b8",
           "fillOpacity": 1
         }
       ],
-      "x2": 131.8636474609375,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
-      "height": 14.545454978942871,
-      "text": "attached \u00b7 read-only"
+      "text": "attached \u00b7 keyboard"
     }
   ]
 }

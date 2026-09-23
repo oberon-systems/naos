@@ -78,7 +78,7 @@
   "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
   "layoutItemVSizing": "fix",
   "r3": 0,
-  "layoutJustifyContent": "space-between",
+  "layoutJustifyContent": "end",
   "constraintsV": "top",
   "constraintsH": "left",
   "r1": 0,
@@ -89,7 +89,6 @@
   "r4": 0,
   "fills": [],
   "shapes": [
-    "5142935e-e171-8029-8008-ab1aea42b8cc",
-    "5142935e-e171-8029-8008-ab1ae9edfba9"
+    "5142935e-e171-8029-8008-ab1aea42b8cc"
   ]
 }
