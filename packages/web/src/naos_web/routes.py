@@ -417,14 +417,17 @@ async def run_terminal_log(request: Request, run_id: str) -> Response:
     )
 
 
-async def _until_disconnect(websocket: WebSocket, outbox: "asyncio.Queue[str]") -> None:
+async def _until_disconnect(websocket: WebSocket, outbox: "asyncio.Queue[bytes | str]") -> None:
     while (message := await websocket.receive())["type"] != "websocket.disconnect":
-        if (text := message.get("text")) is not None:
-            outbox.put_nowait(text)
+        frame = message.get("text")
+        if frame is None:
+            frame = message.get("bytes")
+        if frame is not None:
+            outbox.put_nowait(frame)
 
 
 async def _relay(
-    api: ApiClient, websocket: WebSocket, run_id: str, outbox: "asyncio.Queue[str]"
+    api: ApiClient, websocket: WebSocket, run_id: str, outbox: "asyncio.Queue[bytes | str]"
 ) -> None:
     async for frame in api.attach(run_id, outbox):
         if isinstance(frame, str):
@@ -441,7 +444,7 @@ async def run_terminal_stream(websocket: WebSocket, run_id: str) -> None:
     if origin and origin != websocket.headers.get("host"):
         raise WebSocketException(status.WS_1008_POLICY_VIOLATION, "foreign origin")
     await websocket.accept()
-    outbox: asyncio.Queue[str] = asyncio.Queue()
+    outbox: asyncio.Queue[bytes | str] = asyncio.Queue()
     relay = asyncio.create_task(_relay(websocket.app.state.api, websocket, run_id, outbox))
     listener = asyncio.create_task(_until_disconnect(websocket, outbox))
     try:

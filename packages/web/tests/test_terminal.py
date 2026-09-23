@@ -54,7 +54,8 @@ def test_the_detached_window_stands_alone(client: TestClient) -> None:
 
     assert 'class="topbar' not in body
     assert f'href="/runs/{STARTED}/terminal">Back to the run</a>' in body
-    assert "attached \u00b7 read-only" in body
+    assert ">attached</span>" in body
+    assert "<span data-terminal-keys>read-only</span>" in body
     assert f'data-stream="/runs/{STARTED}/terminal/ws"' in body
 
 
@@ -84,6 +85,27 @@ def test_the_stream_relays_what_the_api_sends(
             websocket.receive_bytes()
 
     assert ended.value.code == 1000
+
+
+def test_the_stream_carries_what_the_viewer_types_upstream(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # the stub sends back whatever it is given, so the relay can be read from the page
+    async def attach(run_id: str, outbox: "asyncio.Queue[bytes | str]") -> AsyncIterator[bytes]:
+        yield CONSOLE
+        while True:
+            frame = await outbox.get()
+            yield frame if isinstance(frame, bytes) else frame.encode()
+
+    monkeypatch.setattr(client.app.state.api, "attach", attach)  # type: ignore[attr-defined]
+    grid = '{"cols": 120, "rows": 30, "view": "panel"}'
+
+    with client.websocket_connect(f"/runs/{STARTED}/terminal/ws") as websocket:
+        assert websocket.receive_bytes() == CONSOLE
+        websocket.send_text(grid)
+        assert websocket.receive_bytes() == grid.encode()
+        websocket.send_bytes(b"whoami\r")
+        assert websocket.receive_bytes() == b"whoami\r"
 
 
 def test_a_refused_attach_closes_the_stream_with_the_reason(

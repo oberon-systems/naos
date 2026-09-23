@@ -10,9 +10,14 @@ from httpx_ws import AsyncWebSocketSession, HTTPXWSException, WebSocketDisconnec
 Row = dict[str, Any]
 
 
-async def _send(ws: AsyncWebSocketSession, outbox: "asyncio.Queue[str]") -> None:
+# Text is the grid the viewer asks for, bytes are what it types.
+async def _send(ws: AsyncWebSocketSession, outbox: "asyncio.Queue[bytes | str]") -> None:
     while True:
-        await ws.send_text(await outbox.get())
+        frame = await outbox.get()
+        if isinstance(frame, str):
+            await ws.send_text(frame)
+        else:
+            await ws.send_bytes(frame)
 
 
 class ApiError(Exception):
@@ -135,7 +140,7 @@ class ApiClient:
     # Console output comes down as bytes, the size the viewer asked for goes up
     # and its answer comes back down as text.
     async def attach(
-        self, run_id: str, outbox: "asyncio.Queue[str] | None" = None
+        self, run_id: str, outbox: "asyncio.Queue[bytes | str] | None" = None
     ) -> AsyncIterator[bytes | str]:
         path = f"/runs/{run_id}/attach"
         try:

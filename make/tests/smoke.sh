@@ -549,6 +549,71 @@ if not rows or {row["actor"] for row in rows} != {"operator"}:
 '
 }
 
+# A key pressed in the browser reaches the guest: the page's socket claims the
+# keyboard, types a command, and the guest's own echo comes back down it.
+check_terminal_input() {
+    "$VENV/bin/python" - "$web" "$run" <<'INPUT' || fail "the browser could not type into the run"
+import json
+import re
+import sys
+
+import anyio
+import httpx
+from httpx_ws import aconnect_ws
+
+# The guest prints what the typed line does not hold, so its own echo never counts.
+TYPED = b"echo NAOS-$((6*7))\r"
+PRINTED = b"NAOS-42"
+# tmux wraps and redraws in the middle of a word, so the screen is read as text
+ESCAPES = re.compile(rb"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-?]*[ -/]*[@-~]|\x1b.|[\x00-\x09\x0b-\x1f\x7f]")
+
+
+def payload(frame: object) -> bytes:
+    data = getattr(frame, "data", None)
+    return data if isinstance(data, bytes) else b""
+
+
+def said(frame: object) -> str:
+    data = getattr(frame, "data", None)
+    return data if isinstance(data, str) else ""
+
+
+async def main() -> None:
+    web, run = sys.argv[1], sys.argv[2]
+    async with httpx.AsyncClient() as client:
+        async with aconnect_ws(f"{web}/runs/{run}/terminal/ws", client) as ws:
+            # an open terminal of the run's keeps the keyboard while it stays open
+            driving = False
+            with anyio.move_on_after(20):
+                while not driving:
+                    await ws.send_text(json.dumps({"cols": 120, "rows": 30, "view": "window"}))
+                    with anyio.move_on_after(5):
+                        while not (text := said(await ws.receive())):
+                            pass
+                        driving = bool(json.loads(text).get("driving"))
+                    if not driving:
+                        await anyio.sleep(1)
+            if not driving:
+                sys.exit("another terminal of the run holds the keyboard; close it while smoke runs")
+            await ws.send_bytes(TYPED)
+            seen = b""
+            with anyio.fail_after(40):
+                while PRINTED not in ESCAPES.sub(b"", seen):
+                    seen += payload(await ws.receive(timeout=40))
+
+
+anyio.run(main)
+INPUT
+    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/events?limit=10000" | "$VENV/bin/python" -c '
+import json, sys
+rows = [row for row in json.load(sys.stdin) if row["event"] == "console_typing"]
+if not rows or {row["actor"] for row in rows} != {"operator"}:
+    sys.exit("typing left no operator audit entry")
+if any(set(row["data"]) - {"view"} for row in rows):
+    sys.exit("the audit carries more than that the keyboard was taken")
+'
+}
+
 echo "registering the image and creating a run..."
 curl -fsS "${auth[@]}" "$api/api/v1/images" -o /dev/null -d @- <<EOF
 {"id": "naos-agents", "version": "$version", "digest": "$digest", "url": "$release/$image"}
@@ -652,6 +717,7 @@ check_gates
 echo "reading the console through the api and the terminal tab..."
 wait_for 30 console_shipped
 check_terminal
+check_terminal_input
 echo "run $run booted, stopping it from the run overlay..."
 [ "$(web_post "$run" stop)" = "$web/runs/$run" ] || fail "stop did not return to the run"
 wait_for 120 collected

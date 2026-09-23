@@ -16,7 +16,6 @@
     const view = element.classList.contains("terminal--window") ? "window" : "panel";
     const design = view === "window" ? 13 : 12;
     const term = new Terminal({
-      disableStdin: true,
       scrollback: 10000,
       fontFamily: font,
       fontSize: design,
@@ -89,6 +88,7 @@
     const scope = element.closest(".run__body, .window") || document;
     const follow = scope.querySelector("[data-follow]");
     const state = scope.querySelector("[data-terminal-state]");
+    const keys = scope.querySelector("[data-terminal-keys]");
     let following = true;
     follow?.addEventListener("click", () => {
       following = !following;
@@ -104,11 +104,23 @@
     socket.binaryType = "arraybuffer";
     socket.onopen = claim;
     const keep = setInterval(claim, CLAIM_MS);
+    // clicking into the terminal is how a panel takes the keyboard, so it says so at once
+    term.textarea?.addEventListener("focus", claim);
+    const encoder = new TextEncoder();
+    term.onData((typed) => {
+      if (driving && socket.readyState === WebSocket.OPEN) {
+        socket.send(encoder.encode(typed));
+      }
+    });
     socket.onmessage = (event) => {
       if (typeof event.data === "string") {
         const reply = JSON.parse(event.data);
         const held = driving;
         driving = reply.driving;
+        term.options.disableStdin = !driving;
+        if (keys) {
+          keys.textContent = driving ? "keyboard" : "read-only";
+        }
         if (!driving) {
           if (term.cols !== reply.cols || term.rows !== reply.rows) {
             term.resize(reply.cols, reply.rows);
