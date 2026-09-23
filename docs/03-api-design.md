@@ -120,14 +120,39 @@ and `last_failure_reason`, the reason of the newest failure in that window.
 The runner ships the output of a VM's `ttyS0` as it appears
 ([04](04-runner-design.md#console)). The API keeps it per Run, up to
 `NAOS_CONSOLE_LIMIT_BYTES`, and accepts it only from the runner whose lease
-holds the Run. `GET /runs/{run_id}/console` answers with the whole log as
-`text/plain`.
+holds the Run.
 
-`WS /runs/{run_id}/attach` is the live, read-only view. It takes the operator
-token in the `Authorization` header, writes a `console_attached` audit event
-with actor `operator`, sends the log so far as binary frames, then follows
-it. Frames from the client are ignored. The socket closes once the Run has
-left STOPPING and every byte was sent.
+`GET /runs/{run_id}/console` answers with the whole log as `text/plain`, and
+with the text of it rather than the screen it drew: escape sequences and the
+lines that hold nothing else are stripped, and a report that only redrew the
+screen is never stored in the first place.
+
+`WS /runs/{run_id}/attach` is the live view. It takes the operator token in the
+`Authorization` header, writes a `console_attached` audit event with actor
+`operator`, sends the stored log so far as binary frames, and then every byte
+the runner reads, raw - redraws and lone echoed spaces included, since a
+terminal needs all of them and only the store is normalised. Nothing is held
+for a terminal that is not open. The socket closes once the Run has left
+STOPPING and every byte was sent.
+
+A viewer speaks back. A text frame is the grid it asks for,
+`{"cols": n, "rows": n, "view": "panel" | "window"}`, and the answer carries
+`driving`, which says whether this viewer holds the guest's one size. A binary
+frame is what its operator typed, and it reaches the guest only from the viewer
+that is driving. A detached window outranks a panel and the claim ages out after
+fifteen seconds, so closing the window hands the keyboard back to the panel.
+Taking it writes one `console_typing` event naming the kind of viewer; the keys
+themselves are never stored or audited, though whatever the guest echoes back
+stands in the log like any other output.
+
+`WS /runners/{runner_id}/runs/{run_id}/console` is the runner's own socket,
+authorized by its bearer token and refused unless its lease holds the Run. The
+runner sends binary frames of eight bytes of offset followed by the console
+bytes at that offset, and the API answers `{"offset": n}` with how far it now
+holds. The API sends the size as `{"cols": n, "rows": n}` and the driver's keys
+as binary frames, which the runner writes into the VM's console socket. The
+console report of [04](04-runner-design.md#console) stays the fallback for a
+runner whose socket is down; both carry offsets, so neither loses a byte.
 
 ```bash
 wscat -c ws://api.example.com/api/v1/runs/run_0123456789abcdef0123456789abcdef/attach \

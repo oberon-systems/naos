@@ -1,6 +1,6 @@
 from typing import Annotated, Any, Literal, Self
 
-from fastapi import APIRouter, Body, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query, Request
 from pydantic import BaseModel, Field, StrictInt, model_validator
 
 from naos_api import audit, consoles, merges, runners
@@ -275,6 +275,7 @@ def report_events(body: EventsIn, principal: PrincipalDep, session: SessionDep) 
 
 @router.post("/{runner_id}/runs/{run_id}/console", response_model_exclude_none=True)
 def report_console(
+    request: Request,
     run_id: str,
     offset: Annotated[int, Query(ge=0)],
     principal: PrincipalDep,
@@ -284,7 +285,10 @@ def report_console(
     # A quiet run ships an empty body once a tick to collect the size.
     data: Annotated[bytes, Body(media_type="application/octet-stream")] = b"",
 ) -> ConsoleOut:
-    held = consoles.append(session, principal.runner_id, run_id, offset, data, limit, now)
+    start, fresh = consoles.append(session, principal.runner_id, run_id, offset, data, limit, now)
+    held = start + len(fresh)
+    if fresh:
+        request.app.state.console_hub.publish(run_id, start, fresh)
     wanted = consoles.size(session, run_id)
     if wanted is None:
         return ConsoleOut(offset=held)

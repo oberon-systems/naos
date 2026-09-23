@@ -8,7 +8,7 @@ from sqlmodel import Session
 
 from naos_api import runners
 from naos_api.clock import NowDep
-from naos_api.db import get_session
+from naos_api.db import get_session, get_socket_session
 from naos_api.runners import RunnerPrincipal, hash_token
 from naos_api.settings import get_settings
 
@@ -54,6 +54,23 @@ def require_operator_connection(
     )
     if not _matches(credentials, expected):
         raise WebSocketException(status.WS_1008_POLICY_VIOLATION, "operator is not authorized")
+
+
+def require_runner_connection(
+    websocket: WebSocket,
+    runner_id: str,
+    session: Annotated[Session, Depends(get_socket_session)],
+    now: NowDep,
+) -> RunnerPrincipal:
+    scheme, token = get_authorization_scheme_param(websocket.headers.get("authorization"))
+    principal = (
+        runners.authenticate(session, token, now) if scheme.lower() == "bearer" and token else None
+    )
+    if principal is None or principal.runner_id != runner_id:
+        raise WebSocketException(
+            status.WS_1008_POLICY_VIOLATION, "runner credentials are not valid"
+        )
+    return principal
 
 
 def _enrollment_hash() -> str | None:

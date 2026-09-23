@@ -8,9 +8,16 @@ from sqlmodel import Session
 
 from naos_api.auth import require_principal
 from naos_api.clock import now_ts
+from naos_api.console_hub import ConsoleHub
 from naos_api.db import Database
 from naos_api.errors import DomainError
-from naos_api.routes import api_router, console_router, domain_error_handler, runner_router
+from naos_api.routes import (
+    api_router,
+    console_router,
+    domain_error_handler,
+    runner_console_router,
+    runner_router,
+)
 from naos_api.runners import expire_leases
 from naos_api.settings import get_settings
 
@@ -57,6 +64,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="naos", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.state.db = Database(settings.database_url)
+    app.state.console_hub = ConsoleHub()
     app.state.db.create_schema()
     app.add_exception_handler(DomainError, domain_error_handler)
 
@@ -68,4 +76,5 @@ def create_app() -> FastAPI:
     app.include_router(runner_router, prefix="/api/v1")
     # A websocket cannot pass the HTTP bearer check of the v1 router, so it carries its own.
     app.include_router(console_router, prefix="/api/v1")
+    app.include_router(runner_console_router, prefix="/api/v1")
     return app

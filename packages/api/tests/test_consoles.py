@@ -1,4 +1,6 @@
 import hashlib
+import json
+import time
 from collections.abc import Callable
 from typing import cast
 
@@ -7,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from httpx import Response
 from sqlmodel import Session, select
+from starlette.testclient import WebSocketTestSession
 from starlette.websockets import WebSocketDisconnect
 
 from naos_api import consoles
@@ -164,6 +167,116 @@ def test_attach_streams_the_log_and_leaves_an_audit_entry(
     assert [(event.actor, event.run_id, event.source) for event in attached] == [
         ("operator", run_id, "api")
     ]
+
+
+def _runner_socket(client: TestClient, runner: dict[str, str], run_id: str) -> WebSocketTestSession:
+    return client.websocket_connect(
+        f"/api/v1/runners/{runner['runner_id']}/runs/{run_id}/console", headers=_bearer(runner)
+    )
+
+
+def test_the_runner_socket_carries_the_output_and_the_keys(
+    client: TestClient, register: Register, create_run: CreateRun, session: Session
+) -> None:
+    runner, run_id = _leased(client, register, create_run)
+    _as_operator(client)
+
+    with _runner_socket(client, runner, run_id) as shipped:
+        shipped.send_bytes((0).to_bytes(8, "big") + b"login: naos\r\n")
+        assert json.loads(shipped.receive_text()) == {"offset": 13}
+
+        with client.websocket_connect(f"/api/v1/runs/{run_id}/attach") as viewer:
+            assert viewer.receive_bytes() == b"login: naos\r\n"
+            viewer.send_text(json.dumps({"cols": 120, "rows": 30, "view": "panel"}))
+            assert json.loads(viewer.receive_text())["driving"] is True
+            assert json.loads(shipped.receive_text()) == {"cols": 120, "rows": 30}
+
+            viewer.send_bytes(b"whoami\r")
+            assert shipped.receive_bytes() == b"whoami\r"
+
+    typed = session.exec(select(AuditEvent).where(AuditEvent.event == "console_typing")).all()
+    assert [(event.actor, event.run_id, event.data["view"]) for event in typed] == [
+        ("operator", run_id, "panel")
+    ]
+
+
+# The terminal is fed ahead of the store, so a test that reads the store waits for
+# it; an empty report answers with how far the store holds.
+def _stored_to(client: TestClient, runner: dict[str, str], run_id: str, end: int) -> None:
+    for _ in range(100):
+        if _ship(client, runner, run_id, end, b"").json()["offset"] == end:
+            return
+        time.sleep(0.02)
+    raise AssertionError(f"the store never reached {end}")
+
+
+def test_a_live_viewer_gets_every_byte_the_store_drops(
+    client: TestClient, register: Register, create_run: CreateRun, session: Session
+) -> None:
+    runner, run_id = _leased(client, register, create_run)
+    _as_operator(client)
+
+    with _runner_socket(client, runner, run_id) as shipped:
+        shipped.send_bytes((0).to_bytes(8, "big") + b"$ ")
+        assert json.loads(shipped.receive_text()) == {"offset": 2}
+
+        with client.websocket_connect(f"/api/v1/runs/{run_id}/attach") as viewer:
+            assert viewer.receive_bytes() == b"$ "
+            shipped.send_bytes((2).to_bytes(8, "big") + b" ")
+            assert json.loads(shipped.receive_text()) == {"offset": 3}
+            assert viewer.receive_bytes() == b" "
+            shipped.send_bytes((3).to_bytes(8, "big") + REDRAW)
+            assert json.loads(shipped.receive_text()) == {"offset": 3 + len(REDRAW)}
+            assert viewer.receive_bytes() == REDRAW
+            _stored_to(client, runner, run_id, 3 + len(REDRAW))
+
+    rows = session.exec(select(ConsoleChunk).where(ConsoleChunk.run_id == run_id)).all()
+    assert [bytes(row.data) for row in rows] == [b"$ ", b"", b""]
+    assert client.get(f"/api/v1/runs/{run_id}/console").content == b"$\n"
+    # with no terminal open nothing is held for one
+    assert not cast(FastAPI, client.app).state.console_hub._viewers
+
+
+def test_a_viewer_that_does_not_drive_types_nothing(
+    client: TestClient, register: Register, create_run: CreateRun, session: Session
+) -> None:
+    runner, run_id = _leased(client, register, create_run)
+    _as_operator(client)
+
+    with _runner_socket(client, runner, run_id) as shipped:
+        shipped.send_bytes((0).to_bytes(8, "big") + b"$ ")
+        assert json.loads(shipped.receive_text()) == {"offset": 2}
+
+        with client.websocket_connect(f"/api/v1/runs/{run_id}/attach") as driver:
+            driver.receive_bytes()
+            driver.send_text(json.dumps({"cols": 100, "rows": 24, "view": "window"}))
+            assert json.loads(driver.receive_text())["driving"] is True
+            assert json.loads(shipped.receive_text()) == {"cols": 100, "rows": 24}
+
+            with client.websocket_connect(f"/api/v1/runs/{run_id}/attach") as watcher:
+                watcher.receive_bytes()
+                watcher.send_text(json.dumps({"cols": 90, "rows": 20, "view": "panel"}))
+                assert json.loads(watcher.receive_text())["driving"] is False
+                watcher.send_bytes(b"rm -rf /\r")
+
+                driver.send_bytes(b"ls\r")
+                assert shipped.receive_bytes() == b"ls\r"
+
+    typed = session.exec(select(AuditEvent).where(AuditEvent.event == "console_typing")).all()
+    assert [event.data["view"] for event in typed] == ["window"]
+
+
+def test_a_foreign_runner_cannot_open_the_console_socket(
+    client: TestClient, register: Register, create_run: CreateRun
+) -> None:
+    _, run_id = _leased(client, register, create_run)
+    other = register("beta")
+
+    with pytest.raises(WebSocketDisconnect), _runner_socket(client, other, run_id) as shipped:
+        shipped.send_bytes((0).to_bytes(8, "big") + b"forged")
+        shipped.receive_text()
+
+    assert client.get(f"/api/v1/runs/{run_id}/console").content == b""
 
 
 @pytest.mark.parametrize("token", [None, "operator-beta-" + "0" * 32])

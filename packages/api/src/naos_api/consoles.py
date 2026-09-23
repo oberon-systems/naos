@@ -45,17 +45,23 @@ def held(session: Session, run_id: str) -> int:
     return end or 0
 
 
-def append(
-    session: Session, runner_id: str, run_id: str, offset: int, data: bytes, limit: int, now: int
-) -> int:
+def hold(session: Session, runner_id: str, run_id: str) -> None:
     run = session.get(Run, run_id)
     lease = session.get(Lease, run.lease_id) if run is not None and run.lease_id else None
     if lease is None or lease.runner_id != runner_id:
         raise LeaseError(f"run {run_id} is not held by runner {runner_id}")
+
+
+# Answers where the new bytes start and the bytes themselves, raw: the store may
+# drop them, but a live terminal still needs every one.
+def append(
+    session: Session, runner_id: str, run_id: str, offset: int, data: bytes, limit: int, now: int
+) -> tuple[int, bytes]:
+    hold(session, runner_id, run_id)
     start = held(session, run_id)
     fresh = data[start - offset :] if offset <= start else b""
     if not fresh:
-        return start
+        return start, b""
     if start >= limit:
         raise ConsoleFullError(f"the console log of run {run_id} is full")
     fresh = fresh[: limit - start]
@@ -66,7 +72,7 @@ def append(
         ConsoleChunk(run_id=run_id, offset=start, end=start + len(fresh), data=kept, at=now)
     )
     session.commit()
-    return start + len(fresh)
+    return start, fresh
 
 
 def _chunks(session: Session, run_id: str, after: int, chunks: int | None) -> list[ConsoleChunk]:
@@ -153,4 +159,12 @@ def size(session: Session, run_id: str) -> ConsoleSize | None:
 def attached(session: Session, run_id: str) -> None:
     get_run(session, run_id)
     audit.record(session, "console_attached", actor="operator", run_id=run_id)
+    session.commit()
+
+
+# That the keyboard was taken, and from which viewer. What was typed is not
+# recorded anywhere: it is an operator's own, and often a secret.
+def took_keyboard(session: Session, run_id: str, view: str) -> None:
+    get_run(session, run_id)
+    audit.record(session, "console_typing", actor="operator", run_id=run_id, view=view)
     session.commit()

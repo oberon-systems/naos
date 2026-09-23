@@ -38,6 +38,7 @@ API_EVENTS: dict[str, frozenset[str]] = {
     "profile_created": frozenset({"profile_id", "name"}),
     "profile_updated": frozenset({"profile_id", "name"}),
     "console_attached": frozenset(),
+    "console_typing": frozenset({"view"}),
 }
 
 _VM = {"vm_id": Id, "run_id": Id}
