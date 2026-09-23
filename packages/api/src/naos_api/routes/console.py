@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 import time
 from collections.abc import Callable
 from contextlib import suppress
@@ -19,8 +18,6 @@ from naos_api.errors import DomainError, NotFoundError
 from naos_api.models import ConsoleSize
 from naos_api.routes.deps import ConsoleLimitDep
 from naos_api.runners import RunnerPrincipal
-
-log = logging.getLogger(__name__)
 
 POLL_SECONDS = 0.5
 FRAME_BYTES = 32 * 1024
@@ -60,13 +57,6 @@ async def _typed(
 ) -> bool:
     size = await _in_session(db, partial(consoles.size, run_id=run_id))
     if size is None or size.owner != owner or not hub.attached(run_id):
-        log.info(
-            "console keys dropped for %s: size=%s driver=%s runner=%s",
-            run_id,
-            size is not None,
-            size is not None and size.owner == owner,
-            hub.attached(run_id),
-        )
         return driving
     # the taking is recorded before the first key travels, so a socket that closes
     # straight after still leaves the audit entry behind
@@ -108,15 +98,7 @@ async def _until_disconnect(
             continue
         # only the guest's own grid travels; a viewer that lost the claim resizes nothing
         if size.owner == owner:
-            sent = hub.to_runner(run_id, _size_frame(size))
-            log.info(
-                "console size %sx%s from the %s of %s: %s",
-                size.cols,
-                size.rows,
-                size.view,
-                run_id,
-                "sent to the runner" if sent else "no runner socket",
-            )
+            hub.to_runner(run_id, _size_frame(size))
         await websocket.send_text(
             json.dumps({"driving": size.owner == owner, "cols": size.cols, "rows": size.rows})
         )
