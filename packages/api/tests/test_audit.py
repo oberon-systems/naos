@@ -104,10 +104,44 @@ def test_run_creation_and_stop_are_recorded(
     client.post(f"/api/v1/runs/{run_id}/stop")
 
     rows = _rows(session)
-    assert [row.event for row in rows] == ["run_created", "run_stop_requested", "run_transition"]
+    assert [row.event for row in rows] == [
+        "run_created",
+        "run_queued",
+        "run_stop_requested",
+        "run_transition",
+    ]
     assert {row.run_id for row in rows} == {run_id}
-    assert rows[1].data == {"status": "PENDING"}
-    assert rows[2].data == {"from": "PENDING", "to": "CANCELLED", "reason": None}
+    assert rows[0].data == {"workspace": None, "profile": None}
+    assert rows[1].data == {"position": 1}
+    assert rows[2].data == {"status": "PENDING"}
+    assert rows[3].data == {"from": "PENDING", "to": "CANCELLED", "reason": None}
+
+
+def test_a_run_is_queued_behind_the_ones_waiting(
+    create_run: CreateRun, register: Register, client: TestClient, session: Session
+) -> None:
+    runner = register()
+    _heartbeat(client, runner)
+    create_run("key-1")
+    second = create_run("key-2")
+
+    queued = [(row.run_id, row.data) for row in _rows(session) if row.event == "run_queued"]
+    assert queued == [(second, {"position": 2})]
+
+
+def test_an_assigned_run_names_its_lease_and_slot(
+    create_run: CreateRun, register: Register, client: TestClient, session: Session
+) -> None:
+    run_id = create_run("key-1")
+    runner = register()
+    _heartbeat(client, runner)
+    _heartbeat(client, runner)
+
+    assigned = [row for row in _rows(session) if row.event == "run_assigned"]
+    assert [(row.run_id, row.actor, row.runner_id) for row in assigned] == [
+        (run_id, "system", runner["runner_id"])
+    ]
+    assert assigned[0].data == {"lease_id": runner["lease_id"], "slot": 1, "slots": 1}
 
 
 def test_runner_lifecycle_is_recorded(
@@ -126,10 +160,11 @@ def test_runner_lifecycle_is_recorded(
     advance(max(LEASE_TTL, TOKEN_TTL // 2))
     _heartbeat(client, runner)
 
-    rows = [row for row in _rows(session) if row.event != "run_created"]
+    rows = [row for row in _rows(session) if row.event not in {"run_created", "run_queued"}]
     assert [(row.event, row.actor) for row in rows] == [
         ("runner_registered", "runner"),
         ("lease_acquired", "runner"),
+        ("run_assigned", "system"),
         ("run_transition", "runner"),
         ("run_transition", "runner"),
         ("lease_expired", "system"),
@@ -138,9 +173,9 @@ def test_runner_lifecycle_is_recorded(
         ("token_rotated", "runner"),
     ]
     assert {row.runner_id for row in rows} == {runner["runner_id"]}
-    assert rows[4].data == {"lease_id": first_lease}
-    assert rows[5].data["to"] == "FAILED"
-    assert rows[6].data == {"lease_id": runner["lease_id"]}
+    assert rows[5].data == {"lease_id": first_lease}
+    assert rows[6].data["to"] == "FAILED"
+    assert rows[7].data == {"lease_id": runner["lease_id"]}
 
 
 def test_issued_credentials_are_recorded_by_name(
@@ -159,7 +194,8 @@ def test_issued_credentials_are_recorded_by_name(
     client.get(f"/api/v1/runners/{runner['runner_id']}/runs", headers=_bearer(runner))
 
     issued = [row for row in _rows(session) if row.event == "credentials_issued"]
-    assert [(row.run_id, row.data) for row in issued] == [(run["id"], {"names": ["alpha-token"]})]
+    assert [(row.run_id, row.data["names"]) for row in issued] == [(run["id"], ["alpha-token"])]
+    assert issued[0].data["ttl"] > 0
 
 
 def test_runner_events_are_validated(
@@ -227,6 +263,8 @@ def test_a_run_is_reconstructed_from_its_timeline(
     ]
     assert steps == [
         "run_created",
+        "run_queued",
+        "run_assigned",
         ("run_transition", "STARTING"),
         "vm_created",
         ("run_transition", "STARTED"),
@@ -240,12 +278,12 @@ def test_a_run_is_reconstructed_from_its_timeline(
         ("run_transition", "COMPLETED"),
         "changes_archived",
     ]
-    assert timeline[2]["vm_id"] == "vm_alpha" and timeline[2]["source"] == "runner"
+    assert timeline[4]["vm_id"] == "vm_alpha" and timeline[4]["source"] == "runner"
     assert client.get("/api/v1/runs/run_missing/events").status_code == 404
 
-    audit = client.get("/api/v1/audit", params={"runner_id": runner["runner_id"], "limit": 3})
+    audit = client.get("/api/v1/audit", params={"runner_id": runner["runner_id"], "limit": 4})
     page = audit.json()
-    assert len(page) == 3
+    assert len(page) == 4
     rest = client.get("/api/v1/audit", params={"after": page[-1]["seq"], "event": "vm_created"})
     assert [row["event"] for row in rest.json()] == ["vm_created"]
 

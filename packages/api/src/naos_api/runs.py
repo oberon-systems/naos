@@ -4,7 +4,7 @@ from pathlib import PurePosixPath
 from typing import Any
 from uuid import uuid4
 
-from sqlmodel import Session, col, func, select, update
+from sqlmodel import Session, col, func, or_, select, update
 
 from naos_api import audit
 from naos_api.audit import Actor
@@ -17,7 +17,7 @@ from naos_api.errors import (
 )
 from naos_api.images.service import check_image
 from naos_api.lifecycle import ACTIVE, TERMINAL, RunStatus, ensure_transition
-from naos_api.models import Lease, Merge, Policy, Run, Runner
+from naos_api.models import Lease, Merge, Policy, Profile, Run, Runner
 from naos_api.policies import check_refs
 from naos_api.spec import PolicyKind, RunSpec, digest_of
 
@@ -60,8 +60,47 @@ def _check_runner(session: Session, runner_id: str | None) -> None:
         raise PolicyError(f"runner {runner_id} does not exist or is revoked")
 
 
+def _workspace(session: Session, policy_id: str | None) -> str | None:
+    policy = session.get(Policy, policy_id) if policy_id else None
+    return PurePosixPath(policy.document["workdir"]).name if policy else None
+
+
+def _free_slots(session: Session, pinned: str | None, now: int) -> int:
+    statement = (
+        select(Lease.id, Runner.capacity)
+        .join(Runner, col(Runner.id) == col(Lease.runner_id))
+        .where(col(Lease.expired_at).is_(None), col(Lease.expires_at) > now)
+    )
+    if pinned is not None:
+        statement = statement.where(col(Lease.runner_id) == pinned)
+    free = 0
+    for lease_id, capacity in session.exec(statement).all():
+        held = session.exec(
+            select(func.count())
+            .select_from(Run)
+            .where(col(Run.lease_id) == lease_id, col(Run.status).not_in(TERMINAL))
+        ).one()
+        free += max((capacity or 0) - held, 0)
+    return free
+
+
+def _waiting(session: Session, pinned: str | None) -> int:
+    statement = (
+        select(func.count())
+        .select_from(Run)
+        .where(col(Run.status) == RunStatus.PENDING, col(Run.lease_id).is_(None))
+    )
+    if pinned is not None:
+        statement = statement.where(or_(col(Run.runner_id).is_(None), col(Run.runner_id) == pinned))
+    return int(session.exec(statement).one())
+
+
 def create_run(
-    session: Session, spec: RunSpec, idempotency_key: str, profile_id: str | None = None
+    session: Session,
+    spec: RunSpec,
+    idempotency_key: str,
+    profile_id: str | None = None,
+    now: int | None = None,
 ) -> tuple[Run, bool]:
     document = spec.model_dump(mode="json")
     request_digest = digest_of({"spec": document, "profile_id": profile_id})
@@ -73,6 +112,11 @@ def create_run(
     check_image(session, spec.image)
     _check_runner(session, spec.runner)
     refs = spec.policy_refs()
+    profile = session.get(Profile, profile_id) if profile_id else None
+    created = {
+        "workspace": _workspace(session, refs[PolicyKind.MOUNT]),
+        "profile": profile.name if profile else None,
+    }
     for attempt in range(CREATE_ATTEMPTS):
         run = Run(
             id=f"run_{uuid4().hex}",
@@ -87,8 +131,12 @@ def create_run(
             idempotency_key=idempotency_key,
             request_digest=request_digest,
         )
+        position = _waiting(session, spec.runner) + 1
+        queued = _free_slots(session, spec.runner, now or now_ts()) < position
         session.add(run)
-        audit.record(session, "run_created", actor="operator", run_id=run.id)
+        audit.record(session, "run_created", actor="operator", run_id=run.id, **created)
+        if queued:
+            audit.record(session, "run_queued", actor="operator", run_id=run.id, position=position)
         try:
             session.commit()
         except Exception:

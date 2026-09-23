@@ -339,15 +339,27 @@ def _held(session: Session, lease_id: str) -> int:
 
 
 def _assign(session: Session, runner_id: str, lease_id: str, capacity: int, now: int) -> None:
-    free = capacity - _held(session, lease_id)
-    if free <= 0:
+    held = _held(session, lease_id)
+    if capacity - held <= 0:
         return
-    for run_id in _candidates(session, runner_id, free):
-        session.exec(
+    for run_id in _candidates(session, runner_id, capacity - held):
+        assigned = session.exec(
             update(Run)
             .where(col(Run.id) == run_id, col(Run.status) == S.PENDING, col(Run.lease_id).is_(None))
             .values(lease_id=lease_id, updated_at=now)
         )
+        if assigned.rowcount == 1:
+            held += 1
+            audit.record(
+                session,
+                "run_assigned",
+                actor="system",
+                run_id=run_id,
+                runner_id=runner_id,
+                lease_id=lease_id,
+                slot=held,
+                slots=capacity,
+            )
     session.commit()
 
 
@@ -409,6 +421,7 @@ def _credentials(
             run_id=run.id,
             runner_id=runner_id,
             names=sorted(issued),
+            ttl=ttl,
         )
     return issued
 

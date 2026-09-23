@@ -4,6 +4,7 @@ from fastapi import APIRouter, Query, Response
 from pydantic import BaseModel, Field
 
 from naos_api import profiles
+from naos_api.clock import NowDep
 from naos_api.lifecycle import RunStatus
 from naos_api.models import Profile
 from naos_api.routes.deps import IdempotencyKey, SessionDep
@@ -103,9 +104,10 @@ def run_from_profile(
     idempotency_key: IdempotencyKey,
     session: SessionDep,
     response: Response,
+    now: NowDep,
 ) -> RunRead:
     run, created = profiles.run_from_profile(
-        session, profile_id, body.image, body.runner, idempotency_key
+        session, profile_id, body.image, body.runner, idempotency_key, now
     )
     if not created:
         response.status_code = 200

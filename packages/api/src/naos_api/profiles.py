@@ -160,7 +160,8 @@ def run_from_profile(
     image: ImageRef,
     runner: str | None,
     idempotency_key: str,
+    now: int | None = None,
 ) -> tuple[Run, bool]:
     profile = get_profile(session, profile_id)
     spec = RunSpec.model_validate({**profile.spec, "image": image, "runner": runner})
-    return create_run(session, spec, idempotency_key, profile_id=profile.id)
+    return create_run(session, spec, idempotency_key, profile_id=profile.id, now=now)

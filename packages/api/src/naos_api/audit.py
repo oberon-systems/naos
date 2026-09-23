@@ -18,7 +18,9 @@ GuestPath = Annotated[str, Field(max_length=4096)]
 Count = Annotated[StrictInt, Field(ge=0)]
 
 API_EVENTS: dict[str, frozenset[str]] = {
-    "run_created": frozenset(),
+    "run_created": frozenset({"workspace", "profile"}),
+    "run_queued": frozenset({"position"}),
+    "run_assigned": frozenset({"lease_id", "slot", "slots"}),
     "run_transition": frozenset({"from", "to", "reason"}),
     "run_stop_requested": frozenset({"status"}),
     "runner_registered": frozenset(),
@@ -26,7 +28,7 @@ API_EVENTS: dict[str, frozenset[str]] = {
     "lease_expired": frozenset({"lease_id"}),
     "token_rotated": frozenset(),
     "waiting_rebound": frozenset({"lease_id"}),
-    "credentials_issued": frozenset({"names"}),
+    "credentials_issued": frozenset({"names", "ttl"}),
     "diff_reported": frozenset({"entries", "rejected", "sensitive", "policy", "decided"}),
     "merge_decided": frozenset({"paths", "resolutions"}),
     "merge_reported": frozenset(

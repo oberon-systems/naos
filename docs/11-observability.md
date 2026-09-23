@@ -49,7 +49,9 @@ describe, so a change and its event land or fail together.
 
 | Event | Actor | Data |
 |---|---|---|
-| `run_created` | operator | none |
+| `run_created` | operator | `workspace` name and `profile` name, either empty |
+| `run_queued` | operator | `position` in the queue, when no live runner has a free slot |
+| `run_assigned` | system | `lease_id`, `slot` and `slots` of the runner that took it |
 | `run_transition` | operator, runner, system | `from`, `to`, `reason` |
 | `run_stop_requested` | operator | `status` |
 | `runner_registered` | runner | none |
@@ -57,7 +59,7 @@ describe, so a change and its event land or fail together.
 | `lease_expired` | system | `lease_id` |
 | `token_rotated` | runner | none |
 | `waiting_rebound` | system | `lease_id` |
-| `credentials_issued` | runner | `names` of the secrets, never the values |
+| `credentials_issued` | runner | `names` of the secrets, never the values, and `ttl` |
 | `diff_reported` | runner | `entries`, `rejected`, `sensitive` counts, merge `policy`, `decided` |
 | `merge_decided` | operator | `paths` and `resolutions` counts |
 | `merge_reported` | runner | `outcome`, `conflicts` and the `applied`, `skipped`, `exported`, `backed_up` counts |

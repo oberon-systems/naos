@@ -121,6 +121,18 @@ def test_a_run_copies_the_profile_and_records_it(
     assert listed["last_run_at"] == run["created_at"]
 
 
+def test_a_created_run_records_its_workspace_and_profile(
+    client: TestClient, image: dict[str, Any], mount_body: dict[str, Any]
+) -> None:
+    mount = client.post("/api/v1/policies", json={"kind": "mount", "document": mount_body}).json()
+    profile = _create(client, spec={**PROFILE_SPEC, "mounts": {"policy": mount["id"]}})
+
+    run = _run(client, profile["id"], image)
+
+    events = client.get(f"/api/v1/runs/{run['id']}/events").json()
+    assert events[0]["data"] == {"workspace": "alpha", "profile": "alpha"}
+
+
 def test_one_key_creates_one_run(
     client: TestClient, session: Session, image: dict[str, Any]
 ) -> None:

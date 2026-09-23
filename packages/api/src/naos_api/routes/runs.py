@@ -119,9 +119,13 @@ router = APIRouter()
 
 @router.post("/runs", status_code=201)
 def create_run(
-    spec: RunSpec, idempotency_key: IdempotencyKey, session: SessionDep, response: Response
+    spec: RunSpec,
+    idempotency_key: IdempotencyKey,
+    session: SessionDep,
+    response: Response,
+    now: NowDep,
 ) -> RunRead:
-    run, created = runs.create_run(session, spec, idempotency_key)
+    run, created = runs.create_run(session, spec, idempotency_key, now=now)
     if not created:
         response.status_code = 200
     return RunRead.of(run)
