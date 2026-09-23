@@ -1,5 +1,7 @@
 import re
+from bisect import bisect_right
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from sqlmodel import Session, col, func, select
 
@@ -36,6 +38,9 @@ def clean(data: bytes) -> bytes:
     text = ESCAPES.sub(b"", data.replace(b"\r\n", b"\n").replace(b"\r", b"\n"))
     lines = [line.rstrip() for line in text.split(b"\n")]
     return b"\n".join(line for line in lines if line)
+
+
+LINE = re.compile(rb"([^\r\n]*)(?:\r\n|\r|\n|\Z)")
 
 
 def held(session: Session, run_id: str) -> int:
@@ -90,9 +95,26 @@ def _joined(rows: list[ConsoleChunk], after: int) -> bytes:
     return b"".join(row.data[max(after - row.offset, 0) :] for row in rows)
 
 
-def read(session: Session, run_id: str, after: int = 0, chunks: int | None = READ_CHUNKS) -> bytes:
+# The downloaded log: the text of the console, each line stamped with the UTC time
+# the API received the chunk it began in, since the serial stream keeps no time.
+def timed(session: Session, run_id: str) -> bytes:
     get_run(session, run_id)
-    return _joined(_chunks(session, run_id, after, chunks), after)
+    starts: list[int] = []
+    times: list[int] = []
+    raw = bytearray()
+    for row in _chunks(session, run_id, 0, None):
+        if row.data:
+            starts.append(len(raw))
+            times.append(row.at)
+            raw += row.data
+    stamped = bytearray()
+    for match in LINE.finditer(bytes(raw)):
+        text = ESCAPES.sub(b"", match.group(1)).rstrip()
+        if text:
+            at = times[bisect_right(starts, match.start()) - 1]
+            stamp = datetime.fromtimestamp(at, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+            stamped += stamp.encode() + b"  " + text + b"\n"
+    return bytes(stamped)
 
 
 # The end travels with the tail: a dropped chunk carries no bytes, so a viewer

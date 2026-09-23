@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 import time
 from collections.abc import Callable
 from typing import cast
@@ -70,7 +71,7 @@ def test_console_output_is_appended_in_order(
 
     log = client.get(f"/api/v1/runs/{run_id}/console")
     assert log.status_code == 200
-    assert log.content == b"login: naos\n"
+    assert log.content == b"2026-01-01T00:00:00Z  login: naos\n"
 
 
 def test_a_quiet_run_ships_an_empty_body(
@@ -98,6 +99,27 @@ def test_a_full_console_log_refuses_more(
     assert _ship(client, runner, run_id, 4096, b"y").status_code == 413
 
 
+def test_the_log_stamps_each_line_with_the_time_it_arrived(
+    client: TestClient,
+    register: Register,
+    create_run: CreateRun,
+    advance: Callable[[int], None],
+) -> None:
+    runner, run_id = _leased(client, register, create_run)
+    _ship(client, runner, run_id, 0, b"naos login: naos\r\nWelcome")
+    advance(61)
+    _ship(client, runner, run_id, 25, b" to Alpine!\r\n\x1b[K\r\n$ ")
+
+    log = client.get(f"/api/v1/runs/{run_id}/console").content.decode()
+
+    # a line that runs over two chunks keeps the time of the one it began in
+    assert log.splitlines() == [
+        "2026-01-01T00:00:00Z  naos login: naos",
+        "2026-01-01T00:00:00Z  Welcome to Alpine!",
+        "2026-01-01T00:01:01Z  $",
+    ]
+
+
 def test_a_chunk_that_only_redraws_the_screen_is_not_stored(
     client: TestClient, register: Register, create_run: CreateRun, session: Session
 ) -> None:
@@ -109,7 +131,9 @@ def test_a_chunk_that_only_redraws_the_screen_is_not_stored(
     assert reply.json() == {"offset": 13 + len(REDRAW)}
     rows = session.exec(select(ConsoleChunk).where(ConsoleChunk.run_id == run_id)).all()
     assert [bytes(row.data) for row in rows] == [b"login: naos\r\n", b""]
-    assert client.get(f"/api/v1/runs/{run_id}/console").content == b"login: naos\n"
+    assert client.get(f"/api/v1/runs/{run_id}/console").content == (
+        b"2026-01-01T00:00:00Z  login: naos\n"
+    )
 
 
 def test_attach_walks_past_a_dropped_chunk(
@@ -232,7 +256,10 @@ def test_a_live_viewer_gets_every_byte_the_store_drops(
 
     rows = session.exec(select(ConsoleChunk).where(ConsoleChunk.run_id == run_id)).all()
     assert [bytes(row.data) for row in rows] == [b"$ ", b"", b""]
-    assert client.get(f"/api/v1/runs/{run_id}/console").content == b"$\n"
+    assert re.fullmatch(
+        rb"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ  \$\n",
+        client.get(f"/api/v1/runs/{run_id}/console").content,
+    )
     # with no terminal open nothing is held for one
     assert not cast(FastAPI, client.app).state.console_hub._viewers
 

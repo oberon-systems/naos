@@ -125,7 +125,9 @@ holds the Run.
 `GET /runs/{run_id}/console` answers with the whole log as `text/plain`, and
 with the text of it rather than the screen it drew: escape sequences and the
 lines that hold nothing else are stripped, and a report that only redrew the
-screen is never stored in the first place.
+screen is never stored in the first place. The serial stream keeps no time, so
+each line starts with the UTC time the API received the chunk the line began
+in, as `2026-01-01T00:00:00Z  naos login: naos`.
 
 `WS /runs/{run_id}/attach` is the live view. It takes the operator token in the
 `Authorization` header, writes a `console_attached` audit event with actor
