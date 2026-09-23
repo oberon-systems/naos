@@ -1,7 +1,8 @@
 # Agents Related
 .mcp.json
 CLAUDE.local.md
-.gemini/skills
+.gemini
+.claude
 
 # Local environments
 .venv
