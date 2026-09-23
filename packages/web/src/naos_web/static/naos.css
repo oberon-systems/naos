@@ -1269,22 +1269,13 @@ body {
   gap: 16px;
 }
 
-.terminal__tools,
-.terminal__toggles {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .terminal__tools {
+  display: flex;
   flex: 1 1 auto;
+  align-items: center;
   justify-content: flex-end;
   gap: 12px;
   min-width: 0;
-}
-
-.terminal__toggles {
-  flex: 0 0 auto;
 }
 
 .terminal__icon {
@@ -1316,29 +1307,6 @@ body {
   color: var(--faint);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.terminal__chip {
-  height: 24px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 6px;
-  background: var(--grey-bg);
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.terminal__chip--on {
-  background: var(--ink);
-  color: var(--surface);
-}
-
-.terminal__chip:disabled {
-  color: var(--faint);
-  cursor: not-allowed;
 }
 
 .terminal {
@@ -1507,16 +1475,6 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.window__actions .terminal__chip {
-  background: #1e293b;
-  color: #94a3b8;
-}
-
-.window__actions .terminal__chip--on {
-  background: #e2e8f0;
-  color: #0b1220;
 }
 
 .window__back {

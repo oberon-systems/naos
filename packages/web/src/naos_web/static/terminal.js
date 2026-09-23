@@ -86,17 +86,14 @@
     window.addEventListener("resize", refit);
 
     const scope = element.closest(".run__body, .window") || document;
-    const follow = scope.querySelector("[data-follow]");
     const state = scope.querySelector("[data-terminal-state]");
     const keys = scope.querySelector("[data-terminal-keys]");
+    // following is where the reader left the scroll: at the bottom it keeps up,
+    // scrolled back it stays put until they scroll down to the end again
     let following = true;
-    follow?.addEventListener("click", () => {
-      following = !following;
-      follow.classList.toggle("terminal__chip--on", following);
-      follow.setAttribute("aria-pressed", String(following));
-      if (following) {
-        term.scrollToBottom();
-      }
+    term.onScroll(() => {
+      const buffer = term.buffer.active;
+      following = buffer.viewportY >= buffer.baseY;
     });
 
     const scheme = location.protocol === "https:" ? "wss:" : "ws:";

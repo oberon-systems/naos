@@ -14,7 +14,6 @@
         <header class="window__bar">
             <span class="window__title">{{ run.id }} — attach — {{ run.runner }}</span>
             <div class="window__actions">
-                {% include "partials/terminal_toggles.html" %}
                 <a class="window__back" href="/runs/{{ run.id }}/terminal">Back to the run</a>
             </div>
         </header>

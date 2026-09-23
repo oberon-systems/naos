@@ -1,7 +1,6 @@
 {% from "components.html" import icon_open, icon_info %}
 <div class="run__body run__body--terminal">
     <div class="terminal__toolbar">
-        {% include "partials/terminal_toggles.html" %}
         <div class="terminal__tools">
             <span class="terminal__endpoint">ws {{ terminal.attach_path }}</span>
             <a class="terminal__download" href="{{ terminal.log }}">Download log</a>

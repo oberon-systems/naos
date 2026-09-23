@@ -59,6 +59,16 @@ def test_the_detached_window_stands_alone(client: TestClient) -> None:
     assert f'data-stream="/runs/{STARTED}/terminal/ws"' in body
 
 
+def test_the_terminal_carries_no_toggles(client: TestClient) -> None:
+    panel = client.get(f"/runs/{STARTED}/terminal", headers=HX).text
+    window = client.get(f"/runs/{STARTED}/terminal?window=1").text
+
+    # following comes from the scroll, and the log carries the time
+    for body in (panel, window):
+        for toggle in (">Follow<", ">Wrap<", ">Timestamps<", ">stdout + stderr<"):
+            assert toggle not in body
+
+
 def test_the_log_downloads_through_the_api(client: TestClient) -> None:
     response = client.get(f"/runs/{STARTED}/terminal/log")
 
