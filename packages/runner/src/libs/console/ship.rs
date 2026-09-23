@@ -4,8 +4,11 @@ use std::io::{self, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use url::Url;
+
 use crate::libs::api::Api;
 use crate::libs::console::control;
+use crate::libs::console::live::Sessions;
 use crate::libs::credentials::{CredentialStore, Credentials};
 use crate::libs::error::AgentError;
 use crate::libs::qemu::VmPaths;
@@ -29,20 +32,24 @@ pub struct Report {
 
 pub struct Shipper<A> {
     api: A,
+    api_url: Url,
     store: CredentialStore,
     vm_dir: PathBuf,
     shipped: HashMap<String, Shipped>,
     sized: HashMap<String, (u16, u16)>,
+    sessions: Sessions,
 }
 
 impl<A: Api> Shipper<A> {
-    pub fn new(api: A, store: CredentialStore, vm_dir: PathBuf) -> Self {
+    pub fn new(api: A, api_url: Url, store: CredentialStore, vm_dir: PathBuf) -> Self {
         Self {
             api,
+            api_url,
             store,
             vm_dir,
             shipped: HashMap::new(),
             sized: HashMap::new(),
+            sessions: Sessions::default(),
         }
     }
 
@@ -58,7 +65,13 @@ impl<A: Api> Shipper<A> {
             .retain(|vm_id, _| running.iter().any(|vm| &vm.vm_id == vm_id));
         self.sized
             .retain(|vm_id, _| running.iter().any(|vm| &vm.vm_id == vm_id));
+        // The live socket carries the console for the VMs it holds; this is the fallback.
+        self.sessions
+            .keep(&self.api_url, &credentials, &self.vm_dir, &running);
         for vm in running {
+            if self.sessions.holds(&vm.vm_id) {
+                continue;
+            }
             let paths = VmPaths::new(self.vm_dir.join(&vm.vm_id));
             let state = self
                 .shipped
@@ -165,7 +178,7 @@ pub async fn ship<A: Api>(
     }
 }
 
-fn read_at(log: &Path, offset: u64, buffer: &mut [u8]) -> io::Result<usize> {
+pub(crate) fn read_at(log: &Path, offset: u64, buffer: &mut [u8]) -> io::Result<usize> {
     let mut file = match File::open(log) {
         Ok(file) => file,
         Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(0),

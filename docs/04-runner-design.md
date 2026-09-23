@@ -218,13 +218,24 @@ writes a `console_attached` audit event. The socket sits in a 0700 directory,
 so only the runner's user can open it.
 
 QEMU also appends everything the guest writes to `ttyS0` to `console.log`.
-Once a second the agent posts what the API does not hold yet to
+For every running VM the agent holds a websocket to
+`WS /api/v1/runners/{runner_id}/runs/{run_id}/console`, carrying its bearer
+token. It sends what the API does not hold yet as eight bytes of offset
+followed by the bytes at that offset, and moves on to the offset the API
+answers with. The same socket brings back the size the viewer asks for, which
+goes to the guest over `control.sock`, and the keys of whoever is driving,
+which the agent writes into `console.sock` - connecting only to write, so
+`naos-runner console` on the host keeps being able to attach.
+
+While that socket is up the agent posts nothing for the run. When it is down,
+once a second it posts what the API does not hold yet to
 `POST /api/v1/runners/{runner_id}/runs/{run_id}/console?offset=N`, raw bytes
-in the body, and moves on to the offset the API answers with. A restarted
-agent starts at 0 and the API skips what it already has. When the API
-refuses a run as full (413) or not held (409), the agent stops shipping it.
-The runner never listens for an attach: operators read the console from the
-API ([03](03-api-design.md#console)).
+in the body, under the same offset rules; a quiet run posts an empty body,
+because the reply is how the size arrives. A restarted agent starts at 0 and
+the API skips what it already has. When the API refuses a run as full (413) or
+not held (409), the agent stops shipping it. The runner never listens for an
+attach: operators reach the console through the API
+([03](03-api-design.md#console)).
 
 ## Lease fencing
 

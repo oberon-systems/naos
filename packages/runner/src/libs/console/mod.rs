@@ -1,4 +1,5 @@
 pub mod control;
+pub mod live;
 pub mod ship;
 
 use std::io::{self, IsTerminal, Read, Write};

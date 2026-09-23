@@ -67,6 +67,7 @@ async fn serve(config: Config) -> Result<(), AgentError> {
     let mut agent = Agent::new(&config, api, runtime, Box::new(HttpImages::new()?));
     let mut shipper = Shipper::new(
         HttpApi::new(config.api_url.clone())?,
+        config.api_url.clone(),
         CredentialStore::new(&config.state_dir),
         config.runtime.vm_dir.clone(),
     );
