@@ -339,7 +339,7 @@ seen |= {("to", row["data"]["to"]) for row in rows if row["event"] == "run_trans
 seen |= {("mcp_call", row["data"]["decision"]) for row in rows if row["event"] == "mcp_call"}
 statuses = ("STARTING", "STARTED", "STOPPING", "COLLECTING", "WAITING_MERGE", "COMPLETED")
 expected = {
-    "run_created", "vm_created", "workspace_shared", "network_allowed", "network_denied",
+    "run_created", "run_assigned", "vm_created", "workspace_shared", "network_allowed", "network_denied",
     "shell_allowed", "shell_denied", ("mcp_call", "allow"), ("mcp_call", "deny"),
     "workspace_collected", "diff_reported", "merge_decided", "merge_conflict", "merge_applied",
     "changes_archived", *(("to", status) for status in statuses),
@@ -363,6 +363,45 @@ check_secrets() {
             fail "a credential reached the audit trail"
         fi
     done
+}
+
+# The Logs & Audit tab renders every event the run carries, refuses none, and exports them all.
+check_run_logs() {
+    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/events?limit=10000" >"$TEMP_DIR/events.json"
+    curl -fsS "$web/runs/$run/logs" >"$TEMP_DIR/logs.html"
+    curl -fsS "$web/runs/$run/logs?kind=errors" >"$TEMP_DIR/errors.html"
+    curl -fsS "$web/runs/$run/logs/export" >"$TEMP_DIR/export.json"
+    "$VENV/bin/python" - "$TEMP_DIR" "$secret" "$operator" <<'PY' || fail "the logs tab is wrong"
+import json, re, sys
+from pathlib import Path
+
+temp, secrets = Path(sys.argv[1]), sys.argv[2:]
+logs = (temp / "logs.html").read_text()
+errors = (temp / "errors.html").read_text()
+exported = json.loads((temp / "export.json").read_text())
+timeline = json.loads((temp / "events.json").read_text())
+
+def events(body):
+    table = body[body.index("<tbody>") : body.index("</tbody>")]
+    return re.findall(r'class="logs__event">([^<]*)<', table)
+
+# The runner may post one more event between the reads, so the timeline is a prefix.
+if exported[: len(timeline)] != timeline:
+    sys.exit("the export is not the timeline of the run")
+shown = len(events(logs))
+if shown < len(timeline) or f"{shown} entries" not in logs:
+    sys.exit("the tab does not show every event of the run")
+if "refused:" in logs:
+    sys.exit("the tab refused an event the api wrote")
+wanted = {"run_created", "run_assigned", "run_transition", "network_denied", "merge_conflict"}
+if missing := wanted - set(events(logs)):
+    sys.exit(f"the tab is missing {sorted(missing)}")
+if "network_denied" not in events(errors) or "run_created" in events(errors):
+    sys.exit("the errors filter does not keep only the errors")
+for value in secrets:
+    if value in logs or value in errors:
+        sys.exit("the logs tab carries a credential")
+PY
 }
 
 # The overlay opened as a plain page: the run, its bound secret counted and never shown.
@@ -747,6 +786,8 @@ check_merge
 echo "checking the audit timeline of the run..."
 wait_for 60 audited
 check_secrets
+echo "checking the logs & audit tab of the run..."
+check_run_logs
 echo "rerunning the run from its overlay, then stopping the copy..."
 rerun_key="$(curl -fsS "$web/runs/$run/rerun" | sed -n 's/.*name="key" value="\([0-9a-f]*\)".*/\1/p')"
 copy="$(web_post "$run" rerun "$rerun_key")"

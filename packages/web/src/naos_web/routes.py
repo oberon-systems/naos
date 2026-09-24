@@ -1,4 +1,5 @@
 import asyncio
+import json
 from dataclasses import replace
 from typing import Annotated, Literal
 from urllib.parse import parse_qsl, urlsplit
@@ -8,7 +9,7 @@ from fastapi import APIRouter, Query, Request, WebSocket, WebSocketException, st
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from naos_web import confirm, new_run, terminal
+from naos_web import confirm, events, new_run, terminal
 from naos_web.client import ApiClient, ApiError, Choices, Dashboard, Row, RunDetail
 from naos_web.clock import NowDep
 from naos_web.format import ago
@@ -28,8 +29,15 @@ from naos_web.pages import (
 from naos_web.rows import RunDetailRow, run_detail, run_rows, runner_detail, runner_rows
 
 State = Literal["all", "active", "queued", "waiting_merge", "failed"]
-Tab = Literal["overview", "terminal"]
+Tab = Literal["overview", "terminal", "logs"]
 StateQuery = Annotated[State, Query()]
+
+LOG_KINDS: tuple[tuple[events.Kind, str], ...] = (
+    ("all", "All"),
+    ("api", "API"),
+    ("runner", "Runner"),
+    ("errors", "Errors"),
+)
 
 router = APIRouter()
 
@@ -361,7 +369,9 @@ def _detail_row(detail: RunDetail, now: int) -> RunDetailRow:
     )
 
 
-async def _run_panel(request: Request, run_id: str, now: int, tab: Tab) -> HTMLResponse:
+async def _run_panel(
+    request: Request, run_id: str, now: int, tab: Tab, kind: events.Kind = "all"
+) -> HTMLResponse:
     api: ApiClient = request.app.state.api
     try:
         detail = await api.run_detail(run_id)
@@ -374,6 +384,9 @@ async def _run_panel(request: Request, run_id: str, now: int, tab: Tab) -> HTMLR
         run=_detail_row(detail, now),
         tab=tab,
         terminal=terminal_view(request, run_id, detail.run["status"]),
+        log_kinds=LOG_KINDS,
+        log_kind=kind,
+        log_rows=events.log_rows(detail.events, detail.runners, kind),
     )
 
 
@@ -400,6 +413,27 @@ async def run_terminal(
         template="run_terminal_window.html",
         run=_detail_row(detail, now),
         terminal=terminal_view(request, run_id, detail.run["status"]),
+    )
+
+
+@router.get("/runs/{run_id}/logs", response_class=HTMLResponse)
+async def run_logs(
+    request: Request, run_id: str, now: NowDep, kind: events.Kind = "all"
+) -> HTMLResponse:
+    return await _run_panel(request, run_id, now, "logs", kind)
+
+
+@router.get("/runs/{run_id}/logs/export")
+async def run_logs_export(request: Request, run_id: str) -> Response:
+    api: ApiClient = request.app.state.api
+    try:
+        rows = await api.run_events(run_id)
+    except ApiError as err:
+        return failed(request, PAGES["runs"], err)
+    return Response(
+        json.dumps(rows, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{run_id}-events.json"'},
     )
 
 

@@ -55,6 +55,7 @@ class RunDetail:
     policies: dict[str, Row]
     images: list[Row]
     profile: Row | None
+    runners: dict[str, str]
 
 
 @dataclass(frozen=True)
@@ -245,6 +246,7 @@ class ApiClient:
             policies={policy["kind"]: policy for policy in policies},
             images=images,
             profile=profile,
+            runners={row["id"]: row["name"] for row in runners},
         )
 
     async def choices(self) -> Choices:

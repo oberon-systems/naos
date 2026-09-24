@@ -1,0 +1,57 @@
+<div class="run__body run__body--logs">
+    <div class="logs__filters">
+        <div class="logs__kinds">
+            {% for key, label in log_kinds %}
+                {% set href = "/runs/" ~ run.id ~ "/logs" ~ ("" if key == "all" else "?kind=" ~ key) %}
+                <a class="logs__kind{{ " logs__kind--active" if key == log_kind }}"
+                   href="{{ href }}"
+                   hx-get="{{ href }}"
+                   hx-target="#overlay">{{ label }}</a>
+            {% endfor %}
+        </div>
+        <div class="logs__scope">
+            <span class="logs__run">{{ run.id }}</span>
+            <span class="run__sep">·</span>
+            <span>{{ log_rows | length }} {{ "entry" if log_rows | length == 1 else "entries" }}</span>
+            <a class="logs__export" href="/runs/{{ run.id }}/logs/export">Export</a>
+        </div>
+    </div>
+    <div class="logs__timeline">
+        <table class="table logs__table">
+            <colgroup>
+                <col class="logs__col-time">
+                <col class="logs__col-kind">
+                <col class="logs__col-event">
+                <col class="logs__col-actor">
+                <col>
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>TIME</th>
+                    <th>KIND</th>
+                    <th>EVENT</th>
+                    <th>ACTOR</th>
+                    <th>DETAIL</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in log_rows %}
+                    <tr class="logs__row{{ " logs__row--error" if row.error }}{{ " logs__row--refused" if row.refused }}">
+                        <td class="logs__time">{{ row.time }}</td>
+                        <td>
+                            <span class="logs__source logs__source--{{ row.kind }}">{{ row.kind }}</span>
+                        </td>
+                        <td class="logs__event">{{ row.event }}</td>
+                        <td class="logs__actor">{{ row.actor }}</td>
+                        <td class="logs__detail">{{ row.detail }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td class="logs__empty" colspan="5">No entries.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <p class="logs__footer">Audit entries are append-only — the api never rewrites one.</p>
+    </div>
+</div>

@@ -1248,6 +1248,156 @@ body {
   color: var(--ink);
 }
 
+/* run logs & audit */
+
+.run__body--logs {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.logs__filters {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.logs__kinds {
+  display: flex;
+  gap: 8px;
+}
+
+.logs__kind {
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--grey-bg);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--grey-text);
+  text-decoration: none;
+}
+
+.logs__kind--active {
+  background: var(--ink);
+  font-weight: 600;
+  color: var(--surface);
+}
+
+.logs__scope {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--soft);
+}
+
+.logs__run {
+  font-family: var(--font-mono);
+  color: var(--faint);
+}
+
+.logs__export {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--blue-text);
+  text-decoration: none;
+}
+
+.logs__timeline {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.logs__table {
+  table-layout: fixed;
+}
+
+.logs__table thead th {
+  border-top: 0;
+  border-bottom-color: var(--border);
+}
+
+.logs__col-time { width: 106px; }
+.logs__col-kind { width: 74px; }
+.logs__col-event { width: 190px; }
+.logs__col-actor { width: 140px; }
+
+.logs__table tbody td {
+  height: 36px;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-bottom-color: var(--border);
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--soft);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logs__table tbody tr:last-child td {
+  border-bottom: 1px solid var(--border);
+}
+
+.logs__time,
+.logs__actor,
+.logs__event {
+  font-family: var(--font-mono);
+}
+
+.logs__table .logs__time {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.logs__table .logs__actor {
+  font-size: 11px;
+}
+
+.logs__table .logs__event {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.logs__source {
+  display: inline-flex;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--grey-bg);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--grey-text);
+}
+
+.logs__source--runner {
+  background: var(--blue-bg);
+  color: var(--blue-text);
+}
+
+.logs__table .logs__row--error .logs__detail {
+  color: var(--red-text);
+}
+
+.logs__row--refused .logs__event,
+.logs__row--refused .logs__detail {
+  font-style: italic;
+}
+
+.logs__footer {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  margin: 0;
+  padding: 0 16px;
+  background: var(--strip);
+  font-size: 11px;
+  color: var(--soft);
+}
+
 /* run terminal */
 
 .run__body--terminal {

@@ -452,25 +452,75 @@ def list_images() -> list[Row]:
     return IMAGES
 
 
-def _event(seq: int, at: int, event: str, data: Row) -> Row:
+def _event(
+    seq: int,
+    at: int,
+    event: str,
+    data: Row,
+    source: str = "api",
+    actor: str = "system",
+    vm_id: str | None = None,
+) -> Row:
     return {
         "seq": seq,
         "id": f"evt_{seq:032x}",
         "at": at,
-        "source": "api",
+        "source": source,
         "event": event,
-        "actor": "system",
+        "actor": actor,
         "run_id": "run_9f21c4",
-        "vm_id": None,
-        "runner_id": None,
+        "vm_id": vm_id,
+        "runner_id": None if actor == "operator" else ALPHA["id"],
         "data": data,
     }
 
 
+def _runner(seq: int, at: int, event: str, data: Row, vm_id: str | None = None) -> Row:
+    return _event(seq, at, event, data, source="runner", actor="runner", vm_id=vm_id)
+
+
+# The timeline of run_9f21c4, closed by two rows no writer may produce.
 RUN_EVENTS: list[Row] = [
-    _event(1, NOW - 140, "run_created", {}),
-    _event(2, NOW - 134, "run_transition", {"from": "PENDING", "to": "STARTING", "reason": None}),
-    _event(3, NOW - 120, "run_transition", {"from": "STARTING", "to": "STARTED", "reason": None}),
+    _event(
+        1,
+        NOW - 140,
+        "run_created",
+        {"workspace": "alpha", "profile": "build-small"},
+        actor="operator",
+    ),
+    _event(2, NOW - 138, "run_assigned", {"lease_id": "lease_5d2a91", "slot": 1, "slots": 2}),
+    _event(
+        3,
+        NOW - 134,
+        "run_transition",
+        {"from": "PENDING", "to": "STARTING", "reason": None},
+        actor="runner",
+    ),
+    _runner(4, NOW - 134, "run_claimed", {}),
+    _event(
+        5, NOW - 133, "credentials_issued", {"names": ["alpha-token"], "ttl": 2700}, actor="runner"
+    ),
+    _runner(6, NOW - 130, "vm_created", {}, vm_id="vm_7c1e"),
+    _event(
+        7,
+        NOW - 120,
+        "run_transition",
+        {"from": "STARTING", "to": "STARTED", "reason": None},
+        actor="runner",
+    ),
+    _runner(
+        8,
+        NOW - 60,
+        "network_denied",
+        {
+            "protocol": "https",
+            "host": "private.example.com",
+            "rule": "deny",
+            "reason": "denied by policy",
+        },
+    ),
+    _runner(9, NOW - 50, "vm_exploded", {"note": "rm -rf /"}),
+    _runner(10, NOW - 40, "run_claimed", {"token": "secret-alpha-value"}),
 ]
 
 

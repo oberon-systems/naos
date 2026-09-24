@@ -48,10 +48,15 @@
            href="/runs/{{ run.id }}/terminal"
            hx-get="/runs/{{ run.id }}/terminal"
            hx-target="#overlay">Terminal</a>
-        <a class="run__tab" href="/runs/{{ run.id }}/logs">Logs &amp; Audit</a>
+        <a class="run__tab{{ " run__tab--active" if tab == "logs" }}"
+           href="/runs/{{ run.id }}/logs"
+           hx-get="/runs/{{ run.id }}/logs"
+           hx-target="#overlay">Logs &amp; Audit</a>
     </nav>
     {% if tab == "terminal" %}
         {% include "partials/run_terminal.html" %}
+    {% elif tab == "logs" %}
+        {% include "partials/run_logs.html" %}
     {% else %}
         <div class="run__body">
             <div class="run__column">
