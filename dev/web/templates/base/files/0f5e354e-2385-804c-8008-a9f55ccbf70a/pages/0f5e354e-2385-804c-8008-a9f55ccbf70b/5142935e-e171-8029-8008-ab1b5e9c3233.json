@@ -1,6 +1,6 @@
 {
   "id": "5142935e-e171-8029-8008-ab1b5e9c3233",
-  "name": "chip log",
+  "name": "chip api",
   "type": "frame",
   "x": 4170,
   "y": 479,
@@ -89,7 +89,7 @@
   "r4": 4,
   "fills": [
     {
-      "fillColor": "#eff8ff",
+      "fillColor": "#f2f4f7",
       "fillOpacity": 1
     }
   ],

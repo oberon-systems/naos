@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 2992,
       "y": 1036.8000019192696,
-      "width": 410.4125061035156,
-      "height": 16.000001907348633,
-      "x1": 0,
-      "y1": 0.800000011920929,
-      "x2": 410.4125061035156,
-      "y2": 16.80000191926956,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "400",
+      "y1": 0.800000011920929,
+      "width": 410.4125061035156,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 2992,
+      "x1": 0,
+      "y2": 16.80000191926956,
       "fills": [
         {
           "fillColor": "#e2e8f0",
           "fillOpacity": 1
         }
       ],
+      "x2": 410.4125061035156,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
+      "height": 16.000001907348633,
       "text": "wscat -c wss://192.0.2.10/api/v1/runs/run_9f21c4/attach \\"
     }
   ]

@@ -1,0 +1,147 @@
+{
+  "id": "d3524346-4bfd-8007-8008-aff55b302ee2",
+  "name": "Text",
+  "type": "text",
+  "x": 24,
+  "y": 76,
+  "width": 83,
+  "height": 31,
+  "rotation": 0,
+  "selrect": {
+    "x": 24,
+    "y": 76,
+    "width": 83,
+    "height": 31,
+    "x1": 24,
+    "y1": 76,
+    "x2": 107,
+    "y2": 107
+  },
+  "points": [
+    {
+      "x": 24,
+      "y": 76
+    },
+    {
+      "x": 107,
+      "y": 76
+    },
+    {
+      "x": 107,
+      "y": 107
+    },
+    {
+      "x": 24,
+      "y": 107
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "d3524346-4bfd-8007-8008-aff55b302edb",
+  "frameId": "d3524346-4bfd-8007-8008-aff55b302edb",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-width",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "22",
+                "fontWeight": "600",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "600",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#101828",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "Runners"
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "22",
+            "fontWeight": "600",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "600",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#101828",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 24,
+      "y": 104.80000078678131,
+      "width": 82.625,
+      "height": 27.200000762939453,
+      "x1": 0,
+      "y1": 1.600000023841858,
+      "x2": 82.625,
+      "y2": 28.80000078678131,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "22px",
+      "fontWeight": "600",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#101828",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "Runners"
+    }
+  ]
+}

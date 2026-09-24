@@ -4,17 +4,17 @@
   "type": "text",
   "x": 4574,
   "y": 590.5,
-  "width": 92,
+  "width": 317,
   "height": 17,
   "rotation": 0,
   "selrect": {
     "x": 4574,
     "y": 590.5,
-    "width": 92,
+    "width": 317,
     "height": 17,
     "x1": 4574,
     "y1": 590.5,
-    "x2": 4666,
+    "x2": 4891,
     "y2": 607.5
   },
   "points": [
@@ -23,11 +23,11 @@
       "y": 590.5
     },
     {
-      "x": 4666,
+      "x": 4891,
       "y": 590.5
     },
     {
-      "x": 4666,
+      "x": 4891,
       "y": 607.5
     },
     {
@@ -82,12 +82,12 @@
                 "letterSpacing": "0",
                 "fills": [
                   {
-                    "fillColor": "#667085",
+                    "fillColor": "#b42318",
                     "fillOpacity": 1
                   }
                 ],
                 "fontFamily": "Inter Tight",
-                "text": "2s ago \u00b7 every 10s"
+                "text": "https private.example.com \u00b7 rule none \u00b7 no matching allow rule"
               }
             ],
             "typographyRefId": null,
@@ -104,7 +104,7 @@
             "letterSpacing": "0",
             "fills": [
               {
-                "fillColor": "#667085",
+                "fillColor": "#b42318",
                 "fillOpacity": 1
               }
             ],
@@ -119,29 +119,29 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 605.77272772789,
+      "x": 4574,
+      "y": 606.4999998211861,
+      "width": 316.0625,
+      "height": 15.199999809265137,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 316.0625,
+      "y2": 15.999999821186066,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "400",
-      "y1": 0.7272727489471436,
-      "width": 91.6477279663086,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 4574,
-      "x1": 0,
-      "y2": 15.272727727890015,
       "fills": [
         {
-          "fillColor": "#667085",
+          "fillColor": "#b42318",
           "fillOpacity": 1
         }
       ],
-      "x2": 91.6477279663086,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "height": 14.545454978942871,
-      "text": "2s ago \u00b7 every 10s"
+      "text": "https private.example.com \u00b7 rule none \u00b7 no matching allow rule"
     }
   ]
 }

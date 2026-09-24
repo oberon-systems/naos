@@ -1,0 +1,99 @@
+{
+  "id": "d3524346-4bfd-8007-8008-b06f950e37ff",
+  "name": "pill STARTED",
+  "type": "frame",
+  "x": 2810,
+  "y": 258,
+  "width": 66,
+  "height": 20,
+  "rotation": 0,
+  "selrect": {
+    "x": 2810,
+    "y": 258,
+    "width": 66,
+    "height": 20,
+    "x1": 2810,
+    "y1": 258,
+    "x2": 2876,
+    "y2": 278
+  },
+  "points": [
+    {
+      "x": 2810,
+      "y": 258
+    },
+    {
+      "x": 2876,
+      "y": 258
+    },
+    {
+      "x": 2876,
+      "y": 278
+    },
+    {
+      "x": 2810,
+      "y": 278
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "d3524346-4bfd-8007-8008-b06f9504cd88",
+  "frameId": "d3524346-4bfd-8007-8008-b06f9504cd88",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 3,
+    "p2": 9,
+    "p3": 3,
+    "p4": 9
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 11,
+  "layoutItemHSizing": "auto",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5",
+  "layoutItemVSizing": "auto",
+  "r3": 11,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 11,
+  "layoutFlexDir": "row",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 11,
+  "fills": [
+    {
+      "fillColor": "#eff8ff",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "d3524346-4bfd-8007-8008-b06f951a5ce2"
+  ]
+}

@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 1600,
       "y": 264.80000191926956,
-      "width": 129.6125030517578,
-      "height": 16.000001907348633,
-      "x1": 0,
-      "y1": 0.800000011920929,
-      "x2": 129.6125030517578,
-      "y2": 16.80000191926956,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "400",
+      "y1": 0.800000011920929,
+      "width": 129.6125030517578,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 1600,
+      "x1": 0,
+      "y2": 16.80000191926956,
       "fills": [
         {
           "fillColor": "#64748b",
           "fillOpacity": 1
         }
       ],
+      "x2": 129.6125030517578,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
+      "height": 16.000001907348633,
       "text": "Welcome to Alpine!"
     }
   ]

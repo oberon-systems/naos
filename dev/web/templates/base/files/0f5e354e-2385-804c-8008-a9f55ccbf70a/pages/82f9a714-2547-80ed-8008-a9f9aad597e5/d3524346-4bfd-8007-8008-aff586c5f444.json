@@ -1,0 +1,147 @@
+{
+  "id": "d3524346-4bfd-8007-8008-aff586c5f444",
+  "name": "Text",
+  "type": "text",
+  "x": 1348,
+  "y": 487.5,
+  "width": 40,
+  "height": 15,
+  "rotation": 0,
+  "selrect": {
+    "x": 1348,
+    "y": 487.5,
+    "width": 40,
+    "height": 15,
+    "x1": 1348,
+    "y1": 487.5,
+    "x2": 1388,
+    "y2": 502.5
+  },
+  "points": [
+    {
+      "x": 1348,
+      "y": 487.5
+    },
+    {
+      "x": 1388,
+      "y": 487.5
+    },
+    {
+      "x": 1388,
+      "y": 502.5
+    },
+    {
+      "x": 1348,
+      "y": 502.5
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "d3524346-4bfd-8007-8008-aff5867fc8cd",
+  "frameId": "d3524346-4bfd-8007-8008-aff5867fc8cd",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-width",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.2",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.2",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "12",
+                "fontWeight": "600",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "600",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#b42318",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "Revoke"
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "12",
+            "fontWeight": "600",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "600",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#b42318",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 1348,
+      "y": 501.9000007510185,
+      "width": 39.525001525878906,
+      "height": 15.200000762939453,
+      "x1": 0,
+      "y1": -0.800000011920929,
+      "x2": 39.525001525878906,
+      "y2": 14.400000751018524,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "12px",
+      "fontWeight": "600",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#b42318",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "Revoke"
+    }
+  ],
+  "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5"
+}
