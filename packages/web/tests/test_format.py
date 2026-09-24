@@ -80,3 +80,18 @@ def test_slots_read_as_the_board_writes_them(
     capacity: int | None, held: int, expected: str
 ) -> None:
     assert format.slots(capacity, held) == expected
+
+
+@pytest.mark.parametrize(
+    ("seconds", "expected"),
+    [
+        (42, "42s"),
+        (2520, "42m"),
+        (14400, "4h"),
+        (42120, "11h 42m"),
+        (97200, "1d 3h"),
+        (172800, "2d"),
+    ],
+)
+def test_a_window_reads_to_the_next_unit(seconds: int, expected: str) -> None:
+    assert format.fine(seconds) == expected

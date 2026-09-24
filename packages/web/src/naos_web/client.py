@@ -63,6 +63,7 @@ class RunnerDetail:
     runner: Row
     runs: list[Row]
     events: list[Row]
+    fleet: list[Row]
 
 
 def read_token(path: Path | None) -> str | None:
@@ -105,10 +106,14 @@ class ApiClient:
     async def _call(self, method: str, path: str, **kwargs: Any) -> Any:
         return (await self._request(method, path, **kwargs)).json()
 
-    async def runs(self, state: str | None = None, limit: int = 50) -> list[Row]:
+    async def runs(
+        self, state: str | None = None, limit: int = 50, runner: str | None = None
+    ) -> list[Row]:
         params: dict[str, Any] = {"limit": limit}
         if state is not None:
             params["state"] = state
+        if runner is not None:
+            params["runner"] = runner
         rows: list[Row] = await self._call("GET", "/runs", params=params)
         return rows
 
@@ -117,12 +122,21 @@ class ApiClient:
         return row
 
     async def runners(self) -> list[Row]:
-        rows: list[Row] = await self._call("GET", "/runners")
+        rows: list[Row] = await self._call("GET", "/runners", params={"limit": 100})
         return rows
 
-    async def events(self, runner_id: str, limit: int = 5) -> list[Row]:
+    async def revoke_runner(self, runner_id: str) -> Row:
+        row: Row = await self._call("POST", f"/runners/{runner_id}/revoke")
+        return row
+
+    async def drain_runner(self, runner_id: str) -> Row:
+        row: Row = await self._call("POST", f"/runners/{runner_id}/drain")
+        return row
+
+    # Newest first, so a short page is the latest of a runner that has run for months.
+    async def events(self, runner_id: str, limit: int = 500) -> list[Row]:
         rows: list[Row] = await self._call(
-            "GET", "/audit", params={"runner_id": runner_id, "limit": limit}
+            "GET", "/audit", params={"runner_id": runner_id, "limit": limit, "order": "desc"}
         )
         return rows
 
@@ -219,12 +233,12 @@ class ApiClient:
 
     async def runner(self, runner_id: str) -> RunnerDetail:
         runners, runs, events = await asyncio.gather(
-            self.runners(), self.runs(limit=100), self.events(runner_id)
+            self.runners(), self.runs(limit=100, runner=runner_id), self.events(runner_id)
         )
         found = next((row for row in runners if row["id"] == runner_id), None)
         if found is None:
             raise ApiError(f"the api knows no runner {runner_id}")
-        return RunnerDetail(runner=found, runs=runs, events=events)
+        return RunnerDetail(runner=found, runs=runs, events=events, fleet=runners)
 
     # The policies are the ones the spec names, so the card shows what this Run was given.
     async def run_detail(self, run_id: str) -> RunDetail:

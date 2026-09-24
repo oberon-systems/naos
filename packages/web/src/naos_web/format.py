@@ -50,3 +50,16 @@ def lease_percent(acquired_at: int | None, expires_at: int | None, now: int) -> 
 
 def slots(capacity: int | None, held: int) -> str:
     return f"{DASH} slots" if capacity is None else f"{held} / {capacity} slots"
+
+
+def fine(seconds: int) -> str:
+    if seconds < HOUR:
+        return coarse(seconds)
+    unit, rest, small = (HOUR, MINUTE, "m") if seconds < DAY else (DAY, HOUR, "h")
+    head = coarse(seconds - seconds % unit)
+    tail = seconds % unit // rest
+    return f"{head} {tail}{small}" if tail else head
+
+
+def left(then: int, now: int) -> int:
+    return max(then - now, 0)

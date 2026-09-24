@@ -1,0 +1,94 @@
+{% from "components.html" import pill %}
+<div class="run__body run__body--logs">
+    <div class="logs__filters">
+        <div class="logs__kinds">
+            {% set base = "/runners/" ~ runner.id ~ "/audit?scope=" ~ scope %}
+            <details class="runner__menu">
+                <summary class="logs__kind runner__menu-toggle">
+                    {{ audit_label }}<span class="runner__menu-caret" aria-hidden="true">▾</span>
+                </summary>
+                <ul class="runner__menu-list">
+                    <li>
+                        <a class="runner__menu-item{{ " runner__menu-item--active" if not audit_run }}"
+                           href="{{ base }}"
+                           hx-get="{{ base }}"
+                           hx-target="#overlay">
+                            <span class="runner__menu-check">{{ "✓" if not audit_run }}</span>
+                            <span class="runner__menu-seq">All runs</span>
+                        </a>
+                    </li>
+                    {% for run in runner.runs %}
+                        <li>
+                            <a class="runner__menu-item{{ " runner__menu-item--active" if run.id == audit_run }}"
+                               href="{{ base }}&run={{ run.id }}"
+                               hx-get="{{ base }}&run={{ run.id }}"
+                               hx-target="#overlay">
+                                <span class="runner__menu-check">{{ "✓" if run.id == audit_run }}</span>
+                                <span class="runner__menu-seq">#{{ run.seq }}</span>
+                                <span class="table__secondary">{{ run.workspace }}</span>
+                                {{ pill(run.status, run.tone) }}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </details>
+            <span class="runner__menu-sep" aria-hidden="true"></span>
+            {% for key, label in scopes %}
+                {% set href = "/runners/" ~ runner.id ~ "/audit?scope=" ~ key ~ ("&run=" ~ audit_run if audit_run else "") %}
+                <a class="logs__kind{{ " logs__kind--active" if key == scope }}"
+                   href="{{ href }}"
+                   hx-get="{{ href }}"
+                   hx-target="#overlay">{{ label }}</a>
+            {% endfor %}
+        </div>
+        <div class="logs__scope">
+            <span>{{ audit_rows | length }} {{ "entry" if audit_rows | length == 1 else "entries" }}</span>
+            <a class="logs__export" href="/runners/{{ runner.id }}/audit/export">Export</a>
+        </div>
+    </div>
+    <div class="logs__timeline">
+        <table class="table logs__table">
+            <colgroup>
+                <col class="logs__col-time">
+                <col class="logs__col-event">
+                <col class="logs__col-run">
+                <col class="logs__col-kind">
+                <col>
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>TIME</th>
+                    <th>EVENT</th>
+                    <th>RUN</th>
+                    <th>ACTOR</th>
+                    <th>DETAIL</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in audit_rows %}
+                    <tr class="logs__row{{ " logs__row--error" if row.error }}{{ " logs__row--refused" if row.refused }}">
+                        <td class="logs__time">{{ row.time }}</td>
+                        <td class="logs__event">{{ row.event }}</td>
+                        <td>
+                            {% if row.run_id %}
+                                <a class="card__link"
+                                   href="/runs/{{ row.run_id }}"
+                                   hx-get="/runs/{{ row.run_id }}"
+                                   hx-target="#overlay">{{ row.run }}</a>
+                            {% else %}
+                                <span class="table__secondary">{{ row.run }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="logs__actor">{{ row.actor }}</td>
+                        <td class="logs__detail">{{ row.detail }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td class="logs__empty" colspan="5">No entries.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <p class="logs__footer">Audit entries are append-only — the api never rewrites one.</p>
+    </div>
+</div>

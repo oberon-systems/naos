@@ -16,21 +16,36 @@ from naos_web.format import ago
 from naos_web.pages import (
     EXITS,
     FENCING,
+    LEASE_NOTE,
     LIFECYCLE,
     NAV,
     PAGES,
     RUN_COLUMNS,
     RUN_FILTERS,
+    RUNNER_COLUMNS,
+    RUNNER_FILTERS,
+    RUNNER_NOTE,
     STATUS_TONE,
     ListPage,
     Summary,
     TileValue,
 )
-from naos_web.rows import RunDetailRow, run_detail, run_rows, runner_detail, runner_rows
+from naos_web.rows import (
+    RunDetailRow,
+    fleet,
+    pick,
+    run_detail,
+    run_rows,
+    runner_detail,
+    runner_rows,
+)
 
 State = Literal["all", "active", "queued", "waiting_merge", "failed"]
 Tab = Literal["overview", "terminal", "logs"]
 StateQuery = Annotated[State, Query()]
+Fleet = Literal["all", "live", "stale", "revoked"]
+FleetQuery = Annotated[Fleet, Query()]
+SearchQuery = Annotated[str, Query(max_length=128)]
 
 LOG_KINDS: tuple[tuple[events.Kind, str], ...] = (
     ("all", "All"),
@@ -548,27 +563,147 @@ async def rerun(request: Request, run_id: str) -> Response:
     return _reopen(request, created["id"])
 
 
+# Search and filters narrow the table; the tiles always count the whole fleet.
 @router.get("/runners", response_class=HTMLResponse)
-def runners(request: Request) -> HTMLResponse:
-    return render(request, PAGES["runners"])
+async def runners(
+    request: Request, now: NowDep, state: FleetQuery = "all", q: SearchQuery = ""
+) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        every = await api.runners()
+    except ApiError as err:
+        return failed(request, PAGES["runners"], err)
+    return render(
+        request,
+        PAGES["runners"],
+        fleet(every),
+        template="partials/runners_body.html" if wants_fragment(request) else "runners.html",
+        runners=runner_rows(pick(every, state, q), now),
+        runner_filters=RUNNER_FILTERS,
+        runner_columns=RUNNER_COLUMNS,
+        runner_note=RUNNER_NOTE,
+        state=state,
+        query=q,
+    )
 
 
-# The overlay the board opens from a runner row. A plain request gets it inside the
-# shell, so the panel is reachable without htmx and a link to it can be shared.
-@router.get("/runners/{runner_id}", response_class=HTMLResponse)
-async def runner(request: Request, runner_id: str, now: NowDep) -> HTMLResponse:
+RunnerTab = Literal["overview", "runs", "audit"]
+
+
+# The popup a runner row opens. A plain request gets it inside the shell, so the
+# popup is reachable without htmx and a link to it can be shared.
+async def _runner_panel(
+    request: Request,
+    runner_id: str,
+    now: int,
+    tab: RunnerTab,
+    scope: events.Scope = "all",
+    run: str | None = None,
+) -> HTMLResponse:
     api: ApiClient = request.app.state.api
     try:
         detail = await api.runner(runner_id)
     except ApiError as err:
         return failed_overlay(request, PAGES["runners"], err)
+    row = runner_detail(detail.runner, detail.runs, now)
+    seqs = {found["id"]: found["seq"] for found in detail.runs}
     return render(
         request,
         PAGES["runners"],
+        fleet(detail.fleet),
         template="runner_overlay.html" if wants_fragment(request) else "runner_overlay_page.html",
-        runner=runner_detail(detail.runner, detail.runs, detail.events, now),
+        runners=runner_rows(detail.fleet, now),
+        runner_filters=RUNNER_FILTERS,
+        runner_columns=RUNNER_COLUMNS,
+        runner_note=RUNNER_NOTE,
+        state="all",
+        query="",
+        runner=row,
+        tab=tab,
+        lease_note=LEASE_NOTE,
         status_tone=STATUS_TONE,
+        scopes=events.SCOPES,
+        scope=scope,
+        audit_run=run if run in seqs else None,
+        audit_label=f"#{seqs[run]}" if run in seqs else "All runs",
+        audit_rows=events.runner_audit(
+            detail.events, seqs, scope, run if run in seqs else None, now
+        ),
     )
+
+
+@router.get("/runners/{runner_id}", response_class=HTMLResponse)
+async def runner(request: Request, runner_id: str, now: NowDep) -> HTMLResponse:
+    return await _runner_panel(request, runner_id, now, "overview")
+
+
+@router.get("/runners/{runner_id}/runs", response_class=HTMLResponse)
+async def runner_runs(request: Request, runner_id: str, now: NowDep) -> HTMLResponse:
+    return await _runner_panel(request, runner_id, now, "runs")
+
+
+@router.get("/runners/{runner_id}/audit", response_class=HTMLResponse)
+async def runner_audit(
+    request: Request,
+    runner_id: str,
+    now: NowDep,
+    scope: events.Scope = "all",
+    run: Annotated[str, Query(max_length=64)] = "",
+) -> HTMLResponse:
+    return await _runner_panel(request, runner_id, now, "audit", scope, run or None)
+
+
+@router.get("/runners/{runner_id}/audit/export")
+async def runner_audit_export(request: Request, runner_id: str) -> Response:
+    api: ApiClient = request.app.state.api
+    try:
+        rows = await api.events(runner_id, limit=1000)
+    except ApiError as err:
+        return failed(request, PAGES["runners"], err)
+    return Response(
+        json.dumps(rows, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{runner_id}-audit.json"'},
+    )
+
+
+RunnerAct = Literal["revoke", "drain"]
+ASKS = {"revoke": confirm.revoke, "drain": confirm.drain}
+
+
+# Declared after the tabs, whose paths this one would otherwise take for an action.
+@router.get("/runners/{runner_id}/{act}", response_class=HTMLResponse)
+async def runner_confirm(
+    request: Request, runner_id: str, act: RunnerAct, now: NowDep
+) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        detail = await api.runner(runner_id)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["runners"], err)
+    row = runner_detail(detail.runner, detail.runs, now)
+    return render(
+        request,
+        PAGES["runners"],
+        template="run_confirm_overlay.html" if wants_fragment(request) else "run_confirm_page.html",
+        confirm=ASKS[act](row),
+    )
+
+
+@router.post("/runners/{runner_id}/{act}", response_class=HTMLResponse)
+async def runner_act(request: Request, runner_id: str, act: RunnerAct) -> Response:
+    api: ApiClient = request.app.state.api
+    try:
+        if act == "revoke":
+            await api.revoke_runner(runner_id)
+        else:
+            await api.drain_runner(runner_id)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["runners"], err)
+    target = f"/runners/{runner_id}"
+    if wants_fragment(request):
+        return Response(headers={"HX-Redirect": target})
+    return RedirectResponse(target, status_code=303)
 
 
 @router.get("/overlay/close", response_class=HTMLResponse)

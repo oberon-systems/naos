@@ -52,7 +52,7 @@ def _entries(count: int) -> str:
 
 
 def _joined(*parts: str | None) -> str:
-    return " · ".join(part for part in parts if part)
+    return " \u00b7 ".join(part for part in parts if part)
 
 
 def _vm(row: Row) -> str:
@@ -147,7 +147,7 @@ API: dict[str, Schema] = {
     "run_queued": Schema({"position": _count}, _data(lambda d: f"position {d['position']}")),
     "run_assigned": Schema(
         {"lease_id": _text, "slot": _count, "slots": _count},
-        _data(lambda d: f"{d['lease_id']} · slot {d['slot']} of {d['slots']}"),
+        _data(lambda d: f"{d['lease_id']} \u00b7 slot {d['slot']} of {d['slots']}"),
     ),
     "run_transition": Schema(
         {"from": _text, "to": _text, "reason": _maybe_text},
@@ -188,9 +188,33 @@ API: dict[str, Schema] = {
     ),
     "console_attached": Schema({}, _none),
     "console_typing": Schema({"view": _text}, _data(_typing)),
+    "runner_registered": Schema({}, lambda row: "enrollment token"),
+    "runner_revoked": Schema({}, lambda row: "tokens refused, lease ended", lambda d: True),
+    "runner_drained": Schema({}, lambda row: "takes no new run"),
+    "lease_acquired": Schema({"lease_id": _text}, _data(lambda d: str(d["lease_id"]))),
+    "lease_expired": Schema(
+        {"lease_id": _text}, _data(lambda d: str(d["lease_id"])), lambda d: True
+    ),
+    "token_rotated": Schema({}, lambda row: "heartbeat past half the ttl"),
 }
 
 RUNNER: dict[str, Schema] = {
+    "runner_registered": Schema({"runner_id": _text}, _none),
+    "runner_credentials_dropped": Schema(
+        {"runner_id": _text}, lambda row: "token refused, registering again", lambda d: True
+    ),
+    "lease_fenced": Schema(
+        {"vms": _count}, _data(lambda d: f"{_plural(d['vms'], 'VM')} destroyed"), lambda d: True
+    ),
+    "image_cached": Schema({"digest": _text}, _data(lambda d: str(d["digest"]))),
+    "image_rejected": Schema(
+        {"digest": _text, "reason": _text},
+        _data(lambda d: _joined(d["digest"], d["reason"])),
+        lambda d: True,
+    ),
+    "audit_dropped": Schema(
+        {"dropped": _count}, _data(lambda d: f"{d['dropped']} dropped"), lambda d: True
+    ),
     "run_claimed": Schema({}, _none),
     "run_failed": Schema({"reason": _text}, _data(_reason), lambda d: True),
     "orphan_destroyed": Schema({}, _vm),
@@ -312,4 +336,82 @@ def log_rows(events: list[Row], runners: dict[str, str], kind: Kind) -> list[Log
         return [row for row in rows if row.error]
     if kind in SCHEMAS:
         return [row for row in rows if row.kind == kind]
+    return rows
+
+
+Scope = Literal["all", "lease", "token", "runs", "errors"]
+SCOPES: tuple[tuple[Scope, str], ...] = (
+    ("all", "All"),
+    ("lease", "Lease"),
+    ("token", "Token"),
+    ("runs", "Runs"),
+    ("errors", "Errors"),
+)
+LEASE_EVENTS = frozenset(
+    {"lease_acquired", "lease_expired", "lease_fenced", "waiting_rebound", "runner_drained"}
+)
+TOKEN_EVENTS = frozenset(
+    {
+        "runner_registered",
+        "runner_revoked",
+        "runner_credentials_dropped",
+        "token_rotated",
+        "credentials_issued",
+        "mcp_credentials_updated",
+    }
+)
+
+
+@dataclass(frozen=True)
+class RunnerAuditRow:
+    time: str
+    event: str
+    run_id: str | None
+    run: str
+    actor: str
+    detail: str
+    error: bool
+    refused: bool
+
+
+def _in_scope(row: Row, logged: LogRow, scope: Scope) -> bool:
+    if scope == "lease":
+        return row["event"] in LEASE_EVENTS
+    if scope == "token":
+        return row["event"] in TOKEN_EVENTS
+    if scope == "runs":
+        return bool(row.get("run_id"))
+    if scope == "errors":
+        return logged.error
+    return True
+
+
+# A day-old entry reads better as an age than as a clock time without a date.
+def _when(at: int, now: int) -> str:
+    return clock(at) if now - at < format.DAY else format.ago(at, now)
+
+
+def runner_audit(
+    events: list[Row], seqs: dict[str, int], scope: Scope, run: str | None, now: int
+) -> list[RunnerAuditRow]:
+    rows = []
+    for row in events:
+        if run and row.get("run_id") != run:
+            continue
+        logged = log_row(row, {})
+        if not _in_scope(row, logged, scope):
+            continue
+        run_id = row.get("run_id")
+        rows.append(
+            RunnerAuditRow(
+                time=_when(row["at"], now),
+                event=logged.event,
+                run_id=run_id if run_id in seqs else None,
+                run=f"#{seqs[run_id]}" if run_id in seqs else (run_id or format.DASH),
+                actor=str(row["actor"]) if row["actor"] in ACTORS else "unknown",
+                detail=logged.detail,
+                error=logged.error,
+                refused=logged.refused,
+            )
+        )
     return rows

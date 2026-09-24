@@ -68,6 +68,14 @@ def test_a_run_without_policies_says_so(client: TestClient) -> None:
     assert facts["Lease fencing"] == "off \u00b7 no lease held"
 
 
+def test_the_runner_card_reads_where_the_runner_is(client: TestClient) -> None:
+    facts = _facts(client.get(f"/runs/{STARTED}", headers=HX).text)
+
+    assert facts["Host"] == "alpha-01.example.com"
+    assert facts["Address"] == "192.0.2.11"
+    assert facts["Token"] == "rotates in 11h 42m"  # noqa: S105  a rotation window, not a secret
+
+
 def test_the_runner_card_opens_the_runner(client: TestClient) -> None:
     body = client.get(f"/runs/{STARTED}", headers=HX).text
 

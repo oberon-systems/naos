@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -11,6 +12,8 @@ from naos_web.pages import (
     STATUS_TONE,
     STOPPABLE,
     RowAction,
+    Summary,
+    TileValue,
     Tone,
 )
 
@@ -59,6 +62,12 @@ class RunnerRow:
     percent: int
     heartbeat: str
     held: list[HeldRow]
+    load: str
+    load_tone: Tone | None
+    lease_bar: bool
+    seen: str
+    rotates: str
+    revocable: bool
 
 
 def _action(run: Row) -> Action:
@@ -115,10 +124,10 @@ def _lease(runner: Row, now: int) -> str:
 
 
 @dataclass(frozen=True)
-class EventRow:
-    event: str
-    detail: str
-    at: str
+class Fact:
+    label: str
+    value: str
+    mono: bool = False
 
 
 @dataclass(frozen=True)
@@ -127,83 +136,217 @@ class RunnerDetailRow:
     name: str
     status: str
     tone: Tone
-    enrolled: str
-    slots: str
-    busy: str
+    meta: list[str]
+    load: str
+    load_tone: Tone | None
     free: str
     percent: int
-    lease: str
+    held: list[RunRow]
+    placement: list[Fact]
+    labels: list[str]
+    lease_id: str
+    lease_left: str
     lease_percent: int
-    state: str
-    heartbeat: str
-    registered: str
+    facts: list[Fact]
+    revocable: bool
+    drainable: bool
     runs: list[RunRow]
-    events: list[EventRow]
 
 
-# What the audit row says beside its name, from the fields that event actually carries.
-def _detail(event: Row) -> str:
-    data = event["data"]
-    for key in ("run_id", "lease_id", "names", "to", "reason"):
-        if key in data and data[key]:
-            value = data[key]
-            return ", ".join(value) if isinstance(value, list) else str(value)
-    return ""
+# Slots read by meaning: none at all is a fault, some free is fine, all taken is busy.
+def _load(runner: Row) -> tuple[str, Tone | None]:
+    busy, capacity = len(runner["runs"]), runner["capacity"]
+    if capacity is None:
+        return format.DASH, None
+    if capacity == 0:
+        return f"{busy}/0", "red"
+    return f"{busy}/{capacity}", "blue" if busy >= capacity else "green"
 
 
-def runner_detail(runner: Row, runs: list[Row], events: list[Row], now: int) -> RunnerDetailRow:
+def _lease_id(runner: Row) -> str:
+    if runner["status"] == "revoked" or not runner.get("lease_id"):
+        return format.DASH
+    return str(runner["lease_id"])
+
+
+def _lease_left(runner: Row, now: int) -> str:
+    acquired, expires = runner["lease_acquired_at"], runner["lease_expires_at"]
+    if runner["status"] == "live" and acquired is not None and expires is not None:
+        return f"{format.left(expires, now)}s of {max(expires - acquired, 0)}s left"
+    lapsed = runner.get("lease_lapsed_at")
+    if runner["status"] == "stale" and lapsed is not None:
+        return f"expired {format.ago(lapsed, now)}"
+    return "no live lease"
+
+
+def _rotates(runner: Row, now: int, span: Callable[[int], str]) -> str:
+    if runner["status"] == "revoked":
+        return format.DASH
+    left = format.left(runner["token_rotates_at"], now)
+    return span(left) if left else "next heartbeat"
+
+
+def _token(runner: Row, now: int) -> str:
+    if runner["status"] == "revoked":
+        return "refused"
+    left = format.left(runner["token_rotates_at"], now)
+    return f"rotates in {format.fine(left)}" if left else "rotates on the next heartbeat"
+
+
+def _previous(runner: Row, now: int) -> str:
+    expires = runner.get("prev_token_expires_at")
+    if expires is None or runner["status"] == "revoked":
+        return format.DASH
+    return f"valid {format.fine(format.left(expires, now))} more"
+
+
+STATE_NOTE = {
+    "live": "heartbeat under 30s",
+    "stale": "lease expired, fenced",
+    "revoked": "token refused",
+}
+
+
+def _runner_state(runner: Row, now: int) -> str:
+    status = runner["status"]
+    if status == "live" and runner.get("drained_at") is not None:
+        return "LIVE \u00b7 draining"
+    if status == "live":
+        seen = runner["last_heartbeat_at"]
+        if seen is not None and now - seen >= 30:
+            return f"LIVE \u00b7 heartbeat {format.ago(seen, now)}"
+    return f"{status.upper()} \u00b7 {STATE_NOTE[status]}"
+
+
+def _heartbeat(runner: Row, now: int) -> str:
+    seen = format.ago(runner["last_heartbeat_at"], now)
+    every = runner.get("heartbeat_seconds")
+    return f"{seen} \u00b7 every {every}s" if every and runner["last_heartbeat_at"] else seen
+
+
+def _agent(placement: Row) -> str | None:
+    return f"naos-runner v{placement['version']}" if placement.get("version") else None
+
+
+def _placement(placement: Row) -> list[Fact]:
+    return [
+        Fact("Host", placement.get("host") or format.DASH),
+        Fact("Address", placement.get("address") or format.DASH, mono=True),
+        Fact("Zone", placement.get("zone") or format.DASH),
+        Fact("Platform", placement.get("platform") or format.DASH),
+        Fact("Agent", _agent(placement) or format.DASH),
+    ]
+
+
+# Runs on the current lease come first, the rest follow newest first.
+def _ordered(runner: Row, runs: list[Row]) -> list[Row]:
     held = {run["id"] for run in runner["runs"]}
-    capacity = runner["capacity"]
-    busy = len(runner["runs"])
+    return sorted(runs, key=lambda run: (run["id"] not in held, -run["seq"]))
+
+
+def runner_detail(runner: Row, runs: list[Row], now: int) -> RunnerDetailRow:
+    placement: Row = runner.get("placement") or {}
+    load, load_tone = _load(runner)
+    busy, capacity = len(runner["runs"]), runner["capacity"]
+    held = {run["id"] for run in runner["runs"]}
+    ordered = run_rows(_ordered(runner, runs), [runner], now)
+    meta = [
+        f"enrolled {format.ago(runner['created_at'], now)}",
+        _agent(placement),
+        placement.get("zone"),
+        f"{load} slots" if capacity is not None else None,
+    ]
+    revoked = runner["status"] == "revoked"
     return RunnerDetailRow(
         id=runner["id"],
         name=runner["name"],
         status=runner["status"],
         tone=RUNNER_TONE[runner["status"]],
-        enrolled=f"enrolled {format.ago(runner['created_at'], now)}",
-        slots=format.slots(capacity, busy),
-        busy=format.DASH if capacity is None else f"{busy} / {capacity} busy",
-        free=format.DASH if capacity is None else f"{capacity - busy} free",
+        meta=[part for part in meta if part],
+        load=load,
+        load_tone=load_tone,
+        free=format.DASH if capacity is None else f"{max(capacity - busy, 0)} free",
         percent=0 if not capacity else round(100 * busy / capacity),
-        lease=_lease(runner, now),
+        held=[row for row in ordered if row.id in held],
+        placement=_placement(placement),
+        labels=list(placement.get("labels") or []),
+        lease_id=_lease_id(runner),
+        lease_left=_lease_left(runner, now),
         lease_percent=format.lease_percent(
             runner["lease_acquired_at"], runner["lease_expires_at"], now
         ),
-        state=runner["status"].upper(),
-        heartbeat=format.ago(runner["last_heartbeat_at"], now),
-        registered=format.ago(runner["created_at"], now),
-        runs=[row for row in run_rows([r for r in runs if r["id"] in held], [runner], now)],
-        events=[
-            EventRow(event=row["event"], detail=_detail(row), at=format.ago(row["at"], now))
-            for row in events
+        facts=[
+            Fact("State", _runner_state(runner, now)),
+            Fact("Heartbeat", _heartbeat(runner, now)),
+            Fact("Token", _token(runner, now)),
+            Fact("Previous token", _previous(runner, now)),
+            Fact("Registered", f"{format.ago(runner['created_at'], now)} \u00b7 enrollment token"),
         ],
+        revocable=not revoked,
+        drainable=not revoked and runner.get("drained_at") is None,
+        runs=ordered,
     )
 
 
 def runner_rows(runners: list[Row], now: int) -> list[RunnerRow]:
-    return [
-        RunnerRow(
-            id=runner["id"],
-            name=runner["name"],
-            status=runner["status"],
-            tone=RUNNER_TONE[runner["status"]],
-            slots=format.slots(runner["capacity"], len(runner["runs"])),
-            lease=_lease(runner, now),
-            percent=format.lease_percent(
-                runner["lease_acquired_at"], runner["lease_expires_at"], now
-            ),
-            heartbeat=format.heartbeat_ago(runner["last_heartbeat_at"], now),
-            held=[HeldRow(seq=held["seq"], status=held["status"]) for held in runner["runs"]],
+    rows = []
+    for runner in runners:
+        load, load_tone = _load(runner)
+        revoked = runner["status"] == "revoked"
+        rows.append(
+            RunnerRow(
+                id=runner["id"],
+                name=runner["name"],
+                status=runner["status"],
+                tone=RUNNER_TONE[runner["status"]],
+                slots=format.slots(runner["capacity"], len(runner["runs"])),
+                lease=_lease(runner, now),
+                percent=format.lease_percent(
+                    runner["lease_acquired_at"], runner["lease_expires_at"], now
+                ),
+                heartbeat=format.heartbeat_ago(runner["last_heartbeat_at"], now),
+                held=[HeldRow(seq=held["seq"], status=held["status"]) for held in runner["runs"]],
+                load=load,
+                load_tone=load_tone,
+                lease_bar=not revoked,
+                seen=format.DASH if revoked else format.ago(runner["last_heartbeat_at"], now),
+                rotates=_rotates(runner, now, format.coarse),
+                revocable=not revoked,
+            )
         )
+    return rows
+
+
+def pick(runners: list[Row], state: str, query: str) -> list[Row]:
+    needle = query.strip().lower()
+    return [
+        runner
         for runner in runners
+        if (state == "all" or runner["status"] == state)
+        and (not needle or needle in runner["name"].lower() or needle in runner["id"].lower())
     ]
 
 
-@dataclass(frozen=True)
-class Fact:
-    label: str
-    value: str
-    mono: bool = False
+def fleet(runners: list[Row]) -> Summary:
+    counts = {status: 0 for status in STATE_NOTE}
+    for runner in runners:
+        counts[runner["status"]] += 1
+    live = [runner for runner in runners if runner["status"] == "live"]
+    slots = sum(runner["capacity"] or 0 for runner in live)
+    busy = sum(len(runner["runs"]) for runner in live)
+    return Summary(
+        subtitle=(
+            f"{len(runners)} enrolled \u00b7 {counts['live']} live \u00b7 "
+            f"{busy} of {slots} slots busy"
+        ),
+        values={
+            **{
+                status: TileValue(str(count), STATE_NOTE[status])
+                for status, count in counts.items()
+            },
+            "slots_busy": TileValue(f"{busy} / {slots}", "across live runners"),
+        },
+    )
 
 
 @dataclass(frozen=True)
@@ -325,10 +468,10 @@ def _holder(runner: Row, now: int) -> RunRunnerRow:
         percent=format.lease_percent(runner["lease_acquired_at"], runner["lease_expires_at"], now),
         lease=f"{_lease(runner, now)} \u00b7 renewed on every heartbeat",
         facts=[
-            Fact("Host", format.DASH),
-            Fact("Address", format.DASH),
+            Fact("Host", (runner.get("placement") or {}).get("host") or format.DASH),
+            Fact("Address", (runner.get("placement") or {}).get("address") or format.DASH),
             Fact("Heartbeat", format.ago(runner["last_heartbeat_at"], now)),
-            Fact("Token", format.DASH),
+            Fact("Token", _token(runner, now)),
         ],
     )
 

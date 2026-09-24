@@ -1,0 +1,84 @@
+{% from "components.html" import pill %}
+<div class="run__body run__body--runner">
+    <div class="run__column">
+        <section class="card run__card">
+            <div class="run__card-header">
+                <h3 class="run__card-title">PLACEMENT</h3>
+            </div>
+            <dl class="run__facts">
+                {% for fact in runner.placement %}
+                    <dt>{{ fact.label }}</dt>
+                    <dd{% if fact.mono %} class="run__mono"{% endif %}>{{ fact.value }}</dd>
+                {% endfor %}
+                <dt>Labels</dt>
+                <dd class="runner__labels">
+                    {% for label in runner.labels %}
+                        <span class="runner__label">{{ label }}</span>
+                    {% else %}
+                        —
+                    {% endfor %}
+                </dd>
+            </dl>
+        </section>
+        <section class="card run__card">
+            <div class="run__card-header">
+                <h3 class="run__card-title">LEASE &amp; TOKEN</h3>
+            </div>
+            <div class="run__card-body">
+                <div class="pane__row">
+                    <span class="panel__lease">{{ runner.lease_id }}</span>
+                    <span class="table__secondary">{{ runner.lease_left }}</span>
+                </div>
+                <div class="lease">
+                    <div class="lease__left" style="width: {{ runner.lease_percent }}%"></div>
+                </div>
+                <p class="table__secondary">{{ lease_note }}</p>
+            </div>
+            <dl class="run__facts">
+                {% for fact in runner.facts %}
+                    <dt>{{ fact.label }}</dt>
+                    <dd>
+                        {{ fact.value }}
+                    </dd>
+                {% endfor %}
+            </dl>
+        </section>
+    </div>
+    <div class="run__column">
+        <section class="card run__card">
+            <div class="run__card-header">
+                <h3 class="run__card-title">SLOTS</h3>
+            </div>
+            <div class="run__card-body">
+                <div class="pane__row">
+                    <span class="runner__load{{ " tone-" ~ runner.load_tone if runner.load_tone }}">{{ runner.load }}</span>
+                    <span class="table__secondary">{{ runner.free }}</span>
+                </div>
+                <div class="lease">
+                    <div class="lease__left" style="width: {{ runner.percent }}%"></div>
+                </div>
+                <p class="table__secondary">a pending run waits until a slot frees</p>
+            </div>
+        </section>
+        <section class="card run__card">
+            <div class="run__card-header">
+                <h3 class="run__card-title">IN THE SLOTS</h3>
+            </div>
+            <ul class="panel__list">
+                {% for run in runner.held %}
+                    <li class="panel__run runner__run"
+                        tabindex="0"
+                        hx-get="/runs/{{ run.id }}"
+                        hx-target="#overlay"
+                        hx-trigger="click, keyup[key=='Enter']">
+                        <span class="run__strong">#{{ run.seq }}</span>
+                        <span class="table__secondary">{{ run.workspace }}</span>
+                        {{ pill(run.status, run.tone) }}
+                    </li>
+                {% else %}
+                    <li class="panel__run table__secondary">every slot is free</li>
+                {% endfor %}
+            </ul>
+        </section>
+    </div>
+</div>

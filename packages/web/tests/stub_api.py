@@ -142,6 +142,21 @@ RUNNERS: list[Row] = [
         "last_heartbeat_at": NOW - 2,
         "lease_acquired_at": NOW - 8,
         "lease_expires_at": NOW + 52,
+        "lease_id": "lease_5d2a91",
+        "lease_lapsed_at": None,
+        "token_expires_at": NOW + 42120 + 43200,
+        "token_rotates_at": NOW + 42120,
+        "prev_token_expires_at": NOW + 14400,
+        "drained_at": None,
+        "heartbeat_seconds": 20,
+        "placement": {
+            "host": "alpha-01.example.com",
+            "address": "192.0.2.11",
+            "zone": "zone-a",
+            "platform": "linux/amd64 \u00b7 Ubuntu 24.04",
+            "version": "0.1.0",
+            "labels": ["ci", "amd64"],
+        },
         "revoked_at": None,
     },
     {
@@ -154,6 +169,21 @@ RUNNERS: list[Row] = [
         "last_heartbeat_at": NOW - 4,
         "lease_acquired_at": NOW - 13,
         "lease_expires_at": NOW + 47,
+        "lease_id": "lease_0b77ce",
+        "lease_lapsed_at": None,
+        "token_expires_at": NOW + 21600 + 43200,
+        "token_rotates_at": NOW + 21600,
+        "prev_token_expires_at": None,
+        "drained_at": None,
+        "heartbeat_seconds": None,
+        "placement": {
+            "host": None,
+            "address": None,
+            "zone": None,
+            "platform": None,
+            "version": None,
+            "labels": [],
+        },
         "revoked_at": None,
     },
     {
@@ -169,6 +199,21 @@ RUNNERS: list[Row] = [
         "last_heartbeat_at": NOW - 1,
         "lease_acquired_at": NOW - 2,
         "lease_expires_at": NOW + 58,
+        "lease_id": "lease_a10f34",
+        "lease_lapsed_at": None,
+        "token_expires_at": NOW + 7200 + 43200,
+        "token_rotates_at": NOW + 7200,
+        "prev_token_expires_at": None,
+        "drained_at": None,
+        "heartbeat_seconds": None,
+        "placement": {
+            "host": None,
+            "address": None,
+            "zone": None,
+            "platform": None,
+            "version": None,
+            "labels": [],
+        },
         "revoked_at": None,
     },
     {
@@ -181,6 +226,21 @@ RUNNERS: list[Row] = [
         "last_heartbeat_at": NOW - 94,
         "lease_acquired_at": None,
         "lease_expires_at": None,
+        "lease_id": "lease_7fe201",
+        "lease_lapsed_at": NOW - 34,
+        "token_expires_at": NOW + 75600,
+        "token_rotates_at": NOW + 32400,
+        "prev_token_expires_at": None,
+        "drained_at": None,
+        "heartbeat_seconds": None,
+        "placement": {
+            "host": None,
+            "address": None,
+            "zone": None,
+            "platform": None,
+            "version": None,
+            "labels": [],
+        },
         "revoked_at": None,
     },
     {
@@ -193,6 +253,21 @@ RUNNERS: list[Row] = [
         "last_heartbeat_at": None,
         "lease_acquired_at": None,
         "lease_expires_at": None,
+        "lease_id": "lease_c3e9a0",
+        "lease_lapsed_at": NOW - 7200,
+        "token_expires_at": NOW + 3600,
+        "token_rotates_at": NOW - 39600,
+        "prev_token_expires_at": None,
+        "drained_at": None,
+        "heartbeat_seconds": None,
+        "placement": {
+            "host": None,
+            "address": None,
+            "zone": None,
+            "platform": None,
+            "version": None,
+            "labels": [],
+        },
         "revoked_at": NOW - 7200,
     },
 ]
@@ -209,8 +284,12 @@ RUN_SEQS = [row["seq"] for row in RUNS]
 
 
 @stub.get("/api/v1/runs")
-def list_runs(state: str | None = None, limit: int = Query(50)) -> list[Row]:
+def list_runs(
+    state: str | None = None, runner: str | None = None, limit: int = Query(50)
+) -> list[Row]:
     rows = RUNS if state is None else [r for r in RUNS if r["status"] in STATES[state]]
+    if runner is not None:
+        rows = [r for r in rows if r["runner"] and r["runner"]["id"] == runner]
     return rows[:limit]
 
 
@@ -240,18 +319,57 @@ def summary() -> Row:
 
 
 @stub.get("/api/v1/runners")
-def list_runners() -> list[Row]:
-    return RUNNERS
+def list_runners(limit: int = Query(50)) -> list[Row]:
+    return RUNNERS[:limit]
+
+
+def _runner_row(runner_id: str) -> Row | None:
+    return next((row for row in RUNNERS if row["id"] == runner_id), None)
+
+
+@stub.post("/api/v1/runners/{runner_id}/revoke", response_model=None)
+def revoke_runner(runner_id: str) -> Row | JSONResponse:
+    WRITES.append(("POST", f"/runners/{runner_id}/revoke", {}, None))
+    row = _runner_row(runner_id)
+    if row is None:
+        return JSONResponse({"detail": f"runner {runner_id} does not exist"}, status_code=404)
+    if row["revoked_at"] is None:
+        row |= {"status": "revoked", "revoked_at": NOW, "runs": [], "lease_acquired_at": None}
+    return row
+
+
+@stub.post("/api/v1/runners/{runner_id}/drain", response_model=None)
+def drain_runner(runner_id: str) -> Row | JSONResponse:
+    WRITES.append(("POST", f"/runners/{runner_id}/drain", {}, None))
+    row = _runner_row(runner_id)
+    if row is None:
+        return JSONResponse({"detail": f"runner {runner_id} does not exist"}, status_code=404)
+    if row["revoked_at"] is not None:
+        return JSONResponse({"detail": f"runner {runner_id} is revoked"}, status_code=409)
+    row["drained_at"] = row["drained_at"] or NOW
+    return row
 
 
 @stub.get("/api/v1/audit")
-def audit(runner_id: str | None = None, limit: int = Query(100)) -> list[Row]:
+def audit(runner_id: str | None = None, limit: int = Query(100), order: str = "asc") -> list[Row]:
     rows: list[Row] = [
+        {
+            "seq": 6,
+            "id": "ev_6",
+            "at": NOW - 60,
+            "source": "api",
+            "event": "run_transition",
+            "actor": "runner",
+            "run_id": "run_9f21c4",
+            "vm_id": None,
+            "runner_id": runner_id,
+            "data": {"from": "STARTED", "to": "FAILED", "reason": "guest exited 1"},
+        },
         {
             "seq": 5,
             "id": "ev_5",
             "at": NOW - 120,
-            "source": "api",
+            "source": "runner",
             "event": "run_claimed",
             "actor": "runner",
             "run_id": "run_9f21c4",

@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Literal
+from urllib.parse import quote
 
 Tone = Literal["blue", "green", "amber", "red", "grey", "faint"]
 
@@ -148,6 +149,31 @@ STATUS_TONE: dict[str, Tone] = {
 }
 
 RUNNER_TONE: dict[str, Tone] = {"live": "green", "stale": "amber", "revoked": "red"}
+
+
+@dataclass(frozen=True)
+class RunnerFilter:
+    key: str
+    label: str
+
+    def href(self, query: str) -> str:
+        params = [] if self.key == "all" else [f"state={self.key}"]
+        params += [f"q={quote(query)}"] if query else []
+        return "/runners" + ("?" + "&".join(params) if params else "")
+
+
+RUNNER_FILTERS: tuple[RunnerFilter, ...] = (
+    RunnerFilter("all", "All"),
+    RunnerFilter("live", "Live"),
+    RunnerFilter("stale", "Stale"),
+    RunnerFilter("revoked", "Revoked"),
+)
+RUNNER_COLUMNS = ("RUNNER", "SLOTS", "LEASE", "HEARTBEAT", "ROTATES IN", "")
+RUNNER_NOTE = (
+    "Tokens are never shown here \u2014 the API keeps only their SHA-256, "
+    "and a heartbeat past half the lifetime returns a replacement."
+)
+LEASE_NOTE = "renewed on every heartbeat \u00b7 expiry fences the runner's VMs"
 
 
 @dataclass(frozen=True)

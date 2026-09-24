@@ -1,0 +1,77 @@
+{% from "components.html" import column_header, dot, footer_note %}
+<div class="card__header">
+    <input type="hidden" id="runner-state" name="state" value="{{ state }}">
+    <input class="search"
+           id="runner-search"
+           type="search"
+           name="q"
+           value="{{ query }}"
+           placeholder="Search name or rnr_…"
+           aria-label="Search runners"
+           hx-get="/runners"
+           hx-include="#runner-state"
+           hx-target="#runners"
+           hx-swap="outerHTML"
+           hx-trigger="input changed delay:300ms"
+           hx-push-url="true"
+           hx-preserve="true">
+    <div class="filters">
+        {% for item in runner_filters %}
+            <a class="filter{{ " filter--active" if item.key == state }}"
+               href="{{ item.href(query) }}"
+               hx-get="{{ item.href(query) }}"
+               hx-target="#runners"
+               hx-swap="outerHTML"
+               hx-push-url="true">{{ item.label }}</a>
+        {% endfor %}
+    </div>
+</div>
+<table class="table runners-table">
+    {{ column_header(runner_columns) }}
+    <tbody>
+        {% for runner in runners %}
+            <tr class="runs-table__row"
+                tabindex="0"
+                hx-get="/runners/{{ runner.id }}"
+                hx-target="#overlay"
+                hx-trigger="click[!event.target.closest('.runners-table__action')], keyup[key=='Enter'&&!event.target.closest('.runners-table__action')]">
+                <td>
+                    <div class="runners-table__name">
+                        <span class="dot dot--lg tone-{{ runner.tone }}"
+                              title="{{ runner.status }}"></span>
+                        <span>{{ runner.name }}</span>
+                    </div>
+                    <div class="table__id">{{ runner.id }}</div>
+                </td>
+                <td>
+                    <span class="runners-table__load{{ " tone-" ~ runner.load_tone if runner.load_tone }}">{{ runner.load }}</span>
+                </td>
+                <td>
+                    {% if runner.lease_bar %}
+                        <div class="runners-table__bar" title="{{ runner.lease }}">
+                            <div class="runners-table__fill tone-{{ runner.tone }}"
+                                 style="width: {{ runner.percent }}%"></div>
+                        </div>
+                    {% else %}
+                        <span class="runners-table__faint">—</span>
+                    {% endif %}
+                </td>
+                <td class="runners-table__seen{{ " tone-amber" if runner.status == "stale" }}">{{ runner.seen }}</td>
+                <td class="runners-table__rotates">{{ runner.rotates }}</td>
+                <td class="runners-table__action">
+                    {% if runner.revocable %}
+                        <a class="button button--small button--outline-danger"
+                           href="/runners/{{ runner.id }}/revoke"
+                           hx-get="/runners/{{ runner.id }}/revoke"
+                           hx-target="#overlay">Revoke</a>
+                    {% endif %}
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td class="table__secondary" colspan="{{ runner_columns | length }}">no runner matches</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{{ footer_note(runner_note) }}

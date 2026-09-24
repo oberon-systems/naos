@@ -224,6 +224,11 @@ if held != [1]:
     sys.exit(f"the runner holds {held}, expected the smoke run")
 if row["lease_acquired_at"] is None or row["lease_expires_at"] is None:
     sys.exit("the live runner names no lease window")
+placement = row["placement"]
+if not placement["version"] or not placement["platform"] or not placement["address"]:
+    sys.exit(f"the runner reported no placement: {placement}")
+if not row["heartbeat_seconds"]:
+    sys.exit("the runner reported no heartbeat interval")
 '
 }
 
@@ -244,6 +249,37 @@ if missing:
 if "Bearer" in body or "Authorization" in body:
     sys.exit("the runs page carries the operator credential")
 ' "$1"
+}
+
+# The fleet as the runners page shows it, then the runner popup with its placement and the run.
+check_runners_page() {
+    local runner
+    runner="$(curl -fsS "${auth[@]}" "$api/api/v1/runners" | "$VENV/bin/python" -c '
+import json, sys
+print(json.load(sys.stdin)[0]["id"])
+')"
+    curl -fsS "$web/runners" | "$VENV/bin/python" -c '
+import sys
+body = sys.stdin.read()
+wanted = [">alpha</span>", "dot dot--lg tone-green", "runners-table__load", "runners-table__rotates"]
+missing = [text for text in wanted if text not in body]
+if missing:
+    sys.exit(f"the runners page is missing {missing}")
+if "Bearer" in body or "token_hash" in body:
+    sys.exit("the runners page carries a credential")
+'
+    for tab in "" /runs /audit; do
+        curl -fsS "$web/runners/$runner$tab" | "$VENV/bin/python" -c '
+import sys
+body, tab = sys.stdin.read(), sys.argv[1]
+wanted = {"": ["naos-runner v", "rotates in", "#1</span>"], "/runs": ["#1</div>"], "/audit": ["lease_acquired"]}[tab]
+missing = [text for text in wanted if text not in body]
+if missing:
+    sys.exit(f"the runner popup {tab or "overview"} is missing {missing}")
+if "Bearer" in body or "token_hash" in body:
+    sys.exit("the runner popup carries a credential")
+' "$tab"
+    done
 }
 
 # Exactly one filter holds the run, and it is the one its state belongs to.
@@ -728,6 +764,7 @@ check_runner_slots
 check_summary STARTED 1
 check_page STARTED
 check_page_filters active
+check_runners_page
 check_profile_locked
 check_run_detail STARTED
 check_confirms
