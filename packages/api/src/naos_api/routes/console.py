@@ -74,12 +74,13 @@ async def _until_disconnect(
         if (keys := message.get("bytes")) is not None:
             driving = await _typed(db, hub, run_id, owner, keys, driving)
             continue
-        # the only thing a viewer says is how big its grid is
+        # a viewer says how big its grid is, and takes the claim when its operator acts
         try:
             wanted = json.loads(message.get("text") or "")
             cols, rows = int(wanted["cols"]), int(wanted["rows"])
             view = str(wanted["view"])
-        except (TypeError, ValueError, KeyError):
+            take = wanted.get("take") is True
+        except (TypeError, ValueError, KeyError, AttributeError):
             continue
         try:
             size = await _in_session(
@@ -92,6 +93,7 @@ async def _until_disconnect(
                     owner=owner,
                     view=view,
                     now=int(time.time()),
+                    take=take,
                 ),
             )
         except DomainError:

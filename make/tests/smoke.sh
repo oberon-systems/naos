@@ -582,11 +582,13 @@ async def main() -> None:
     web, run = sys.argv[1], sys.argv[2]
     async with httpx.AsyncClient() as client:
         async with aconnect_ws(f"{web}/runs/{run}/terminal/ws", client) as ws:
-            # an open terminal of the run's keeps the keyboard while it stays open
+            # the socket takes the keyboard the way a browser does when it opens
             driving = False
             with anyio.move_on_after(20):
                 while not driving:
-                    await ws.send_text(json.dumps({"cols": 120, "rows": 30, "view": "window"}))
+                    await ws.send_text(
+                        json.dumps({"cols": 120, "rows": 30, "view": "window", "take": True})
+                    )
                     with anyio.move_on_after(5):
                         while not (text := said(await ws.receive())):
                             pass

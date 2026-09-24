@@ -138,11 +138,13 @@ for a terminal that is not open. The socket closes once the Run has left
 STOPPING and every byte was sent.
 
 A viewer speaks back. A text frame is the grid it asks for,
-`{"cols": n, "rows": n, "view": "panel" | "window"}`, and the answer carries
+`{"cols": n, "rows": n, "view": "panel" | "window", "take": bool}`, and the answer carries
 `driving`, which says whether this viewer holds the guest's one size. A binary
 frame is what its operator typed, and it reaches the guest only from the viewer
-that is driving. A detached window outranks a panel and the claim ages out after
-fifteen seconds, so closing the window hands the keyboard back to the panel.
+that is driving. A frame with `take` moves the claim to its viewer whatever kind
+it is: a terminal sends it when its operator opens it or clicks into it, and its
+periodic frames only keep a claim it already holds. The claim ages out after
+fifteen seconds, so closing the terminal that held it frees the keyboard.
 Taking it writes one `console_typing` event naming the kind of viewer; the keys
 themselves are never stored or audited, though whatever the guest echoes back
 stands in the log like any other output.

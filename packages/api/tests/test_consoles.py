@@ -293,6 +293,35 @@ def test_a_viewer_that_does_not_drive_types_nothing(
     assert [event.data["view"] for event in typed] == ["window"]
 
 
+def test_the_viewer_its_operator_acted_on_takes_the_keyboard(
+    client: TestClient, register: Register, create_run: CreateRun
+) -> None:
+    runner, run_id = _leased(client, register, create_run)
+    _as_operator(client)
+
+    with _runner_socket(client, runner, run_id) as shipped:
+        shipped.send_bytes((0).to_bytes(8, "big") + b"$ ")
+        assert json.loads(shipped.receive_text()) == {"offset": 2}
+
+        with client.websocket_connect(f"/api/v1/runs/{run_id}/attach") as window:
+            window.receive_bytes()
+            window.send_text(json.dumps({"cols": 100, "rows": 24, "view": "window", "take": True}))
+            assert json.loads(window.receive_text())["driving"] is True
+            assert json.loads(shipped.receive_text()) == {"cols": 100, "rows": 24}
+
+            with client.websocket_connect(f"/api/v1/runs/{run_id}/attach") as panel:
+                panel.receive_bytes()
+                panel.send_text(json.dumps({"cols": 90, "rows": 20, "view": "panel", "take": True}))
+                assert json.loads(panel.receive_text())["driving"] is True
+                assert json.loads(shipped.receive_text()) == {"cols": 90, "rows": 20}
+
+                window.send_text(json.dumps({"cols": 100, "rows": 24, "view": "window"}))
+                assert json.loads(window.receive_text())["driving"] is False
+                window.send_bytes(b"rm -rf /\r")
+                panel.send_bytes(b"ls\r")
+                assert shipped.receive_bytes() == b"ls\r"
+
+
 def test_a_foreign_runner_cannot_open_the_console_socket(
     client: TestClient, register: Register, create_run: CreateRun
 ) -> None:

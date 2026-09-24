@@ -133,29 +133,31 @@ def tail(session: Session, run_id: str, after: int) -> Tail:
 # to the runner in the reply to the next console report.
 COLS = range(20, 501)
 ROWS = range(5, 201)
-# The guest has one size, so one viewer holds it. A detached window outranks a
-# panel, and the claim ages out in case a socket dies without saying goodbye.
+# The guest has one size, so one viewer holds it: the one its operator opened or
+# clicked last. The claim ages out in case a socket dies without saying goodbye.
 CLAIM_SECONDS = 15
-RANK = {"panel": 1, "window": 2}
+VIEWS = frozenset({"panel", "window"})
 
 
 def resize(
-    session: Session, run_id: str, cols: int, rows: int, owner: str, view: str, now: int
+    session: Session,
+    run_id: str,
+    cols: int,
+    rows: int,
+    owner: str,
+    view: str,
+    now: int,
+    take: bool = False,
 ) -> ConsoleSize:
     get_run(session, run_id)
     if cols not in COLS or rows not in ROWS:
         raise SizeError(f"a console of {cols}x{rows} is out of range")
-    if view not in RANK:
+    if view not in VIEWS:
         raise SizeError(f"{view} is not a kind of viewer")
     size = session.get(ConsoleSize, run_id)
     if size is None:
         size = ConsoleSize(run_id=run_id, cols=cols, rows=rows, owner=owner, view=view, at=now)
-    elif (
-        size.owner == owner
-        or not size.owner
-        or now - size.at > CLAIM_SECONDS
-        or RANK[view] > RANK.get(size.view, 0)
-    ):
+    elif size.owner == owner or not size.owner or now - size.at > CLAIM_SECONDS or take:
         size.cols, size.rows, size.owner, size.view, size.at = cols, rows, owner, view, now
     else:
         return size

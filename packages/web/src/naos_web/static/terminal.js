@@ -3,8 +3,8 @@
 
   const THEME = { background: "#0b1220", foreground: "#cbd5e1", cursor: "#4ade80" };
 
-  // the guest has one size, so a viewer keeps saying what it wants and takes
-  // the claim over as soon as the one who held it lets go
+  // the guest has one size: a viewer takes it when its operator opens or clicks
+  // into it, and otherwise only keeps saying what it wants
   const CLAIM_MS = 5000;
 
   function start(element) {
@@ -33,11 +33,12 @@
     let driving = true;
     let socket = null;
 
-    function claim() {
+    function claim(take = false) {
       if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ cols: term.cols, rows: term.rows, view }));
+        socket.send(JSON.stringify({ cols: term.cols, rows: term.rows, view, take }));
       }
     }
+    const take = () => claim(true);
 
     // a viewer that does not hold the size shows the holder's grid instead, and
     // shrinks the font, never past the design size, until that grid fits
@@ -99,10 +100,13 @@
     const scheme = location.protocol === "https:" ? "wss:" : "ws:";
     socket = new WebSocket(`${scheme}//${location.host}${element.dataset.stream}`);
     socket.binaryType = "arraybuffer";
-    socket.onopen = claim;
+    socket.onopen = take;
     const keep = setInterval(claim, CLAIM_MS);
-    // clicking into the terminal is how a panel takes the keyboard, so it says so at once
-    term.textarea?.addEventListener("focus", claim);
+    term.textarea?.addEventListener("focus", take);
+    // a click on a focused terminal and a return to its window fire no focus of their own
+    element.addEventListener("pointerdown", take);
+    const refocus = () => document.activeElement === term.textarea && take();
+    window.addEventListener("focus", refocus);
     const encoder = new TextEncoder();
     term.onData((typed) => {
       if (driving && socket.readyState === WebSocket.OPEN) {
@@ -141,6 +145,7 @@
     element.addEventListener("htmx:beforeCleanupElement", () => {
       clearInterval(keep);
       window.removeEventListener("resize", refit);
+      window.removeEventListener("focus", refocus);
       resize.disconnect();
       socket.close();
       term.dispose();
