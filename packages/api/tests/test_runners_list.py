@@ -7,6 +7,7 @@ from sqlmodel import Session
 from naos_api.models import Runner
 
 LEASE_TTL = 60
+TOKEN_TTL = 3600
 Register = Callable[..., dict[str, str]]
 Advance = Callable[[int], None]
 CreateRun = Callable[[str], str]
@@ -47,9 +48,17 @@ def test_a_registered_runner_is_live_and_carries_no_secret(
         "runs",
         "created_at",
         "last_heartbeat_at",
+        "lease_id",
         "lease_acquired_at",
         "lease_expires_at",
+        "lease_lapsed_at",
+        "token_expires_at",
+        "token_rotates_at",
+        "prev_token_expires_at",
         "revoked_at",
+        "drained_at",
+        "heartbeat_seconds",
+        "placement",
     }
     assert row["id"] == runner["runner_id"]
     assert row["name"] == "alpha"
@@ -65,7 +74,7 @@ def test_a_registered_runner_is_live_and_carries_no_secret(
 def test_a_runner_whose_lease_ran_out_is_stale(
     client: TestClient, register: Register, advance: Advance
 ) -> None:
-    register()
+    runner = register()
     advance(LEASE_TTL + 1)
 
     (row,) = _list(client)
@@ -73,6 +82,8 @@ def test_a_runner_whose_lease_ran_out_is_stale(
     assert row["status"] == "stale"
     assert row["lease_acquired_at"] is None
     assert row["lease_expires_at"] is None
+    assert row["lease_id"] == runner["lease_id"]
+    assert row["lease_lapsed_at"] is not None
     assert row["runs"] == []
 
 
@@ -124,3 +135,34 @@ def test_the_newest_runner_comes_first(
     second = register("beta")
 
     assert [row["id"] for row in _list(client)] == [second["runner_id"], first["runner_id"]]
+
+
+def test_the_token_shows_its_windows_and_never_its_value(
+    client: TestClient, register: Register, session: Session
+) -> None:
+    runner = register()
+    stored = session.get(Runner, runner["runner_id"])
+    assert stored is not None
+
+    (row,) = _list(client)
+
+    assert row["token_expires_at"] == stored.token_expires_at
+    assert row["token_rotates_at"] == stored.token_expires_at - TOKEN_TTL // 2
+    assert row["prev_token_expires_at"] is None
+    assert runner["token"] not in str(row)
+    assert stored.token_hash not in str(row)
+
+
+def test_a_rotated_token_names_how_long_the_previous_one_holds(
+    client: TestClient, register: Register, advance: Advance
+) -> None:
+    runner = register()
+    advance(TOKEN_TTL // 2)
+    _heartbeat(client, runner, capacity=1)
+
+    (row,) = _list(client)
+
+    assert row["prev_token_expires_at"] is not None
+    advance(TOKEN_TTL)
+    (row,) = _list(client)
+    assert row["prev_token_expires_at"] is None

@@ -28,12 +28,42 @@ Capacity = Annotated[StrictInt, Field(ge=0, le=64)]
 Reason = Annotated[str, Field(min_length=1, max_length=MAX_REASON_LENGTH)]
 
 
+# Control characters would reach an operator's terminal or page, so none is accepted.
+Printable = r"^[^\x00-\x1f\x7f-\x9f]+$"
+Host = Annotated[str, Field(pattern=r"^[A-Za-z0-9._-]{1,253}$")]
+Label = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")]
+
+
+class PlacementIn(StrictModel):
+    host: Host | None = None
+    zone: Annotated[str, Field(max_length=64, pattern=Printable)] | None = None
+    platform: Annotated[str, Field(max_length=128, pattern=Printable)]
+    version: Annotated[str, Field(pattern=r"^[0-9A-Za-z.+-]{1,32}$")]
+    labels: Annotated[list[Label], Field(max_length=16)] = []
+
+    def placement(self) -> runners.Placement:
+        return runners.Placement(
+            host=self.host,
+            zone=self.zone,
+            platform=self.platform,
+            version=self.version,
+            labels=list(self.labels),
+        )
+
+
 class RegisterIn(StrictModel):
     name: RunnerName
+    placement: PlacementIn | None = None
 
 
 class HeartbeatIn(StrictModel):
     capacity: Capacity
+    interval_seconds: Annotated[StrictInt, Field(ge=1, le=3600)] | None = None
+    placement: PlacementIn | None = None
+
+
+def _address(request: Request) -> str | None:
+    return request.client.host if request.client else None
 
 
 class TransitionIn(StrictModel):
@@ -170,25 +200,40 @@ router = APIRouter(prefix="/runners")
 @router.post("/register", status_code=201, dependencies=[Depends(require_enrollment)])
 def register(
     body: RegisterIn,
+    request: Request,
     session: SessionDep,
     token_ttl: TokenTtlDep,
     lease_ttl: LeaseTtlDep,
     now: NowDep,
 ) -> RegisterOut:
-    runner, token, lease = runners.register_runner(session, body.name, now, token_ttl, lease_ttl)
+    placement = body.placement.placement() if body.placement else None
+    runner, token, lease = runners.register_runner(
+        session, body.name, now, token_ttl, lease_ttl, placement, _address(request)
+    )
     return RegisterOut(runner_id=runner.id, token=TokenOut.of(token), lease=LeaseOut.of(lease, now))
 
 
 @router.post("/{runner_id}/heartbeat")
 def heartbeat(
     body: HeartbeatIn,
+    request: Request,
     principal: PrincipalDep,
     session: SessionDep,
     lease_ttl: LeaseTtlDep,
     token_ttl: TokenTtlDep,
     now: NowDep,
 ) -> HeartbeatOut:
-    beat = runners.heartbeat(session, principal, body.capacity, now, lease_ttl, token_ttl)
+    beat = runners.heartbeat(
+        session,
+        principal,
+        body.capacity,
+        now,
+        lease_ttl,
+        token_ttl,
+        interval=body.interval_seconds,
+        placement=body.placement.placement() if body.placement else None,
+        address=_address(request),
+    )
     return HeartbeatOut(
         lease=LeaseOut.of(beat.lease, now),
         token=TokenOut.of(beat.token) if beat.token else None,

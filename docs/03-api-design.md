@@ -38,8 +38,9 @@ process. List values are JSON. Every route depends only on the values it uses.
 
 ## Operator credentials
 
-Every route under `/api/v1` outside `/api/v1/runners` takes the operator
-token as a Bearer credential. The API holds only its SHA-256 in
+Every route under `/api/v1` except the runner's own routes
+([Runner credentials](#runner-credentials)) takes the operator token as a Bearer
+credential. `GET /runners` and the revoke and drain routes are operator routes. The API holds only its SHA-256 in
 `NAOS_OPERATOR_TOKEN_SHA256`; while that is unset, or the token does not
 match, every such route answers 401 before its handler runs.
 
@@ -56,6 +57,8 @@ GET /api/v1/runs/summary
 GET /api/v1/runs/{run_id}
 POST /api/v1/runs/{run_id}/stop
 GET /api/v1/runners
+POST /api/v1/runners/{runner_id}/revoke
+POST /api/v1/runners/{runner_id}/drain
 POST /api/v1/runners/register
 POST /api/v1/runners/{runner_id}/heartbeat
 GET /api/v1/runners/{runner_id}/runs
@@ -168,9 +171,38 @@ wscat -c ws://api.example.com/api/v1/runs/run_0123456789abcdef0123456789abcdef/a
 `GET /runners` answers with every runner, newest first: its `status` (`live`,
 `stale` or `revoked`), the `capacity` of its last heartbeat, the `runs` it
 holds as `id`, `seq` and `status`, `last_heartbeat_at`, the `lease_acquired_at`
-and `lease_expires_at` window and `revoked_at`. `capacity` outlives the lease,
-so the slots of a runner that stopped answering are still known. No token
-hash, current or previous, is part of the answer.
+and `lease_expires_at` window, `revoked_at` and `drained_at`. `capacity`
+outlives the lease, so the slots of a runner that stopped answering are still
+known.
+
+`placement` repeats what the runner reported with the `address` the API saw
+it from, and `heartbeat_seconds` how often it beats; both are empty until
+the runner reports them. `lease_id` names the live lease, or for a stale runner its latest lease, whose
+deadline is `lease_lapsed_at`. The token is described by its windows only:
+`token_expires_at`, `token_rotates_at` (the first heartbeat past half the
+lifetime gets a replacement) and `prev_token_expires_at` while the previous
+token is still accepted. No token value or hash is part of the answer.
+
+## Revoking and draining runners
+
+`POST /runners/{runner_id}/revoke` refuses the runner's tokens from then on and
+ends its live lease at once. Runs on that lease fail with `runner revoked`,
+PENDING Runs assigned to it go back to the queue, and a Run of that runner
+waiting for its merge fails too, since its changes stay on a host that can no
+longer take a lease. The agent fences its VMs as on any lost lease.
+
+`POST /runners/{runner_id}/drain` keeps the runner and its lease, but assigns
+it no new Run; the Runs it holds finish as usual. A drained runner offers no
+free slot, and a Run pinned to it is refused with 422.
+
+Both answer with the runner as `GET /runners` lists it, 404 for an unknown
+runner, and repeat harmlessly. Draining a revoked runner returns 409. A
+revoked agent registers again under a new identity while its enrollment token
+is valid ([04](04-runner-design.md#lease-fencing)).
+
+`GET /runs?runner={runner_id}` lists the Runs that any lease of that runner
+held, newest first. `GET /audit?order=desc` reads the trail newest first, so
+a screen can show the latest entries of one runner.
 
 ## Idempotency
 
@@ -310,6 +342,7 @@ POST /api/v1/runners/{runner_id}/events                      runner token
   token stays valid until its own expiry, and a heartbeat made with it gets a
   fresh replacement, so a lost response never locks the runner out.
 - A runner token used on another runner's path gets 403.
+- Once the operator revokes a runner, both of its tokens get 401.
 
 ### Leases
 
@@ -323,7 +356,9 @@ POST /api/v1/runners/{runner_id}/events                      runner token
   the next lease of the same runner takes them over, since only that runner
   holds their changes.
 - A heartbeat assigns unassigned PENDING Runs up to the capacity the runner
-  reports, and that capacity is kept on the runner. Each assignment is
+  reports, and that capacity is kept on the runner. It may also carry
+  `interval_seconds`, how often the runner beats, and `placement`, which
+  registration takes too (see [Runner placement](#runner-placement)). Each assignment is
   compare-and-swap, so a Run never lands on two leases.
 - `GET .../runs` returns the desired state: every non-terminal Run on the
   live lease, with its spec, the `image_url` of its image, the resolved
@@ -334,6 +369,15 @@ POST /api/v1/runners/{runner_id}/events                      runner token
   follows a claim already has them. A missing or expired secret is left out,
   and `expires_at` is at most `NAOS_RUN_CREDENTIAL_TTL_SECONDS` away, so a
   runner that loses its lease loses its credentials with it.
+
+### Runner placement
+
+`placement` is what the agent says about where it runs: `host`, `zone`,
+`platform`, `version` and up to 16 `labels`. The API refuses a request
+whose placement carries a control character or a label outside
+`[A-Za-z0-9._-]`, since these values reach an operator's screen. It records
+the peer address it saw the request from as `address`. A heartbeat without
+`placement` keeps the last one.
 
 ### Runner transitions
 

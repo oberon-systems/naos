@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Self
+from typing import Annotated, Any, Literal, Self
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
@@ -46,8 +46,15 @@ def search_events(
     since: Annotated[int | None, Query(ge=0)] = None,
     after: Annotated[int | None, Query(ge=0)] = None,
     limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+    order: Literal["asc", "desc"] = "asc",
 ) -> list[AuditEventRead]:
     found = audit.search(
-        session, runner_id=runner_id, event=event, since=since, after=after, limit=limit
+        session,
+        runner_id=runner_id,
+        event=event,
+        since=since,
+        after=after,
+        limit=limit,
+        newest_first=order == "desc",
     )
     return [AuditEventRead.of(row) for row in found]

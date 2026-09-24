@@ -33,6 +33,15 @@ class Runner(SQLModel, table=True):
     # lease has lapsed are still known.
     capacity: int | None = None
     revoked_at: int | None = None
+    drained_at: int | None = None
+    # What the agent reports about itself, and the address the API last saw it from.
+    host: str | None = None
+    address: str | None = None
+    zone: str | None = None
+    platform: str | None = None
+    version: str | None = None
+    labels: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    heartbeat_seconds: int | None = None
 
 
 class Lease(SQLModel, table=True):

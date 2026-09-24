@@ -17,6 +17,7 @@ from naos_api.spec import PolicyKind, RunSpec
 
 S = RunStatus
 LEASE_EXPIRED_REASON = "runner lease expired"
+REVOKED_REASON = "runner revoked"
 LEASE_BOUND = frozenset({S.STARTING, S.STARTED, S.STOPPING, S.COLLECTING})
 CREDENTIAL_BOUND = frozenset({S.PENDING, S.STARTING, S.STARTED})
 RUNNER_TRANSITIONS = frozenset(
@@ -47,6 +48,28 @@ class IssuedToken:
     @property
     def digest(self) -> str:
         return hash_token(self.value)
+
+
+@dataclass(frozen=True)
+class Placement:
+    host: str | None
+    zone: str | None
+    platform: str
+    version: str
+    labels: list[str]
+
+
+def _placed(placement: Placement | None, address: str | None) -> dict[str, Any]:
+    values: dict[str, Any] = {"address": address}
+    if placement is not None:
+        values |= {
+            "host": placement.host,
+            "zone": placement.zone,
+            "platform": placement.platform,
+            "version": placement.version,
+            "labels": placement.labels,
+        }
+    return values
 
 
 @dataclass(frozen=True)
@@ -92,6 +115,7 @@ class RunnerState:
     runner: Runner
     lease: Lease | None
     runs: list[HeldRun]
+    lapsed: Lease | None = None
 
 
 def _holding(session: Session, lease_id: str) -> list[HeldRun]:
@@ -113,19 +137,36 @@ def list_runners(session: Session, now: int, limit: int, offset: int) -> list[Ru
         .offset(offset)
         .limit(limit)
     )
-    states: list[RunnerState] = []
-    for runner in session.exec(statement).all():
-        lease = _live_lease(session, runner.id)
-        # A lease is only marked expired by the sweep, so its deadline decides here.
-        if lease is not None and lease.expires_at <= now:
-            lease = None
-        held = _holding(session, lease.id) if lease is not None else []
-        states.append(RunnerState(runner=runner, lease=lease, runs=held))
-    return states
+    return [runner_state(session, runner, now) for runner in session.exec(statement).all()]
+
+
+def runner_state(session: Session, runner: Runner, now: int) -> RunnerState:
+    lease = _live_lease(session, runner.id)
+    # A lease is only marked expired by the sweep, so its deadline decides here.
+    if lease is not None and lease.expires_at <= now:
+        lease = None
+    held = _holding(session, lease.id) if lease is not None else []
+    lapsed = None if lease is not None else _latest_lease(session, runner.id)
+    return RunnerState(runner=runner, lease=lease, runs=held, lapsed=lapsed)
+
+
+def _latest_lease(session: Session, runner_id: str) -> Lease | None:
+    statement = (
+        select(Lease)
+        .where(col(Lease.runner_id) == runner_id)
+        .order_by(col(Lease.acquired_at).desc(), col(Lease.id).desc())
+    )
+    return session.exec(statement).first()
 
 
 def register_runner(
-    session: Session, name: str, now: int, token_ttl: int, lease_ttl: int
+    session: Session,
+    name: str,
+    now: int,
+    token_ttl: int,
+    lease_ttl: int,
+    placement: Placement | None = None,
+    address: str | None = None,
 ) -> tuple[Runner, IssuedToken, Lease]:
     token = IssuedToken.new(now + token_ttl)
     runner = Runner(
@@ -134,6 +175,7 @@ def register_runner(
         token_hash=token.digest,
         token_expires_at=token.expires_at,
         created_at=now,
+        **_placed(placement, address),
     )
     session.add(runner)
     session.flush()
@@ -173,55 +215,119 @@ def authenticate(session: Session, token: str, now: int) -> RunnerPrincipal | No
     )
 
 
-def _fail_bound(session: Session, lease_id: str, runner_id: str, now: int) -> None:
-    bound = col(Run.lease_id) == lease_id
-    statement = select(Run.id, Run.status).where(bound, col(Run.status).in_(LEASE_BOUND))
+def _fail_bound(
+    session: Session,
+    bound: Any,
+    statuses: frozenset[RunStatus],
+    runner_id: str,
+    now: int,
+    reason: str,
+    actor: audit.Actor,
+) -> None:
+    statement = select(Run.id, Run.status).where(bound, col(Run.status).in_(statuses))
     for run_id, status in session.exec(statement).all():
         failed = session.exec(
             update(Run)
             .where(col(Run.id) == run_id, col(Run.status) == status, bound)
             .values(
                 status=S.FAILED,
-                status_reason=LEASE_EXPIRED_REASON,
+                status_reason=reason,
                 updated_at=now,
                 **runs.stamps(S.FAILED, now),
             )
         )
         if failed.rowcount == 1:
             audit.transitioned(
-                session,
-                run_id,
-                S(status),
-                S.FAILED,
-                LEASE_EXPIRED_REASON,
-                actor="system",
-                runner_id=runner_id,
+                session, run_id, S(status), S.FAILED, reason, actor=actor, runner_id=runner_id
             )
+
+
+def _lapse(
+    session: Session,
+    lease_id: str,
+    runner_id: str,
+    now: int,
+    reason: str,
+    actor: audit.Actor,
+    *where: Any,
+) -> bool:
+    claimed = session.exec(
+        update(Lease)
+        .where(col(Lease.id) == lease_id, col(Lease.expired_at).is_(None), *where)
+        .values(expired_at=now, live_runner_id=None)
+    )
+    if claimed.rowcount != 1:
+        return False
+    audit.record(session, "lease_expired", actor=actor, runner_id=runner_id, lease_id=lease_id)
+    session.exec(
+        update(Run)
+        .where(col(Run.lease_id) == lease_id, col(Run.status) == S.PENDING)
+        .values(lease_id=None, updated_at=now)
+    )
+    bound = col(Run.lease_id) == lease_id
+    _fail_bound(session, bound, LEASE_BOUND, runner_id, now, reason, actor)
+    return True
 
 
 def expire_leases(session: Session, now: int) -> list[str]:
     lapsed = (col(Lease.expired_at).is_(None), col(Lease.expires_at) <= now)
     expired: list[str] = []
     for lease_id, runner_id in session.exec(select(Lease.id, Lease.runner_id).where(*lapsed)).all():
-        claimed = session.exec(
-            update(Lease)
-            .where(col(Lease.id) == lease_id, *lapsed)
-            .values(expired_at=now, live_runner_id=None)
-        )
-        if claimed.rowcount != 1:
-            continue
-        expired.append(lease_id)
-        audit.record(
-            session, "lease_expired", actor="system", runner_id=runner_id, lease_id=lease_id
-        )
-        session.exec(
-            update(Run)
-            .where(col(Run.lease_id) == lease_id, col(Run.status) == S.PENDING)
-            .values(lease_id=None, updated_at=now)
-        )
-        _fail_bound(session, lease_id, runner_id, now)
+        due = col(Lease.expires_at) <= now
+        if _lapse(session, lease_id, runner_id, now, LEASE_EXPIRED_REASON, "system", due):
+            expired.append(lease_id)
     session.commit()
     return expired
+
+
+def _known(session: Session, runner_id: str) -> Runner:
+    runner = session.get(Runner, runner_id)
+    if runner is None:
+        raise NotFoundError(f"runner {runner_id} does not exist")
+    return runner
+
+
+# A Run waiting for its merge outlives the lease, but its changes sit on a host
+# that can never take a lease again, so it fails with the rest.
+def revoke_runner(session: Session, runner_id: str, now: int) -> Runner:
+    runner = _known(session, runner_id)
+    revoked = session.exec(
+        update(Runner)
+        .where(col(Runner.id) == runner_id, col(Runner.revoked_at).is_(None))
+        .values(revoked_at=now)
+    )
+    if revoked.rowcount == 1:
+        audit.record(session, "runner_revoked", actor="operator", runner_id=runner_id)
+        lease = _live_lease(session, runner_id)
+        if lease is not None:
+            _lapse(session, lease.id, runner_id, now, REVOKED_REASON, "operator")
+        leases = select(Lease.id).where(col(Lease.runner_id) == runner_id)
+        waiting = frozenset({S.WAITING_MERGE})
+        bound = col(Run.lease_id).in_(leases)
+        _fail_bound(session, bound, waiting, runner_id, now, REVOKED_REASON, "operator")
+    session.commit()
+    session.refresh(runner)
+    return runner
+
+
+def drain_runner(session: Session, runner_id: str, now: int) -> Runner:
+    runner = _known(session, runner_id)
+    if runner.revoked_at is not None:
+        raise InvalidTransitionError(f"runner {runner_id} is revoked")
+    drained = session.exec(
+        update(Runner)
+        .where(
+            col(Runner.id) == runner_id,
+            col(Runner.revoked_at).is_(None),
+            col(Runner.drained_at).is_(None),
+        )
+        .values(drained_at=now)
+    )
+    if drained.rowcount == 1:
+        audit.record(session, "runner_drained", actor="operator", runner_id=runner_id)
+    session.commit()
+    session.refresh(runner)
+    return runner
 
 
 def _renew_lease(session: Session, runner_id: str, now: int, lease_ttl: int) -> str:
@@ -339,6 +445,9 @@ def _held(session: Session, lease_id: str) -> int:
 
 
 def _assign(session: Session, runner_id: str, lease_id: str, capacity: int, now: int) -> None:
+    runner = session.get(Runner, runner_id)
+    if runner is None or runner.revoked_at is not None or runner.drained_at is not None:
+        return
     held = _held(session, lease_id)
     if capacity - held <= 0:
         return
@@ -370,14 +479,20 @@ def heartbeat(
     now: int,
     lease_ttl: int,
     token_ttl: int,
+    interval: int | None = None,
+    placement: Placement | None = None,
+    address: str | None = None,
 ) -> Heartbeat:
     expire_leases(session, now)
     lease_id = _renew_lease(session, principal.runner_id, now, lease_ttl)
     token = _rotate_token(session, principal, now, token_ttl)
+    reported = _placed(placement, address)
+    if interval is not None:
+        reported["heartbeat_seconds"] = interval
     session.exec(
         update(Runner)
         .where(col(Runner.id) == principal.runner_id)
-        .values(last_heartbeat_at=now, capacity=capacity)
+        .values(last_heartbeat_at=now, capacity=capacity, **reported)
     )
     session.commit()
     _assign(session, principal.runner_id, lease_id, capacity, now)

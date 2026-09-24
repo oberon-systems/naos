@@ -58,6 +58,8 @@ def _check_runner(session: Session, runner_id: str | None) -> None:
     runner = session.get(Runner, runner_id)
     if runner is None or runner.revoked_at is not None:
         raise PolicyError(f"runner {runner_id} does not exist or is revoked")
+    if runner.drained_at is not None:
+        raise PolicyError(f"runner {runner_id} is draining")
 
 
 def _workspace(session: Session, policy_id: str | None) -> str | None:
@@ -69,7 +71,12 @@ def _free_slots(session: Session, pinned: str | None, now: int) -> int:
     statement = (
         select(Lease.id, Runner.capacity)
         .join(Runner, col(Runner.id) == col(Lease.runner_id))
-        .where(col(Lease.expired_at).is_(None), col(Lease.expires_at) > now)
+        .where(
+            col(Lease.expired_at).is_(None),
+            col(Lease.expires_at) > now,
+            col(Runner.revoked_at).is_(None),
+            col(Runner.drained_at).is_(None),
+        )
     )
     if pinned is not None:
         statement = statement.where(col(Lease.runner_id) == pinned)
@@ -164,12 +171,16 @@ def list_runs(
     state: RunState | None = None,
     limit: int = 50,
     offset: int = 0,
+    runner: str | None = None,
 ) -> Sequence[Run]:
     statement = select(Run)
     if status is not None:
         statement = statement.where(Run.status == status)
     if state is not None:
         statement = statement.where(col(Run.status).in_(STATES[state]))
+    if runner is not None:
+        leases = select(Lease.id).where(col(Lease.runner_id) == runner)
+        statement = statement.where(col(Run.lease_id).in_(leases))
     statement = statement.order_by(col(Run.seq).desc()).offset(offset).limit(limit)
     return session.exec(statement).all()
 

@@ -55,8 +55,10 @@ describe, so a change and its event land or fail together.
 | `run_transition` | operator, runner, system | `from`, `to`, `reason` |
 | `run_stop_requested` | operator | `status` |
 | `runner_registered` | runner | none |
+| `runner_revoked` | operator | none; the lease it ends is recorded as `lease_expired` by the operator |
+| `runner_drained` | operator | none |
 | `lease_acquired` | runner | `lease_id` |
-| `lease_expired` | system | `lease_id` |
+| `lease_expired` | system, operator | `lease_id` |
 | `token_rotated` | runner | none |
 | `waiting_rebound` | system | `lease_id` |
 | `credentials_issued` | runner | `names` of the secrets, never the values, and `ttl` |

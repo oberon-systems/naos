@@ -24,6 +24,8 @@ API_EVENTS: dict[str, frozenset[str]] = {
     "run_transition": frozenset({"from", "to", "reason"}),
     "run_stop_requested": frozenset({"status"}),
     "runner_registered": frozenset(),
+    "runner_revoked": frozenset(),
+    "runner_drained": frozenset(),
     "lease_acquired": frozenset({"lease_id"}),
     "lease_expired": frozenset({"lease_id"}),
     "token_rotated": frozenset(),
@@ -237,6 +239,7 @@ def search(
     since: int | None,
     after: int | None,
     limit: int,
+    newest_first: bool = False,
 ) -> Sequence[AuditEvent]:
     statement = select(AuditEvent)
     if runner_id is not None:
@@ -247,4 +250,5 @@ def search(
         statement = statement.where(col(AuditEvent.at) >= since)
     if after is not None:
         statement = statement.where(col(AuditEvent.seq) > after)
-    return session.exec(statement.order_by(col(AuditEvent.seq)).limit(limit)).all()
+    order = col(AuditEvent.seq).desc() if newest_first else col(AuditEvent.seq)
+    return session.exec(statement.order_by(order).limit(limit)).all()

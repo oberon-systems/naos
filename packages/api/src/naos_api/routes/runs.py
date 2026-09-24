@@ -136,10 +136,11 @@ def list_runs(
     session: SessionDep,
     run_status: Annotated[RunStatus | None, Query(alias="status")] = None,
     state: RunState | None = None,
+    runner: str | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[RunRead]:
-    page = runs.list_runs(session, run_status, state, limit, offset)
+    page = runs.list_runs(session, run_status, state, limit, offset, runner)
     return [RunRead.viewed(view) for view in runs.view_runs(session, page)]
 
 
