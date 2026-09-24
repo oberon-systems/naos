@@ -9,8 +9,8 @@ use std::time::Duration;
 use sha2::{Digest, Sha256};
 
 use crate::libs::api::{
-    Api, ConsoleReply, DesiredRun, DesiredState, DiffReport, EventsReply, HeartbeatReply, ImageRef,
-    IssuedToken, LeaseGrant, MergeReport, Registration, RunSpec, RunStatus, RuntimeSpec,
+    Api, Beat, ConsoleReply, DesiredRun, DesiredState, DiffReport, EventsReply, HeartbeatReply,
+    ImageRef, IssuedToken, LeaseGrant, MergeReport, Registration, RunSpec, RunStatus, RuntimeSpec,
     Transition,
 };
 use crate::libs::audit::Event;
@@ -20,6 +20,7 @@ use crate::libs::ids::hex;
 use crate::libs::image::{BoxFuture, ImageSource};
 use crate::libs::overlay::merge::{Decision, Outcome, Report};
 use crate::libs::overlay::Diff;
+use crate::libs::placement::Placement;
 use crate::libs::runtime::{LocalVm, Runtime};
 
 pub const LEASE_ID: &str = "lease_alpha";
@@ -132,6 +133,7 @@ pub struct FakeApi {
     diffs: Mutex<Vec<(String, usize)>>,
     merges: Mutex<Vec<(String, Outcome)>>,
     capacities: Mutex<Vec<u32>>,
+    placements: Mutex<Vec<Placement>>,
     desired: Mutex<Option<DesiredState>>,
     rotated_token: Mutex<Option<String>>,
     reject_heartbeats: AtomicUsize,
@@ -212,6 +214,10 @@ impl FakeApi {
         lock(&self.capacities).clone()
     }
 
+    pub fn placements(&self) -> Vec<Placement> {
+        lock(&self.placements).clone()
+    }
+
     pub fn events(&self) -> Vec<Event> {
         lock(&self.events).clone()
     }
@@ -222,7 +228,7 @@ impl FakeApi {
 }
 
 impl Api for FakeApi {
-    async fn register(&self, _: &str, _: &str) -> Result<Registration, AgentError> {
+    async fn register(&self, _: &str, _: &Placement, _: &str) -> Result<Registration, AgentError> {
         let count = self.registrations.fetch_add(1, Ordering::SeqCst) + 1;
         Ok(Registration {
             runner_id: "rnr_alpha".into(),
@@ -236,9 +242,10 @@ impl Api for FakeApi {
     async fn heartbeat(
         &self,
         _: &Credentials,
-        capacity: u32,
+        beat: &Beat<'_>,
     ) -> Result<HeartbeatReply, AgentError> {
-        lock(&self.capacities).push(capacity);
+        lock(&self.capacities).push(beat.capacity);
+        lock(&self.placements).push(beat.placement.clone());
         let rejected =
             self.reject_heartbeats
                 .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1));

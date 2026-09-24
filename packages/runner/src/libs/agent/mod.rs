@@ -1,13 +1,14 @@
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use crate::libs::api::Api;
+use crate::libs::api::{Api, Beat};
 use crate::libs::audit::{self, Spool};
 use crate::libs::config::Config;
 use crate::libs::credentials::{read_secret_file, CredentialStore, Credentials};
 use crate::libs::error::AgentError;
 use crate::libs::image::ImageSource;
 use crate::libs::lease::LeaseClock;
+use crate::libs::placement::Placement;
 use crate::libs::reconciler::reconcile;
 use crate::libs::runtime::Runtime;
 
@@ -23,6 +24,7 @@ pub struct Agent<A, R> {
     images: Box<dyn ImageSource>,
     name: String,
     capacity: u32,
+    placement: Placement,
     store: CredentialStore,
     spool: Spool,
     enrollment_token_file: PathBuf,
@@ -38,6 +40,7 @@ impl<A: Api + Sync, R: Runtime> Agent<A, R> {
             images,
             name: config.name.clone(),
             capacity: config.capacity,
+            placement: Placement::detect(config),
             store: CredentialStore::new(&config.state_dir),
             spool: Spool::new(&config.state_dir),
             enrollment_token_file: config.enrollment_token_file.clone(),
@@ -61,13 +64,18 @@ impl<A: Api + Sync, R: Runtime> Agent<A, R> {
 
         let actual = self.runtime.list().await;
         let capacity = if actual.is_ok() { self.capacity } else { 0 };
+        let beat = Beat {
+            capacity,
+            interval_seconds: self.interval().as_secs(),
+            placement: &self.placement,
+        };
         let beat = heartbeat(
             &self.api,
             &mut self.lease,
             &self.store,
             &mut self.credentials,
             &credentials,
-            capacity,
+            &beat,
         )
         .await;
         let credentials = match beat {
@@ -95,13 +103,18 @@ impl<A: Api + Sync, R: Runtime> Agent<A, R> {
             tokio::select! {
                 failures = &mut reconciling => break failures,
                 () = tokio::time::sleep(interval) => {
+                    let beat = Beat {
+                        capacity: self.capacity,
+                        interval_seconds: interval.as_secs(),
+                        placement: &self.placement,
+                    };
                     let beat = heartbeat(
                         &self.api,
                         &mut self.lease,
                         &self.store,
                         &mut self.credentials,
                         &current,
-                        self.capacity,
+                        &beat,
                     )
                     .await;
                     match beat {
@@ -166,7 +179,10 @@ impl<A: Api + Sync, R: Runtime> Agent<A, R> {
 
         let enrollment = read_secret_file(&self.enrollment_token_file)?;
         let sent_at = Instant::now();
-        let registration = self.api.register(&self.name, &enrollment).await?;
+        let registration = self
+            .api
+            .register(&self.name, &self.placement, &enrollment)
+            .await?;
         self.lease
             .renewed(sent_at, Duration::from_secs(registration.lease.ttl_seconds));
         audit::registered(&registration.runner_id);
@@ -215,10 +231,10 @@ async fn heartbeat<A: Api>(
     store: &CredentialStore,
     cached: &mut Option<Credentials>,
     credentials: &Credentials,
-    capacity: u32,
+    beat: &Beat<'_>,
 ) -> Result<Credentials, AgentError> {
     let sent_at = Instant::now();
-    let reply = api.heartbeat(credentials, capacity).await?;
+    let reply = api.heartbeat(credentials, beat).await?;
     lease.renewed(sent_at, Duration::from_secs(reply.lease.ttl_seconds));
     match reply.token {
         Some(token) => remember(

@@ -12,6 +12,9 @@ use crate::libs::error::AgentError;
 
 pub const MAX_CAPACITY: u32 = 64;
 const DEFAULT_CAPACITY: u32 = 1;
+const MAX_ZONE: usize = 64;
+const MAX_LABELS: usize = 16;
+const MAX_LABEL: usize = 32;
 const PREFIX: &str = "NAOS_AGENT_";
 const ENV_FILE: &str = "NAOS_AGENT_ENV_FILE";
 pub const DEFAULT_QEMU_BINARY: &str = "/usr/bin/qemu-system-x86_64";
@@ -25,6 +28,8 @@ pub struct Config {
     pub api_url: Url,
     pub name: String,
     pub capacity: u32,
+    pub zone: Option<String>,
+    pub labels: Vec<String>,
     pub state_dir: PathBuf,
     pub enrollment_token_file: PathBuf,
     pub runtime: RuntimeConfig,
@@ -47,6 +52,8 @@ pub struct RawConfig {
     pub api_url: String,
     pub name: String,
     pub capacity: Option<u32>,
+    pub zone: Option<String>,
+    pub labels: Option<String>,
     pub state_dir: PathBuf,
     pub enrollment_token_file: PathBuf,
 }
@@ -93,6 +100,12 @@ impl Config {
             api_url: parse_api_url(&raw.api_url)?,
             name: parse_name(&raw.name)?,
             capacity: raw.capacity.map_or(Ok(DEFAULT_CAPACITY), check_capacity)?,
+            zone: raw
+                .zone
+                .filter(|zone| !zone.is_empty())
+                .map(parse_zone)
+                .transpose()?,
+            labels: raw.labels.as_deref().map_or(Ok(Vec::new()), parse_labels)?,
             state_dir: raw.state_dir,
             enrollment_token_file: raw.enrollment_token_file,
             runtime: runtime()?,
@@ -268,6 +281,39 @@ pub fn parse_name(raw: &str) -> Result<String, AgentError> {
     } else {
         Err(AgentError::Config(format!(
             "NAOS_AGENT_NAME {raw:?} is not a valid runner name"
+        )))
+    }
+}
+
+pub fn parse_zone(raw: String) -> Result<String, AgentError> {
+    if raw.len() <= MAX_ZONE && !raw.trim().is_empty() && !raw.chars().any(char::is_control) {
+        Ok(raw)
+    } else {
+        Err(AgentError::Config(format!(
+            "NAOS_AGENT_ZONE must be 1..={MAX_ZONE} bytes without control characters"
+        )))
+    }
+}
+
+pub fn parse_labels(raw: &str) -> Result<Vec<String>, AgentError> {
+    let labels: Vec<String> = raw
+        .split(',')
+        .map(str::trim)
+        .filter(|label| !label.is_empty())
+        .map(str::to_owned)
+        .collect();
+    let valid = |label: &String| {
+        let mut chars = label.chars();
+        chars.next().is_some_and(|c| c.is_ascii_alphanumeric())
+            && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
+            && label.len() <= MAX_LABEL
+    };
+    if labels.len() <= MAX_LABELS && labels.iter().all(valid) {
+        Ok(labels)
+    } else {
+        Err(AgentError::Config(format!(
+            "NAOS_AGENT_LABELS must list at most {MAX_LABELS} labels of [A-Za-z0-9._-], \
+             up to {MAX_LABEL} bytes each"
         )))
     }
 }

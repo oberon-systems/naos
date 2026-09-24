@@ -1,8 +1,9 @@
-use crate::libs::api::{Api, HttpApi, RunStatus, Transition};
+use crate::libs::api::{Api, Beat, HttpApi, RunStatus, Transition};
 use crate::libs::audit::Event;
 use crate::libs::config::parse_api_url;
 use crate::libs::credentials::Credentials;
 use crate::libs::error::AgentError;
+use crate::libs::placement::Placement;
 use serde_json::json;
 use wiremock::matchers::{body_bytes, body_json, header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -21,13 +22,35 @@ fn credentials() -> Credentials {
     }
 }
 
+fn placement() -> Placement {
+    Placement {
+        host: Some("alpha-01.example.com".into()),
+        zone: Some("zone-a".into()),
+        platform: "linux/amd64".into(),
+        version: "0.1.0".into(),
+        labels: vec!["ci".into()],
+    }
+}
+
+fn placement_json() -> serde_json::Value {
+    json!({
+        "host": "alpha-01.example.com",
+        "zone": "zone-a",
+        "platform": "linux/amd64",
+        "version": "0.1.0",
+        "labels": ["ci"],
+    })
+}
+
 #[tokio::test]
 async fn register_sends_the_enrollment_bearer() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/api/v1/runners/register"))
         .and(header("authorization", "Bearer enroll-alpha"))
-        .and(body_json(json!({ "name": "alpha" })))
+        .and(body_json(
+            json!({ "name": "alpha", "placement": placement_json() }),
+        ))
         .respond_with(ResponseTemplate::new(201).set_body_json(json!({
             "runner_id": "rnr_alpha",
             "token": { "value": "token-alpha", "expires_at": 1767312000 },
@@ -38,7 +61,7 @@ async fn register_sends_the_enrollment_bearer() {
         .await;
 
     let registration = api(&server)
-        .register("alpha", "enroll-alpha")
+        .register("alpha", &placement(), "enroll-alpha")
         .await
         .expect("registered");
 
@@ -53,7 +76,9 @@ async fn heartbeat_and_transition_use_the_runner_token() {
     Mock::given(method("POST"))
         .and(path(format!("{RUNNER}/heartbeat")))
         .and(header("authorization", "Bearer token-alpha"))
-        .and(body_json(json!({ "capacity": 2 })))
+        .and(body_json(json!({
+            "capacity": 2, "interval_seconds": 20, "placement": placement_json(),
+        })))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
             "lease": { "id": "lease_alpha", "expires_at": 1767225660, "ttl_seconds": 60 },
             "token": null,
@@ -72,7 +97,16 @@ async fn heartbeat_and_transition_use_the_runner_token() {
         .await;
     let api = api(&server);
 
-    let reply = api.heartbeat(&credentials(), 2).await.expect("heartbeat");
+    let placement = placement();
+    let beat = Beat {
+        capacity: 2,
+        interval_seconds: 20,
+        placement: &placement,
+    };
+    let reply = api
+        .heartbeat(&credentials(), &beat)
+        .await
+        .expect("heartbeat");
     assert!(reply.token.is_none());
     let claim = Transition {
         lease_id: "lease_alpha",
@@ -224,7 +258,13 @@ async fn unsafe_path_segments_never_reach_the_network() {
         token: "token-alpha".into(),
     };
 
-    let outcome = api(&server).heartbeat(&forged, 1).await;
+    let placement = placement();
+    let beat = Beat {
+        capacity: 1,
+        interval_seconds: 20,
+        placement: &placement,
+    };
+    let outcome = api(&server).heartbeat(&forged, &beat).await;
 
     assert!(matches!(outcome, Err(AgentError::Api { status: 0, .. })));
 }

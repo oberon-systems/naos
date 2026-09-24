@@ -54,6 +54,8 @@ without them.
 | `NAOS_AGENT_API_URL` | API base URL; plain `http` only to loopback |
 | `NAOS_AGENT_NAME` | Runner name, `[A-Za-z0-9][A-Za-z0-9._-]{0,63}` |
 | `NAOS_AGENT_CAPACITY` | Runs this runner accepts, 0 to 64, default 1 |
+| `NAOS_AGENT_ZONE` | Optional zone shown to operators, up to 64 bytes, no control characters |
+| `NAOS_AGENT_LABELS` | Optional comma list of up to 16 labels, `[A-Za-z0-9._-]`, 32 bytes each |
 | `NAOS_AGENT_STATE_DIR` | Holds `credentials.json` and the audit spool `audit.jsonl`, mode 0600 |
 | `NAOS_AGENT_ENROLLMENT_TOKEN_FILE` | Enrollment token, mode 0600 |
 | `NAOS_AGENT_ENV_FILE` | Optional `.env` file loaded before the variables above |
@@ -64,6 +66,12 @@ without them.
 | `NAOS_AGENT_GIT_BINARY` | `git` for the shell gate, default `/usr/bin/git` |
 | `NAOS_AGENT_VIRTIOFSD_BINARY` | virtiofsd 1.13 or newer for workspaces, default `/usr/libexec/virtiofsd` |
 | `NAOS_AGENT_IMAGE_MAX_BYTES` | Largest image the agent downloads, default `8589934592` |
+
+Registration and every heartbeat carry the agent's placement: the host name,
+the zone and labels above, the platform as `linux/amd64` followed by the
+`PRETTY_NAME` of `/etc/os-release`, and the agent version. A host name outside
+`[A-Za-z0-9._-]` is not sent, and control characters are dropped from the
+platform. The heartbeat also names its interval, a third of the lease.
 
 The agent never looks for a `.env` file on its own. A file dropped into the
 working directory could otherwise redirect the API URL the agent trusts.
@@ -248,6 +256,9 @@ start to reconcile.
 
 A rejected runner token drops the stored credentials. The agent registers
 again under a new identity, and the VMs of the old one become orphans.
+Revoking a runner ([03](03-api-design.md#revoking-and-draining-runners)) ends
+its lease at once, so the agent fences its VMs on the next failed renewal and
+comes back under a new identity while its enrollment token is valid.
 
 ## Acceptance
 

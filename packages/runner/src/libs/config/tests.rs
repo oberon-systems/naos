@@ -16,6 +16,8 @@ fn raw() -> RawConfig {
         api_url: API_URL.into(),
         name: "alpha".into(),
         capacity: None,
+        zone: None,
+        labels: None,
         state_dir: STATE_DIR.into(),
         enrollment_token_file: TOKEN_FILE.into(),
     }
@@ -31,6 +33,8 @@ fn config_with(state_dir: &Path) -> Config {
         api_url: parse_api_url(API_URL).expect("url"),
         name: "alpha".into(),
         capacity: DEFAULT_CAPACITY,
+        zone: None,
+        labels: Vec::new(),
         state_dir: state_dir.to_path_buf(),
         enrollment_token_file: TOKEN_FILE.into(),
         runtime: RuntimeConfig::resolve(runtime, &UserDirs::default()).expect("runtime"),
@@ -43,6 +47,8 @@ fn full_env(env: &mut EnvSetter) {
     env.set("NAOS_AGENT_STATE_DIR", STATE_DIR);
     env.set("NAOS_AGENT_ENROLLMENT_TOKEN_FILE", TOKEN_FILE);
     env.del("NAOS_AGENT_CAPACITY");
+    env.del("NAOS_AGENT_ZONE");
+    env.del("NAOS_AGENT_LABELS");
     env.del("NAOS_AGENT_ENV_FILE");
 }
 
@@ -256,4 +262,49 @@ fn a_named_env_file_that_is_missing_is_an_error() {
 
     let err = load().expect_err("missing env file").to_string();
     assert!(err.contains("NAOS_AGENT_ENV_FILE"), "{err}");
+}
+
+#[test]
+fn zone_and_labels_are_read_from_their_own_variables() {
+    let config = Config::parse(
+        RawConfig {
+            zone: Some("zone-a \u{b7} rack 3".into()),
+            labels: Some("ci, amd64,docker".into()),
+            ..raw()
+        },
+        || Ok(runtime()),
+    )
+    .expect("config");
+
+    assert_eq!(config.zone.as_deref(), Some("zone-a \u{b7} rack 3"));
+    assert_eq!(config.labels, ["ci", "amd64", "docker"]);
+}
+
+#[test]
+fn an_empty_zone_is_no_zone() {
+    let config = Config::parse(
+        RawConfig {
+            zone: Some(String::new()),
+            ..raw()
+        },
+        || Ok(runtime()),
+    )
+    .expect("config");
+
+    assert_eq!(config.zone, None);
+    assert!(config.labels.is_empty());
+}
+
+#[test]
+fn a_zone_with_a_control_character_is_refused() {
+    let err = parse_zone("zone-a\nrack 3".into()).expect_err("control character");
+    assert!(err.to_string().contains("NAOS_AGENT_ZONE"));
+}
+
+#[test]
+fn labels_outside_the_alphabet_or_too_many_are_refused() {
+    assert!(parse_labels("ci,has space").is_err());
+    assert!(parse_labels("-leading").is_err());
+    assert!(parse_labels(&"x,".repeat(17)).is_err());
+    assert!(parse_labels(&"a".repeat(33)).is_err());
 }

@@ -40,6 +40,8 @@ directory is created 0700.
 export NAOS_AGENT_API_URL=https://api.example.com
 export NAOS_AGENT_NAME=alpha
 export NAOS_AGENT_CAPACITY=2
+export NAOS_AGENT_ZONE=zone-a
+export NAOS_AGENT_LABELS=ci,amd64
 export NAOS_AGENT_STATE_DIR="$HOME/.local/state/naos/agent"
 export NAOS_AGENT_ENROLLMENT_TOKEN_FILE="$HOME/.config/naos/enrollment"
 runner

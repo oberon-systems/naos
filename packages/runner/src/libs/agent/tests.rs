@@ -19,6 +19,8 @@ fn setup(runtime: FakeRuntime) -> (TempDir, Agent<FakeApi, FakeRuntime>) {
         api_url: parse_api_url("http://127.0.0.1:8000").expect("url"),
         name: "alpha".into(),
         capacity: 2,
+        zone: Some("zone-a".into()),
+        labels: vec!["ci".into()],
         state_dir: dir.path().to_path_buf(),
         enrollment_token_file: enrollment,
         runtime: RuntimeConfig {
@@ -46,6 +48,20 @@ async fn first_cycle_registers_and_persists_credentials() {
     let stored = CredentialStore::new(dir.path()).load().expect("load");
     assert_eq!(stored.map(|c| c.token), Some("token-1".into()));
     assert_eq!(agent.interval(), Duration::from_secs(20));
+}
+
+#[tokio::test]
+async fn every_heartbeat_carries_where_the_agent_runs() {
+    let (_dir, mut agent) = setup(FakeRuntime::default());
+    agent.api.serve(desired(vec![]));
+
+    agent.cycle().await.expect("cycle");
+
+    let placements = agent.api.placements();
+    assert_eq!(placements.len(), 1);
+    assert_eq!(placements[0].zone.as_deref(), Some("zone-a"));
+    assert_eq!(placements[0].labels, ["ci"]);
+    assert_eq!(placements[0].version, env!("CARGO_PKG_VERSION"));
 }
 
 #[tokio::test]

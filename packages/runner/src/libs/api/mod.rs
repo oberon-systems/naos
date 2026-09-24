@@ -13,6 +13,7 @@ use crate::libs::credentials::Credentials;
 use crate::libs::error::AgentError;
 use crate::libs::overlay::merge::{Decision, Outcome};
 use crate::libs::overlay::Entry;
+use crate::libs::placement::Placement;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 // A diff can hold up to 100 000 entries.
@@ -159,6 +160,14 @@ pub struct EventReport<'a> {
     pub events: &'a [Event],
 }
 
+/// What every heartbeat carries besides the token.
+#[derive(Debug, Clone, Serialize)]
+pub struct Beat<'a> {
+    pub capacity: u32,
+    pub interval_seconds: u64,
+    pub placement: &'a Placement,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct ConsoleReply {
     pub offset: u64,
@@ -177,13 +186,14 @@ pub trait Api {
     fn register(
         &self,
         name: &str,
+        placement: &Placement,
         enrollment_token: &str,
     ) -> impl Future<Output = Result<Registration, AgentError>> + Send;
 
     fn heartbeat(
         &self,
         credentials: &Credentials,
-        capacity: u32,
+        beat: &Beat<'_>,
     ) -> impl Future<Output = Result<HeartbeatReply, AgentError>> + Send;
 
     fn desired(
@@ -295,26 +305,27 @@ impl Api for HttpApi {
     async fn register(
         &self,
         name: &str,
+        placement: &Placement,
         enrollment_token: &str,
     ) -> Result<Registration, AgentError> {
         let request = self
             .client
             .post(self.url(&["register"])?)
             .bearer_auth(enrollment_token)
-            .json(&serde_json::json!({ "name": name }));
+            .json(&serde_json::json!({ "name": name, "placement": placement }));
         Self::send(request).await
     }
 
     async fn heartbeat(
         &self,
         credentials: &Credentials,
-        capacity: u32,
+        beat: &Beat<'_>,
     ) -> Result<HeartbeatReply, AgentError> {
         let request = self
             .client
             .post(self.url(&[&credentials.runner_id, "heartbeat"])?)
             .bearer_auth(&credentials.token)
-            .json(&serde_json::json!({ "capacity": capacity }));
+            .json(beat);
         Self::send(request).await
     }
 
