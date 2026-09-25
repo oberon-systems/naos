@@ -7,9 +7,9 @@
             </div>
             <div class="run__card-body image__source">
                 <span class="field__label">Digest</span>
-                <code class="image__digest">{{ image.digest_head }}
+                <code class="image__digest">{{ image.digest_head -}}
                     <br>
-                {{ image.digest_tail }}</code>
+                {{- image.digest_tail }}</code>
                 <span class="field__label">Source</span>
                 <code class="image__digest">{{ image.url }}</code>
                 <p class="table__secondary">{{ source_note }}</p>
