@@ -123,7 +123,7 @@ repos:
       - id: forbid-binary
       # Templates carry the separators and dashes the mockups show; vendored code stays as shipped.
       - id: require-ascii
-        exclude: (.*\.md$|^packages/web/.*\.html$|^packages/web/src/naos_web/static/vendor/)
+        exclude: (.*\.md$|^packages/web/.*\.html$|^packages/web/src/naos_web/static/vendor/|^dev/web/templates/base/state\.json$)
       - id: shellcheck
         args: [-e, SC2086]
       # -i 4 overrides shfmt's tab indentation, which the forbid-tabs hook
