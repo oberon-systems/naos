@@ -76,6 +76,7 @@ GET /api/v1/profiles
 POST /api/v1/profiles
 GET /api/v1/profiles/{profile_id}
 PUT /api/v1/profiles/{profile_id}
+DELETE /api/v1/profiles/{profile_id}
 POST /api/v1/profiles/{profile_id}/runs
 POST /api/v1/images
 GET /api/v1/images
@@ -258,13 +259,22 @@ profile and never references it, so a later update reaches no started Run.
 - `GET /profiles` lists by name; `q` matches a substring of the name or the id,
   ignoring case. Each profile carries `active_runs`, the Runs copied from it
   that are not terminal, `active_run` with `id`, `seq` and `status` of the
-  oldest of them, and `last_run_at`, null when it never ran.
+  oldest of them, `last_run_at`, null when it never ran, and `runs_total`
+  and `runs_24h`, the Runs copied from it ever and in the last day.
 - `PUT /profiles/{profile_id}` takes a new `spec`. While any Run copied from
   the profile is not terminal it returns 409 naming that Run; the check and
   the write are one statement.
+- `DELETE /profiles/{profile_id}` answers 204. While any Run copied from the
+  profile is not terminal it returns 409 naming those Runs, with the same
+  one-statement check as the update. Runs keep `profile_id` and their own
+  spec after the profile is gone.
 - `POST /profiles/{profile_id}/runs` takes `image` and an optional `runner`
   and creates a PENDING Run from the stored spec. The Run records the profile
   it was copied from.
+- `GET /runs?profile=` lists the Runs copied from a profile, and
+  `GET /audit?profile_id=` returns its created, updated and deleted events
+  and every event of those Runs.
+- A gate the spec leaves at `null` has no policy, and nothing passes it.
 
 A Run spec may name a `runner` id. The Run is then offered to that runner only;
 unset lets any runner claim it. An unknown or revoked runner returns 422.

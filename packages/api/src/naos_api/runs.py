@@ -173,6 +173,7 @@ def list_runs(
     offset: int = 0,
     runner: str | None = None,
     image: str | None = None,
+    profile: str | None = None,
 ) -> Sequence[Run]:
     statement = select(Run)
     if status is not None:
@@ -184,6 +185,8 @@ def list_runs(
         statement = statement.where(col(Run.lease_id).in_(leases))
     if image is not None:
         statement = statement.where(booted_image() == image)
+    if profile is not None:
+        statement = statement.where(col(Run.profile_id) == profile)
     statement = statement.order_by(col(Run.seq).desc()).offset(offset).limit(limit)
     return session.exec(statement).all()
 

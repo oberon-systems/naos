@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from uuid import uuid4
 
 from sqlalchemy import ColumnElement
-from sqlmodel import Session, col, func, or_, select, update
+from sqlmodel import Session, case, col, delete, func, or_, select, update
 
 from naos_api import audit
 from naos_api.clock import now_ts
@@ -14,6 +14,8 @@ from naos_api.policies import check_refs
 from naos_api.runs import create_run
 from naos_api.spec import ImageRef, ProfileSpec, RunSpec, digest_of
 
+DAY = 86400
+
 
 @dataclass(frozen=True)
 class ActiveRun:
@@ -23,11 +25,18 @@ class ActiveRun:
 
 
 @dataclass(frozen=True)
+class Usage:
+    last_run_at: int | None = None
+    runs_total: int = 0
+    runs_24h: int = 0
+
+
+@dataclass(frozen=True)
 class ProfileView:
     profile: Profile
     active_runs: int
     active_run: ActiveRun | None
-    last_run_at: int | None
+    usage: Usage
 
 
 def _open() -> ColumnElement[bool]:
@@ -67,7 +76,9 @@ def list_profiles(
     return session.exec(statement).all()
 
 
-def view_profiles(session: Session, profiles: Sequence[Profile]) -> list[ProfileView]:
+def view_profiles(
+    session: Session, profiles: Sequence[Profile], now: int | None = None
+) -> list[ProfileView]:
     ids = [profile.id for profile in profiles]
     if not ids:
         return []
@@ -77,13 +88,15 @@ def view_profiles(session: Session, profiles: Sequence[Profile]) -> list[Profile
         .where(of_page, _open())
         .order_by(col(Run.seq))
     ).all()
-    last = dict(
-        session.exec(
-            select(Run.profile_id, func.max(Run.created_at))
+    recent = case((col(Run.created_at) >= (now or now_ts()) - DAY, 1), else_=0)
+    usage = {
+        profile_id: Usage(last_at, int(total), int(day or 0))
+        for profile_id, last_at, total, day in session.exec(
+            select(Run.profile_id, func.max(Run.created_at), func.count(), func.sum(recent))
             .where(of_page)
             .group_by(col(Run.profile_id))
         ).all()
-    )
+    }
     counts: dict[str, int] = {}
     first: dict[str, ActiveRun] = {}
     for profile_id, run_id, seq, status in active:
@@ -96,7 +109,7 @@ def view_profiles(session: Session, profiles: Sequence[Profile]) -> list[Profile
             profile=profile,
             active_runs=counts.get(profile.id, 0),
             active_run=first.get(profile.id),
-            last_run_at=last.get(profile.id),
+            usage=usage.get(profile.id, Usage()),
         )
         for profile in profiles
     ]
@@ -152,6 +165,31 @@ def update_profile(session: Session, profile_id: str, spec: ProfileSpec) -> Prof
     blocking = view.active_run
     detail = f"#{blocking.seq} is {blocking.status}" if blocking else "a run is active"
     raise ProfileBusyError(f"profile {profile.name} cannot change: {detail} on it")
+
+
+def _busy_detail(session: Session, profile: Profile) -> str:
+    active = session.exec(
+        select(Run.seq, Run.status)
+        .where(col(Run.profile_id) == profile.id, _open())
+        .order_by(col(Run.seq).desc())
+    ).all()
+    named = " and ".join(f"#{seq} {RunStatus(status)}" for seq, status in active)
+    return (
+        f"profile {profile.name} is used by {named or 'an active run'}. Delete it once they finish."
+    )
+
+
+def delete_profile(session: Session, profile_id: str) -> None:
+    profile = get_profile(session, profile_id)
+    busy = select(Run.id).where(col(Run.profile_id) == profile_id, _open())
+    result = session.exec(delete(Profile).where(col(Profile.id) == profile_id, ~busy.exists()))
+    if result.rowcount == 1:
+        audit.record(
+            session, "profile_deleted", actor="operator", profile_id=profile_id, name=profile.name
+        )
+    session.commit()
+    if result.rowcount != 1:
+        raise ProfileBusyError(_busy_detail(session, profile))
 
 
 def run_from_profile(

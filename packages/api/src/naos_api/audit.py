@@ -41,6 +41,7 @@ API_EVENTS: dict[str, frozenset[str]] = {
     "secret_created": frozenset({"name"}),
     "profile_created": frozenset({"profile_id", "name"}),
     "profile_updated": frozenset({"profile_id", "name"}),
+    "profile_deleted": frozenset({"profile_id", "name"}),
     "console_attached": frozenset(),
     "console_typing": frozenset({"view"}),
 }
@@ -241,6 +242,7 @@ def search(
     limit: int,
     newest_first: bool = False,
     image_id: str | None = None,
+    profile_id: str | None = None,
 ) -> Sequence[AuditEvent]:
     statement = select(AuditEvent)
     if runner_id is not None:
@@ -252,6 +254,13 @@ def search(
             col(AuditEvent.data)["image_id"].as_string() == image_id,
         )
         statement = statement.where(or_(registered, col(AuditEvent.run_id).in_(booting)))
+    if profile_id is not None:
+        copied = select(Run.id).where(col(Run.profile_id) == profile_id)
+        own = and_(
+            col(AuditEvent.event).startswith("profile_"),
+            col(AuditEvent.data)["profile_id"].as_string() == profile_id,
+        )
+        statement = statement.where(or_(own, col(AuditEvent.run_id).in_(copied)))
     if event is not None:
         statement = statement.where(col(AuditEvent.event) == event)
     if since is not None:

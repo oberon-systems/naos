@@ -121,6 +121,65 @@ def test_a_run_copies_the_profile_and_records_it(
     assert listed["last_run_at"] == run["created_at"]
 
 
+def test_a_profile_counts_its_runs_ever_and_in_the_last_day(
+    client: TestClient, session: Session, image: dict[str, Any]
+) -> None:
+    profile = _create(client)
+    old = _run(client, profile["id"], image, key="old")
+    _run(client, profile["id"], image, key="new")
+    session.exec(update(Run).where(col(Run.id) == old["id"]).values(created_at=0))
+    session.commit()
+
+    listed = client.get("/api/v1/profiles").json()[0]
+
+    assert (listed["runs_total"], listed["runs_24h"]) == (2, 1)
+    assert _create(client, "beta")["runs_total"] == 0
+
+
+def test_runs_and_audit_are_filtered_by_profile(client: TestClient, image: dict[str, Any]) -> None:
+    alpha, beta = _create(client, "alpha"), _create(client, "beta")
+    run = _run(client, alpha["id"], image)
+    _run(client, beta["id"], image, key="beta")
+
+    runs_of = client.get("/api/v1/runs", params={"profile": alpha["id"]}).json()
+    trail = client.get("/api/v1/audit", params={"profile_id": alpha["id"]}).json()
+
+    assert [row["id"] for row in runs_of] == [run["id"]]
+    assert trail[0]["event"] == "profile_created"
+    assert {row["run_id"] for row in trail[1:]} == {run["id"]}
+
+
+def test_a_delete_is_refused_while_a_run_is_open_and_names_it(
+    client: TestClient, image: dict[str, Any]
+) -> None:
+    profile = _create(client)
+    run = _run(client, profile["id"], image)
+
+    refused = client.delete(f"/api/v1/profiles/{profile['id']}")
+
+    assert refused.status_code == 409
+    assert f"#{run['seq']} PENDING" in refused.json()["detail"]
+    assert client.get(f"/api/v1/profiles/{profile['id']}").status_code == 200
+
+
+def test_a_delete_removes_the_profile_and_leaves_its_runs(
+    client: TestClient, session: Session, image: dict[str, Any]
+) -> None:
+    profile = _create(client)
+    run = _run(client, profile["id"], image)
+    runs.stop_run(session, run["id"])
+
+    assert client.delete(f"/api/v1/profiles/{profile['id']}").status_code == 204
+
+    assert client.get(f"/api/v1/profiles/{profile['id']}").status_code == 404
+    assert client.delete(f"/api/v1/profiles/{profile['id']}").status_code == 404
+    kept = client.get(f"/api/v1/runs/{run['id']}").json()
+    assert kept["profile_id"] == profile["id"]
+    assert kept["spec"]["runtime"] == PROFILE_SPEC["runtime"]
+    trail = client.get("/api/v1/audit", params={"profile_id": profile["id"]}).json()
+    assert trail[-1]["event"] == "profile_deleted"
+
+
 def test_a_created_run_records_its_workspace_and_profile(
     client: TestClient, image: dict[str, Any], mount_body: dict[str, Any]
 ) -> None:
@@ -269,6 +328,7 @@ def test_policies_are_listed_by_kind(
         ("POST", "/api/v1/profiles"),
         ("GET", "/api/v1/profiles/prof_alpha"),
         ("PUT", "/api/v1/profiles/prof_alpha"),
+        ("DELETE", "/api/v1/profiles/prof_alpha"),
         ("POST", "/api/v1/profiles/prof_alpha/runs"),
         ("GET", "/api/v1/policies"),
     ],
