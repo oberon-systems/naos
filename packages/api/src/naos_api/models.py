@@ -160,4 +160,7 @@ class Image(SQLModel, table=True):
     version: str
     digest: str = Field(unique=True)
     url: str
+    name: str | None = None
+    size_bytes: int | None = None
+    built_at: int | None = None
     created_at: int = Field(default_factory=now_ts)

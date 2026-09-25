@@ -3,7 +3,7 @@ from typing import Annotated, Any, Literal, Self
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, create_model, model_validator
-from sqlmodel import Session, col, select
+from sqlmodel import Session, and_, col, or_, select
 
 from naos_api.clock import now_ts
 from naos_api.lifecycle import RunStatus
@@ -240,10 +240,18 @@ def search(
     after: int | None,
     limit: int,
     newest_first: bool = False,
+    image_id: str | None = None,
 ) -> Sequence[AuditEvent]:
     statement = select(AuditEvent)
     if runner_id is not None:
         statement = statement.where(col(AuditEvent.runner_id) == runner_id)
+    if image_id is not None:
+        booting = select(Run.id).where(col(Run.spec)[("image", "id")].as_string() == image_id)
+        registered = and_(
+            col(AuditEvent.event) == "image_registered",
+            col(AuditEvent.data)["image_id"].as_string() == image_id,
+        )
+        statement = statement.where(or_(registered, col(AuditEvent.run_id).in_(booting)))
     if event is not None:
         statement = statement.where(col(AuditEvent.event) == event)
     if since is not None:

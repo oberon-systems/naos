@@ -15,7 +15,7 @@ from naos_api.errors import (
     NotFoundError,
     PolicyError,
 )
-from naos_api.images.service import check_image
+from naos_api.images.service import booted_image, check_image
 from naos_api.lifecycle import ACTIVE, TERMINAL, RunStatus, ensure_transition
 from naos_api.models import Lease, Merge, Policy, Profile, Run, Runner
 from naos_api.policies import check_refs
@@ -172,6 +172,7 @@ def list_runs(
     limit: int = 50,
     offset: int = 0,
     runner: str | None = None,
+    image: str | None = None,
 ) -> Sequence[Run]:
     statement = select(Run)
     if status is not None:
@@ -181,6 +182,8 @@ def list_runs(
     if runner is not None:
         leases = select(Lease.id).where(col(Lease.runner_id) == runner)
         statement = statement.where(col(Run.lease_id).in_(leases))
+    if image is not None:
+        statement = statement.where(booted_image() == image)
     statement = statement.order_by(col(Run.seq).desc()).offset(offset).limit(limit)
     return session.exec(statement).all()
 

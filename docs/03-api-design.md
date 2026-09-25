@@ -285,16 +285,23 @@ stores it as given, without encryption for now, and never returns its value.
 
 The API keeps the catalog of images a Run may boot: what to boot and where to
 download it from. It stores no image bytes; the runner downloads the file
-itself and trusts the digest, not the host. The images are built as described
-in [packer/README.md](../packer/README.md).
+itself and trusts the digest, not the host. The project builds its own images
+as described in [packer/README.md](../packer/README.md), but an image may come
+from anyone.
 
 - An operator registers an image with `POST /api/v1/images` and a body of
   `id`, `version`, `digest` and `url`. The API answers 201 and never contacts
   the url.
+- `name`, `size_bytes` and `built_at` are optional facts the operator states.
+  The API checks their shape only; nothing measures or verifies them.
 - The url must use https and must not carry credentials; any other url gets
   422.
-- `id`, `version`, `digest` and `url` are immutable and image rows are never
-  deleted: no endpoint or service writes them, like the Run spec.
+- Every field is immutable and image rows are never deleted: no endpoint or
+  service writes them, like the Run spec. The same `id` or `digest` with any
+  other value gets 409.
+- `GET /images` adds `runs_open` and `runs_total`, the Runs that boot the
+  image now and ever. `GET /runs?image=` lists those Runs, and
+  `GET /audit?image_id=` returns the registration and every event of them.
 - `POST /runs` requires a registered image with the same `id` and `digest`,
   otherwise it returns 422.
 

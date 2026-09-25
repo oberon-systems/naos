@@ -42,6 +42,7 @@ def run_events(
 def search_events(
     session: SessionDep,
     runner_id: str | None = None,
+    image_id: str | None = None,
     event: str | None = None,
     since: Annotated[int | None, Query(ge=0)] = None,
     after: Annotated[int | None, Query(ge=0)] = None,
@@ -56,5 +57,6 @@ def search_events(
         after=after,
         limit=limit,
         newest_first=order == "desc",
+        image_id=image_id,
     )
     return [AuditEventRead.of(row) for row in found]
