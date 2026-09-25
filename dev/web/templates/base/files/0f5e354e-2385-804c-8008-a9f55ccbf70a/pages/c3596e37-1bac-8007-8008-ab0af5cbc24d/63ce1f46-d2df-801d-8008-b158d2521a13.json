@@ -3,36 +3,36 @@
   "name": "optional hint",
   "type": "text",
   "x": 4764,
-  "y": 543,
+  "y": 614,
   "width": 592,
-  "height": 16,
+  "height": 31,
   "rotation": 0,
   "selrect": {
     "x": 4764,
-    "y": 543,
+    "y": 614,
     "width": 592,
-    "height": 16,
+    "height": 31,
     "x1": 4764,
-    "y1": 543,
+    "y1": 614,
     "x2": 5356,
-    "y2": 559
+    "y2": 645
   },
   "points": [
     {
       "x": 4764,
-      "y": 543
+      "y": 614
     },
     {
       "x": 5356,
-      "y": 543
+      "y": 614
     },
     {
       "x": 5356,
-      "y": 559
+      "y": 645
     },
     {
       "x": 4764,
-      "y": 559
+      "y": 645
     }
   ],
   "transform": {
@@ -87,7 +87,7 @@
                   }
                 ],
                 "fontFamily": "Inter Tight",
-                "text": "size and build date are whatever the operator states \u2014 the image may come from anyone; leave them empty when unknown"
+                "text": "size, build date and name are whatever the operator states \u2014 the image may come from anyone; leave them empty when unknown"
               }
             ],
             "typographyRefId": null,
@@ -122,12 +122,12 @@
   "positionData": [
     {
       "x": 4764,
-      "y": 557.5454547405243,
-      "width": 585.0568237304688,
+      "y": 628.5454547405243,
+      "width": 573.5454711914062,
       "height": 13.818181991577148,
       "x1": 0,
       "y1": 0.7272727489471436,
-      "x2": 585.0568237304688,
+      "x2": 573.5454711914062,
       "y2": 14.545454740524292,
       "fontStyle": "normal",
       "textTransform": "none",
@@ -143,7 +143,32 @@
       ],
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "text": "size and build date are whatever the operator states \u2014 the image may come from anyone; leave them empty when unknown"
+      "text": "size, build date and name are whatever the operator states \u2014 the image may come from anyone; leave them empty when "
+    },
+    {
+      "x": 4764,
+      "y": 643.9431819915771,
+      "width": 43.3636360168457,
+      "height": 13.818181991577148,
+      "x1": 0,
+      "y1": 16.125,
+      "x2": 43.3636360168457,
+      "y2": 29.94318199157715,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#98a2b3",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "unknown"
     }
   ],
   "layoutItemMargin": {
