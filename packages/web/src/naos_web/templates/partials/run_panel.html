@@ -63,7 +63,7 @@
                 {% with title="Run", facts=run.run, link=none %}
                     {% include "partials/run_facts_card.html" %}
                 {% endwith %}
-                {% with title="Policy", facts=run.policy, link=("/profiles" if run.profile_id else none), label="Edit profile" %}
+                {% with title="Policy", facts=run.policy, link=("/profiles/" ~ run.profile_id ~ "/edit" if run.profile_id else none), label="Edit profile" %}
                     {% include "partials/run_facts_card.html" %}
                 {% endwith %}
             </div>

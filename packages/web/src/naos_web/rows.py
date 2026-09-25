@@ -506,7 +506,7 @@ def run_detail(
         elapsed=elapsed,
         attempt=f"attempt {format.DASH}",
         stoppable=run["status"] in STOPPABLE,
-        profile_id=run.get("profile_id"),
+        profile_id=profile["id"] if profile else None,
         run=[
             Fact("Run id", run["id"], mono=True),
             Fact("State", _state(run)),

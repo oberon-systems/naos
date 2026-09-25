@@ -288,9 +288,12 @@ def list_runs(
     state: str | None = None,
     runner: str | None = None,
     image: str | None = None,
+    profile: str | None = None,
     limit: int = Query(50),
 ) -> list[Row]:
     rows = RUNS if state is None else [r for r in RUNS if r["status"] in STATES[state]]
+    if profile is not None:
+        rows = [r for r in rows if r["profile_id"] == profile]
     if runner is not None:
         rows = [r for r in rows if r["runner"] and r["runner"]["id"] == runner]
     if image is not None:
@@ -359,11 +362,14 @@ def drain_runner(runner_id: str) -> Row | JSONResponse:
 def audit(
     runner_id: str | None = None,
     image_id: str | None = None,
+    profile_id: str | None = None,
     limit: int = Query(100),
     order: str = "asc",
 ) -> list[Row]:
     if image_id is not None:
         return IMAGE_EVENTS.get(image_id, [])[:limit]
+    if profile_id is not None:
+        return PROFILE_EVENTS.get(profile_id, [])[:limit]
     rows: list[Row] = [
         {
             "seq": 6,
@@ -452,6 +458,8 @@ def profile(pid: str, name: str, cpu: int, memory: int, active: Row | None, used
         "active_runs": 1 if active else 0,
         "active_run": active,
         "last_run_at": NOW - 600 if used else None,
+        "runs_total": 14 if used else 0,
+        "runs_24h": 3 if used else 0,
         "created_at": NOW - 9000,
         "updated_at": NOW - 9000,
     }
@@ -573,6 +581,34 @@ IMAGE_EVENTS: dict[str, list[Row]] = {
         },
     ]
 }
+PROFILE_EVENTS: dict[str, list[Row]] = {
+    "prof_7a1c30": [
+        {
+            "seq": 12,
+            "id": "ev_12",
+            "at": NOW - 120,
+            "source": "api",
+            "event": "run_created",
+            "actor": "operator",
+            "run_id": "run_9f21c4",
+            "vm_id": None,
+            "runner_id": None,
+            "data": {"workspace": "alpha", "profile": "build-small"},
+        },
+        {
+            "seq": 11,
+            "id": "ev_11",
+            "at": NOW - 9000,
+            "source": "api",
+            "event": "profile_created",
+            "actor": "operator",
+            "run_id": None,
+            "vm_id": None,
+            "runner_id": None,
+            "data": {"profile_id": "prof_7a1c30", "name": "build-small"},
+        },
+    ]
+}
 # Every write the dialog sends, in order, so a test reads what reached the api.
 WRITES: list[tuple[str, str, Row, str | None]] = []
 
@@ -587,9 +623,20 @@ def list_profiles(q: str | None = None) -> list[Row]:
     return [row for row in PROFILES if needle in row["name"].lower() or needle in row["id"]]
 
 
-@stub.get("/api/v1/profiles/{pid}")
-def get_profile(pid: str) -> Row:
-    return _found(pid)
+@stub.get("/api/v1/profiles/{pid}", response_model=None)
+def get_profile(pid: str) -> Row | JSONResponse:
+    found = next((row for row in PROFILES if row["id"] == pid), None)
+    return found if found else JSONResponse({"detail": f"profile {pid} does not exist"}, 404)
+
+
+@stub.delete("/api/v1/profiles/{pid}", response_model=None)
+def delete_profile(pid: str) -> Response:
+    WRITES.append(("DELETE", f"/profiles/{pid}", {}, None))
+    found = _found(pid)
+    if found["active_run"]:
+        detail = f"profile {found['name']} is used by #128 STARTED. Delete it once they finish."
+        return JSONResponse({"detail": detail}, 409)
+    return Response(status_code=204)
 
 
 @stub.post("/api/v1/profiles")

@@ -1,0 +1,83 @@
+{% from "components.html" import column_header, footer_note, pill %}
+<div class="card__header">
+    <input type="hidden" id="profile-state" name="state" value="{{ state }}">
+    <input class="search"
+           id="profile-search"
+           type="search"
+           name="q"
+           value="{{ query }}"
+           placeholder="Search profile or policy id…"
+           aria-label="Search profiles"
+           hx-get="/profiles"
+           hx-include="#profile-state"
+           hx-target="#profiles"
+           hx-swap="outerHTML"
+           hx-trigger="input changed delay:300ms"
+           hx-push-url="true"
+           hx-preserve="true">
+    <div class="filters">
+        {% for item in profile_filters %}
+            <a class="filter{{ " filter--active" if item.key == state }}"
+               href="{{ item.href(query) }}"
+               hx-get="{{ item.href(query) }}"
+               hx-target="#profiles"
+               hx-swap="outerHTML"
+               hx-push-url="true">{{ item.label }}</a>
+        {% endfor %}
+    </div>
+</div>
+<table class="table profiles-table">
+    {{ column_header(profile_columns) }}
+    <tbody>
+        {% for profile in profiles %}
+            <tr class="runs-table__row"
+                tabindex="0"
+                hx-get="/profiles/{{ profile.id }}"
+                hx-target="#overlay"
+                hx-trigger="click[!event.target.closest('.action')], keyup[key=='Enter'&&!event.target.closest('.action')]">
+                <td>
+                    <div class="runners-table__name">
+                        <span class="dot tone-{{ profile.tone }}"></span>
+                        <span>{{ profile.name }}</span>
+                    </div>
+                    <div class="table__id">{{ profile.short_id }}</div>
+                </td>
+                <td>
+                    <div class="run__mono">{{ profile.runtime }}</div>
+                    <div class="table__secondary">{{ profile.disk }}</div>
+                </td>
+                <td>
+                    <div class="profile__tags">
+                        {% for item in profile.tags %}
+                            <span class="profile__tag{{ " profile__tag--off" if not item.set }}">{{ item.label }}</span>
+                        {% endfor %}
+                    </div>
+                    <div class="table__secondary">{{ profile.policies }}</div>
+                </td>
+                <td>
+                    {{ pill(profile.merge, profile.merge_tone) }}
+                    <div class="table__secondary">{{ profile.merge_note }}</div>
+                </td>
+                <td>
+                    <div class="run__mono">{{ profile.timeout }}</div>
+                    <div class="table__secondary">{{ profile.timeout_note }}</div>
+                </td>
+                <td>
+                    <div>{{ profile.runs }}</div>
+                    <div class="table__secondary">{{ profile.runs_note }}</div>
+                </td>
+                <td>
+                    <a class="action"
+                       href="/profiles/{{ profile.id }}/edit"
+                       hx-get="/profiles/{{ profile.id }}/edit"
+                       hx-target="#overlay">Edit</a>
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td class="table__secondary" colspan="{{ profile_columns | length }}">no profile matches</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{{ footer_note(profile_note) }}

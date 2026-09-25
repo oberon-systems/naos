@@ -144,10 +144,15 @@ def _registered(data: Row) -> str:
     return f"{data['version']} \u00b7 sha256:{hexes[:8]}\u2026{hexes[-4:]}"
 
 
+PROFILE: dict[str, Check] = {"profile_id": _text, "name": _text}
+
 API: dict[str, Schema] = {
     "image_registered": Schema(
         {"image_id": _text, "version": _text, "digest": _text}, _data(_registered)
     ),
+    "profile_created": Schema(PROFILE, _data(lambda d: str(d["name"]))),
+    "profile_updated": Schema(PROFILE, _data(lambda d: f"{d['name']} \u00b7 spec changed")),
+    "profile_deleted": Schema(PROFILE, _data(lambda d: str(d["name"]))),
     "run_created": Schema(
         {"workspace": _maybe_text, "profile": _maybe_text},
         _data(_created),
@@ -453,5 +458,35 @@ def image_audit(
     for row in events:
         logged = log_row(row, {})
         if _in_image_scope(row, logged, scope):
+            rows.append(_audit_row(row, logged, seqs, now))
+    return rows
+
+
+ProfileScope = Literal["all", "profile", "runs", "errors"]
+PROFILE_SCOPES: tuple[tuple[ProfileScope, str], ...] = (
+    ("all", "All"),
+    ("profile", "Profile"),
+    ("runs", "Runs"),
+    ("errors", "Errors"),
+)
+
+
+def _in_profile_scope(row: Row, logged: LogRow, scope: ProfileScope) -> bool:
+    if scope == "profile":
+        return str(row["event"]).startswith("profile_")
+    if scope == "runs":
+        return bool(row.get("run_id"))
+    if scope == "errors":
+        return logged.error
+    return True
+
+
+def profile_audit(
+    events: list[Row], seqs: dict[str, int], scope: ProfileScope, now: int
+) -> list[RunnerAuditRow]:
+    rows = []
+    for row in events:
+        logged = log_row(row, {})
+        if _in_profile_scope(row, logged, scope):
             rows.append(_audit_row(row, logged, seqs, now))
     return rows

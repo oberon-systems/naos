@@ -1,0 +1,59 @@
+{% from "components.html" import pill %}
+<div class="run__body run__body--runner">
+    <div class="run__column">
+        <section class="card run__card">
+            <div class="run__card-header">
+                <h3 class="run__card-title">RUNTIME</h3>
+            </div>
+            <dl class="run__facts">
+                {% for fact in profile.facts %}
+                    <dt>{{ fact.label }}</dt>
+                    <dd>
+                        {{ fact.value }}
+                    </dd>
+                {% endfor %}
+            </dl>
+            <p class="image__hint table__secondary">{{ copy_note }}</p>
+        </section>
+        <section class="card run__card">
+            <div class="run__card-header">
+                <h3 class="run__card-title">POLICIES · RESOLVED DOCUMENTS</h3>
+            </div>
+            <ul class="profile__policies">
+                {% for line in profile.policies %}
+                    <li class="profile__policy">
+                        <div class="profile__policy-head">
+                            <span class="profile__tag{{ " profile__tag--off" if not line.id }}">{{ line.tag }}</span>
+                            {% if line.id %}<code class="profile__policy-id">{{ line.id }}</code>{% endif %}
+                        </div>
+                        <span class="profile__policy-summary{{ " table__secondary" if not line.id }}">{{ line.summary }}</span>
+                    </li>
+                {% endfor %}
+            </ul>
+            <p class="image__hint table__secondary">{{ policies_note }}</p>
+        </section>
+    </div>
+    <div class="run__column">
+        <section class="card run__card">
+            <div class="run__card-header">
+                <h3 class="run__card-title">OPEN RUNS</h3>
+            </div>
+            <ul class="panel__list">
+                {% for run in profile.open %}
+                    <li class="panel__run runner__run"
+                        tabindex="0"
+                        hx-get="/runs/{{ run.id }}"
+                        hx-target="#overlay"
+                        hx-trigger="click, keyup[key=='Enter']">
+                        <span class="run__strong">#{{ run.seq }}</span>
+                        <span class="table__secondary">{{ run.workspace }}</span>
+                        {{ pill(run.status, run.tone) }}
+                    </li>
+                {% else %}
+                    <li class="panel__run table__secondary">no run from this profile is open</li>
+                {% endfor %}
+            </ul>
+            <p class="image__hint table__secondary">{{ open_note }}</p>
+        </section>
+    </div>
+</div>

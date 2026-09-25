@@ -23,6 +23,10 @@ async def _send(ws: AsyncWebSocketSession, outbox: "asyncio.Queue[bytes | str]")
 class ApiError(Exception):
     """The api refused or never answered, so the page says so instead of inventing data."""
 
+    def __init__(self, message: str, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
+
 
 # A domain refusal carries a sentence meant for the operator; a validation error does not.
 def _detail(response: httpx.Response) -> str:
@@ -67,6 +71,15 @@ class RunnerDetail:
 
 
 @dataclass(frozen=True)
+class ProfileDetail:
+    profile: Row
+    runs: list[Row]
+    events: list[Row]
+    profiles: list[Row]
+    policies: list[Row]
+
+
+@dataclass(frozen=True)
 class ImageDetail:
     image: Row
     runs: list[Row]
@@ -106,7 +119,9 @@ class ApiClient:
             response.raise_for_status()
         except httpx.HTTPStatusError as err:
             status = err.response.status_code
-            raise ApiError(f"the api answered {status} for {path}{_detail(err.response)}") from err
+            raise ApiError(
+                f"the api answered {status} for {path}{_detail(err.response)}", status
+            ) from err
         except httpx.HTTPError as err:
             raise ApiError(f"the api did not answer {path}") from err
         return response
@@ -120,6 +135,7 @@ class ApiClient:
         limit: int = 50,
         runner: str | None = None,
         image: str | None = None,
+        profile: str | None = None,
     ) -> list[Row]:
         params: dict[str, Any] = {"limit": limit}
         if state is not None:
@@ -128,6 +144,8 @@ class ApiClient:
             params["runner"] = runner
         if image is not None:
             params["image"] = image
+        if profile is not None:
+            params["profile"] = profile
         rows: list[Row] = await self._call("GET", "/runs", params=params)
         return rows
 
@@ -219,6 +237,15 @@ class ApiClient:
         row: Row = await self._call("PUT", f"/profiles/{profile_id}", json={"spec": spec})
         return row
 
+    async def delete_profile(self, profile_id: str) -> None:
+        await self._request("DELETE", f"/profiles/{profile_id}")
+
+    async def profile_events(self, profile_id: str, limit: int = 500) -> list[Row]:
+        rows: list[Row] = await self._call(
+            "GET", "/audit", params={"profile_id": profile_id, "limit": limit, "order": "desc"}
+        )
+        return rows
+
     async def run_from_profile(
         self, profile_id: str, image: Row, runner: str | None, idempotency_key: str
     ) -> Row:
@@ -273,6 +300,27 @@ class ApiClient:
             raise ApiError(f"the api knows no image {image_id}")
         return ImageDetail(image=found, runs=runs, events=events, catalog=catalog)
 
+    async def profile_detail(self, profile_id: str) -> ProfileDetail:
+        profile, runs, events, profiles, policies = await asyncio.gather(
+            self.profile(profile_id),
+            self.runs(limit=100, profile=profile_id),
+            self.profile_events(profile_id),
+            self.profiles(),
+            self.policies(),
+        )
+        return ProfileDetail(profile, runs, events, profiles, policies)
+
+    # A Run outlives the profile it was copied from, so a deleted one is no profile.
+    async def _source_profile(self, profile_id: str | None) -> Row | None:
+        if not profile_id:
+            return None
+        try:
+            return await self.profile(profile_id)
+        except ApiError as err:
+            if err.status == 404:
+                return None
+            raise
+
     # The policies are the ones the spec names, so the card shows what this Run was given.
     async def run_detail(self, run_id: str) -> RunDetail:
         run = await self.run(run_id)
@@ -284,7 +332,7 @@ class ApiClient:
             self.images(),
             asyncio.gather(*(self.policy(policy_id) for policy_id in named)),
         )
-        profile = await self.profile(run["profile_id"]) if run.get("profile_id") else None
+        profile = await self._source_profile(run.get("profile_id"))
         holder = run["runner"]["id"] if run["runner"] else spec.get("runner")
         return RunDetail(
             run=run,

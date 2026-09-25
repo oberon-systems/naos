@@ -1,0 +1,44 @@
+{% from "components.html" import closer, pill, scrim with context %}
+{{ scrim("/profiles") }}
+<section class="panel panel--run panel--runner"
+         role="dialog"
+         aria-label="Profile {{ profile.name }}">
+    <header class="panel__header run__header">
+        <div class="panel__title">
+            <span class="dot dot--lg tone-{{ profile.tone }}"></span>
+            <h2 class="panel__name">{{ profile.name }}</h2>
+            {{ pill(profile.pill, profile.pill_tone) }}
+            <span class="table__id">{{ profile.id }}</span>
+            <div class="run__actions">
+                {% for label, act, klass in (("Clone", "clone", "button--outline"), ("Edit", "edit", "button--outline"), ("Delete", "delete", "button--outline-danger")) %}
+                    <a class="button {{ klass }}"
+                       href="/profiles/{{ profile.id }}/{{ act }}"
+                       hx-get="/profiles/{{ profile.id }}/{{ act }}"
+                       hx-target="#overlay">{{ label }}</a>
+                {% endfor %}
+                {{ closer("/profiles") }}
+            </div>
+        </div>
+        <p class="panel__facts">
+            {% for part in profile.meta %}
+                {% if not loop.first %}<span class="run__sep">·</span>{% endif %}
+                <span>{{ part }}</span>
+            {% endfor %}
+        </p>
+    </header>
+    <nav class="run__tabs">
+        {% for key, label, href in (("overview", "Overview", ""), ("runs", "Runs", "/runs"), ("audit", "Audit", "/audit")) %}
+            <a class="run__tab{{ " run__tab--active" if tab == key }}"
+               href="/profiles/{{ profile.id }}{{ href }}"
+               hx-get="/profiles/{{ profile.id }}{{ href }}"
+               hx-target="#overlay">{{ label }}</a>
+        {% endfor %}
+    </nav>
+    {% if tab == "runs" %}
+        {% include "partials/profile_runs.html" %}
+    {% elif tab == "audit" %}
+        {% include "partials/profile_audit.html" %}
+    {% else %}
+        {% include "partials/profile_overview.html" %}
+    {% endif %}
+</section>

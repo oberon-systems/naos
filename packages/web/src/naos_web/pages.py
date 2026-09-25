@@ -86,7 +86,7 @@ NAV: tuple[ListPage, ...] = (
             Tile("secrets", "Secrets", "amber"),
             Tile("runs_24h", "Runs 24h", "grey"),
         ),
-        action=Action("New profile", "/profiles/new"),
+        action=Action("New profile", "/profiles/new", overlay=True),
         chip=Chip("a Run copies, never references", "grey"),
     ),
     ListPage(
@@ -190,6 +190,37 @@ IMAGE_NOTE = (
 SOURCE_NOTE = (
     "The runner downloads the file itself and trusts this digest, not the host that served "
     "it. https only, no credentials, and the API never contacts the url."
+)
+
+PROFILE_FILTERS: tuple[SearchFilter, ...] = (
+    SearchFilter("all", "All", "/profiles"),
+    SearchFilter("used", "Used", "/profiles"),
+    SearchFilter("unused", "Unused", "/profiles"),
+)
+PROFILE_COLUMNS = ("PROFILE", "RUNTIME", "POLICIES", "MERGE", "TIMEOUT", "RUNS", "")
+PROFILE_NOTE = (
+    "A profile is only a starting point: creating a Run copies these values into a spec "
+    "that never changes again, so editing a profile leaves every started Run alone."
+)
+COPY_NOTE = (
+    "Creating a Run copies these values into its own spec, which never changes again "
+    "\u2014 an edit here never reaches a Run that has started."
+)
+POLICIES_NOTE = (
+    "Documents as the API resolved them. A secret appears by name only; "
+    "its value never leaves the API."
+)
+OPEN_NOTE = (
+    "Edit is refused while a run from this profile is open. "
+    "Every run ever launched from it is in Runs."
+)
+FORM_NOTE = (
+    "A Run copies these values when it is created. An edit later never reaches a Run "
+    "that has started."
+)
+GATES_NOTE = (
+    "Every gate starts closed: none allows nothing until you pick a policy. "
+    "An MCP policy names its secrets; their values never reach this form."
 )
 
 

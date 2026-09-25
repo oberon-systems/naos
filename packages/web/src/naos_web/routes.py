@@ -9,20 +9,28 @@ from fastapi import APIRouter, Query, Request, WebSocket, WebSocketException, st
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from naos_web import confirm, events, new_run, register, terminal
+from naos_web import confirm, events, new_run, profiles, register, terminal
 from naos_web.client import ApiClient, ApiError, Choices, Dashboard, Row, RunDetail
 from naos_web.clock import NowDep
 from naos_web.format import ago
 from naos_web.pages import (
+    COPY_NOTE,
     EXITS,
     FENCING,
+    FORM_NOTE,
+    GATES_NOTE,
     IMAGE_COLUMNS,
     IMAGE_FILTERS,
     IMAGE_NOTE,
     LEASE_NOTE,
     LIFECYCLE,
     NAV,
+    OPEN_NOTE,
     PAGES,
+    POLICIES_NOTE,
+    PROFILE_COLUMNS,
+    PROFILE_FILTERS,
+    PROFILE_NOTE,
     RUN_COLUMNS,
     RUN_FILTERS,
     RUNNER_COLUMNS,
@@ -55,6 +63,8 @@ Fleet = Literal["all", "live", "stale", "revoked"]
 FleetQuery = Annotated[Fleet, Query()]
 Usage = Literal["all", "in_use", "unused"]
 UsageQuery = Annotated[Usage, Query()]
+Used = Literal["all", "used", "unused"]
+UsedQuery = Annotated[Used, Query()]
 SearchQuery = Annotated[str, Query(max_length=128)]
 
 LOG_KINDS: tuple[tuple[events.Kind, str], ...] = (
@@ -856,9 +866,227 @@ async def image_audit_export(request: Request, image_id: str) -> Response:
     )
 
 
+def _shelf(
+    every: list[Row], policies: list[Row], now: int, used: Used = "all", query: str = ""
+) -> dict[str, object]:
+    return {
+        "profiles": profiles.profile_rows(profiles.pick_profiles(every, used, query), now),
+        "profile_filters": PROFILE_FILTERS,
+        "profile_columns": PROFILE_COLUMNS,
+        "profile_note": PROFILE_NOTE,
+        "state": used,
+        "query": query,
+    }
+
+
+def _moved(request: Request, target: str) -> Response:
+    if wants_fragment(request):
+        return Response(headers={"HX-Redirect": target})
+    return RedirectResponse(target, status_code=303)
+
+
+# Search and filters narrow the table; the tiles always count every profile and policy.
 @router.get("/profiles", response_class=HTMLResponse)
-def profiles(request: Request) -> HTMLResponse:
-    return render(request, PAGES["profiles"])
+async def profile_shelf(
+    request: Request, now: NowDep, state: UsedQuery = "all", q: SearchQuery = ""
+) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        every, policies = await asyncio.gather(api.profiles(), api.policies())
+    except ApiError as err:
+        return failed(request, PAGES["profiles"], err)
+    return render(
+        request,
+        PAGES["profiles"],
+        profiles.shelf(every, policies),
+        template="partials/profiles_body.html" if wants_fragment(request) else "profiles.html",
+        **_shelf(every, policies, now, state, q),
+    )
+
+
+async def _profile_form(
+    request: Request, now: int, form: profiles.Form, notice: str = ""
+) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        every, policies = await asyncio.gather(api.profiles(), api.policies())
+    except ApiError as err:
+        return failed_overlay(request, PAGES["profiles"], err)
+    return render(
+        request,
+        PAGES["profiles"],
+        profiles.shelf(every, policies),
+        template="profile_form_overlay.html"
+        if wants_fragment(request)
+        else "profile_form_page.html",
+        **_shelf(every, policies, now),
+        form=form,
+        gates=profiles.gate_fields(form, policies),
+        merges=profiles.merge_options(form),
+        form_note=FORM_NOTE,
+        gates_note=GATES_NOTE,
+        notice=notice,
+    )
+
+
+# Declared before /profiles/{profile_id}, which would otherwise take "new" for an id.
+@router.get("/profiles/new", response_class=HTMLResponse)
+async def new_profile(request: Request, now: NowDep) -> HTMLResponse:
+    return await _profile_form(request, now, profiles.new_form())
+
+
+@router.post("/profiles/new", response_class=HTMLResponse)
+async def create_profile(request: Request, now: NowDep) -> Response:
+    api: ApiClient = request.app.state.api
+    fields = await _form(request)
+    form = profiles.read_form("clone" if fields.get("mode") == "clone" else "new", fields)
+    try:
+        created = await api.create_profile(form.name, form.spec())
+    except (ApiError, new_run.FormError) as err:
+        return await _profile_form(request, now, form, str(err))
+    return _moved(request, f"/profiles/{created['id']}")
+
+
+ProfileTab = Literal["overview", "runs", "audit"]
+
+
+async def _profile_panel(
+    request: Request,
+    profile_id: str,
+    now: int,
+    tab: ProfileTab,
+    scope: events.ProfileScope = "all",
+) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        detail = await api.profile_detail(profile_id)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["profiles"], err)
+    seqs = {found["id"]: found["seq"] for found in detail.runs}
+    return render(
+        request,
+        PAGES["profiles"],
+        profiles.shelf(detail.profiles, detail.policies),
+        template="profile_overlay.html" if wants_fragment(request) else "profile_overlay_page.html",
+        **_shelf(detail.profiles, detail.policies, now),
+        profile=profiles.profile_detail(detail.profile, detail.runs, detail.policies, now),
+        tab=tab,
+        copy_note=COPY_NOTE,
+        policies_note=POLICIES_NOTE,
+        open_note=OPEN_NOTE,
+        scopes=events.PROFILE_SCOPES,
+        scope=scope,
+        audit_rows=events.profile_audit(detail.events, seqs, scope, now),
+    )
+
+
+@router.get("/profiles/{profile_id}", response_class=HTMLResponse)
+async def profile(request: Request, profile_id: str, now: NowDep) -> HTMLResponse:
+    return await _profile_panel(request, profile_id, now, "overview")
+
+
+@router.get("/profiles/{profile_id}/runs", response_class=HTMLResponse)
+async def profile_runs(request: Request, profile_id: str, now: NowDep) -> HTMLResponse:
+    return await _profile_panel(request, profile_id, now, "runs")
+
+
+@router.get("/profiles/{profile_id}/audit", response_class=HTMLResponse)
+async def profile_audit(
+    request: Request, profile_id: str, now: NowDep, scope: events.ProfileScope = "all"
+) -> HTMLResponse:
+    return await _profile_panel(request, profile_id, now, "audit", scope)
+
+
+@router.get("/profiles/{profile_id}/audit/export")
+async def profile_audit_export(request: Request, profile_id: str) -> Response:
+    api: ApiClient = request.app.state.api
+    try:
+        rows = await api.profile_events(profile_id, limit=1000)
+    except ApiError as err:
+        return failed(request, PAGES["profiles"], err)
+    return Response(
+        json.dumps(rows, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{profile_id}-audit.json"'},
+    )
+
+
+@router.get("/profiles/{profile_id}/edit", response_class=HTMLResponse)
+async def edit_profile(request: Request, profile_id: str, now: NowDep) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        found = await api.profile(profile_id)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["profiles"], err)
+    return await _profile_form(request, now, profiles.edit_form(found))
+
+
+# The api refuses the write while a run from the profile is open; the form shows why.
+@router.post("/profiles/{profile_id}/edit", response_class=HTMLResponse)
+async def update_profile(request: Request, profile_id: str, now: NowDep) -> Response:
+    api: ApiClient = request.app.state.api
+    try:
+        found = await api.profile(profile_id)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["profiles"], err)
+    form = profiles.read_form("edit", await _form(request), found)
+    try:
+        await api.update_profile(profile_id, form.spec())
+    except (ApiError, new_run.FormError) as err:
+        return await _profile_form(request, now, form, str(err))
+    return _moved(request, f"/profiles/{profile_id}")
+
+
+@router.get("/profiles/{profile_id}/clone", response_class=HTMLResponse)
+async def clone_profile(request: Request, profile_id: str, now: NowDep) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        found = await api.profile(profile_id)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["profiles"], err)
+    return await _profile_form(request, now, profiles.clone_form(found))
+
+
+def _delete_dialog(request: Request, found: Row, refusal: str = "") -> HTMLResponse:
+    return render(
+        request,
+        PAGES["profiles"],
+        template="profile_delete_overlay.html"
+        if wants_fragment(request)
+        else "profile_delete_page.html",
+        profile=found,
+        refusal=refusal,
+    )
+
+
+# A profile a run still holds is refused up front; the api decides again on the write.
+@router.get("/profiles/{profile_id}/delete", response_class=HTMLResponse)
+async def delete_confirm(request: Request, profile_id: str) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        found, held = await asyncio.gather(
+            api.profile(profile_id), api.runs(limit=100, profile=profile_id)
+        )
+    except ApiError as err:
+        return failed_overlay(request, PAGES["profiles"], err)
+    refusal = profiles.busy_note(found, held) if found["active_runs"] else ""
+    return _delete_dialog(request, found, refusal)
+
+
+@router.post("/profiles/{profile_id}/delete", response_class=HTMLResponse)
+async def delete_profile(request: Request, profile_id: str) -> Response:
+    api: ApiClient = request.app.state.api
+    try:
+        found = await api.profile(profile_id)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["profiles"], err)
+    try:
+        await api.delete_profile(profile_id)
+    except ApiError as err:
+        if err.status != 409:
+            return failed_overlay(request, PAGES["profiles"], err)
+        return _delete_dialog(request, found, str(err))
+    return _moved(request, "/profiles")
 
 
 @router.get("/audit", response_class=HTMLResponse)

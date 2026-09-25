@@ -1,0 +1,48 @@
+{% from "components.html" import closer, scrim with context %}
+{% set back = "/profiles/" ~ profile.id %}
+{% set opened = profile.active_runs %}
+{{ scrim(back, get=back) }}
+<section class="panel panel--dialog panel--delete"
+         role="dialog"
+         aria-label="Delete {{ profile.name }}">
+    <header class="panel__header">
+        <div class="panel__title">
+            <h2 class="panel__name">
+                {% if refusal %}
+                    {{ profile.name }} cannot be deleted
+                {% else %}
+                    Delete {{ profile.name }}?
+                {% endif %}
+            </h2>
+            {{ closer(back, get=back) }}
+        </div>
+        <p class="panel__facts">
+            Profile {{ profile.id }} · {{ profile.runs_total }} {{ "run" if profile.runs_total == 1 else "runs" }} · {{ opened ~ " open" if opened else "none open" }}
+        </p>
+    </header>
+    <form class="dialog"
+          method="post"
+          action="{{ back }}/delete"
+          hx-post="{{ back }}/delete"
+          hx-target="#overlay">
+        <div class="dialog__body">
+            {% if refusal %}
+                <p class="dialog__error">{{ refusal }}</p>
+            {% else %}
+                <p class="confirm__question">
+                    The profile leaves the list and cannot be picked for a new Run. Runs already launched from it keep their own copy of the spec and are not touched.
+                </p>
+            {% endif %}
+        </div>
+        <footer class="dialog__footer dialog__footer--end">
+            <div class="dialog__actions">
+                {% if refusal %}
+                    {{ closer(back, get=back, label="OK", klass="button") }}
+                {% else %}
+                    {{ closer(back, get=back, label="No", klass="button button--outline") }}
+                    <button class="button button--danger" type="submit">Yes</button>
+                {% endif %}
+            </div>
+        </footer>
+    </form>
+</section>

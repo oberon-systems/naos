@@ -1,0 +1,47 @@
+{% from "components.html" import pill %}
+<div class="run__body run__body--logs">
+    <section class="logs__timeline">
+        <div class="run__card-header">
+            <h3 class="run__card-title">RUNS</h3>
+            <span class="table__secondary">{{ profile.open | length }} open · {{ profile.finished }} finished · a row opens the run</span>
+        </div>
+        <table class="table runner-runs profile-runs">
+            <thead>
+                <tr>
+                    <th>RUN</th>
+                    <th>STATUS</th>
+                    <th>RUNNER</th>
+                    <th>SPEC</th>
+                    <th>STARTED</th>
+                    <th>DURATION</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for run in profile.runs %}
+                    <tr class="runs-table__row"
+                        tabindex="0"
+                        hx-get="/runs/{{ run.id }}"
+                        hx-target="#overlay"
+                        hx-trigger="click, keyup[key=='Enter']">
+                        <td>
+                            <div class="run__strong">#{{ run.seq }}</div>
+                            <div class="table__id">{{ run.id }}</div>
+                        </td>
+                        <td>{{ pill(run.status, run.tone) }}</td>
+                        <td>{{ run.runner }}</td>
+                        <td>
+                            <span>{{ run.workspace }}</span>
+                            {% if run.secondary %}<span class="table__secondary runner-runs__image">{{ run.secondary }}</span>{% endif %}
+                        </td>
+                        <td>{{ run.started }}</td>
+                        <td class="run__mono">{{ run.duration }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td class="table__secondary" colspan="6">no run was launched from this profile</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</div>
