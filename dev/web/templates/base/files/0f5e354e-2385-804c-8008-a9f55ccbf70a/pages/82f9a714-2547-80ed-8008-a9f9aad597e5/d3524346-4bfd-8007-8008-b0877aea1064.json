@@ -114,34 +114,34 @@
       }
     ]
   },
+  "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 4935,
       "y": 291,
-      "width": 48.10000228881836,
-      "height": 12,
-      "x1": 0,
-      "y1": 0,
-      "x2": 48.10000228881836,
-      "y2": 12,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "10px",
       "fontWeight": "600",
+      "y1": 0,
+      "width": 48.10000228881836,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 4935,
+      "x1": 0,
+      "y2": 12,
       "fills": [
         {
           "fillColor": "#175cd3",
           "fillOpacity": 1
         }
       ],
+      "x2": 48.10000228881836,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 12,
       "text": "STOPPING"
     }
-  ],
-  "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5"
+  ]
 }

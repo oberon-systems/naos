@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 2382.999999999998,
       "y": 44.80000191926956,
-      "width": 42.8125,
-      "height": 16.000001907348633,
-      "x1": 0,
-      "y1": 0.800000011920929,
-      "x2": 42.8125,
-      "y2": 16.80000191926956,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "600",
+      "y1": 0.800000011920929,
+      "width": 42.8125,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 2382.999999999998,
+      "x1": 0,
+      "y2": 16.80000191926956,
       "fills": [
         {
           "fillColor": "#b42318",
           "fillOpacity": 1
         }
       ],
+      "x2": 42.8125,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 16.000001907348633,
       "text": "Revoke"
     }
   ]

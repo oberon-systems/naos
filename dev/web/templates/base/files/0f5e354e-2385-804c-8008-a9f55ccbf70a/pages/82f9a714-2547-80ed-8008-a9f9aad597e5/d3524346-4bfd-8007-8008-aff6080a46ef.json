@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 1600,
       "y": 464.1000003814697,
-      "width": 93.5999984741211,
-      "height": 17.600000381469727,
-      "x1": 0,
-      "y1": 0,
-      "x2": 93.5999984741211,
-      "y2": 17.600000381469727,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "500",
+      "y1": 0,
+      "width": 93.5999984741211,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 1600,
+      "x1": 0,
+      "y2": 17.600000381469727,
       "fills": [
         {
           "fillColor": "#101828",
           "fillOpacity": 1
         }
       ],
+      "x2": 93.5999984741211,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
+      "height": 17.600000381469727,
       "text": "lease_5d2a91"
     }
   ]

@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 2224,
       "y": 378.4000005722046,
-      "width": 92.4124984741211,
-      "height": 14.40000057220459,
-      "x1": 0,
-      "y1": 0,
-      "x2": 92.4124984741211,
-      "y2": 14.40000057220459,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 0,
+      "width": 92.4124984741211,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 2224,
+      "x1": 0,
+      "y2": 14.40000057220459,
       "fills": [
         {
           "fillColor": "#667085",
           "fillOpacity": 1
         }
       ],
+      "x2": 92.4124984741211,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
+      "height": 14.40000057220459,
       "text": "playwright e2e"
     }
   ]

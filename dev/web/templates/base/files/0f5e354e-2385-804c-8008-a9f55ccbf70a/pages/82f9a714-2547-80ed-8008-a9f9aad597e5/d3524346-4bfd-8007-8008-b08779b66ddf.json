@@ -114,34 +114,34 @@
       }
     ]
   },
+  "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 5130,
       "y": 236,
-      "width": 35.98749923706055,
-      "height": 12,
-      "x1": 0,
-      "y1": 0,
-      "x2": 35.98749923706055,
-      "y2": 12,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "10px",
       "fontWeight": "600",
+      "y1": 0,
+      "width": 35.98749923706055,
       "textDecoration": "none",
       "letterSpacing": "0.6px",
+      "x": 5130,
+      "x1": 0,
+      "y2": 12,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 35.98749923706055,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 12,
       "text": "ACTOR"
     }
-  ],
-  "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5"
+  ]
 }

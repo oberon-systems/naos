@@ -1,0 +1,101 @@
+{
+  "id": "63ce1f46-d2df-801d-8008-b158b8ce15ae",
+  "name": "Body",
+  "type": "frame",
+  "x": 4740,
+  "y": 1142,
+  "width": 640,
+  "height": 585,
+  "rotation": 0,
+  "selrect": {
+    "x": 4740,
+    "y": 1142,
+    "width": 640,
+    "height": 585,
+    "x1": 4740,
+    "y1": 1142,
+    "x2": 5380,
+    "y2": 1727
+  },
+  "points": [
+    {
+      "x": 4740,
+      "y": 1142
+    },
+    {
+      "x": 5380,
+      "y": 1142
+    },
+    {
+      "x": 5380,
+      "y": 1727
+    },
+    {
+      "x": 4740,
+      "y": 1727
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "63ce1f46-d2df-801d-8008-b158b8ce15ad",
+  "frameId": "63ce1f46-d2df-801d-8008-b158b8ce15ad",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 20,
+    "p2": 24,
+    "p3": 24,
+    "p4": 24
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 16,
+    "columnGap": 16
+  },
+  "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",
+  "layoutItemVSizing": "auto",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": [],
+  "shapes": [
+    "63ce1f46-d2df-801d-8008-b158d27aa9da",
+    "63ce1f46-d2df-801d-8008-b158d258d725",
+    "63ce1f46-d2df-801d-8008-b158d2521a13",
+    "63ce1f46-d2df-801d-8008-b158d22cb1cf",
+    "63ce1f46-d2df-801d-8008-b158c59e90af",
+    "63ce1f46-d2df-801d-8008-b158c57c80f9",
+    "63ce1f46-d2df-801d-8008-b158c55df5ef",
+    "63ce1f46-d2df-801d-8008-b158c53ccce2"
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "id": "63ce1f46-d2df-801d-8008-b152008a197e",
+  "name": "Image beta",
+  "type": "frame",
+  "x": 24,
+  "y": 1495,
+  "width": 1391.9999999999995,
+  "height": 58,
+  "rotation": 0,
+  "selrect": {
+    "x": 24,
+    "y": 1495,
+    "width": 1391.9999999999995,
+    "height": 58,
+    "x1": 24,
+    "y1": 1495,
+    "x2": 1415.9999999999995,
+    "y2": 1553
+  },
+  "points": [
+    {
+      "x": 24,
+      "y": 1495
+    },
+    {
+      "x": 1415.9999999999995,
+      "y": 1495
+    },
+    {
+      "x": 1415.9999999999995,
+      "y": 1553
+    },
+    {
+      "x": 24,
+      "y": 1553
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "63ce1f46-d2df-801d-8008-b152008a1935",
+  "frameId": "63ce1f46-d2df-801d-8008-b152008a1935",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 16,
+    "p3": 0,
+    "p4": 16
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",
+  "layoutItemVSizing": "fix",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "row",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": [],
+  "shapes": [
+    "63ce1f46-d2df-801d-8008-b152008a42d1",
+    "63ce1f46-d2df-801d-8008-b152008a42d2",
+    "63ce1f46-d2df-801d-8008-b152008a42d3",
+    "63ce1f46-d2df-801d-8008-b152008a42d4",
+    "63ce1f46-d2df-801d-8008-b152008a42d5",
+    "63ce1f46-d2df-801d-8008-b152008a42d6"
+  ]
+}

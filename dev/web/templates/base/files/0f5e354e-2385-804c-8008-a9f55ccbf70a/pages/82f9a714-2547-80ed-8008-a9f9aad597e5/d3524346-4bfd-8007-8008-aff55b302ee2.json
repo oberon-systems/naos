@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 24,
       "y": 104.80000078678131,
-      "width": 82.625,
-      "height": 27.200000762939453,
-      "x1": 0,
-      "y1": 1.600000023841858,
-      "x2": 82.625,
-      "y2": 28.80000078678131,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "22px",
       "fontWeight": "600",
+      "y1": 1.600000023841858,
+      "width": 82.625,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 24,
+      "x1": 0,
+      "y2": 28.80000078678131,
       "fills": [
         {
           "fillColor": "#101828",
           "fillOpacity": 1
         }
       ],
+      "x2": 82.625,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 27.200000762939453,
       "text": "Runners"
     }
   ]

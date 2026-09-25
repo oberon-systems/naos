@@ -1,0 +1,121 @@
+{
+  "id": "63ce1f46-d2df-801d-8008-b156c935b52d",
+  "name": "Image detail \u2014 Audit",
+  "type": "frame",
+  "x": 3680,
+  "y": 1040,
+  "width": 940,
+  "height": 530,
+  "rotation": 0,
+  "selrect": {
+    "x": 3680,
+    "y": 1040,
+    "width": 940,
+    "height": 530,
+    "x1": 3680,
+    "y1": 1040,
+    "x2": 4620,
+    "y2": 1570
+  },
+  "points": [
+    {
+      "x": 3680,
+      "y": 1040
+    },
+    {
+      "x": 4620,
+      "y": 1040
+    },
+    {
+      "x": 4620,
+      "y": 1570
+    },
+    {
+      "x": 3680,
+      "y": 1570
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "00000000-0000-0000-0000-000000000000",
+  "frameId": "00000000-0000-0000-0000-000000000000",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 12,
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",
+  "layoutItemVSizing": "auto",
+  "r3": 12,
+  "layoutJustifyContent": "start",
+  "r1": 12,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [
+    {
+      "strokeColor": "#e4e7ec",
+      "strokeOpacity": 1,
+      "strokeAlignment": "inner",
+      "strokeWidth": 1
+    }
+  ],
+  "proportion": 1,
+  "shadow": [
+    {
+      "id": "5142935e-e171-8029-8008-ab1b90637bb1",
+      "style": "drop-shadow",
+      "color": {
+        "opacity": 0.2,
+        "color": "#000000"
+      },
+      "offsetX": 0,
+      "offsetY": 18,
+      "blur": 48,
+      "spread": -8,
+      "hidden": false
+    }
+  ],
+  "r4": 12,
+  "fills": [
+    {
+      "fillColor": "#ffffff",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "63ce1f46-d2df-801d-8008-b156c935b52e",
+    "63ce1f46-d2df-801d-8008-b156c937833b",
+    "63ce1f46-d2df-801d-8008-b156c937ca3c",
+    "63ce1f46-d2df-801d-8008-b156c937ca3d",
+    "63ce1f46-d2df-801d-8008-b15842f80995"
+  ]
+}
