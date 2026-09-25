@@ -66,6 +66,14 @@ class RunnerDetail:
     fleet: list[Row]
 
 
+@dataclass(frozen=True)
+class ImageDetail:
+    image: Row
+    runs: list[Row]
+    events: list[Row]
+    catalog: list[Row]
+
+
 def read_token(path: Path | None) -> str | None:
     if path is None:
         return None
@@ -107,13 +115,19 @@ class ApiClient:
         return (await self._request(method, path, **kwargs)).json()
 
     async def runs(
-        self, state: str | None = None, limit: int = 50, runner: str | None = None
+        self,
+        state: str | None = None,
+        limit: int = 50,
+        runner: str | None = None,
+        image: str | None = None,
     ) -> list[Row]:
         params: dict[str, Any] = {"limit": limit}
         if state is not None:
             params["state"] = state
         if runner is not None:
             params["runner"] = runner
+        if image is not None:
+            params["image"] = image
         rows: list[Row] = await self._call("GET", "/runs", params=params)
         return rows
 
@@ -224,6 +238,16 @@ class ApiClient:
         rows: list[Row] = await self._call("GET", "/images")
         return rows
 
+    async def image_events(self, image_id: str, limit: int = 500) -> list[Row]:
+        rows: list[Row] = await self._call(
+            "GET", "/audit", params={"image_id": image_id, "limit": limit, "order": "desc"}
+        )
+        return rows
+
+    async def register_image(self, body: Row) -> Row:
+        row: Row = await self._call("POST", "/images", json=body)
+        return row
+
     # One page, three independent reads: fetch them together rather than in turn.
     async def dashboard(self, state: str | None = None) -> Dashboard:
         runs, summary, runners = await asyncio.gather(
@@ -239,6 +263,15 @@ class ApiClient:
         if found is None:
             raise ApiError(f"the api knows no runner {runner_id}")
         return RunnerDetail(runner=found, runs=runs, events=events, fleet=runners)
+
+    async def image(self, image_id: str) -> ImageDetail:
+        catalog, runs, events = await asyncio.gather(
+            self.images(), self.runs(limit=100, image=image_id), self.image_events(image_id)
+        )
+        found = next((row for row in catalog if row["id"] == image_id), None)
+        if found is None:
+            raise ApiError(f"the api knows no image {image_id}")
+        return ImageDetail(image=found, runs=runs, events=events, catalog=catalog)
 
     # The policies are the ones the spec names, so the card shows what this Run was given.
     async def run_detail(self, run_id: str) -> RunDetail:

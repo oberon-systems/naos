@@ -1,0 +1,55 @@
+{% from "components.html" import pill %}
+<div class="run__body run__body--runner">
+    <div class="run__column">
+        <section class="card run__card">
+            <div class="run__card-header">
+                <h3 class="run__card-title">DIGEST &amp; SOURCE</h3>
+            </div>
+            <div class="run__card-body image__source">
+                <span class="field__label">Digest</span>
+                <code class="image__digest">{{ image.digest_head }}
+                    <br>
+                {{ image.digest_tail }}</code>
+                <span class="field__label">Source</span>
+                <code class="image__digest">{{ image.url }}</code>
+                <p class="table__secondary">{{ source_note }}</p>
+            </div>
+        </section>
+        <section class="card run__card">
+            <div class="run__card-header">
+                <h3 class="run__card-title">FACTS</h3>
+            </div>
+            <dl class="run__facts">
+                {% for fact in image.facts %}
+                    <dt>{{ fact.label }}</dt>
+                    <dd>
+                        {{ fact.value }}
+                    </dd>
+                {% endfor %}
+            </dl>
+        </section>
+    </div>
+    <div class="run__column">
+        <section class="card run__card">
+            <div class="run__card-header">
+                <h3 class="run__card-title">BOOTING NOW</h3>
+            </div>
+            <ul class="panel__list">
+                {% for run in image.booting %}
+                    <li class="panel__run runner__run"
+                        tabindex="0"
+                        hx-get="/runs/{{ run.id }}"
+                        hx-target="#overlay"
+                        hx-trigger="click, keyup[key=='Enter']">
+                        <span class="run__strong">#{{ run.seq }}</span>
+                        <span class="table__secondary">{{ run.workspace }}</span>
+                        {{ pill(run.status, run.tone) }}
+                    </li>
+                {% else %}
+                    <li class="panel__run table__secondary">no run boots this image now</li>
+                {% endfor %}
+            </ul>
+            <p class="image__hint table__secondary">every run that ever booted this image is in Runs</p>
+        </section>
+    </div>
+</div>

@@ -1,0 +1,58 @@
+{% from "components.html" import closer, scrim with context %}
+{% macro text(name, label, value, hint="", placeholder="", required=true) -%}
+    <label class="field">
+        <span class="field__label">{{ label }}</span>
+        <span class="field__box">
+            <input class="field__input"
+                   type="text"
+                   name="{{ name }}"
+                   value="{{ value }}"
+                   placeholder="{{ placeholder }}"
+                   {% if required %}required{% endif %}>
+        </span>
+        {% if hint %}<span class="field__hint">{{ hint }}</span>{% endif %}
+    </label>
+{%- endmacro %}
+{{ scrim("/images") }}
+<section class="panel panel--dialog panel--register"
+         role="dialog"
+         aria-label="Register image">
+    <header class="panel__header">
+        <div class="panel__title">
+            <h2 class="panel__name">Register image</h2>
+            {{ closer("/images") }}
+        </div>
+        <p class="panel__facts">
+            A catalog row is immutable — a new build is a new version, and nothing here is ever edited or deleted.
+        </p>
+    </header>
+    <form class="dialog"
+          method="post"
+          action="/images/register"
+          hx-post="/images/register"
+          hx-target="#overlay">
+        <div class="dialog__body">
+            <div class="dialog__fields">
+                {{ text("id", "Image id", entry.id, "letters, digits, _ and -; the id is never reused", "image_epsilon") }}
+                {{ text("name", "Name · optional", entry.name, placeholder="epsilon", required=false) }}
+                {{ text("version", "Version", entry.version, placeholder="2026.09.2") }}
+                {{ text("digest", "Digest", entry.digest, "the runner refuses a downloaded file with any other digest", "sha256:…") }}
+                {{ text("url", "Source url", entry.url, "https only, no credentials — the API stores it and never fetches it", "https://") }}
+                <div class="dialog__grid">
+                    {{ text("size", "Size · optional", entry.size, placeholder="4.2 GiB", required=false) }}
+                    {{ text("built", "Built · optional", entry.built, placeholder="YYYY-MM-DD", required=false) }}
+                </div>
+                <span class="field__hint">size, build date and name are whatever the operator states — the image may come from anyone; leave them empty when unknown</span>
+            </div>
+            {% if notice %}<p class="dialog__error">{{ notice }}</p>{% endif %}
+        </div>
+        <footer class="dialog__footer dialog__footer--end">
+            <div class="dialog__actions">
+                <a class="button button--outline"
+                   href="/images"
+                   {% if not standalone %}hx-get="/overlay/close" hx-target="#overlay"{% endif %}>Cancel</a>
+                <button class="button" type="submit">Register</button>
+            </div>
+        </footer>
+    </form>
+</section>

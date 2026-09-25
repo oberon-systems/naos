@@ -136,9 +136,18 @@ MERGE_COUNTS = ("applied", "skipped", "exported", "backed_up")
 NETWORK: dict[str, Check] = {"protocol": _text, "host": _text, "rule": _text}
 SHELL: dict[str, Check] = {"capability": _text, "path": _text}
 
+
 # The run-scoped events of both writers, keyed as the API stores them: a runner's
 # run_id and vm_id are lifted into columns. Optional fields are the ones a row may lack.
+def _registered(data: Row) -> str:
+    hexes = str(data["digest"]).removeprefix("sha256:")
+    return f"{data['version']} \u00b7 sha256:{hexes[:8]}\u2026{hexes[-4:]}"
+
+
 API: dict[str, Schema] = {
+    "image_registered": Schema(
+        {"image_id": _text, "version": _text, "digest": _text}, _data(_registered)
+    ),
     "run_created": Schema(
         {"workspace": _maybe_text, "profile": _maybe_text},
         _data(_created),
@@ -391,6 +400,20 @@ def _when(at: int, now: int) -> str:
     return clock(at) if now - at < format.DAY else format.ago(at, now)
 
 
+def _audit_row(row: Row, logged: LogRow, seqs: dict[str, int], now: int) -> RunnerAuditRow:
+    run_id = row.get("run_id")
+    return RunnerAuditRow(
+        time=_when(row["at"], now),
+        event=logged.event,
+        run_id=run_id if run_id in seqs else None,
+        run=f"#{seqs[run_id]}" if run_id in seqs else (run_id or format.DASH),
+        actor=str(row["actor"]) if row["actor"] in ACTORS else "unknown",
+        detail=logged.detail,
+        error=logged.error,
+        refused=logged.refused,
+    )
+
+
 def runner_audit(
     events: list[Row], seqs: dict[str, int], scope: Scope, run: str | None, now: int
 ) -> list[RunnerAuditRow]:
@@ -399,19 +422,36 @@ def runner_audit(
         if run and row.get("run_id") != run:
             continue
         logged = log_row(row, {})
-        if not _in_scope(row, logged, scope):
-            continue
-        run_id = row.get("run_id")
-        rows.append(
-            RunnerAuditRow(
-                time=_when(row["at"], now),
-                event=logged.event,
-                run_id=run_id if run_id in seqs else None,
-                run=f"#{seqs[run_id]}" if run_id in seqs else (run_id or format.DASH),
-                actor=str(row["actor"]) if row["actor"] in ACTORS else "unknown",
-                detail=logged.detail,
-                error=logged.error,
-                refused=logged.refused,
-            )
-        )
+        if _in_scope(row, logged, scope):
+            rows.append(_audit_row(row, logged, seqs, now))
+    return rows
+
+
+ImageScope = Literal["all", "registered", "runs", "errors"]
+IMAGE_SCOPES: tuple[tuple[ImageScope, str], ...] = (
+    ("all", "All"),
+    ("registered", "Registered"),
+    ("runs", "Runs"),
+    ("errors", "Errors"),
+)
+
+
+def _in_image_scope(row: Row, logged: LogRow, scope: ImageScope) -> bool:
+    if scope == "registered":
+        return bool(row["event"] == "image_registered")
+    if scope == "runs":
+        return bool(row.get("run_id"))
+    if scope == "errors":
+        return logged.error
+    return True
+
+
+def image_audit(
+    events: list[Row], seqs: dict[str, int], scope: ImageScope, now: int
+) -> list[RunnerAuditRow]:
+    rows = []
+    for row in events:
+        logged = log_row(row, {})
+        if _in_image_scope(row, logged, scope):
+            rows.append(_audit_row(row, logged, seqs, now))
     return rows

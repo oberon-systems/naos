@@ -30,8 +30,10 @@
 {% macro badge(label) -%}
     <span class="badge">{{ label }}</span>
 {%- endmacro %}
-{% macro button(label, href) -%}
-    <a class="button" href="{{ href }}">{{ label }}</a>
+{% macro button(label, href, overlay=false) -%}
+    <a class="button"
+       href="{{ href }}"
+       {% if overlay %}hx-get="{{ href }}" hx-target="#overlay"{% endif %}>{{ label }}</a>
 {%- endmacro %}
 {% macro filter(label, href, active=false, target="#page") -%}
     <a class="filter{{ " filter--active" if active }}"
@@ -76,7 +78,7 @@
         {% if page.chip or page.action %}
             <div class="page-header__actions">
                 {% if page.chip %}{{ chip(page.chip.label, page.chip.tone, dotted=true) }}{% endif %}
-                {% if page.action %}{{ button(page.action.label, page.action.href) }}{% endif %}
+                {% if page.action %}{{ button(page.action.label, page.action.href, page.action.overlay) }}{% endif %}
             </div>
         {% endif %}
     </header>

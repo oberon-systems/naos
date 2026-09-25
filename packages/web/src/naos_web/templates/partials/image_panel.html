@@ -1,0 +1,41 @@
+{% from "components.html" import closer, pill, scrim with context %}
+{{ scrim("/images") }}
+<section class="panel panel--run panel--runner"
+         role="dialog"
+         aria-label="Image {{ image.name }}">
+    <header class="panel__header run__header">
+        <div class="panel__title">
+            <span class="dot dot--lg tone-{{ image.tone }}"></span>
+            <h2 class="panel__name">{{ image.name }}</h2>
+            {{ pill("IN USE" if image.in_use else "UNUSED", "green" if image.in_use else "grey") }}
+            {% if image.named %}<span class="table__id">{{ image.id }}</span>{% endif %}
+            <div class="run__actions">
+                <button class="button button--outline"
+                        type="button"
+                        data-copy="{{ image.url }}">Copy url</button>
+                {{ closer("/images") }}
+            </div>
+        </div>
+        <p class="panel__facts">
+            {% for part in image.meta %}
+                {% if not loop.first %}<span class="run__sep">·</span>{% endif %}
+                <span>{{ part }}</span>
+            {% endfor %}
+        </p>
+    </header>
+    <nav class="run__tabs">
+        {% for key, label, href in (("overview", "Overview", ""), ("runs", "Runs", "/runs"), ("audit", "Audit", "/audit")) %}
+            <a class="run__tab{{ " run__tab--active" if tab == key }}"
+               href="/images/{{ image.id }}{{ href }}"
+               hx-get="/images/{{ image.id }}{{ href }}"
+               hx-target="#overlay">{{ label }}</a>
+        {% endfor %}
+    </nav>
+    {% if tab == "runs" %}
+        {% include "partials/image_runs.html" %}
+    {% elif tab == "audit" %}
+        {% include "partials/image_audit.html" %}
+    {% else %}
+        {% include "partials/image_overview.html" %}
+    {% endif %}
+</section>

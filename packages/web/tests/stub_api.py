@@ -285,11 +285,16 @@ RUN_SEQS = [row["seq"] for row in RUNS]
 
 @stub.get("/api/v1/runs")
 def list_runs(
-    state: str | None = None, runner: str | None = None, limit: int = Query(50)
+    state: str | None = None,
+    runner: str | None = None,
+    image: str | None = None,
+    limit: int = Query(50),
 ) -> list[Row]:
     rows = RUNS if state is None else [r for r in RUNS if r["status"] in STATES[state]]
     if runner is not None:
         rows = [r for r in rows if r["runner"] and r["runner"]["id"] == runner]
+    if image is not None:
+        rows = [r for r in rows if r["spec"]["image"]["id"] == image]
     return rows[:limit]
 
 
@@ -351,7 +356,14 @@ def drain_runner(runner_id: str) -> Row | JSONResponse:
 
 
 @stub.get("/api/v1/audit")
-def audit(runner_id: str | None = None, limit: int = Query(100), order: str = "asc") -> list[Row]:
+def audit(
+    runner_id: str | None = None,
+    image_id: str | None = None,
+    limit: int = Query(100),
+    order: str = "asc",
+) -> list[Row]:
+    if image_id is not None:
+        return IMAGE_EVENTS.get(image_id, [])[:limit]
     rows: list[Row] = [
         {
             "seq": 6,
@@ -509,16 +521,58 @@ IMAGES: list[Row] = [
         "version": "1.4.2",
         "digest": "sha256:3f9a" + "0" * 56 + "c21e",
         "url": "https://images.example.com/a.qcow2",
+        "name": "agents",
+        "size_bytes": 4_080_218_931,
+        "built_at": NOW - 4 * 86400,
         "created_at": NOW - 100,
+        "runs_open": 2,
+        "runs_total": 5,
     },
     {
         "id": "naos-agents-old",
         "version": "1.3.0",
         "digest": "sha256:" + "b" * 64,
-        "url": "https://images.example.com/b.qcow2",
+        "url": "https://mirror.example.net/pub/b.qcow2",
+        "name": None,
+        "size_bytes": None,
+        "built_at": None,
         "created_at": NOW - 9000,
+        "runs_open": 0,
+        "runs_total": 0,
     },
 ]
+IMAGE_EVENTS: dict[str, list[Row]] = {
+    "naos-agents": [
+        {
+            "seq": 9,
+            "id": "ev_9",
+            "at": NOW - 60,
+            "source": "api",
+            "event": "run_transition",
+            "actor": "runner",
+            "run_id": "run_9f21c4",
+            "vm_id": None,
+            "runner_id": None,
+            "data": {"from": "STARTING", "to": "FAILED", "reason": "image digest mismatch"},
+        },
+        {
+            "seq": 8,
+            "id": "ev_8",
+            "at": NOW - 100,
+            "source": "api",
+            "event": "image_registered",
+            "actor": "operator",
+            "run_id": None,
+            "vm_id": None,
+            "runner_id": None,
+            "data": {
+                "image_id": "naos-agents",
+                "version": "1.4.2",
+                "digest": "sha256:3f9a" + "0" * 56 + "c21e",
+            },
+        },
+    ]
+}
 # Every write the dialog sends, in order, so a test reads what reached the api.
 WRITES: list[tuple[str, str, Row, str | None]] = []
 
@@ -568,6 +622,23 @@ def list_policies() -> list[Row]:
 @stub.get("/api/v1/images")
 def list_images() -> list[Row]:
     return IMAGES
+
+
+@stub.post("/api/v1/images", response_model=None)
+def register_image(body: Row) -> Row | JSONResponse:
+    WRITES.append(("POST", "/images", body, None))
+    if any(row["id"] == body["id"] for row in IMAGES):
+        detail = f"image {body['id']} is already registered with other values"
+        return JSONResponse({"detail": detail}, 409)
+    return (
+        {"name": None, "size_bytes": None, "built_at": None}
+        | body
+        | {
+            "created_at": NOW,
+            "runs_open": 0,
+            "runs_total": 0,
+        }
+    )
 
 
 def _event(

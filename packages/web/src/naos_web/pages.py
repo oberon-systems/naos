@@ -17,6 +17,7 @@ class Tile:
 class Action:
     label: str
     href: str
+    overlay: bool = False
 
 
 @dataclass(frozen=True)
@@ -72,7 +73,7 @@ NAV: tuple[ListPage, ...] = (
             Tile("unused", "Unused", "faint"),
             Tile("catalog_size", "Catalog size", "grey"),
         ),
-        action=Action("Register image", "/images/register"),
+        action=Action("Register image", "/images/register", overlay=True),
         chip=Chip("catalog is append-only", "grey"),
     ),
     ListPage(
@@ -152,21 +153,22 @@ RUNNER_TONE: dict[str, Tone] = {"live": "green", "stale": "amber", "revoked": "r
 
 
 @dataclass(frozen=True)
-class RunnerFilter:
+class SearchFilter:
     key: str
     label: str
+    path: str
 
     def href(self, query: str) -> str:
         params = [] if self.key == "all" else [f"state={self.key}"]
         params += [f"q={quote(query)}"] if query else []
-        return "/runners" + ("?" + "&".join(params) if params else "")
+        return self.path + ("?" + "&".join(params) if params else "")
 
 
-RUNNER_FILTERS: tuple[RunnerFilter, ...] = (
-    RunnerFilter("all", "All"),
-    RunnerFilter("live", "Live"),
-    RunnerFilter("stale", "Stale"),
-    RunnerFilter("revoked", "Revoked"),
+RUNNER_FILTERS: tuple[SearchFilter, ...] = (
+    SearchFilter("all", "All", "/runners"),
+    SearchFilter("live", "Live", "/runners"),
+    SearchFilter("stale", "Stale", "/runners"),
+    SearchFilter("revoked", "Revoked", "/runners"),
 )
 RUNNER_COLUMNS = ("RUNNER", "SLOTS", "LEASE", "HEARTBEAT", "ROTATES IN", "")
 RUNNER_NOTE = (
@@ -174,6 +176,21 @@ RUNNER_NOTE = (
     "and a heartbeat past half the lifetime returns a replacement."
 )
 LEASE_NOTE = "renewed on every heartbeat \u00b7 expiry fences the runner's VMs"
+
+IMAGE_FILTERS: tuple[SearchFilter, ...] = (
+    SearchFilter("all", "All", "/images"),
+    SearchFilter("in_use", "In use", "/images"),
+    SearchFilter("unused", "Unused", "/images"),
+)
+IMAGE_COLUMNS = ("IMAGE", "VERSION", "DIGEST", "SOURCE", "REGISTERED", "USAGE")
+IMAGE_NOTE = (
+    "An image row is never rewritten or deleted \u2014 a new build is a new version, "
+    "and a Run pins the digest it booted."
+)
+SOURCE_NOTE = (
+    "The runner downloads the file itself and trusts this digest, not the host that served "
+    "it. https only, no credentials, and the API never contacts the url."
+)
 
 
 @dataclass(frozen=True)
@@ -210,6 +227,8 @@ EXITS: tuple[tuple[str, str], ...] = (
     ("PENDING", "CANCELLED"),
 )
 FENCING = "an expired lease fences its runs"
+
+FINISHED = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
 
 # The states POST /runs/{id}/stop moves; the api answers the rest with the Run unchanged.
 STOPPABLE = frozenset({"PENDING", "STARTING", "STARTED"})

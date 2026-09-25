@@ -5,7 +5,7 @@ from naos_web.pages import NAV
 
 PATHS = [page.href for page in NAV]
 # The pages not built yet are still the bare shell 10a built; those tiles stay empty.
-UNFILLED = [page.href for page in NAV if page.key not in {"runs", "runners"}]
+UNFILLED = [page.href for page in NAV if page.key not in {"runs", "runners", "images"}]
 
 
 @pytest.mark.parametrize("path", PATHS)

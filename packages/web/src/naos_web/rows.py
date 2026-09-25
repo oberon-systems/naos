@@ -1,9 +1,11 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlsplit
 
 from naos_web import format
 from naos_web.pages import (
+    FINISHED,
     LIFECYCLE,
     MERGE_MEANING,
     OPEN_ACTION,
@@ -528,4 +530,172 @@ def run_detail(
         ],
         holder=_holder(runner, now) if runner else None,
         steps=_steps(run, events, now),
+    )
+
+
+@dataclass(frozen=True)
+class ImageRow:
+    id: str
+    name: str
+    named: bool
+    version: str
+    built: str
+    digest: str
+    host: str
+    path: str
+    registered: str
+    size: str
+    in_use: bool
+    tone: Tone
+    runs: str
+
+
+@dataclass(frozen=True)
+class ImageDetailRow:
+    id: str
+    name: str
+    named: bool
+    in_use: bool
+    tone: Tone
+    meta: list[str]
+    digest_head: str
+    digest_tail: str
+    url: str
+    facts: list[Fact]
+    booting: list[RunRow]
+    runs: list[RunRow]
+    finished: int
+
+
+GIB = 1 << 30
+STATED = " \u00b7 stated at registration"
+UNSTATED = "not stated"
+
+
+def _gib(size: int) -> str:
+    return f"{size / GIB:.1f}"
+
+
+def _short_digest(digest: str) -> str:
+    hexes = digest.removeprefix("sha256:")
+    return f"sha256:{hexes[:8]}\u2026{hexes[-4:]}"
+
+
+def _usage(image: Row) -> str:
+    opened, total = image["runs_open"], image["runs_total"]
+    if opened:
+        return f"{opened} run{'s' if opened != 1 else ''}"
+    return "no runs" if not total else f"{total} finished"
+
+
+def image_rows(images: list[Row], now: int) -> list[ImageRow]:
+    rows = []
+    for image in images:
+        source = urlsplit(image["url"])
+        in_use = image["runs_open"] > 0
+        rows.append(
+            ImageRow(
+                id=image["id"],
+                name=image["name"] or image["id"],
+                named=bool(image["name"]),
+                version=image["version"],
+                built=(
+                    f"built {format.ago(image['built_at'], now)}"
+                    if image["built_at"] is not None
+                    else "build date not stated"
+                ),
+                digest=_short_digest(image["digest"]),
+                host=source.netloc,
+                path=source.path,
+                registered=format.ago(image["created_at"], now),
+                size=(
+                    f"{_gib(image['size_bytes'])} GiB"
+                    if image["size_bytes"] is not None
+                    else "size not stated"
+                ),
+                in_use=in_use,
+                tone="green" if in_use else "faint",
+                runs=_usage(image),
+            )
+        )
+    return rows
+
+
+def pick_images(images: list[Row], state: str, query: str) -> list[Row]:
+    needle = query.strip().lower().removeprefix("sha256:")
+    return [
+        image
+        for image in images
+        if (state == "all" or (image["runs_open"] > 0) == (state == "in_use"))
+        and (
+            not needle
+            or any(
+                needle in str(image[key] or "").lower()
+                for key in ("id", "name", "version", "digest")
+            )
+        )
+    ]
+
+
+def catalog(images: list[Row]) -> Summary:
+    in_use = [image for image in images if image["runs_open"] > 0]
+    sized = [image["size_bytes"] for image in images if image["size_bytes"] is not None]
+    booting = sum(image["runs_open"] for image in in_use)
+    total = _gib(sum(sized)) if sized else format.DASH
+    stated = (
+        f"GiB across {len(images)} images"
+        if len(sized) == len(images)
+        else f"GiB \u00b7 size stated for {len(sized)} of {len(images)}"
+    )
+    return Summary(
+        subtitle=(
+            f"{len(images)} registered \u00b7 {len(in_use)} in use"
+            + (f" \u00b7 {total} GiB stated" if sized else "")
+        ),
+        values={
+            "registered": TileValue(str(len(images)), "in the catalog"),
+            "in_use": TileValue(str(len(in_use)), f"booting {booting} runs"),
+            "unused": TileValue(str(len(images) - len(in_use)), "kept, never deleted"),
+            "catalog_size": TileValue(total, stated if sized else "no size stated"),
+        },
+    )
+
+
+# Runs still booting the image come first, the rest follow newest first.
+def image_detail(image: Row, runs: list[Row], now: int) -> ImageDetailRow:
+    ordered = run_rows(
+        sorted(runs, key=lambda run: (run["status"] in FINISHED, -run["seq"])), [], now
+    )
+    booting = [row for row in ordered if row.status not in FINISHED]
+    opened = image["runs_open"]
+    size = image["size_bytes"]
+    built = image["built_at"]
+    hexes = image["digest"].removeprefix("sha256:")
+    registered = format.ago(image["created_at"], now)
+    meta = [
+        f"registered {registered}",
+        image["version"],
+        f"{_gib(size)} GiB" if size is not None else None,
+        f"{opened} run{'s' if opened != 1 else ''} booting" if opened else None,
+    ]
+    return ImageDetailRow(
+        id=image["id"],
+        name=image["name"] or image["id"],
+        named=bool(image["name"]),
+        in_use=opened > 0,
+        tone="green" if opened else "faint",
+        meta=[part for part in meta if part],
+        digest_head=f"sha256:{hexes[:32]}",
+        digest_tail=hexes[32:],
+        url=image["url"],
+        facts=[
+            Fact("Version", image["version"]),
+            Fact("Size", UNSTATED if size is None else f"{_gib(size)} GiB{STATED}"),
+            Fact("Built", UNSTATED if built is None else f"{format.ago(built, now)}{STATED}"),
+            Fact("Registered", f"{registered} \u00b7 by operator"),
+            Fact("Booting", f"{opened} run{'s' if opened != 1 else ''}" if opened else "none"),
+        ],
+        booting=booting,
+        runs=ordered,
+        finished=len(ordered) - len(booting),
     )

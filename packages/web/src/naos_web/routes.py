@@ -9,13 +9,16 @@ from fastapi import APIRouter, Query, Request, WebSocket, WebSocketException, st
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from naos_web import confirm, events, new_run, terminal
+from naos_web import confirm, events, new_run, register, terminal
 from naos_web.client import ApiClient, ApiError, Choices, Dashboard, Row, RunDetail
 from naos_web.clock import NowDep
 from naos_web.format import ago
 from naos_web.pages import (
     EXITS,
     FENCING,
+    IMAGE_COLUMNS,
+    IMAGE_FILTERS,
+    IMAGE_NOTE,
     LEASE_NOTE,
     LIFECYCLE,
     NAV,
@@ -25,6 +28,7 @@ from naos_web.pages import (
     RUNNER_COLUMNS,
     RUNNER_FILTERS,
     RUNNER_NOTE,
+    SOURCE_NOTE,
     STATUS_TONE,
     ListPage,
     Summary,
@@ -32,8 +36,12 @@ from naos_web.pages import (
 )
 from naos_web.rows import (
     RunDetailRow,
+    catalog,
     fleet,
+    image_detail,
+    image_rows,
     pick,
+    pick_images,
     run_detail,
     run_rows,
     runner_detail,
@@ -45,6 +53,8 @@ Tab = Literal["overview", "terminal", "logs"]
 StateQuery = Annotated[State, Query()]
 Fleet = Literal["all", "live", "stale", "revoked"]
 FleetQuery = Annotated[Fleet, Query()]
+Usage = Literal["all", "in_use", "unused"]
+UsageQuery = Annotated[Usage, Query()]
 SearchQuery = Annotated[str, Query(max_length=128)]
 
 LOG_KINDS: tuple[tuple[events.Kind, str], ...] = (
@@ -711,9 +721,139 @@ def close_overlay() -> HTMLResponse:
     return HTMLResponse("")
 
 
+def _catalog(
+    images: list[Row], now: int, usage: Usage = "all", query: str = ""
+) -> dict[str, object]:
+    return {
+        "images": image_rows(pick_images(images, usage, query), now),
+        "image_filters": IMAGE_FILTERS,
+        "image_columns": IMAGE_COLUMNS,
+        "image_note": IMAGE_NOTE,
+        "state": usage,
+        "query": query,
+    }
+
+
+# Search and filters narrow the table; the tiles always count the whole catalog.
 @router.get("/images", response_class=HTMLResponse)
-def images(request: Request) -> HTMLResponse:
-    return render(request, PAGES["images"])
+async def images(
+    request: Request, now: NowDep, state: UsageQuery = "all", q: SearchQuery = ""
+) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        every = await api.images()
+    except ApiError as err:
+        return failed(request, PAGES["images"], err)
+    return render(
+        request,
+        PAGES["images"],
+        catalog(every),
+        template="partials/images_body.html" if wants_fragment(request) else "images.html",
+        **_catalog(every, now, state, q),
+    )
+
+
+async def _register_dialog(
+    request: Request, now: int, entry: register.Draft, notice: str = ""
+) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        every = await api.images()
+    except ApiError as err:
+        return failed_overlay(request, PAGES["images"], err)
+    return render(
+        request,
+        PAGES["images"],
+        catalog(every),
+        template="image_register_overlay.html"
+        if wants_fragment(request)
+        else "image_register_page.html",
+        **_catalog(every, now),
+        entry=entry,
+        notice=notice,
+    )
+
+
+# Declared before /images/{image_id}, which would otherwise take "register" for an id.
+@router.get("/images/register", response_class=HTMLResponse)
+async def register_dialog(request: Request, now: NowDep) -> HTMLResponse:
+    return await _register_dialog(request, now, register.Draft())
+
+
+@router.post("/images/register", response_class=HTMLResponse)
+async def register_image(request: Request, now: NowDep) -> Response:
+    api: ApiClient = request.app.state.api
+    entry = register.draft(await _form(request))
+    try:
+        created = await api.register_image(register.body(entry))
+    except (ApiError, ValueError) as err:
+        return await _register_dialog(request, now, entry, str(err))
+    target = f"/images/{created['id']}"
+    if wants_fragment(request):
+        return Response(headers={"HX-Redirect": target})
+    return RedirectResponse(target, status_code=303)
+
+
+ImageTab = Literal["overview", "runs", "audit"]
+
+
+async def _image_panel(
+    request: Request,
+    image_id: str,
+    now: int,
+    tab: ImageTab,
+    scope: events.ImageScope = "all",
+) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        detail = await api.image(image_id)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["images"], err)
+    seqs = {found["id"]: found["seq"] for found in detail.runs}
+    return render(
+        request,
+        PAGES["images"],
+        catalog(detail.catalog),
+        template="image_overlay.html" if wants_fragment(request) else "image_overlay_page.html",
+        **_catalog(detail.catalog, now),
+        image=image_detail(detail.image, detail.runs, now),
+        tab=tab,
+        source_note=SOURCE_NOTE,
+        scopes=events.IMAGE_SCOPES,
+        scope=scope,
+        audit_rows=events.image_audit(detail.events, seqs, scope, now),
+    )
+
+
+@router.get("/images/{image_id}", response_class=HTMLResponse)
+async def image(request: Request, image_id: str, now: NowDep) -> HTMLResponse:
+    return await _image_panel(request, image_id, now, "overview")
+
+
+@router.get("/images/{image_id}/runs", response_class=HTMLResponse)
+async def image_runs(request: Request, image_id: str, now: NowDep) -> HTMLResponse:
+    return await _image_panel(request, image_id, now, "runs")
+
+
+@router.get("/images/{image_id}/audit", response_class=HTMLResponse)
+async def image_audit(
+    request: Request, image_id: str, now: NowDep, scope: events.ImageScope = "all"
+) -> HTMLResponse:
+    return await _image_panel(request, image_id, now, "audit", scope)
+
+
+@router.get("/images/{image_id}/audit/export")
+async def image_audit_export(request: Request, image_id: str) -> Response:
+    api: ApiClient = request.app.state.api
+    try:
+        rows = await api.image_events(image_id, limit=1000)
+    except ApiError as err:
+        return failed(request, PAGES["images"], err)
+    return Response(
+        json.dumps(rows, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{image_id}-audit.json"'},
+    )
 
 
 @router.get("/profiles", response_class=HTMLResponse)
