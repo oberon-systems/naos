@@ -1,0 +1,115 @@
+{
+  "id": "12dda6e6-3adb-80d1-8008-b18cbfff2ef0",
+  "name": "input",
+  "type": "frame",
+  "x": 4966.666666666666,
+  "y": 238,
+  "width": 186.66666666666697,
+  "height": 32,
+  "rotation": 0,
+  "selrect": {
+    "x": 4966.666666666666,
+    "y": 238,
+    "width": 186.66666666666697,
+    "height": 32,
+    "x1": 4966.666666666666,
+    "y1": 238,
+    "x2": 5153.333333333333,
+    "y2": 270
+  },
+  "points": [
+    {
+      "x": 4966.666666666667,
+      "y": 238
+    },
+    {
+      "x": 5153.333333333334,
+      "y": 238
+    },
+    {
+      "x": 5153.333333333334,
+      "y": 270
+    },
+    {
+      "x": 4966.666666666667,
+      "y": 270
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "12dda6e6-3adb-80d1-8008-b18cbf623f90",
+  "frameId": "12dda6e6-3adb-80d1-8008-b18cbf623f90",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutItemAbsolute": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 7,
+    "p2": 12,
+    "p3": 7,
+    "p4": 12
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 6,
+  "showContent": false,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 8,
+    "columnGap": 8
+  },
+  "pageId": "c3596e37-1bac-8007-8008-ab0b9caaad6d",
+  "layoutItemVSizing": "fix",
+  "r3": 6,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 6,
+  "layoutFlexDir": "row",
+  "layoutAlignContent": "stretch",
+  "strokes": [
+    {
+      "strokeColor": "#e4e7ec",
+      "strokeAlignment": "inner",
+      "strokeWidth": 1
+    }
+  ],
+  "proportion": 1,
+  "shadow": [],
+  "r4": 6,
+  "layoutItemMargin": {
+    "m1": 0,
+    "m2": 0,
+    "m3": 0,
+    "m4": 0
+  },
+  "fills": [
+    {
+      "fillColor": "#fafafb",
+      "fillOpacity": 1
+    }
+  ],
+  "layoutItemZIndex": 0,
+  "shapes": [
+    "12dda6e6-3adb-80d1-8008-b18cc031fe2a"
+  ]
+}

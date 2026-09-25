@@ -1,0 +1,108 @@
+{
+  "id": "12dda6e6-3adb-80d1-8008-b18cac624152",
+  "name": "run_created 13:51:02",
+  "type": "frame",
+  "x": 3704,
+  "y": 285,
+  "width": 892,
+  "height": 36,
+  "rotation": 0,
+  "selrect": {
+    "x": 3704,
+    "y": 285,
+    "width": 892,
+    "height": 36,
+    "x1": 3704,
+    "y1": 285,
+    "x2": 4596,
+    "y2": 321
+  },
+  "points": [
+    {
+      "x": 3704,
+      "y": 285
+    },
+    {
+      "x": 4596,
+      "y": 285
+    },
+    {
+      "x": 4596,
+      "y": 321
+    },
+    {
+      "x": 3704,
+      "y": 321
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "12dda6e6-3adb-80d1-8008-b18ca6303fa1",
+  "frameId": "12dda6e6-3adb-80d1-8008-b18ca6303fa1",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutItemAbsolute": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 16,
+    "p3": 0,
+    "p4": 16
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "showContent": false,
+  "layoutItemHSizing": "fix",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "c3596e37-1bac-8007-8008-ab0b9caaad6d",
+  "layoutItemVSizing": "fix",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "row",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "shadow": [],
+  "r4": 0,
+  "layoutItemMargin": {
+    "m1": 0,
+    "m2": 0,
+    "m3": 0,
+    "m4": 0
+  },
+  "fills": [],
+  "layoutItemZIndex": 0,
+  "shapes": [
+    "12dda6e6-3adb-80d1-8008-b18cae1023fc",
+    "12dda6e6-3adb-80d1-8008-b18cadaaafa5",
+    "12dda6e6-3adb-80d1-8008-b18cad38f28a",
+    "12dda6e6-3adb-80d1-8008-b18cacc75937",
+    "12dda6e6-3adb-80d1-8008-b18cac8ac820"
+  ]
+}

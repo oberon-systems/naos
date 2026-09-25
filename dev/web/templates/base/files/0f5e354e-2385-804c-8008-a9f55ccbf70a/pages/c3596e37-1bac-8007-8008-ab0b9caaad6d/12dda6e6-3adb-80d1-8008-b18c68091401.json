@@ -1,0 +1,109 @@
+{
+  "id": "12dda6e6-3adb-80d1-8008-b18c68091401",
+  "name": "card body",
+  "type": "frame",
+  "x": 1584,
+  "y": 207,
+  "width": 520,
+  "height": 205,
+  "rotation": 0,
+  "selrect": {
+    "x": 1584,
+    "y": 207,
+    "width": 520,
+    "height": 205,
+    "x1": 1584,
+    "y1": 207,
+    "x2": 2104,
+    "y2": 412
+  },
+  "points": [
+    {
+      "x": 1584,
+      "y": 207
+    },
+    {
+      "x": 2104,
+      "y": 207
+    },
+    {
+      "x": 2104,
+      "y": 412
+    },
+    {
+      "x": 1584,
+      "y": 412
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "12dda6e6-3adb-80d1-8008-b18c675d136f",
+  "frameId": "12dda6e6-3adb-80d1-8008-b18c675d136f",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutItemAbsolute": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 16,
+    "p3": 14,
+    "p4": 16
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "showContent": false,
+  "layoutItemHSizing": "fix",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 2,
+    "columnGap": 2
+  },
+  "pageId": "c3596e37-1bac-8007-8008-ab0b9caaad6d",
+  "layoutItemVSizing": "auto",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "shadow": [],
+  "r4": 0,
+  "layoutItemMargin": {
+    "m1": 0,
+    "m2": 0,
+    "m3": 0,
+    "m4": 0
+  },
+  "fills": [],
+  "layoutItemZIndex": 0,
+  "shapes": [
+    "12dda6e6-3adb-80d1-8008-b18de74923c7",
+    "12dda6e6-3adb-80d1-8008-b18c6b1bdeda",
+    "12dda6e6-3adb-80d1-8008-b18c6a3f6e76",
+    "12dda6e6-3adb-80d1-8008-b18c695ddc64",
+    "12dda6e6-3adb-80d1-8008-b18c68e9cf72",
+    "12dda6e6-3adb-80d1-8008-b18c684905e4"
+  ]
+}

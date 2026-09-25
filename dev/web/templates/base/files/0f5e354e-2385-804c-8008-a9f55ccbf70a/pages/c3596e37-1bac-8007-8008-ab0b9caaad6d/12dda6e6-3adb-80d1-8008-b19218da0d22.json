@@ -1,0 +1,107 @@
+{
+  "id": "12dda6e6-3adb-80d1-8008-b19218da0d22",
+  "name": "title",
+  "type": "frame",
+  "x": 2644,
+  "y": 24.5,
+  "width": 258,
+  "height": 26,
+  "rotation": 0,
+  "selrect": {
+    "x": 2644,
+    "y": 24.5,
+    "width": 258,
+    "height": 26,
+    "x1": 2644,
+    "y1": 24.5,
+    "x2": 2902,
+    "y2": 50.5
+  },
+  "points": [
+    {
+      "x": 2644,
+      "y": 24.5
+    },
+    {
+      "x": 2902,
+      "y": 24.5
+    },
+    {
+      "x": 2902,
+      "y": 50.5
+    },
+    {
+      "x": 2644,
+      "y": 50.5
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "12dda6e6-3adb-80d1-8008-b19218da0d19",
+  "frameId": "12dda6e6-3adb-80d1-8008-b19218da0d19",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutItemAbsolute": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "showContent": false,
+  "layoutItemHSizing": "auto",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 10,
+    "columnGap": 10
+  },
+  "pageId": "c3596e37-1bac-8007-8008-ab0b9caaad6d",
+  "layoutItemVSizing": "auto",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "row",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "shadow": [],
+  "r4": 0,
+  "layoutItemMargin": {
+    "m1": 0,
+    "m2": 0,
+    "m3": 0,
+    "m4": 0
+  },
+  "fills": [],
+  "layoutItemZIndex": 0,
+  "shapes": [
+    "12dda6e6-3adb-80d1-8008-b19218da0d2b",
+    "12dda6e6-3adb-80d1-8008-b19218da0d2c",
+    "12dda6e6-3adb-80d1-8008-b19218da0d2d",
+    "12dda6e6-3adb-80d1-8008-b19218da0d2e"
+  ]
+}

@@ -1,0 +1,112 @@
+{
+  "id": "12dda6e6-3adb-80d1-8008-b18cb90285a2",
+  "name": "Body",
+  "type": "frame",
+  "x": 4740,
+  "y": 102,
+  "width": 640,
+  "height": 613,
+  "rotation": 0,
+  "selrect": {
+    "x": 4740,
+    "y": 102,
+    "width": 640,
+    "height": 613,
+    "x1": 4740,
+    "y1": 102,
+    "x2": 5380,
+    "y2": 715
+  },
+  "points": [
+    {
+      "x": 4740,
+      "y": 102
+    },
+    {
+      "x": 5380,
+      "y": 102
+    },
+    {
+      "x": 5380,
+      "y": 715
+    },
+    {
+      "x": 4740,
+      "y": 715
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "12dda6e6-3adb-80d1-8008-b18cb6e3f8f3",
+  "frameId": "12dda6e6-3adb-80d1-8008-b18cb6e3f8f3",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutItemAbsolute": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 20,
+    "p2": 24,
+    "p3": 24,
+    "p4": 24
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "showContent": false,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 16,
+    "columnGap": 16
+  },
+  "pageId": "c3596e37-1bac-8007-8008-ab0b9caaad6d",
+  "layoutItemVSizing": "auto",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "shadow": [],
+  "r4": 0,
+  "layoutItemMargin": {
+    "m1": 0,
+    "m2": 0,
+    "m3": 0,
+    "m4": 0
+  },
+  "fills": [],
+  "layoutItemZIndex": 0,
+  "shapes": [
+    "12dda6e6-3adb-80d1-8008-b18cc0d5dca6",
+    "12dda6e6-3adb-80d1-8008-b18cc07c41fa",
+    "12dda6e6-3adb-80d1-8008-b191bbd00983",
+    "12dda6e6-3adb-80d1-8008-b18cc050f95d",
+    "12dda6e6-3adb-80d1-8008-b191bb980809",
+    "12dda6e6-3adb-80d1-8008-b191bb6bb63f",
+    "12dda6e6-3adb-80d1-8008-b191bb5d26f8",
+    "12dda6e6-3adb-80d1-8008-b18cbdc3a382",
+    "12dda6e6-3adb-80d1-8008-b18cb9202a52"
+  ]
+}

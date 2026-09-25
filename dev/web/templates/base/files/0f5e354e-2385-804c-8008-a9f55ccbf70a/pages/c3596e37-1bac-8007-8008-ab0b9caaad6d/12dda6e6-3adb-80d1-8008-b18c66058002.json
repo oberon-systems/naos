@@ -1,0 +1,104 @@
+{
+  "id": "12dda6e6-3adb-80d1-8008-b18c66058002",
+  "name": "card header",
+  "type": "frame",
+  "x": 1584,
+  "y": 428.0000000000002,
+  "width": 520,
+  "height": 40,
+  "rotation": 0,
+  "selrect": {
+    "x": 1584,
+    "y": 428.0000000000002,
+    "width": 520,
+    "height": 40,
+    "x1": 1584,
+    "y1": 428.0000000000002,
+    "x2": 2104,
+    "y2": 468.0000000000002
+  },
+  "points": [
+    {
+      "x": 1584,
+      "y": 428.0000000000002
+    },
+    {
+      "x": 2104,
+      "y": 428.0000000000002
+    },
+    {
+      "x": 2104,
+      "y": 468.0000000000002
+    },
+    {
+      "x": 1584,
+      "y": 468.0000000000002
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "12dda6e6-3adb-80d1-8008-b18c65ccc4be",
+  "frameId": "12dda6e6-3adb-80d1-8008-b18c65ccc4be",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutItemAbsolute": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 14,
+    "p2": 16,
+    "p3": 8,
+    "p4": 16
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "showContent": false,
+  "layoutItemHSizing": "fix",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "c3596e37-1bac-8007-8008-ab0b9caaad6d",
+  "layoutItemVSizing": "fix",
+  "r3": 0,
+  "layoutJustifyContent": "space-between",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "row",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "shadow": [],
+  "r4": 0,
+  "layoutItemMargin": {
+    "m1": 0,
+    "m2": 0,
+    "m3": 0,
+    "m4": 0
+  },
+  "fills": [],
+  "layoutItemZIndex": 0,
+  "shapes": [
+    "12dda6e6-3adb-80d1-8008-b18c664bd760"
+  ]
+}
