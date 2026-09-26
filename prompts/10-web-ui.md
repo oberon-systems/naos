@@ -23,9 +23,12 @@ Order:
 8. `10h-web-images.md` — Images catalog.
 9. `10i-web-profiles.md` — Profiles and resolved policies.
 10. `10j-web-audit.md` — Audit trail.
+11. `10k-web-policies.md` — Policies list, policy documents and form.
+12. `10l-web-changes.md` — Changes tab, the filesystem diff viewer.
+13. `10m-web-merge.md` — Merge decision, conflicts and report.
 
-Not covered, because no board exists yet: the filesystem diff viewer, merge
-approval, per-gate event screens, and any secrets UI. Draw the board first.
+Not covered, because no board exists yet: per-gate event screens and any
+secrets UI. Draw the board first.
 
 The UI is never an authorization boundary. Every action goes through API
 authorization. Dangerous actions require confirmation. Never display secrets.
