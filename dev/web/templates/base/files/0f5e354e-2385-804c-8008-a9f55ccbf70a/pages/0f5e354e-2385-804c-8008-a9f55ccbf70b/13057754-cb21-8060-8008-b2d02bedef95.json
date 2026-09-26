@@ -1,0 +1,198 @@
+{
+  "id": "13057754-cb21-8060-8008-b2d02bedef95",
+  "name": "note",
+  "type": "text",
+  "x": 4736,
+  "y": 3011,
+  "width": 384,
+  "height": 47,
+  "rotation": 0,
+  "selrect": {
+    "x": 4736,
+    "y": 3011,
+    "width": 384,
+    "height": 47,
+    "x1": 4736,
+    "y1": 3011,
+    "x2": 5120,
+    "y2": 3058
+  },
+  "points": [
+    {
+      "x": 4736,
+      "y": 3011
+    },
+    {
+      "x": 5120,
+      "y": 3011
+    },
+    {
+      "x": 5120,
+      "y": 3058
+    },
+    {
+      "x": 4736,
+      "y": 3058
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "13057754-cb21-8060-8008-b2d02bedef93",
+  "frameId": "13057754-cb21-8060-8008-b2d02bedef93",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-height",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "11",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#98a2b3",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "The base is the host file at collection time; the merge applies only while the host still matches it. Export leaves the host alone and writes the agent's version to merge/export/."
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "11",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#98a2b3",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "layoutItemHSizing": "fill",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 4736,
+      "y": 3025.5454547405243,
+      "width": 376.227294921875,
+      "height": 13.818181991577148,
+      "x1": 0,
+      "y1": 0.7272727489471436,
+      "x2": 376.227294921875,
+      "y2": 14.545454740524292,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#98a2b3",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "The base is the host file at collection time; the merge applies only while the host "
+    },
+    {
+      "x": 4736,
+      "y": 3040.943181991577,
+      "width": 363.352294921875,
+      "height": 13.818181991577148,
+      "x1": 0,
+      "y1": 16.125,
+      "x2": 363.352294921875,
+      "y2": 29.94318199157715,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#98a2b3",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "still matches it. Export leaves the host alone and writes the agent's version to "
+    },
+    {
+      "x": 4736,
+      "y": 3056.3409118652344,
+      "width": 69.9772720336914,
+      "height": 13.818183898925781,
+      "x1": 0,
+      "y1": 31.522727966308594,
+      "x2": 69.9772720336914,
+      "y2": 45.340911865234375,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#98a2b3",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "merge/export/."
+    }
+  ],
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b"
+}

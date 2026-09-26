@@ -1,0 +1,102 @@
+{
+  "id": "13057754-cb21-8060-8008-b2d02bedef93",
+  "name": "card body",
+  "type": "frame",
+  "x": 4720,
+  "y": 2783,
+  "width": 416,
+  "height": 289,
+  "rotation": 0,
+  "selrect": {
+    "x": 4720,
+    "y": 2783,
+    "width": 416,
+    "height": 289,
+    "x1": 4720,
+    "y1": 2783,
+    "x2": 5136,
+    "y2": 3072
+  },
+  "points": [
+    {
+      "x": 4720,
+      "y": 2783
+    },
+    {
+      "x": 5136,
+      "y": 2783
+    },
+    {
+      "x": 5136,
+      "y": 3072
+    },
+    {
+      "x": 4720,
+      "y": 3072
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "13057754-cb21-8060-8008-b2d02bedef81",
+  "frameId": "13057754-cb21-8060-8008-b2d02bedef81",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 16,
+    "p3": 14,
+    "p4": 16
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 2,
+    "columnGap": 2
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "auto",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": [],
+  "shapes": [
+    "13057754-cb21-8060-8008-b2d02bedef95",
+    "13057754-cb21-8060-8008-b2d02bedef96",
+    "13057754-cb21-8060-8008-b2d02bedef97",
+    "13057754-cb21-8060-8008-b2d02bedef98",
+    "13057754-cb21-8060-8008-b2d02bedef99",
+    "13057754-cb21-8060-8008-b2d02bedef9a",
+    "13057754-cb21-8060-8008-b2d02bedef9b",
+    "13057754-cb21-8060-8008-b2d02bedef9c",
+    "13057754-cb21-8060-8008-b2d02bedef9d"
+  ]
+}

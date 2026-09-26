@@ -1,0 +1,116 @@
+{
+  "id": "13057754-cb21-8060-8008-b2ce82fa4c99",
+  "name": "Card Runs",
+  "type": "frame",
+  "x": 5824,
+  "y": 363,
+  "width": 892,
+  "height": 285.9999999999998,
+  "rotation": 0,
+  "selrect": {
+    "x": 5824,
+    "y": 363,
+    "width": 892,
+    "height": 285.9999999999998,
+    "x1": 5824,
+    "y1": 363,
+    "x2": 6716,
+    "y2": 648.9999999999998
+  },
+  "points": [
+    {
+      "x": 5824,
+      "y": 363
+    },
+    {
+      "x": 6716,
+      "y": 363
+    },
+    {
+      "x": 6716,
+      "y": 648.9999999999998
+    },
+    {
+      "x": 5824,
+      "y": 648.9999999999998
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "13057754-cb21-8060-8008-b2ce7e3f3433",
+  "frameId": "13057754-cb21-8060-8008-b2ce7e3f3433",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 10,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
+  "layoutItemVSizing": "auto",
+  "r3": 10,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 10,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [
+    {
+      "strokeStyle": "solid",
+      "strokeColor": "#e4e7ec",
+      "strokeOpacity": 1,
+      "strokeAlignment": "inner",
+      "strokeWidth": 1
+    }
+  ],
+  "proportion": 1,
+  "r4": 10,
+  "fills": [
+    {
+      "fillColor": "#ffffff",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "13057754-cb21-8060-8008-b2ce82d20472",
+    "13057754-cb21-8060-8008-b2ce831b6e0b",
+    "13057754-cb21-8060-8008-b2ce823a9d4f",
+    "13057754-cb21-8060-8008-b2ce8314b6b1",
+    "13057754-cb21-8060-8008-b2ce81aa562c",
+    "13057754-cb21-8060-8008-b2ce830c9548",
+    "13057754-cb21-8060-8008-b2ce8118f703",
+    "13057754-cb21-8060-8008-b2ce830563d3",
+    "13057754-cb21-8060-8008-b2ce808168fd",
+    "13057754-cb21-8060-8008-b2ce82ed966a"
+  ]
+}

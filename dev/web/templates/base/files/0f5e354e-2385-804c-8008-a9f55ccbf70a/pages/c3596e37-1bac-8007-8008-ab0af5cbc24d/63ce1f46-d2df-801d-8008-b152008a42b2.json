@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 750,
       "y": 617.0909109115601,
-      "width": 156.01136779785156,
-      "height": 13.090910911560059,
-      "x1": 0,
-      "y1": 0,
-      "x2": 156.01136779785156,
-      "y2": 13.090910911560059,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "10px",
       "fontWeight": "400",
+      "y1": 0,
+      "width": 156.01136779785156,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 750,
+      "x1": 0,
+      "y2": 13.090910911560059,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 156.01136779785156,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
+      "height": 13.090910911560059,
       "text": "/pub/delta-2026.07.2.qcow2"
     }
   ]

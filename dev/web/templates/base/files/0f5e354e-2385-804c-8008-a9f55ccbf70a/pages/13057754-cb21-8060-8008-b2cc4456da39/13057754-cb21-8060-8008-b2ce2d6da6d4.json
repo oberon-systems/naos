@@ -1,0 +1,173 @@
+{
+  "id": "13057754-cb21-8060-8008-b2ce2d6da6d4",
+  "name": "note",
+  "type": "text",
+  "x": 5316,
+  "y": 345,
+  "width": 324,
+  "height": 31,
+  "rotation": 0,
+  "selrect": {
+    "x": 5316,
+    "y": 345,
+    "width": 324,
+    "height": 31,
+    "x1": 5316,
+    "y1": 345,
+    "x2": 5640,
+    "y2": 376
+  },
+  "points": [
+    {
+      "x": 5316,
+      "y": 345
+    },
+    {
+      "x": 5640,
+      "y": 345
+    },
+    {
+      "x": 5640,
+      "y": 376
+    },
+    {
+      "x": 5316,
+      "y": 376
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "13057754-cb21-8060-8008-b2ce2d865699",
+  "frameId": "13057754-cb21-8060-8008-b2ce2d865699",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-height",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "11",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#98a2b3",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "A policy is never edited or deleted. A different document is a new policy with its own id."
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "11",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#98a2b3",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "layoutItemHSizing": "fill",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 5316,
+      "y": 359.5454547405243,
+      "width": 306.1363830566406,
+      "height": 13.818181991577148,
+      "x1": 0,
+      "y1": 0.7272727489471436,
+      "x2": 306.1363830566406,
+      "y2": 14.545454740524292,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#98a2b3",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "A policy is never edited or deleted. A different document is a new "
+    },
+    {
+      "x": 5316,
+      "y": 374.94318199157715,
+      "width": 99.57955932617188,
+      "height": 13.818181991577148,
+      "x1": 0,
+      "y1": 16.125,
+      "x2": 99.57955932617188,
+      "y2": 29.94318199157715,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#98a2b3",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "policy with its own id."
+    }
+  ],
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39"
+}

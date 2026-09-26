@@ -119,53 +119,53 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 4776,
       "y": 686.27272772789,
-      "width": 418.9432373046875,
-      "height": 14.545454978942871,
-      "x1": 0,
-      "y1": 0.7272727489471436,
-      "x2": 418.9432373046875,
-      "y2": 15.272727727890015,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "400",
+      "y1": 0.7272727489471436,
+      "width": 418.9432373046875,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 4776,
+      "x1": 0,
+      "y2": 15.272727727890015,
       "fills": [
         {
           "fillColor": "#b42318",
           "fillOpacity": 1
         }
       ],
+      "x2": 418.9432373046875,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 14.545454978942871,
       "text": "the api answered 409 for /images: image image_epsilon is already registered with "
     },
     {
-      "x": 4776,
       "y": 703.0681838989258,
-      "width": 177.5,
-      "height": 14.545455932617188,
-      "x1": 0,
-      "y1": 17.522727966308594,
-      "x2": 177.5,
-      "y2": 32.06818389892578,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "400",
+      "y1": 17.522727966308594,
+      "width": 177.5,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 4776,
+      "x1": 0,
+      "y2": 32.06818389892578,
       "fills": [
         {
           "fillColor": "#b42318",
           "fillOpacity": 1
         }
       ],
+      "x2": 177.5,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 14.545455932617188,
       "text": "another version, digest, url or facts"
     }
   ]

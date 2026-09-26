@@ -1,0 +1,147 @@
+{
+  "id": "13057754-cb21-8060-8008-b2d065733e75",
+  "name": "Text",
+  "type": "text",
+  "x": 1584,
+  "y": 3620,
+  "width": 129,
+  "height": 22,
+  "rotation": 0,
+  "selrect": {
+    "x": 1584,
+    "y": 3620,
+    "width": 129,
+    "height": 22,
+    "x1": 1584,
+    "y1": 3620,
+    "x2": 1713,
+    "y2": 3642
+  },
+  "points": [
+    {
+      "x": 1584,
+      "y": 3620
+    },
+    {
+      "x": 1713,
+      "y": 3620
+    },
+    {
+      "x": 1713,
+      "y": 3642
+    },
+    {
+      "x": 1584,
+      "y": 3642
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "13057754-cb21-8060-8008-b2d065733e72",
+  "frameId": "13057754-cb21-8060-8008-b2d065733e72",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-width",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.2",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.2",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "18",
+                "fontWeight": "700",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "700",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#101828",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "Merge 9 paths?"
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "18",
+            "fontWeight": "700",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "700",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#101828",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 1584,
+      "y": 3641.0909111499786,
+      "width": 128.80682373046875,
+      "height": 21.81818389892578,
+      "x1": 0,
+      "y1": -0.7272727489471436,
+      "x2": 128.80682373046875,
+      "y2": 21.090911149978638,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "18px",
+      "fontWeight": "700",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#101828",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "Merge 9 paths?"
+    }
+  ]
+}

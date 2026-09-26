@@ -1,0 +1,174 @@
+{
+  "id": "13057754-cb21-8060-8008-b2d065bf3e5a",
+  "name": "Text",
+  "type": "text",
+  "x": 2144,
+  "y": 3717,
+  "width": 432,
+  "height": 29,
+  "rotation": 0,
+  "selrect": {
+    "x": 2144,
+    "y": 3717,
+    "width": 432,
+    "height": 29,
+    "x1": 2144,
+    "y1": 3717,
+    "x2": 2576,
+    "y2": 3746
+  },
+  "points": [
+    {
+      "x": 2144,
+      "y": 3717
+    },
+    {
+      "x": 2576,
+      "y": 3717
+    },
+    {
+      "x": 2576,
+      "y": 3746
+    },
+    {
+      "x": 2144,
+      "y": 3746
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "13057754-cb21-8060-8008-b2d065bf3e51",
+  "frameId": "13057754-cb21-8060-8008-b2d065bf3e51",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-height",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.2",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.2",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "12",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#667085",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "None of the 11 changes reach the host and the run completes. The agent's changes stay in the runner's archive with the upper disk."
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "12",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#667085",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "layoutItemHSizing": "fix",
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "fix",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 2144,
+      "y": 3730.8181822299957,
+      "width": 431.1591491699219,
+      "height": 14.545454978942871,
+      "x1": 0,
+      "y1": -0.7272727489471436,
+      "x2": 431.1591491699219,
+      "y2": 13.818182229995728,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#667085",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "None of the 11 changes reach the host and the run completes. The agent's changes "
+    },
+    {
+      "x": 2144,
+      "y": 3745.2159099578857,
+      "width": 241.71591186523438,
+      "height": 14.545454978942871,
+      "x1": 0,
+      "y1": 13.670454978942871,
+      "x2": 241.71591186523438,
+      "y2": 28.215909957885742,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#667085",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "stay in the runner's archive with the upper disk."
+    }
+  ]
+}

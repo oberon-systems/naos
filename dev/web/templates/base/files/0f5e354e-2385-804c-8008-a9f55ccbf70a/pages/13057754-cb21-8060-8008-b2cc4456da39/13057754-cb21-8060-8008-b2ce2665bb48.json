@@ -1,0 +1,173 @@
+{
+  "id": "13057754-cb21-8060-8008-b2ce2665bb48",
+  "name": "note",
+  "type": "text",
+  "x": 2660,
+  "y": 291,
+  "width": 488,
+  "height": 31,
+  "rotation": 0,
+  "selrect": {
+    "x": 2660,
+    "y": 291,
+    "width": 488,
+    "height": 31,
+    "x1": 2660,
+    "y1": 291,
+    "x2": 3148,
+    "y2": 322
+  },
+  "points": [
+    {
+      "x": 2660,
+      "y": 291
+    },
+    {
+      "x": 3148,
+      "y": 291
+    },
+    {
+      "x": 3148,
+      "y": 322
+    },
+    {
+      "x": 2660,
+      "y": 322
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "13057754-cb21-8060-8008-b2ce267d9bee",
+  "frameId": "13057754-cb21-8060-8008-b2ce267d9bee",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-height",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "11",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#98a2b3",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "The workspace reaches the guest read-only over virtiofs; in rw mode its writes land on a disk of their own and come back only through a merge."
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "11",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#98a2b3",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "layoutItemHSizing": "fill",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 2660,
+      "y": 305.5454547405243,
+      "width": 472.875,
+      "height": 13.818181991577148,
+      "x1": 0,
+      "y1": 0.7272727489471436,
+      "x2": 472.875,
+      "y2": 14.545454740524292,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#98a2b3",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "The workspace reaches the guest read-only over virtiofs; in rw mode its writes land on a disk of their "
+    },
+    {
+      "x": 2660,
+      "y": 320.94318199157715,
+      "width": 200.9204559326172,
+      "height": 13.818181991577148,
+      "x1": 0,
+      "y1": 16.125,
+      "x2": 200.9204559326172,
+      "y2": 29.94318199157715,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#98a2b3",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "own and come back only through a merge."
+    }
+  ],
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39"
+}

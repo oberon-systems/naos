@@ -1,0 +1,105 @@
+{
+  "id": "13057754-cb21-8060-8008-b2cc8451cebb",
+  "name": "Right column",
+  "type": "frame",
+  "x": 2120,
+  "y": 167,
+  "width": 356,
+  "height": 405.9999999999999,
+  "rotation": 0,
+  "selrect": {
+    "x": 2120,
+    "y": 167,
+    "width": 356,
+    "height": 405.9999999999999,
+    "x1": 2120,
+    "y1": 167,
+    "x2": 2476,
+    "y2": 572.9999999999999
+  },
+  "points": [
+    {
+      "x": 2120,
+      "y": 167
+    },
+    {
+      "x": 2476,
+      "y": 167
+    },
+    {
+      "x": 2476,
+      "y": 572.9999999999999
+    },
+    {
+      "x": 2120,
+      "y": 572.9999999999999
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "13057754-cb21-8060-8008-b2cc8451ceba",
+  "frameId": "13057754-cb21-8060-8008-b2cc8451ceba",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutItemAbsolute": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "showContent": false,
+  "layoutItemHSizing": "fix",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 16,
+    "columnGap": 16
+  },
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
+  "layoutItemVSizing": "auto",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "shadow": [],
+  "r4": 0,
+  "layoutItemMargin": {
+    "m1": 0,
+    "m2": 0,
+    "m3": 0,
+    "m4": 0
+  },
+  "fills": [],
+  "layoutItemZIndex": 0,
+  "shapes": [
+    "13057754-cb21-8060-8008-b2cded053732",
+    "13057754-cb21-8060-8008-b2cdec9678dc"
+  ]
+}
