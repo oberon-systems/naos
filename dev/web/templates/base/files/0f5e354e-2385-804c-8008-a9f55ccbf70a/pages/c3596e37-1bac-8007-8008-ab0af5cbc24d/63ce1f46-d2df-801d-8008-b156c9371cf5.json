@@ -162,16 +162,7 @@
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",
   "constraintsV": "top",
-  "interactions": [
-    {
-      "eventType": "click",
-      "actionType": "open-url",
-      "destination": null,
-      "positionRelativeTo": null,
-      "preserveScroll": false,
-      "url": "http://localhost:9001/#/view?file-id=0f5e354e-2385-804c-8008-a9f55ccbf70a&page-id=82f9a714-2547-80ed-8008-a9f9aad597e5&section=interactions&frame-id=d3524346-4bfd-8007-8008-aff6080a0c2b"
-    }
-  ],
+  "interactions": [],
   "constraintsH": "left",
   "positionData": [
     {

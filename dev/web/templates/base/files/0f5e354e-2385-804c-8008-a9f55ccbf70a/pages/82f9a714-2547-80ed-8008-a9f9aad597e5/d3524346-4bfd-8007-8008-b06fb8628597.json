@@ -116,16 +116,7 @@
   },
   "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5",
   "constraintsV": "top",
-  "interactions": [
-    {
-      "eventType": "click",
-      "actionType": "open-url",
-      "destination": null,
-      "positionRelativeTo": null,
-      "preserveScroll": false,
-      "url": "http://localhost:9001/#/view?file-id=0f5e354e-2385-804c-8008-a9f55ccbf70a&page-id=0f5e354e-2385-804c-8008-a9f55ccbf70b&section=interactions&frame-id=5142935e-e171-8029-8008-ab1b2ec55a82"
-    }
-  ],
+  "interactions": [],
   "constraintsH": "left",
   "positionData": [
     {

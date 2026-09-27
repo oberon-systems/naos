@@ -142,18 +142,7 @@
   "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
   "layoutItemVSizing": "fix",
   "constraintsV": "top",
-  "interactions": [
-    {
-      "eventType": "click",
-      "actionType": "open-overlay",
-      "destination": "13057754-cb21-8060-8008-b2cc8451ceb8",
-      "positionRelativeTo": null,
-      "preserveScroll": false,
-      "overlayPosType": "center",
-      "closeClickOutside": true,
-      "backgroundOverlay": true
-    }
-  ],
+  "interactions": [],
   "constraintsH": "left",
   "positionData": [
     {
