@@ -106,7 +106,7 @@
                 "letterSpacing": "0",
                 "fills": [
                   {
-                    "fillColor": "#175cd3",
+                    "fillColor": "#667085",
                     "fillOpacity": 1
                   }
                 ],
@@ -187,7 +187,7 @@
       "letterSpacing": "normal",
       "fills": [
         {
-          "fillColor": "#175cd3",
+          "fillColor": "#667085",
           "fillOpacity": 1
         }
       ],
