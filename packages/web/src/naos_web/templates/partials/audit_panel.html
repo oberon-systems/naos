@@ -10,7 +10,7 @@
                     <dt>{{ fact.label }}</dt>
                     <dd{% if fact.mono %} class="run__mono"{% endif %}>
                         {% if fact.href %}
-                            <a class="card__link"
+                            <a class="run__fact-link"
                                href="{{ fact.href }}"
                                hx-get="{{ fact.href }}"
                                hx-target="#overlay">{{ fact.value }}</a>

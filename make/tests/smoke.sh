@@ -421,15 +421,16 @@ if min(summary["denials"].values()) < 1 or summary["spool_lag"] is None:
     for path in "/audit?q=network_denied" "/audit/$denied" "/audit/$denied/logs"; do
         curl -fsS "$web$path" >"$TEMP_DIR/audit.html"
         "$VENV/bin/python" - "$TEMP_DIR/audit.html" "$path" "$secret" "$operator" <<'PY' || fail "the audit page is wrong"
+import re
 import sys
 page, path, *secrets = sys.argv[1:]
-body = open(page).read()
+body = re.sub(r">\s+|\s+<", lambda m: m.group().strip(), open(page).read())
 if path.endswith("/logs"):
     wanted = ["network_denied", "timeline of run #"]
 elif "?" in path:
     wanted = ["network_denied", "tile__number"]
 else:
-    wanted = ["network_denied", "<dt>Gate</dt>", "<dd>network</dd>"]
+    wanted = ["network_denied", "<dt>Gate</dt>", "<dd>network</dd>", 'hx-get="/runs/', 'hx-get="/runners/']
 missing = [text for text in wanted if text not in body]
 if missing:
     sys.exit(f"{path} is missing {missing}")

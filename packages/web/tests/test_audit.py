@@ -53,8 +53,9 @@ def test_rows_are_newest_first_and_name_run_and_runner(client: TestClient) -> No
         "RUNNER",
         "DATA",
     ]
-    assert "<div>#128</div>" in body and "<div>#126</div>" in body
-    assert "<div>alpha</div>" in body and "no runner" in body and "no run" in body
+    assert 'class="audit-table__run">#128</div>' in body and ">#126</div>" in body
+    assert 'class="audit-table__runner">alpha</div>' in body
+    assert "no runner" in body and "no run" in body
     assert "gate decision" in body and "runner health" in body and "vm lifecycle" in body
     assert "https registry.example.com \u00b7 rule no rule matched" in body
 
@@ -87,7 +88,7 @@ def test_a_denial_popup_names_its_run_and_policy(client: TestClient) -> None:
     assert facts["Reached the API"] == "4s after the runner wrote it"
     assert facts["Run"] == "run_9f21c4 \u00b7 #128"
     assert facts["VM"] == "vm_7f3a91"
-    assert facts["Runner"] == "rnr_8c1f42aa \u00b7 alpha"
+    assert facts["Runner"] == "rnr_8c1f42 \u00b7 alpha"
     assert facts["Seq"] == "41 887"
     assert facts["Gate"] == "network"
     assert facts["Policy"].startswith("netpol_9a07")
@@ -98,6 +99,8 @@ def test_a_denial_popup_names_its_run_and_policy(client: TestClient) -> None:
     assert f'data-copy="{DENIED}"' in body
     assert f'hx-get="/audit/{DENIED}/logs"' in body
     assert 'hx-get="/runs/run_9f21c4"' in body and 'hx-target="#overlay">run_9f21c4' in body
+    assert 'hx-get="/runners/rnr_8c1f42aa"' in body and 'hx-target="#overlay">rnr_8c1f42 ' in body
+    assert f'hx-get="/policies/netpol_9a07{"0" * 28}"' in body
     assert "<html" not in body
 
 
@@ -176,7 +179,9 @@ def test_the_tail_adds_only_newer_rows(client: TestClient) -> None:
     response = client.get("/audit/tail", params={"after": 41897}, headers=HX)
 
     assert _events(response.text) == [FORGED, f"evt_{41900:032x}", f"evt_{41899:032x}"]
-    assert 'id="audit-after" name="after" value="41901" hx-swap-oob="true"' in response.text
+    assert re.search(
+        r'id="audit-after"\s+name="after"\s+value="41901"\s+hx-swap-oob="true"', response.text
+    )
     assert "secret-alpha-value" not in response.text
     assert client.get("/audit/tail", params={"after": 41901}, headers=HX).status_code == 204
 

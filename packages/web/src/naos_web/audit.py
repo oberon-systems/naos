@@ -156,6 +156,7 @@ class AuditRow:
     run_id: str | None
     run: str
     run_note: str
+    runner_id: str | None
     runner: str
     runner_note: str
     data: str
@@ -166,13 +167,14 @@ class AuditRow:
 def _run(run_id: str | None, seqs: dict[str, int]) -> tuple[str, str]:
     if not run_id:
         return format.DASH, "no run"
-    return (f"#{seqs[run_id]}" if run_id in seqs else run_id), run_id
+    short = format.short_id(run_id)
+    return (f"#{seqs[run_id]}" if run_id in seqs else short), short
 
 
 def _runner(runner_id: str | None, names: dict[str, str]) -> tuple[str, str]:
     if not runner_id:
         return format.DASH, "no runner"
-    return names.get(runner_id) or runner_id, runner_id
+    return names.get(runner_id) or format.short_id(runner_id), format.short_id(runner_id)
 
 
 def audit_row(row: Row, seqs: dict[str, int], names: dict[str, str], now: int) -> AuditRow:
@@ -191,6 +193,7 @@ def audit_row(row: Row, seqs: dict[str, int], names: dict[str, str], now: int) -
         run_id=row.get("run_id"),
         run=run,
         run_note=run_note,
+        runner_id=row.get("runner_id"),
         runner=runner,
         runner_note=runner_note,
         data=logged.detail,
@@ -268,7 +271,12 @@ def _policy(gate: str | None, run: Row | None) -> list[Fact]:
     policy = run["spec"].get(gate, {}).get("policy")
     return [
         Fact("Gate", gate),
-        Fact("Policy", policy or "none \u00b7 default deny", bool(policy)),
+        Fact(
+            "Policy",
+            policy or "none \u00b7 default deny",
+            bool(policy),
+            f"/policies/{policy}" if policy else None,
+        ),
         Fact("Run status", str(run["status"])),
     ]
 
@@ -297,6 +305,7 @@ def detail(row: Row, run: Row | None, names: dict[str, str]) -> Detail:
     at = datetime.fromtimestamp(row["at"], UTC).strftime("%H:%M:%S \u00b7 %Y-%m-%d")
     kind = "refused" if logged.refused else KINDS.get(row["event"], ("", "all"))[0]
     where = _where(run, run_id, runner_id, runner_name)
+    run_label = f"{format.short_id(run['id'])} \u00b7 #{run['seq']}" if run else run_id
     return Detail(
         id=str(row["id"]),
         event=logged.event,
@@ -313,15 +322,19 @@ def detail(row: Row, run: Row | None, names: dict[str, str]) -> Detail:
         correlation=[
             Fact(
                 "Run",
-                f"{run_id} \u00b7 #{run['seq']}" if run else (run_id or format.DASH),
+                run_label or format.DASH,
                 True,
                 f"/runs/{run_id}" if run else None,
             ),
             Fact("VM", row.get("vm_id") or format.DASH, True),
             Fact(
                 "Runner",
-                " \u00b7 ".join(part for part in (runner_id, runner_name) if part) or format.DASH,
+                " \u00b7 ".join(
+                    part for part in (runner_id and format.short_id(runner_id), runner_name) if part
+                )
+                or format.DASH,
                 True,
+                f"/runners/{runner_id}" if runner_id else None,
             ),
         ],
         data=[]

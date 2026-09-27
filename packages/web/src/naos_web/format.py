@@ -63,3 +63,7 @@ def fine(seconds: int) -> str:
 
 def left(then: int, now: int) -> int:
     return max(then - now, 0)
+
+
+def short_id(identifier: str) -> str:
+    return identifier[:10]

@@ -9,23 +9,23 @@
         hx-include="unset"
         hx-trigger="click, keyup[key=='Enter']">
         <td>
-            <div class="run__mono">{{ row.time }}</div>
-            <div class="table__secondary">{{ row.age }}</div>
+            <div class="audit-table__time">{{ row.time }}</div>
+            <div class="audit-table__note">{{ row.age }}</div>
         </td>
         <td>
             <div class="audit-table__event{{ " audit-table__event--error" if row.error }}">{{ row.event }}</div>
-            <div class="table__secondary">{{ row.kind }}</div>
+            <div class="audit-table__note">{{ row.kind }}</div>
         </td>
-        <td>{{ row.actor }}</td>
+        <td class="audit-table__actor">{{ row.actor }}</td>
         <td>{{ pill(row.source, "blue" if row.source == "runner" else "grey") }}</td>
         <td>
-            <div>{{ row.run }}</div>
-            <div class="table__id">{{ row.run_note }}</div>
+            <div class="audit-table__run{{ " audit-table__none" if not row.run_id }}">{{ row.run }}</div>
+            <div class="audit-table__id">{{ row.run_note }}</div>
         </td>
         <td>
-            <div>{{ row.runner }}</div>
-            <div class="table__id">{{ row.runner_note }}</div>
+            <div class="audit-table__runner{{ " audit-table__none" if not row.runner_id }}">{{ row.runner }}</div>
+            <div class="audit-table__id">{{ row.runner_note }}</div>
         </td>
-        <td class="audit-table__data">{{ row.data }}</td>
+        <td class="audit-table__data{{ " audit-table__data--error" if row.error }}">{{ row.data }}</td>
     </tr>
 {% endfor %}

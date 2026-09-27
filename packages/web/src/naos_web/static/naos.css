@@ -1199,6 +1199,11 @@ body {
   text-align: right;
 }
 
+.run__fact-link {
+  color: var(--text);
+  text-decoration: none;
+}
+
 .timeline {
   display: flex;
   flex-direction: column;
@@ -2117,10 +2122,47 @@ body {
 .audit-table th:nth-child(6),
 .audit-table td:nth-child(6) { width: 120px; }
 
+.audit-table__time {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.audit-table__note {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--faint);
+}
+
 .audit-table__event {
   font-family: var(--font-mono);
   font-weight: 500;
+}
+
+.audit-table__actor {
+  font-weight: 400;
+  color: var(--soft);
+}
+
+.audit-table__run {
+  font-weight: 600;
   color: var(--ink);
+}
+
+.audit-table__runner {
+  font-weight: 400;
+  color: var(--ink);
+}
+
+.audit-table .audit-table__none {
+  color: var(--faint);
+}
+
+.audit-table__id {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--faint);
 }
 
 .audit-table__event--error {
@@ -2134,9 +2176,13 @@ body {
 
 .audit-table__data {
   font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--text);
+  font-size: 11px;
+  color: var(--faint);
   overflow-wrap: anywhere;
+}
+
+.audit-table__data--error {
+  color: var(--red-text);
 }
 
 .panel--audit {
