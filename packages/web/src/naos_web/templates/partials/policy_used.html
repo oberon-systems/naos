@@ -1,0 +1,89 @@
+{% from "components.html" import pill %}
+<div class="run__body run__body--logs">
+    <section class="card run__card">
+        <div class="run__card-header">
+            <h3 class="run__card-title">PROFILES · {{ used.profiles | length }}</h3>
+            <span class="table__secondary">profiles that name this policy now</span>
+        </div>
+        <table class="table policy__used">
+            <thead>
+                <tr>
+                    <th>PROFILE</th>
+                    <th>RUNTIME</th>
+                    <th>MERGE</th>
+                    <th>RUNS</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for profile in used.profiles %}
+                    <tr>
+                        <td>
+                            <div class="run__strong">{{ profile.name }}</div>
+                            <div class="table__id">{{ profile.short_id }}</div>
+                        </td>
+                        <td class="run__mono">{{ profile.runtime }}</td>
+                        <td>{{ pill(profile.merge, profile.merge_tone) }}</td>
+                        <td>
+                            <div>{{ profile.runs }}</div>
+                            <div class="table__secondary">{{ profile.runs_note }}</div>
+                        </td>
+                        <td>
+                            <a class="action"
+                               href="/profiles/{{ profile.id }}"
+                               hx-get="/profiles/{{ profile.id }}"
+                               hx-target="#overlay">Open profile</a>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td class="table__secondary" colspan="5">no profile names this policy</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    <section class="card run__card">
+        <div class="run__card-header">
+            <h3 class="run__card-title">RUNS · {{ used.runs | length }}</h3>
+            <span class="table__secondary">{{ used.opened }} open · {{ used.finished }} finished · a row opens the run</span>
+        </div>
+        <table class="table policy__used">
+            <thead>
+                <tr>
+                    <th>RUN</th>
+                    <th>STATUS</th>
+                    <th>PROFILE</th>
+                    <th>SPEC</th>
+                    <th>STARTED</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in used.runs %}
+                    <tr class="runs-table__row"
+                        tabindex="0"
+                        hx-get="/runs/{{ item.row.id }}"
+                        hx-target="#overlay"
+                        hx-trigger="click, keyup[key=='Enter']">
+                        <td>
+                            <div class="run__strong">#{{ item.row.seq }}</div>
+                            <div class="table__id">{{ item.row.id }}</div>
+                        </td>
+                        <td>{{ pill(item.row.status, item.row.tone) }}</td>
+                        <td>{{ item.profile }}</td>
+                        <td>
+                            <span>{{ item.row.workspace }}</span>
+                            <span class="table__secondary runner-runs__image">{{ item.row.image }}</span>
+                        </td>
+                        <td>{{ item.row.started }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td class="table__secondary" colspan="5">no run named this policy</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    <p class="image__hint table__secondary">{{ used_note }}</p>
+</div>

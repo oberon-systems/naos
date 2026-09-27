@@ -1,0 +1,165 @@
+{% from "components.html" import closer, scrim with context %}
+{% macro input(name, value, label="", placeholder="", mono=false) -%}
+    <label class="field">
+        {% if label %}<span class="field__label">{{ label }}</span>{% endif %}
+        <span class="field__box">
+            <input class="field__input{{ " run__mono" if mono }}"
+                   type="text"
+                   name="{{ name }}"
+                   value="{{ value }}"
+                   placeholder="{{ placeholder }}"
+                   aria-label="{{ label or name }}">
+        </span>
+    </label>
+{%- endmacro %}
+{% macro choose(name, value, options, label="") -%}
+    <label class="field">
+        {% if label %}<span class="field__label">{{ label }}</span>{% endif %}
+        <select class="field__box field__select"
+                name="{{ name }}"
+                aria-label="{{ label or name }}">
+            {% for option in options %}
+                <option value="{{ option }}" {% if option == value %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+        </select>
+    </label>
+{%- endmacro %}
+{% macro step(value, label, klass="policy__add") -%}
+    <button class="{{ klass }}"
+            type="submit"
+            name="step"
+            value="{{ value }}"
+            formnovalidate>{{ label }}</button>
+{%- endmacro %}
+{% macro rules(name, title) -%}
+    {% set items = form.items(name) %}
+    <h3 class="run__card-title profile__section">{{ title }} · {{ items | length }} OF {{ limits[name] }}</h3>
+    {% if items %}
+        <div class="policy__rule policy__rule--head">
+            <span class="field__label">Protocol</span>
+            <span class="field__label">Host</span>
+            <span class="field__label">IP</span>
+        </div>
+    {% endif %}
+    {% for item in items %}
+        <div class="policy__rule">
+            {{ choose(name ~ "." ~ loop.index0 ~ ".protocol", item.protocol, protocols) }}
+            {{ input(name ~ "." ~ loop.index0 ~ ".host", item.host, placeholder="—") }}
+            {{ input(name ~ "." ~ loop.index0 ~ ".ip", item.ip, placeholder="—", mono=true) }}
+            {{ step("drop:" ~ name ~ ":" ~ loop.index0, "×", "policy__drop") }}
+        </div>
+    {% endfor %}
+    {% if not form.full(name) %}{{ step("add:" ~ name, "+ Add " ~ name ~ " rule") }}{% endif %}
+{%- endmacro %}
+{{ scrim("/policies") }}
+<section class="panel panel--dialog panel--register"
+         role="dialog"
+         aria-label="New policy">
+    <header class="panel__header">
+        <div class="panel__title">
+            <h2 class="panel__name">New policy</h2>
+            {{ closer("/policies") }}
+        </div>
+        <p class="panel__facts">{{ form_note }}</p>
+    </header>
+    <form class="dialog"
+          method="post"
+          action="/policies/new"
+          hx-post="/policies/new"
+          hx-target="#overlay">
+        <input type="hidden" name="kind" value="{{ form.kind }}">
+        <div class="dialog__body">
+            <div class="dialog__fields">
+                <div class="field">
+                    <span class="field__label">Kind</span>
+                    <div class="filters policy__kinds">
+                        {% for key, label in kinds.items() %}
+                            <a class="filter{{ " filter--active" if key == form.kind }}"
+                               href="/policies/new?kind={{ key }}"
+                               hx-get="/policies/new?kind={{ key }}"
+                               hx-target="#overlay">{{ label }}</a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% if form.kind == "mount" %}
+                    <h3 class="run__card-title profile__section">WORKSPACE</h3>
+                    <div class="policy__workspace">
+                        {{ input("workspace", form.workspace, "Host path", "/srv/alpha", mono=true) }}
+                        {{ choose("workspace_mode", form.workspace_mode, modes, "Mode") }}
+                    </div>
+                    <span class="field__hint">{{ workspace_hint }}</span>
+                    {% set items = form.items("home") %}
+                    <h3 class="run__card-title profile__section">HOME · {{ items | length }} OF {{ limits.home }}</h3>
+                    {% if items %}
+                        <div class="policy__home policy__rule--head">
+                            <span class="field__label">Host path</span>
+                            <span class="field__label">Guest path under /home/naos</span>
+                            <span class="field__label">Mode</span>
+                        </div>
+                    {% endif %}
+                    {% for item in items %}
+                        <div class="policy__home">
+                            {{ input("home." ~ loop.index0 ~ ".host_path", item.host_path, mono=true) }}
+                            {{ input("home." ~ loop.index0 ~ ".guest_path", item.guest_path, mono=true) }}
+                            {{ choose("home." ~ loop.index0 ~ ".mode", item.mode, modes) }}
+                            {{ step("drop:home:" ~ loop.index0, "×", "policy__drop") }}
+                        </div>
+                    {% endfor %}
+                    {% if not form.full("home") %}{{ step('add:home', '+ Add home mount') }}{% endif %}
+                {% elif form.kind == "network" %}
+                    {{ rules('allow', 'ALLOW') }}
+                    {{ rules('deny', 'DENY') }}
+                {% elif form.kind == "shell" %}
+                    <h3 class="run__card-title profile__section">CAPABILITIES · {{ form.allow | length }} SELECTED</h3>
+                    <div class="policy__capabilities">
+                        {% for name, note in capabilities.items() %}
+                            <label class="policy__capability">
+                                <input type="checkbox"
+                                       name="cap.{{ name }}"
+                                       {% if name in form.allow %}checked{% endif %}>
+                                <code>{{ name }}</code>
+                                <span class="table__secondary">{{ note }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    {% set items = form.items("servers") %}
+                    <h3 class="run__card-title profile__section">SERVERS · {{ items | length }}</h3>
+                    {% for item in items %}
+                        {% set at = "servers." ~ loop.index0 ~ "." %}
+                        <div class="policy__server-form">
+                            <div class="policy__server-head">
+                                <strong>Server {{ item.name or loop.index }}</strong>
+                                {{ step("drop:servers:" ~ loop.index0, "Remove", "policy__remove") }}
+                            </div>
+                            <div class="policy__server-row policy__server-row--name">
+                                {{ input(at ~ "name", item.name, "Name", "alpha", mono=true) }}
+                                {{ input(at ~ "url", item.url, "URL", "https://mcp.example.com/mcp", mono=true) }}
+                            </div>
+                            <div class="dialog__grid">
+                                {{ input(at ~ "tools", item.tools, "Tools", "fetch, search", mono=true) }}
+                                {{ input(at ~ "resources", item.resources, "Resource prefixes", "docs://alpha/", mono=true) }}
+                            </div>
+                            <div class="policy__server-row policy__server-row--limits">
+                                {{ input(at ~ "credential", item.credential, "Credential", "alpha-token", mono=true) }}
+                                {{ input(at ~ "timeout", item.timeout, "Timeout, s") }}
+                                {{ input(at ~ "calls", item.calls, "Calls / min") }}
+                            </div>
+                        </div>
+                    {% endfor %}
+                    {% if not form.full("servers") %}{{ step('add:servers', '+ Add server') }}{% endif %}
+                {% endif %}
+                <span class="field__hint">{{ form_hint }}</span>
+            </div>
+            {% if notice %}<p class="dialog__error">{{ notice }}</p>{% endif %}
+        </div>
+        <footer class="dialog__footer dialog__footer--end">
+            <div class="dialog__actions">
+                <a class="button button--outline"
+                   href="/policies"
+                   {% if not standalone %}hx-get="/overlay/close" hx-target="#overlay"{% endif %}>Cancel</a>
+                <button class="button" type="submit">Create policy</button>
+            </div>
+        </footer>
+    </form>
+</section>

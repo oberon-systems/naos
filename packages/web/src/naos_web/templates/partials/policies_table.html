@@ -1,0 +1,75 @@
+{% from "components.html" import column_header, footer_note %}
+<div class="card__header">
+    <input type="hidden" id="policy-kind" name="kind" value="{{ state }}">
+    <input class="search"
+           id="policy-search"
+           type="search"
+           name="q"
+           value="{{ query }}"
+           placeholder="Search policy id or digest…"
+           aria-label="Search policies"
+           hx-get="/policies"
+           hx-include="#policy-kind"
+           hx-target="#policies"
+           hx-swap="outerHTML"
+           hx-trigger="input changed delay:300ms"
+           hx-push-url="true"
+           hx-preserve="true">
+    <div class="filters">
+        {% for item in policy_filters %}
+            <a class="filter{{ " filter--active" if item.key == state }}"
+               href="{{ item.href(query) }}"
+               hx-get="{{ item.href(query) }}"
+               hx-target="#policies"
+               hx-swap="outerHTML"
+               hx-push-url="true">{{ item.label }}</a>
+        {% endfor %}
+    </div>
+</div>
+<table class="table policies-table">
+    {{ column_header(policy_columns) }}
+    <tbody>
+        {% for policy in policies %}
+            <tr class="runs-table__row"
+                tabindex="0"
+                hx-get="/policies/{{ policy.id }}"
+                hx-target="#overlay"
+                hx-trigger="click[!event.target.closest('.action')], keyup[key=='Enter'&&!event.target.closest('.action')]">
+                <td>
+                    <div class="runners-table__name">
+                        <span class="dot tone-{{ policy.tone }}"></span>
+                        <span class="run__mono run__strong">{{ policy.id }}</span>
+                    </div>
+                    <div class="table__id">{{ policy.digest }}</div>
+                </td>
+                <td>
+                    <span class="profile__tag">{{ policy.tag }}</span>
+                    <span>{{ policy.kind }}</span>
+                </td>
+                <td>
+                    <div>{{ policy.document }}</div>
+                    <div class="table__secondary">{{ policy.document_note }}</div>
+                </td>
+                <td>
+                    <div{% if policy.tone == "faint" %} class="table__secondary"{% endif %}>{{ policy.used }}</div>
+                    <div class="table__secondary">{{ policy.used_note }}</div>
+                </td>
+                <td>
+                    <div>{{ policy.created }}</div>
+                    <div class="table__id">{{ policy.created_note }}</div>
+                </td>
+                <td>
+                    <a class="action"
+                       href="/policies/{{ policy.id }}"
+                       hx-get="/policies/{{ policy.id }}"
+                       hx-target="#overlay">Open</a>
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td class="table__secondary" colspan="{{ policy_columns | length }}">no policy matches</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{{ footer_note(policy_note) }}

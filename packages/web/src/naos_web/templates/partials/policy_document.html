@@ -1,0 +1,147 @@
+{% macro facts(items) -%}
+    <dl class="run__facts">
+        {% for fact in items %}
+            <dt>{{ fact.label }}</dt>
+            <dd>
+                {{ fact.value }}
+            </dd>
+        {% endfor %}
+    </dl>
+{%- endmacro %}
+<div class="run__body run__body--runner">
+    <div class="run__column">
+        {% for table in policy.tables %}
+            <section class="card run__card">
+                <div class="run__card-header">
+                    <h3 class="run__card-title">{{ table.title }}</h3>
+                </div>
+                {% if table.rows %}
+                    <table class="table policy__table">
+                        <thead>
+                            <tr>
+                                {% for column in table.columns %}<th>{{ column }}</th>{% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in table.rows %}
+                                <tr>
+                                    {% for cell in row %}
+                                        <td class="{{ "run__mono" if cell.mono }} {{ "table__secondary" if cell.faint }}">{{ cell.text }}</td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="policy__empty table__secondary">{{ table.empty }}</p>
+                {% endif %}
+                <p class="image__hint table__secondary">{{ table.note }}</p>
+            </section>
+        {% endfor %}
+        {% if policy.kind == "mount" %}
+            <section class="card run__card">
+                <div class="run__card-header">
+                    <h3 class="run__card-title">WORKDIR</h3>
+                </div>
+                <dl class="run__facts">
+                    <dt>Workdir</dt>
+                    <dd class="run__mono">
+                        {{ policy.workdir }}
+                    </dd>
+                </dl>
+                <p class="image__hint table__secondary">
+                    The agent's tmux session starts here. A host path outside the allowed mount roots is refused when the policy is created.
+                </p>
+            </section>
+        {% elif policy.kind == "shell" %}
+            <section class="card run__card">
+                <div class="run__card-header">
+                    <h3 class="run__card-title">
+                        CAPABILITIES · {{ policy.capabilities | selectattr("granted") | list | length }} OF {{ policy.capabilities | length }}
+                    </h3>
+                </div>
+                <ul class="policy__capabilities">
+                    {% for item in policy.capabilities %}
+                        <li class="policy__capability{{ " policy__capability--off" if not item.granted }}">
+                            <span class="policy__check">{{ "✓" if item.granted else "—" }}</span>
+                            <code>{{ item.name }}</code>
+                            <span class="table__secondary">{{ item.note if item.granted else "not granted" }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+                <p class="image__hint table__secondary">
+                    A shell policy grants capabilities and nothing else; limits are constants of the gate.
+                </p>
+            </section>
+        {% elif policy.kind == "mcp" %}
+            <section class="card run__card">
+                <div class="run__card-header">
+                    <h3 class="run__card-title">SERVERS · {{ policy.servers | length }}</h3>
+                </div>
+                <ul class="policy__servers">
+                    {% for server in policy.servers %}
+                        <li class="policy__server">
+                            <div>
+                                <strong class="run__mono">{{ server.name }}</strong>
+                                <span class="run__mono table__secondary">{{ server.url }}</span>
+                            </div>
+                            <div>
+                                tools {{ server.tools }}
+                                {% if server.exposed %}→ {{ server.exposed }}{% endif %}
+                            </div>
+                            <div>resources {{ server.resources }}</div>
+                            <div class="table__secondary">
+                                credential
+                                {% if server.credential %}
+                                    <code class="profile__tag">{{ server.credential }}</code>
+                                {% else %}
+                                    none
+                                {% endif %}
+                                {{ server.limits }}
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+                <p class="image__hint table__secondary">
+                    A secret appears by name only; its value never leaves the API. A resource prefix routes to one server.
+                </p>
+            </section>
+        {% endif %}
+        <section class="card run__card">
+            <div class="run__card-header">
+                <h3 class="run__card-title">CANONICAL DOCUMENT</h3>
+                <button class="card__link policy__copy"
+                        type="button"
+                        data-copy="{{ policy.canonical }}">Copy JSON</button>
+            </div>
+            <pre class="policy__json">{{ policy.canonical }}</pre>
+            {% if policy.canonical_note %}<p class="image__hint table__secondary">{{ policy.canonical_note }}</p>{% endif %}
+        </section>
+    </div>
+    <div class="run__column">
+        <section class="card run__card">
+            <div class="run__card-header">
+                <h3 class="run__card-title">IDENTITY</h3>
+            </div>
+            {{ facts(policy.identity) }}
+            <p class="image__hint table__secondary">{{ identity_note }}</p>
+        </section>
+        {% if policy.kind == "mcp" %}
+            <section class="card run__card">
+                <div class="run__card-header">
+                    <h3 class="run__card-title">SECRETS · {{ policy.secrets | length }}</h3>
+                </div>
+                {{ facts(policy.secrets) }}
+                <p class="image__hint table__secondary">{{ secrets_note }}</p>
+            </section>
+        {% else %}
+            <section class="card run__card">
+                <div class="run__card-header">
+                    <h3 class="run__card-title">ENFORCEMENT</h3>
+                </div>
+                {{ facts(policy.enforcement) }}
+                <p class="image__hint table__secondary">{{ policy.enforcement_note }}</p>
+            </section>
+        {% endif %}
+    </div>
+</div>

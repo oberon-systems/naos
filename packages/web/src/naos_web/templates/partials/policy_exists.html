@@ -1,0 +1,32 @@
+{% from "components.html" import closer, scrim with context %}
+{{ scrim("/policies") }}
+<section class="panel panel--dialog panel--delete"
+         role="dialog"
+         aria-label="Policy already exists">
+    <header class="panel__header">
+        <div class="panel__title">
+            <h2 class="panel__name">Policy already exists</h2>
+            {{ closer("/policies") }}
+        </div>
+        <p class="panel__facts">The API answered 200 with {{ existing.id }}</p>
+    </header>
+    <form class="dialog"
+          method="post"
+          action="/policies/new"
+          hx-post="/policies/new"
+          hx-target="#overlay">
+        {% for name, value in fields %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+        <div class="dialog__body">
+            <p class="confirm__question">{{ exists_note }}</p>
+        </div>
+        <footer class="dialog__footer dialog__footer--end">
+            <div class="dialog__actions">
+                <button class="button button--outline" type="submit" name="step" value="back">Back to form</button>
+                <a class="button"
+                   href="/policies/{{ existing.id }}"
+                   hx-get="/policies/{{ existing.id }}"
+                   hx-target="#overlay">Open policy</a>
+            </div>
+        </footer>
+    </form>
+</section>

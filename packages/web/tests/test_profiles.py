@@ -36,9 +36,9 @@ def writes() -> Iterator[list[Any]]:
 def test_the_tiles_count_profiles_policies_secrets_and_runs(client: TestClient) -> None:
     body = client.get("/profiles", params={"state": "unused"}).text
 
-    assert re.findall(r'class="tile__number">([^<]+)<', body) == ["3", "3", "1", "6"]
-    assert "mount \u00b7 net \u00b7 mcp" in body
-    assert "3 profiles \u00b7 3 policies \u00b7 1 secret" in body
+    assert re.findall(r'class="tile__number">([^<]+)<', body) == ["3", "4", "1", "6"]
+    assert "mount \u00b7 net \u00b7 shell \u00b7 mcp" in body
+    assert "3 profiles \u00b7 4 policies \u00b7 1 secret" in body
 
 
 def test_a_row_shows_runtime_gates_merge_timeout_and_runs(client: TestClient) -> None:

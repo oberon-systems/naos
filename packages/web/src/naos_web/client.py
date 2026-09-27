@@ -136,6 +136,7 @@ class ApiClient:
         runner: str | None = None,
         image: str | None = None,
         profile: str | None = None,
+        policy: str | None = None,
     ) -> list[Row]:
         params: dict[str, Any] = {"limit": limit}
         if state is not None:
@@ -146,6 +147,8 @@ class ApiClient:
             params["image"] = image
         if profile is not None:
             params["profile"] = profile
+        if policy is not None:
+            params["policy"] = policy
         rows: list[Row] = await self._call("GET", "/runs", params=params)
         return rows
 
@@ -232,8 +235,10 @@ class ApiClient:
         row: Row = await self._call("POST", f"/runs/{run_id}/stop")
         return row
 
-    async def profiles(self, query: str | None = None) -> list[Row]:
+    async def profiles(self, query: str | None = None, policy: str | None = None) -> list[Row]:
         params = {"q": query} if query else {}
+        if policy is not None:
+            params["policy"] = policy
         rows: list[Row] = await self._call("GET", "/profiles", params=params)
         return rows
 
@@ -269,9 +274,29 @@ class ApiClient:
         )
         return row
 
-    async def policies(self) -> list[Row]:
-        rows: list[Row] = await self._call("GET", "/policies")
+    async def policies(self, kind: str | None = None, query: str | None = None) -> list[Row]:
+        params = {"kind": kind} if kind else {}
+        if query:
+            params["q"] = query
+        rows: list[Row] = await self._call("GET", "/policies", params=params)
         return rows
+
+    # The api answers 201 for a new policy and 200 for the one an equivalent document holds.
+    async def create_policy(self, kind: str, document: Row) -> tuple[Row, bool]:
+        response = await self._request(
+            "POST", "/policies", json={"kind": kind, "document": document}
+        )
+        row: Row = response.json()
+        return row, response.status_code == 201
+
+    async def secret(self, name: str) -> Row | None:
+        try:
+            row: Row = await self._call("GET", f"/secrets/{name}")
+        except ApiError as err:
+            if err.status == 404:
+                return None
+            raise
+        return row
 
     async def images(self) -> list[Row]:
         rows: list[Row] = await self._call("GET", "/images")

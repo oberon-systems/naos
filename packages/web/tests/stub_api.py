@@ -59,6 +59,9 @@ def run(
 
 NETPOL = "netpol_9a07" + "0" * 28
 MCPPOL = "mcppol_5b2d" + "0" * 28
+MNTPOL = "mntpol_4c1e" + "0" * 28
+SHELLPOL = "shellpol_c42f" + "0" * 26
+PREFIXES = {"mount": "mntpol", "network": "netpol", "shell": "shellpol", "mcp": "mcppol"}
 ALPHA = {"id": "rnr_8c1f42aa", "name": "alpha"}
 BETA = {"id": "rnr_4ad907bb", "name": "beta"}
 GAMMA = {"id": "rnr_2e77b0cc", "name": "gamma"}
@@ -289,11 +292,15 @@ def list_runs(
     runner: str | None = None,
     image: str | None = None,
     profile: str | None = None,
+    policy: str | None = None,
     limit: int = Query(50),
 ) -> list[Row]:
     rows = RUNS if state is None else [r for r in RUNS if r["status"] in STATES[state]]
     if profile is not None:
         rows = [r for r in rows if r["profile_id"] == profile]
+    if policy is not None:
+        kinds = ("mounts", "network", "shell", "mcp")
+        rows = [r for r in rows if policy in (r["spec"][kind]["policy"] for kind in kinds)]
     if runner is not None:
         rows = [r for r in rows if r["runner"] and r["runner"]["id"] == runner]
     if image is not None:
@@ -617,24 +624,45 @@ POLICIES: list[Row] = [
         "digest": "0" * 64,
         "document": {
             "allow": [
-                {"protocol": "https", "host": f"{name}.example.com"}
+                {"protocol": "https", "host": f"{name}.example.com", "ip": None}
                 for name in ("alpha", "beta", "gamma")
             ],
-            "deny": [],
+            "deny": [{"protocol": None, "host": None, "ip": "192.0.2.10"}],
         },
         "created_at": NOW - 9000,
+        "profiles": ["prof_7a1c30", "prof_a93e07", "prof_91ba35"],
+        "runs_open": 1,
+        "runs_total": 28,
     },
     {
-        "id": "mntpol_4c1e" + "0" * 28,
+        "id": MNTPOL,
         "kind": "mount",
         "digest": "1" * 64,
         "document": {
             "workdir": "/naos/api",
             "mounts": [
-                {"host_path": "/srv/projects/alpha/api", "guest_path": "/naos/api", "mode": "rw"}
+                {"host_path": "/srv/projects/alpha/api", "guest_path": "/naos/api", "mode": "rw"},
+                {
+                    "host_path": "/srv/alpha-cache",
+                    "guest_path": "/home/naos/.cache/alpha",
+                    "mode": "ro",
+                },
             ],
         },
         "created_at": NOW - 9000,
+        "profiles": [],
+        "runs_open": 0,
+        "runs_total": 0,
+    },
+    {
+        "id": SHELLPOL,
+        "kind": "shell",
+        "digest": "3" * 64,
+        "document": {"allow": ["git_status", "grep", "list_dir", "read_file"]},
+        "created_at": NOW - 7000,
+        "profiles": [],
+        "runs_open": 0,
+        "runs_total": 3,
     },
     {
         "id": MCPPOL,
@@ -650,12 +678,32 @@ POLICIES: list[Row] = [
                     "credential": "alpha-token",
                     "timeout_seconds": 30,
                     "max_calls_per_minute": 60,
-                }
+                },
+                {
+                    "name": "beta",
+                    "url": "https://beta.example.com/mcp",
+                    "tools": ["fetch"],
+                    "resources": ["docs://beta/"],
+                    "credential": None,
+                    "timeout_seconds": 15,
+                    "max_calls_per_minute": 120,
+                },
             ]
         },
         "created_at": NOW - 9000,
+        "profiles": [],
+        "runs_open": 1,
+        "runs_total": 1,
     },
 ]
+SECRETS: dict[str, Row] = {
+    "alpha-token": {
+        "id": "sec_alpha",
+        "name": "alpha-token",
+        "expires_at": NOW + 12 * 86400,
+        "created_at": NOW - 9000,
+    }
+}
 IMAGES: list[Row] = [
     {
         "id": "naos-agents",
@@ -751,9 +799,15 @@ def _found(pid: str) -> Row:
 
 
 @stub.get("/api/v1/profiles")
-def list_profiles(q: str | None = None) -> list[Row]:
+def list_profiles(q: str | None = None, policy: str | None = None) -> list[Row]:
     needle = (q or "").lower()
-    return [row for row in PROFILES if needle in row["name"].lower() or needle in row["id"]]
+    named: list[str] = next((row["profiles"] for row in POLICIES if row["id"] == policy), [])
+    return [
+        row
+        for row in PROFILES
+        if (needle in row["name"].lower() or needle in row["id"])
+        and (policy is None or row["id"] in named)
+    ]
 
 
 @stub.get("/api/v1/profiles/{pid}", response_model=None)
@@ -795,8 +849,43 @@ def run_from_profile(pid: str, body: Row, idempotency_key: str = Header()) -> Ro
 
 
 @stub.get("/api/v1/policies")
-def list_policies() -> list[Row]:
-    return POLICIES
+def list_policies(kind: str | None = None, q: str | None = None) -> list[Row]:
+    needle = (q or "").lower()
+    return [
+        row
+        for row in POLICIES
+        if (kind is None or row["kind"] == kind)
+        and (needle in row["id"].lower() or needle in row["digest"])
+    ]
+
+
+# An equivalent document answers 200 with the policy that holds it; a mount outside /srv is 422.
+@stub.post("/api/v1/policies", response_model=None)
+def create_policy(body: Row) -> Row | JSONResponse:
+    WRITES.append(("POST", "/policies", body, None))
+    document = body["document"]
+    if body["kind"] == "mount" and not document["workspace"]["host_path"].startswith("/srv/"):
+        detail = f"host path {document['workspace']['host_path']!r} is outside the allowed roots"
+        return JSONResponse({"detail": detail}, 422)
+    if body["kind"] == "shell" and sorted(document["allow"]) == POLICIES[2]["document"]["allow"]:
+        return JSONResponse(POLICIES[2], 200)
+    created = {
+        "id": f"{PREFIXES[body['kind']]}_new001",
+        "kind": body["kind"],
+        "digest": "9" * 64,
+        "document": document,
+        "created_at": NOW,
+        "profiles": [],
+        "runs_open": 0,
+        "runs_total": 0,
+    }
+    return JSONResponse(created, 201)
+
+
+@stub.get("/api/v1/secrets/{name}", response_model=None)
+def get_secret(name: str) -> Row | JSONResponse:
+    found = SECRETS.get(name)
+    return found if found else _missing(f"secret {name}")
 
 
 @stub.get("/api/v1/images")

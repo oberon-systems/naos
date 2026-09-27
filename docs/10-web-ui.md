@@ -14,6 +14,7 @@ Views:
 - filesystem diff;
 - merge approval;
 - profiles;
+- policies, immutable: find by id or digest, read the resolved document and who uses it, create one of each kind;
 - images.
 
 Run creation should make image, host directory, mount mode, network/shell/MCP policy, merge policy, timeout, and runtime settings explicit.

@@ -567,6 +567,49 @@ check_profile_locked() {
     [ "$code" = 409 ] || fail "a profile with an active run was updated ($code)"
 }
 
+# A policy is found by its digest, reads who uses it, and an equivalent document keeps its id.
+check_policies_page() {
+    local digest
+    digest="$(curl -fsS "${auth[@]}" "$api/api/v1/policies/$network_policy" |
+        "$VENV/bin/python" -c '
+import json, sys
+row = json.load(sys.stdin)
+if sys.argv[1] not in row["profiles"] or row["runs_open"] < 1:
+    sys.exit(f"the network policy misses its profile or run: {row}")
+print(row["digest"])
+' "$profile")"
+    curl -fsS "${auth[@]}" "$api/api/v1/runs?policy=$network_policy" | "$VENV/bin/python" -c '
+import json, sys
+if [row["id"] for row in json.load(sys.stdin)] != [sys.argv[1]]:
+    sys.exit("the runs of the network policy are wrong")
+' "$run"
+    curl -fsS "$web/policies?q=${digest:0:12}" >"$TEMP_DIR/policies-list.html"
+    curl -fsS "$web/policies/$network_policy" >"$TEMP_DIR/policies-document.html"
+    curl -fsS "$web/policies/$network_policy/used" >"$TEMP_DIR/policies-used.html"
+    curl -fsS "$web/policies/$mcp_policy" >"$TEMP_DIR/policies-mcp.html"
+    curl -fsS -X POST "$web/policies/new" --data-urlencode "kind=shell" \
+        --data-urlencode "cap.read_file=on" --data-urlencode "cap.list_dir=on" \
+        --data-urlencode "cap.grep=on" >"$TEMP_DIR/policies-exists.html"
+    "$VENV/bin/python" - "$TEMP_DIR" "$network_policy" "$shell_policy" "$run" "$secret" "$operator" <<'PY' || fail "the policies page is wrong"
+import sys
+temp, network, shell, run, *secrets = sys.argv[1:]
+wanted = {
+    "list": [network, "tile__number"],
+    "document": ["CANONICAL DOCUMENT", "www.google.com", "New from this"],
+    "used": [run, "Open profile"],
+    "mcp": ["SECRETS · 1", "alpha-token"],
+    "exists": ["Policy already exists", shell],
+}
+for name, texts in wanted.items():
+    body = open(f"{temp}/policies-{name}.html").read()
+    missing = [text for text in texts if text not in body]
+    if missing:
+        sys.exit(f"policies {name} is missing {missing}")
+    if any(value in body for value in secrets) or "Bearer" in body:
+        sys.exit(f"policies {name} carries a credential")
+PY
+}
+
 share_gone() {
     ! pgrep -f -- "--socket-path=$TEMP_DIR/runs" >/dev/null
 }
@@ -805,6 +848,7 @@ check_page STARTED
 check_page_filters active
 check_runners_page
 check_profile_locked
+check_policies_page
 check_run_detail STARTED
 check_confirms
 echo "editing the workspace and calling the gates from the console..."

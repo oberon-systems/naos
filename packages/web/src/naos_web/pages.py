@@ -90,6 +90,19 @@ NAV: tuple[ListPage, ...] = (
         chip=Chip("a Run copies, never references", "grey"),
     ),
     ListPage(
+        key="policies",
+        title="Policies",
+        href="/policies",
+        tiles=(
+            Tile("mount", "Mount", "blue"),
+            Tile("network", "Network", "green"),
+            Tile("shell", "Shell", "amber"),
+            Tile("mcp", "MCP", "grey"),
+        ),
+        action=Action("New policy", "/policies/new", overlay=True),
+        chip=Chip("immutable \u00b7 a new document is a new id", "blue"),
+    ),
+    ListPage(
         key="audit",
         title="Audit",
         href="/audit",
@@ -157,9 +170,10 @@ class SearchFilter:
     key: str
     label: str
     path: str
+    param: str = "state"
 
     def href(self, query: str) -> str:
-        params = [] if self.key == "all" else [f"state={self.key}"]
+        params = [] if self.key == "all" else [f"{self.param}={self.key}"]
         params += [f"q={quote(query)}"] if query else []
         return self.path + ("?" + "&".join(params) if params else "")
 
@@ -201,6 +215,48 @@ PROFILE_COLUMNS = ("PROFILE", "RUNTIME", "POLICIES", "MERGE", "TIMEOUT", "RUNS",
 PROFILE_NOTE = (
     "A profile is only a starting point: creating a Run copies these values into a spec "
     "that never changes again, so editing a profile leaves every started Run alone."
+)
+POLICY_FILTERS: tuple[SearchFilter, ...] = (
+    SearchFilter("all", "All", "/policies", "kind"),
+    SearchFilter("mount", "Mount", "/policies", "kind"),
+    SearchFilter("network", "Network", "/policies", "kind"),
+    SearchFilter("shell", "Shell", "/policies", "kind"),
+    SearchFilter("mcp", "MCP", "/policies", "kind"),
+)
+POLICY_COLUMNS = ("POLICY", "KIND", "DOCUMENT", "USED BY", "CREATED", "")
+POLICY_NOTE = (
+    "A policy never changes: the API stores the resolved document once, an equivalent "
+    "document returns the same id, and a Run keeps a snapshot of what it started with."
+)
+IDENTITY_NOTE = (
+    "A policy is never edited or deleted. A different document is a new policy with its own id."
+)
+SECRETS_NOTE = "Names only. Credentials are issued to the runner per Run and never shown here."
+USED_NOTE = (
+    "A Run keeps the snapshot it started with, so it stays listed here even after its "
+    "profile moves to another policy."
+)
+POLICY_FORM_NOTE = (
+    "A policy never changes once created. The same document returns the policy that "
+    "already holds it."
+)
+POLICY_FORM_HINTS = {
+    "mount": "A host path is absolute, normalized and inside one of the roots the API allows; "
+    "anything else is refused with 422.",
+    "network": "A rule sets at least one of protocol, host or ip. Hosts are lowercased and lose "
+    "a trailing dot; an address goes in ip, never in host; localhost is refused.",
+    "shell": "At least one capability. The gate serves only the paths the Run's mount policy "
+    "names, whatever this list grants.",
+    "mcp": "Each server needs tools or resource prefixes. Credential is the name of a secret, "
+    "never its value; the runner receives it per Run.",
+}
+WORKSPACE_HINT = (
+    "Mounted at /naos/<last segment of the host path> and used as the workdir. rw writes land "
+    "on the upper disk and reach the host only through a merge."
+)
+EXISTS_NOTE = (
+    "This document resolves to a policy the API already holds, so nothing new was created. "
+    "Equivalent documents share one digest and one id; pick that id in a profile."
 )
 COPY_NOTE = (
     "Creating a Run copies these values into its own spec, which never changes again "

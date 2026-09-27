@@ -11,15 +11,18 @@ from fastapi.templating import Jinja2Templates
 
 from naos_web import audit as trail
 from naos_web import confirm, events, new_run, profiles, register, terminal
+from naos_web import policies as documents
 from naos_web.client import ApiClient, ApiError, Choices, Dashboard, Row, RunDetail
 from naos_web.clock import NowDep
 from naos_web.format import ago
 from naos_web.pages import (
     COPY_NOTE,
+    EXISTS_NOTE,
     EXITS,
     FENCING,
     FORM_NOTE,
     GATES_NOTE,
+    IDENTITY_NOTE,
     IMAGE_COLUMNS,
     IMAGE_FILTERS,
     IMAGE_NOTE,
@@ -29,6 +32,11 @@ from naos_web.pages import (
     OPEN_NOTE,
     PAGES,
     POLICIES_NOTE,
+    POLICY_COLUMNS,
+    POLICY_FILTERS,
+    POLICY_FORM_HINTS,
+    POLICY_FORM_NOTE,
+    POLICY_NOTE,
     PROFILE_COLUMNS,
     PROFILE_FILTERS,
     PROFILE_NOTE,
@@ -37,8 +45,11 @@ from naos_web.pages import (
     RUNNER_COLUMNS,
     RUNNER_FILTERS,
     RUNNER_NOTE,
+    SECRETS_NOTE,
     SOURCE_NOTE,
     STATUS_TONE,
+    USED_NOTE,
+    WORKSPACE_HINT,
     ListPage,
     Summary,
     TileValue,
@@ -1088,6 +1099,169 @@ async def delete_profile(request: Request, profile_id: str) -> Response:
             return failed_overlay(request, PAGES["profiles"], err)
         return _delete_dialog(request, found, str(err))
     return _moved(request, "/profiles")
+
+
+KindFilter = Literal["all", "mount", "network", "shell", "mcp"]
+KindQuery = Annotated[KindFilter, Query()]
+PolicyTab = Literal["document", "used"]
+
+
+def _policy_list(
+    policies: list[Row], now: int, kind: KindFilter = "all", query: str = ""
+) -> dict[str, object]:
+    return {
+        "policies": documents.policy_rows(policies, now),
+        "policy_filters": POLICY_FILTERS,
+        "policy_columns": POLICY_COLUMNS,
+        "policy_note": POLICY_NOTE,
+        "state": kind,
+        "query": query,
+    }
+
+
+# Search and filters narrow the table through the api; the tiles always count every policy.
+@router.get("/policies", response_class=HTMLResponse)
+async def policy_shelf(
+    request: Request, now: NowDep, kind: KindQuery = "all", q: SearchQuery = ""
+) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        every = await api.policies()
+        shown = (
+            await api.policies(None if kind == "all" else kind, q or None)
+            if kind != "all" or q
+            else every
+        )
+    except ApiError as err:
+        return failed(request, PAGES["policies"], err)
+    return render(
+        request,
+        PAGES["policies"],
+        documents.shelf(every),
+        template="partials/policies_body.html" if wants_fragment(request) else "policies.html",
+        **_policy_list(shown, now, kind, q),
+    )
+
+
+async def _policy_overlay(
+    request: Request, now: int, overlay: str, page: str, **context: object
+) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        every = await api.policies()
+    except ApiError as err:
+        return failed_overlay(request, PAGES["policies"], err)
+    return render(
+        request,
+        PAGES["policies"],
+        documents.shelf(every),
+        template=overlay if wants_fragment(request) else page,
+        **_policy_list(every, now),
+        **context,
+    )
+
+
+async def _policy_form(
+    request: Request, now: int, form: documents.PolicyForm, notice: str = ""
+) -> HTMLResponse:
+    return await _policy_overlay(
+        request,
+        now,
+        "policy_form_overlay.html",
+        "policy_form_page.html",
+        form=form,
+        kinds=documents.KIND_LABELS,
+        capabilities=documents.CAPABILITIES,
+        protocols=documents.PROTOCOLS,
+        modes=documents.MODES,
+        limits=documents.LIMITS,
+        form_note=POLICY_FORM_NOTE,
+        form_hint=POLICY_FORM_HINTS[form.kind],
+        workspace_hint=WORKSPACE_HINT,
+        notice=notice,
+    )
+
+
+# Declared before /policies/{policy_id}, which would otherwise take "new" for an id.
+@router.get("/policies/new", response_class=HTMLResponse)
+async def new_policy(request: Request, now: NowDep, kind: str = "mount") -> HTMLResponse:
+    return await _policy_form(request, now, documents.new_form(kind))
+
+
+# A step adds or drops a row and redraws the form; only a plain submit reaches the api.
+@router.post("/policies/new", response_class=HTMLResponse)
+async def create_policy(request: Request, now: NowDep) -> Response:
+    api: ApiClient = request.app.state.api
+    fields = await _form(request)
+    form = documents.read_form(fields)
+    if fields.get("step"):
+        return await _policy_form(request, now, form.stepped(fields["step"]))
+    try:
+        created, fresh = await api.create_policy(form.kind, form.document())
+    except (ApiError, new_run.FormError) as err:
+        return await _policy_form(request, now, form, str(err))
+    if fresh:
+        return _moved(request, f"/policies/{created['id']}")
+    return await _policy_overlay(
+        request,
+        now,
+        "policy_exists_overlay.html",
+        "policy_exists_page.html",
+        existing=created,
+        fields=form.fields(),
+        exists_note=EXISTS_NOTE,
+    )
+
+
+async def _policy_panel(request: Request, policy_id: str, now: int, tab: PolicyTab) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    secrets: dict[str, Row | None] = {}
+    used = None
+    try:
+        found = await api.policy(policy_id)
+        if tab == "used":
+            named, runs = await asyncio.gather(
+                api.profiles(policy=policy_id), api.runs(limit=100, policy=policy_id)
+            )
+            used = documents.used_by(found, named, runs, now)
+        else:
+            names = documents.secret_names(found)
+            stored = await asyncio.gather(*(api.secret(name) for name in names))
+            secrets = dict(zip(names, stored, strict=True))
+    except ApiError as err:
+        return failed_overlay(request, PAGES["policies"], err)
+    return await _policy_overlay(
+        request,
+        now,
+        "policy_overlay.html",
+        "policy_overlay_page.html",
+        policy=documents.policy_detail(found, secrets, now),
+        used=used,
+        tab=tab,
+        identity_note=IDENTITY_NOTE,
+        secrets_note=SECRETS_NOTE,
+        used_note=USED_NOTE,
+    )
+
+
+@router.get("/policies/{policy_id}", response_class=HTMLResponse)
+async def policy(request: Request, policy_id: str, now: NowDep) -> HTMLResponse:
+    return await _policy_panel(request, policy_id, now, "document")
+
+
+@router.get("/policies/{policy_id}/used", response_class=HTMLResponse)
+async def policy_used(request: Request, policy_id: str, now: NowDep) -> HTMLResponse:
+    return await _policy_panel(request, policy_id, now, "used")
+
+
+@router.get("/policies/{policy_id}/new", response_class=HTMLResponse)
+async def policy_from(request: Request, policy_id: str, now: NowDep) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        found = await api.policy(policy_id)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["policies"], err)
+    return await _policy_form(request, now, documents.from_document(found))
 
 
 AuditQuery = Annotated[trail.Category, Query()]

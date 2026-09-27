@@ -1,0 +1,45 @@
+{% from "components.html" import closer, pill, scrim with context %}
+{{ scrim("/policies") }}
+<section class="panel panel--run panel--runner"
+         role="dialog"
+         aria-label="Policy {{ policy.id }}">
+    <header class="panel__header run__header">
+        <div class="panel__title">
+            {{ closer("/policies", label="←", klass="panel__close policy__back") }}
+            <span class="dot dot--lg tone-{{ policy.tone }}"></span>
+            <h2 class="panel__name run__mono">{{ policy.id }}</h2>
+            {{ pill(policy.pill, policy.pill_tone) }}
+            <span class="profile__tag">{{ policy.tag }}</span>
+            <span class="table__secondary">{{ policy.kind }}</span>
+            <div class="run__actions">
+                <a class="button button--outline"
+                   href="/policies/{{ policy.id }}/new"
+                   hx-get="/policies/{{ policy.id }}/new"
+                   hx-target="#overlay">New from this</a>
+                <button class="button button--outline"
+                        type="button"
+                        data-copy="{{ policy.id }}">Copy id</button>
+                {{ closer("/policies") }}
+            </div>
+        </div>
+        <p class="panel__facts">
+            {% for part in policy.meta %}
+                {% if not loop.first %}<span class="run__sep">·</span>{% endif %}
+                <span>{{ part }}</span>
+            {% endfor %}
+        </p>
+    </header>
+    <nav class="run__tabs">
+        {% for key, label, href in (("document", "Document", ""), ("used", "Used by", "/used")) %}
+            <a class="run__tab{{ " run__tab--active" if tab == key }}"
+               href="/policies/{{ policy.id }}{{ href }}"
+               hx-get="/policies/{{ policy.id }}{{ href }}"
+               hx-target="#overlay">{{ label }}</a>
+        {% endfor %}
+    </nav>
+    {% if tab == "used" %}
+        {% include "partials/policy_used.html" %}
+    {% else %}
+        {% include "partials/policy_document.html" %}
+    {% endif %}
+</section>
