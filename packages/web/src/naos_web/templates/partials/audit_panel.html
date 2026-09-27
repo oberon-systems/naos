@@ -1,0 +1,122 @@
+{% from "components.html" import closer, pill, scrim with context %}
+{% macro card(title, facts, note="") -%}
+    <section class="card run__card">
+        <div class="run__card-header">
+            <h3 class="run__card-title">{{ title }}</h3>
+        </div>
+        {% if facts %}
+            <dl class="run__facts">
+                {% for fact in facts %}
+                    <dt>{{ fact.label }}</dt>
+                    <dd{% if fact.mono %} class="run__mono"{% endif %}>
+                        {% if fact.href %}
+                            <a class="card__link"
+                               href="{{ fact.href }}"
+                               hx-get="{{ fact.href }}"
+                               hx-target="#overlay">{{ fact.value }}</a>
+                        {% else %}
+                            {{ fact.value }}
+                        {% endif %}
+                    </dd>
+                {% endfor %}
+            </dl>
+        {% endif %}
+        {{ caller() if caller }}
+        {% if note %}<p class="audit-panel__note">{{ note }}</p>{% endif %}
+    </section>
+{%- endmacro %}
+{{ scrim("/audit") }}
+<section class="panel panel--run panel--audit"
+         role="dialog"
+         aria-label="Audit event {{ detail.event }}">
+    <header class="panel__header run__header">
+        <div class="panel__title">
+            <span class="dot dot--lg tone-{{ detail.tone }}"></span>
+            <h2 class="panel__name">{{ detail.event }}</h2>
+            {{ pill(detail.source, "blue" if detail.source == "RUNNER" else "grey") }}
+            {% if detail.refusal %}{{ pill('REFUSED', 'red') }}{% endif %}
+            <span class="table__id">{{ detail.id }}</span>
+            <div class="run__actions">
+                <button class="button button--outline"
+                        type="button"
+                        data-copy="{{ detail.id }}">Copy id</button>
+                {{ closer("/audit") }}
+            </div>
+        </div>
+        <p class="panel__facts">
+            {% for part in detail.meta %}
+                {% if not loop.first %}<span class="run__sep">·</span>{% endif %}
+                <span{% if part.startswith("seq ") %} class="run__mono"{% endif %}>{{ part }}</span>
+            {% endfor %}
+        </p>
+    </header>
+    <nav class="run__tabs">
+        {% for key, label, href in (("overview", "Overview", ""), ("logs", "Logs", "/logs")) %}
+            {% if key == "overview" or detail.logs %}
+                <a class="run__tab{{ " run__tab--active" if tab == key }}"
+                   href="/audit/{{ detail.id }}{{ href }}"
+                   hx-get="/audit/{{ detail.id }}{{ href }}"
+                   hx-target="#overlay">{{ label }}</a>
+            {% endif %}
+        {% endfor %}
+    </nav>
+    {% if tab == "logs" %}
+        <div class="run__body run__body--logs">
+            <p class="audit-panel__scope">{{ detail.logs }} · {{ log_lines | length }} {{ "entry" if log_lines | length == 1 else "entries" }}</p>
+            <div class="logs__timeline">
+                <table class="table logs__table">
+                    <colgroup>
+                        <col class="logs__col-time">
+                        <col class="logs__col-kind">
+                        <col class="logs__col-event">
+                        <col class="logs__col-actor">
+                        <col>
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>TIME</th>
+                            <th>KIND</th>
+                            <th>EVENT</th>
+                            <th>ACTOR</th>
+                            <th>DETAIL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for line in log_lines %}
+                            {% set row = line.row %}
+                            <tr class="logs__row{{ " logs__row--error" if row.error }}{{ " logs__row--refused" if row.refused }}{{ " logs__row--current" if line.current }}">
+                                <td class="logs__time">{{ row.time }}</td>
+                                <td>
+                                    <span class="logs__source logs__source--{{ row.kind }}">{{ row.kind }}</span>
+                                </td>
+                                <td class="logs__event">{{ row.event }}</td>
+                                <td class="logs__actor">{{ row.actor }}</td>
+                                <td class="logs__detail">{{ row.detail or "—" }}</td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td class="logs__empty" colspan="5">No entries.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <p class="audit-panel__scope">Audit entries are append-only; the api never rewrites one.</p>
+        </div>
+    {% else %}
+        <div class="run__body run__body--audit">
+            <div class="run__column">
+                {{ card("WHEN", detail.when) }}
+                {{ card("CORRELATION", detail.correlation) }}
+                {% if detail.policy %}
+                    {{ card("POLICY", detail.policy, denial_note if detail.denial else "") }}
+                {% endif %}
+            </div>
+            <div class="run__column">
+                {% call card("DATA", detail.data, detail.schema) %}
+                    {% if detail.refusal %}<p class="audit-panel__refused">{{ detail.refusal }}</p>{% endif %}
+                {% endcall %}
+            </div>
+        </div>
+    {% endif %}
+</section>

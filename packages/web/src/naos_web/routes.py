@@ -9,6 +9,7 @@ from fastapi import APIRouter, Query, Request, WebSocket, WebSocketException, st
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
+from naos_web import audit as trail
 from naos_web import confirm, events, new_run, profiles, register, terminal
 from naos_web.client import ApiClient, ApiError, Choices, Dashboard, Row, RunDetail
 from naos_web.clock import NowDep
@@ -1089,6 +1090,156 @@ async def delete_profile(request: Request, profile_id: str) -> Response:
     return _moved(request, "/profiles")
 
 
+AuditQuery = Annotated[trail.Category, Query()]
+AfterQuery = Annotated[int, Query(ge=0)]
+AuditTab = Literal["overview", "logs"]
+
+
+async def _trail(api: ApiClient, state: trail.Category, query: str, limit: int) -> list[Row]:
+    found = trail.params(state, query)
+    if found is None:
+        return []
+    return await api.trail({**found, "limit": limit, "order": "desc"})
+
+
+async def _held(api: ApiClient, row: Row) -> Row | None:
+    run_id = row.get("run_id")
+    if not run_id:
+        return None
+    try:
+        return await api.run(run_id)
+    except ApiError as err:
+        if err.status == 404:
+            return None
+        raise
+
+
+# A run's own timeline when the event has one, else the latest events of its runner.
+async def _timeline(api: ApiClient, row: Row, run: Row | None) -> list[Row]:
+    if run is not None:
+        return await api.run_events(run["id"])
+    if row.get("runner_id"):
+        return await api.events(row["runner_id"])
+    return []
+
+
+# The whole trail answers the tiles; the filter and the search narrow only the table.
+async def _audit_page(
+    request: Request,
+    now: int,
+    state: trail.Category,
+    query: str,
+    template: str = "audit.html",
+    **popup: object,
+) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        rows, summary, runners, runs = await asyncio.gather(
+            _trail(api, state, query, trail.PAGE_SIZE),
+            api.trail_summary(),
+            api.runners(),
+            api.runs(limit=100),
+        )
+    except ApiError as err:
+        return failed(request, PAGES["audit"], err)
+    names = {runner["id"]: runner["name"] for runner in runners}
+    seqs = {found["id"]: found["seq"] for found in runs}
+    return render(
+        request,
+        PAGES["audit"],
+        trail.tiles(summary),
+        template="partials/audit_body.html" if wants_fragment(request) else template,
+        audit_rows=trail.audit_rows(rows, seqs, names, now),
+        audit_filters=trail.AUDIT_FILTERS,
+        audit_columns=trail.AUDIT_COLUMNS,
+        audit_note=trail.AUDIT_NOTE,
+        after=max((row["seq"] for row in rows), default=summary["last_seq"] or 0),
+        state=state,
+        query=query,
+        **popup,
+    )
+
+
 @router.get("/audit", response_class=HTMLResponse)
-def audit(request: Request) -> HTMLResponse:
-    return render(request, PAGES["audit"])
+async def audit(
+    request: Request, now: NowDep, state: AuditQuery = "all", q: SearchQuery = ""
+) -> HTMLResponse:
+    return await _audit_page(request, now, state, q)
+
+
+# Newer rows go on top of the table; the page keeps the last seq it has shown.
+@router.get("/audit/tail", response_class=HTMLResponse)
+async def audit_tail(
+    request: Request, now: NowDep, after: AfterQuery, state: AuditQuery = "all", q: SearchQuery = ""
+) -> Response:
+    api: ApiClient = request.app.state.api
+    found = trail.params(state, q)
+    if found is None:
+        return Response(status_code=204)
+    try:
+        rows, runners, runs = await asyncio.gather(
+            api.trail({**found, "after": after, "limit": trail.PAGE_SIZE}),
+            api.runners(),
+            api.runs(limit=100),
+        )
+    except ApiError:
+        return Response(status_code=204)
+    if not rows:
+        return Response(status_code=204)
+    seqs = {run["id"]: run["seq"] for run in runs}
+    names = {runner["id"]: runner["name"] for runner in runners}
+    templates: Jinja2Templates = request.app.state.templates
+    return templates.TemplateResponse(
+        request,
+        "partials/audit_tail.html",
+        {"audit_rows": trail.audit_rows(rows[::-1], seqs, names, now), "after": rows[-1]["seq"]},
+    )
+
+
+@router.get("/audit/export")
+async def audit_export(
+    request: Request, state: AuditQuery = "all", q: SearchQuery = ""
+) -> Response:
+    api: ApiClient = request.app.state.api
+    try:
+        rows = await _trail(api, state, q, trail.EXPORT_SIZE)
+    except ApiError as err:
+        return failed(request, PAGES["audit"], err)
+    return Response(
+        json.dumps(rows, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": 'attachment; filename="audit.json"'},
+    )
+
+
+# The popup an event row opens. A plain request gets it over the trail, so a link
+# to one event can be shared.
+async def _audit_popup(request: Request, event_id: str, now: int, tab: AuditTab) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        picked, runners = await asyncio.gather(api.trail_event(event_id), api.runners())
+        run = await _held(api, picked)
+        lines = await _timeline(api, picked, run) if tab == "logs" else []
+    except ApiError as err:
+        return failed_overlay(request, PAGES["audit"], err)
+    names = {runner["id"]: runner["name"] for runner in runners}
+    popup = {
+        "detail": trail.detail(picked, run, names),
+        "tab": tab,
+        "log_lines": trail.timeline(lines, names, event_id),
+        "denial_note": trail.DENIAL_NOTE,
+    }
+    if wants_fragment(request):
+        return render(request, PAGES["audit"], None, template="audit_overlay.html", **popup)
+    return await _audit_page(request, now, "all", "", "audit_overlay_page.html", **popup)
+
+
+# Declared after /audit/tail and /audit/export, which this path would otherwise take for an id.
+@router.get("/audit/{event_id}", response_class=HTMLResponse)
+async def audit_event(request: Request, event_id: str, now: NowDep) -> HTMLResponse:
+    return await _audit_popup(request, event_id, now, "overview")
+
+
+@router.get("/audit/{event_id}/logs", response_class=HTMLResponse)
+async def audit_event_logs(request: Request, event_id: str, now: NowDep) -> HTMLResponse:
+    return await _audit_popup(request, event_id, now, "logs")

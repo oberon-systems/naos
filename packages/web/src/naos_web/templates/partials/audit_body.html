@@ -1,0 +1,47 @@
+{% from "components.html" import column_header, footer_note %}
+<section class="card" id="audit">
+    <div class="card__header">
+        <input type="hidden" id="audit-state" name="state" value="{{ state }}">
+        <input type="hidden" id="audit-after" name="after" value="{{ after }}">
+        <input class="search"
+               id="audit-search"
+               type="search"
+               name="q"
+               value="{{ query }}"
+               placeholder="Search event, run_… or rnr_…"
+               aria-label="Search the audit trail"
+               hx-get="/audit"
+               hx-include="#audit-state"
+               hx-target="#audit"
+               hx-swap="outerHTML"
+               hx-trigger="input changed delay:300ms"
+               hx-push-url="true"
+               hx-preserve="true">
+        <div class="filters">
+            {% for item in audit_filters %}
+                <a class="filter{{ " filter--active" if item.key == state }}"
+                   href="{{ item.href(query) }}"
+                   hx-get="{{ item.href(query) }}"
+                   hx-target="#audit"
+                   hx-swap="outerHTML"
+                   hx-push-url="true">{{ item.label }}</a>
+            {% endfor %}
+        </div>
+    </div>
+    <table class="table audit-table">
+        {{ column_header(audit_columns) }}
+        <tbody id="audit-rows"
+               hx-get="/audit/tail"
+               hx-include="#audit-state, #audit-search, #audit-after"
+               hx-trigger="every 5s"
+               hx-swap="afterbegin">
+            {% include "partials/audit_rows.html" %}
+            {% if not audit_rows %}
+                <tr>
+                    <td class="table__secondary" colspan="{{ audit_columns | length }}">no event matches</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+    {{ footer_note(audit_note) }}
+</section>

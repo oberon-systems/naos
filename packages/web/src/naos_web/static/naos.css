@@ -12,6 +12,7 @@
   --sunken: #f9fafb;
   --border: #e4e7ec;
   --divider: #eff1f4;
+  --selected: #f0f4ff;
 
   --blue-dot: #175cd3;
   --blue-bg: #eff8ff;
@@ -2096,3 +2097,75 @@ body {
 
 .profile-runs th:nth-child(6),
 .profile-runs td:nth-child(6) { width: 110px; }
+
+/* audit page */
+
+.audit-table th:nth-child(1),
+.audit-table td:nth-child(1) { width: 100px; }
+
+.audit-table th:nth-child(2),
+.audit-table td:nth-child(2) { width: 195px; }
+
+.audit-table th:nth-child(3),
+.audit-table td:nth-child(3),
+.audit-table th:nth-child(4),
+.audit-table td:nth-child(4) { width: 85px; }
+
+.audit-table th:nth-child(5),
+.audit-table td:nth-child(5) { width: 110px; }
+
+.audit-table th:nth-child(6),
+.audit-table td:nth-child(6) { width: 120px; }
+
+.audit-table__event {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.audit-table__event--error {
+  color: var(--red-text);
+}
+
+.audit-table__row--refused .audit-table__event,
+.audit-table__row--refused .audit-table__data {
+  font-style: italic;
+}
+
+.audit-table__data {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.panel--audit {
+  width: min(940px, calc(100vw - 48px));
+}
+
+.run__body--audit {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.audit-panel__note,
+.audit-panel__refused {
+  margin: 0;
+  padding: 0 16px 14px;
+  font-size: 11px;
+  color: var(--soft);
+}
+
+.audit-panel__refused {
+  font-style: italic;
+  color: var(--red-text);
+}
+
+.audit-panel__scope {
+  margin: 0;
+  font-size: 11px;
+  color: var(--soft);
+}
+
+.logs__row--current {
+  background: var(--selected);
+}

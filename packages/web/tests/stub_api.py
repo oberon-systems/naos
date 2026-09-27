@@ -5,7 +5,7 @@ page; the shapes are the ones packages/api returns.
 """
 
 import time
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import FastAPI, Header, Query
 from fastapi.responses import JSONResponse, Response
@@ -358,14 +358,147 @@ def drain_runner(runner_id: str) -> Row | JSONResponse:
     return row
 
 
+def _trail(
+    seq: int,
+    ago: int,
+    event: str,
+    data: Row,
+    actor: str = "runner",
+    source: str = "runner",
+    run_id: str | None = "run_9f21c4",
+    runner_id: str | None = ALPHA["id"],
+    vm_id: str | None = None,
+    lag: int = 0,
+) -> Row:
+    return {
+        "seq": seq,
+        "id": f"evt_{seq:032x}",
+        "at": NOW - ago,
+        "received_at": NOW - ago + lag,
+        "source": source,
+        "event": event,
+        "actor": actor,
+        "run_id": run_id,
+        "vm_id": vm_id,
+        "runner_id": runner_id,
+        "data": data,
+    }
+
+
+# The board's trail, oldest first, closed by two rows no writer may produce.
+TRAIL: list[Row] = [
+    _trail(
+        41880,
+        540,
+        "run_created",
+        {"workspace": "alpha", "profile": "build-small"},
+        actor="operator",
+        source="api",
+        runner_id=None,
+    ),
+    _trail(
+        41881,
+        538,
+        "run_transition",
+        {"from": "PENDING", "to": "STARTING", "reason": None},
+        source="api",
+    ),
+    _trail(41882, 530, "vm_created", {}, vm_id="vm_7f3a91", lag=3),
+    _trail(
+        41887,
+        509,
+        "network_denied",
+        {
+            "protocol": "https",
+            "host": "registry.example.com",
+            "rule": "no rule matched",
+            "reason": "denied by policy",
+        },
+        vm_id="vm_7f3a91",
+        lag=4,
+    ),
+    _trail(
+        41890,
+        493,
+        "shell_allowed",
+        {"capability": "read_file", "path": "/workspace/pyproject.toml"},
+        lag=4,
+    ),
+    _trail(
+        41895,
+        250,
+        "diff_reported",
+        {"entries": 12, "rejected": 0, "sensitive": 0, "policy": "ask", "decided": False},
+        source="api",
+        run_id="run_5be317",
+        runner_id=GAMMA["id"],
+    ),
+    _trail(
+        41897,
+        140,
+        "merge_decided",
+        {"paths": 12, "resolutions": 3},
+        actor="operator",
+        source="api",
+        run_id="run_5be317",
+        runner_id=None,
+    ),
+    _trail(
+        41899,
+        50,
+        "lease_expired",
+        {"lease_id": "lease_7fe201"},
+        actor="system",
+        source="api",
+        run_id=None,
+        runner_id="rnr_91ba35dd",
+    ),
+    _trail(41900, 40, "vm_exploded", {"note": "rm -rf /"}),
+    _trail(41901, 30, "run_claimed", {"token": "secret-alpha-value"}),
+]
+TRAIL_QUERIES: list[Row] = []
+
+
+@stub.get("/api/v1/audit/summary")
+def audit_summary() -> Row:
+    return {
+        "total": 1284,
+        "last_seq": 41902,
+        "events_24h": 1284,
+        "sources": ["api", "runner"],
+        "denials": {"network": 5, "shell": 2, "mcp": 0},
+        "refused_24h": 0,
+        "spool_lag": 4,
+    }
+
+
+@stub.get("/api/v1/audit/{event_id}", response_model=None)
+def audit_event(event_id: str) -> Row | JSONResponse:
+    found = next((row for row in TRAIL if row["id"] == event_id), None)
+    return found if found else _missing(f"audit event {event_id}")
+
+
 @stub.get("/api/v1/audit")
 def audit(
     runner_id: str | None = None,
     image_id: str | None = None,
     profile_id: str | None = None,
+    run_id: str | None = None,
+    event: Annotated[list[str] | None, Query()] = None,
+    after: int | None = None,
     limit: int = Query(100),
     order: str = "asc",
 ) -> list[Row]:
+    if runner_id is None and image_id is None and profile_id is None:
+        TRAIL_QUERIES.append({"run_id": run_id, "event": event, "after": after, "order": order})
+        found = [
+            row
+            for row in TRAIL
+            if (run_id is None or row["run_id"] == run_id)
+            and (not event or row["event"] in event)
+            and (after is None or row["seq"] > after)
+        ]
+        return (found[::-1] if order == "desc" else found)[:limit]
     if image_id is not None:
         return IMAGE_EVENTS.get(image_id, [])[:limit]
     if profile_id is not None:

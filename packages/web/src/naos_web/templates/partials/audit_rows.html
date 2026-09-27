@@ -1,0 +1,31 @@
+{% from "components.html" import pill %}
+{% for row in audit_rows %}
+    <tr class="runs-table__row audit-table__row{{ " audit-table__row--refused" if row.refused }}"
+        tabindex="0"
+        data-event="{{ row.id }}"
+        hx-get="/audit/{{ row.id }}"
+        hx-target="#overlay"
+        hx-swap="innerHTML"
+        hx-include="unset"
+        hx-trigger="click, keyup[key=='Enter']">
+        <td>
+            <div class="run__mono">{{ row.time }}</div>
+            <div class="table__secondary">{{ row.age }}</div>
+        </td>
+        <td>
+            <div class="audit-table__event{{ " audit-table__event--error" if row.error }}">{{ row.event }}</div>
+            <div class="table__secondary">{{ row.kind }}</div>
+        </td>
+        <td>{{ row.actor }}</td>
+        <td>{{ pill(row.source, "blue" if row.source == "runner" else "grey") }}</td>
+        <td>
+            <div>{{ row.run }}</div>
+            <div class="table__id">{{ row.run_note }}</div>
+        </td>
+        <td>
+            <div>{{ row.runner }}</div>
+            <div class="table__id">{{ row.runner_note }}</div>
+        </td>
+        <td class="audit-table__data">{{ row.data }}</td>
+    </tr>
+{% endfor %}

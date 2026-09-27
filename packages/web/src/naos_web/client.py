@@ -172,6 +172,18 @@ class ApiClient:
         )
         return rows
 
+    async def trail(self, params: Row) -> list[Row]:
+        rows: list[Row] = await self._call("GET", "/audit", params=params)
+        return rows
+
+    async def trail_summary(self) -> Row:
+        row: Row = await self._call("GET", "/audit/summary")
+        return row
+
+    async def trail_event(self, event_id: str) -> Row:
+        row: Row = await self._call("GET", f"/audit/{event_id}")
+        return row
+
     async def run(self, run_id: str) -> Row:
         row: Row = await self._call("GET", f"/runs/{run_id}")
         return row

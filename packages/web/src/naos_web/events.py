@@ -210,6 +210,11 @@ API: dict[str, Schema] = {
         {"lease_id": _text}, _data(lambda d: str(d["lease_id"])), lambda d: True
     ),
     "token_rotated": Schema({}, lambda row: "heartbeat past half the ttl"),
+    "runner_events_refused": Schema(
+        {"count": _count},
+        _data(lambda d: f"{_plural(d['count'], 'event')} refused"),
+        lambda d: True,
+    ),
 }
 
 RUNNER: dict[str, Schema] = {

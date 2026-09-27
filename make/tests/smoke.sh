@@ -401,6 +401,44 @@ check_secrets() {
     done
 }
 
+# The audit page counts the gate denials; a denial's popup names its policy and run timeline.
+check_audit_page() {
+    local denied
+    denied="$(curl -fsS "${auth[@]}" "$api/api/v1/audit?event=network_denied&run_id=$run" |
+        "$VENV/bin/python" -c '
+import json, sys
+row = json.load(sys.stdin)[0]
+if row["received_at"] < row["at"]:
+    sys.exit("a runner event reached the api before it was written")
+print(row["id"])
+')"
+    curl -fsS "${auth[@]}" "$api/api/v1/audit/summary" | "$VENV/bin/python" -c '
+import json, sys
+summary = json.load(sys.stdin)
+if min(summary["denials"].values()) < 1 or summary["spool_lag"] is None:
+    sys.exit(f"the audit summary misses the smoke run: {summary}")
+'
+    for path in "/audit?q=network_denied" "/audit/$denied" "/audit/$denied/logs"; do
+        curl -fsS "$web$path" >"$TEMP_DIR/audit.html"
+        "$VENV/bin/python" - "$TEMP_DIR/audit.html" "$path" "$secret" "$operator" <<'PY' || fail "the audit page is wrong"
+import sys
+page, path, *secrets = sys.argv[1:]
+body = open(page).read()
+if path.endswith("/logs"):
+    wanted = ["network_denied", "timeline of run #"]
+elif "?" in path:
+    wanted = ["network_denied", "tile__number"]
+else:
+    wanted = ["network_denied", "<dt>Gate</dt>", "<dd>network</dd>"]
+missing = [text for text in wanted if text not in body]
+if missing:
+    sys.exit(f"{path} is missing {missing}")
+if any(value in body for value in secrets) or "Bearer" in body:
+    sys.exit(f"{path} carries a credential")
+PY
+    done
+}
+
 # The Logs & Audit tab renders every event the run carries, refuses none, and exports them all.
 check_run_logs() {
     curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/events?limit=10000" >"$TEMP_DIR/events.json"
@@ -825,6 +863,8 @@ wait_for 60 audited
 check_secrets
 echo "checking the logs & audit tab of the run..."
 check_run_logs
+echo "checking the audit page..."
+check_audit_page
 echo "rerunning the run from its overlay, then stopping the copy..."
 rerun_key="$(curl -fsS "$web/runs/$run/rerun" | sed -n 's/.*name="key" value="\([0-9a-f]*\)".*/\1/p')"
 copy="$(web_post "$run" rerun "$rerun_key")"
