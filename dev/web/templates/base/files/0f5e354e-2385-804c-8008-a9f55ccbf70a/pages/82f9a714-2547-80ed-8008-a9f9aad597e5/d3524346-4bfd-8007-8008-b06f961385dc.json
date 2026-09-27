@@ -82,7 +82,7 @@
                 "letterSpacing": "0",
                 "fills": [
                   {
-                    "fillColor": "#101828",
+                    "fillColor": "#175cd3",
                     "fillOpacity": 1
                   }
                 ],
@@ -104,7 +104,7 @@
             "letterSpacing": "0",
             "fills": [
               {
-                "fillColor": "#101828",
+                "fillColor": "#175cd3",
                 "fillOpacity": 1
               }
             ],
@@ -116,31 +116,41 @@
   },
   "pageId": "82f9a714-2547-80ed-8008-a9f9aad597e5",
   "constraintsV": "top",
+  "interactions": [
+    {
+      "eventType": "click",
+      "actionType": "open-url",
+      "destination": null,
+      "positionRelativeTo": null,
+      "preserveScroll": false,
+      "url": "http://localhost:9001/#/view?file-id=0f5e354e-2385-804c-8008-a9f55ccbf70a&page-id=0f5e354e-2385-804c-8008-a9f55ccbf70b&section=interactions&frame-id=5142935e-e171-8029-8008-ab1b2ec55a82"
+    }
+  ],
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 371.19999998807907,
+      "x": 2660,
+      "y": 371.2727279663086,
+      "width": 25.78409194946289,
+      "height": 15.272727966308594,
+      "x1": 0,
+      "y1": 0,
+      "x2": 25.78409194946289,
+      "y2": 15.272727966308594,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "600",
-      "y1": -0.800000011920929,
-      "width": 25.8125,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 2660,
-      "x1": 0,
-      "y2": 15.199999988079071,
       "fills": [
         {
-          "fillColor": "#101828",
+          "fillColor": "#175cd3",
           "fillOpacity": 1
         }
       ],
-      "x2": 25.8125,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "height": 16,
       "text": "#119"
     }
   ]

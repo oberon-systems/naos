@@ -1,5 +1,17 @@
 {
   "id": "c3596e37-1bac-8007-8008-ab0af5cbc24d",
   "name": "Images",
+  "flows": {
+    "dbbafd92-e887-807a-8008-b3e6e90dd6f1": {
+      "id": "dbbafd92-e887-807a-8008-b3e6e90dd6f1",
+      "name": "Flow 1",
+      "startingFrame": "63ce1f46-d2df-801d-8008-b156430bdb5a"
+    },
+    "dbbafd92-e887-807a-8008-b3e6ea0d8cc5": {
+      "id": "dbbafd92-e887-807a-8008-b3e6ea0d8cc5",
+      "name": "Flow 2",
+      "startingFrame": "63ce1f46-d2df-801d-8008-b156c935b52d"
+    }
+  },
   "index": 2
 }

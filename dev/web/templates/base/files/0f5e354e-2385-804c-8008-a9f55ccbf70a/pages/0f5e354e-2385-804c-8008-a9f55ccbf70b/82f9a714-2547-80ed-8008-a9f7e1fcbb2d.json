@@ -82,7 +82,7 @@
                 "letterSpacing": "0",
                 "fills": [
                   {
-                    "fillColor": "#344054",
+                    "fillColor": "#175cd3",
                     "fillOpacity": 1
                   }
                 ],
@@ -104,7 +104,7 @@
             "letterSpacing": "0",
             "fills": [
               {
-                "fillColor": "#344054",
+                "fillColor": "#175cd3",
                 "fillOpacity": 1
               }
             ],
@@ -116,31 +116,43 @@
   },
   "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
   "constraintsV": "top",
+  "interactions": [
+    {
+      "eventType": "click",
+      "actionType": "open-overlay",
+      "destination": "5142935e-e171-8029-8008-ab1b904cc503",
+      "positionRelativeTo": null,
+      "preserveScroll": false,
+      "overlayPosType": "center",
+      "closeClickOutside": true,
+      "backgroundOverlay": true
+    }
+  ],
   "constraintsH": "left",
   "positionData": [
     {
+      "x": 630,
       "y": 588.77272772789,
+      "width": 28.795455932617188,
+      "height": 14.545454978942871,
+      "x1": 0,
+      "y1": 0.7272727489471436,
+      "x2": 28.795455932617188,
+      "y2": 15.272727727890015,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "500",
-      "y1": 0.7272727489471436,
-      "width": 28.795455932617188,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 630,
-      "x1": 0,
-      "y2": 15.272727727890015,
       "fills": [
         {
-          "fillColor": "#344054",
+          "fillColor": "#175cd3",
           "fillOpacity": 1
         }
       ],
-      "x2": 28.795455932617188,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "height": 14.545454978942871,
       "text": "alpha"
     }
   ]

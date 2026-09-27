@@ -87,7 +87,30 @@
                   }
                 ],
                 "fontFamily": "Inter Tight",
-                "text": "STARTED \u00b7 claimed by alpha"
+                "text": "STARTED \u00b7 claimed by "
+              },
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "12",
+                "fontWeight": "500",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "500",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#175cd3",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "alpha"
               }
             ],
             "typographyRefId": null,
@@ -116,32 +139,69 @@
   },
   "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
   "constraintsV": "top",
+  "interactions": [
+    {
+      "eventType": "click",
+      "actionType": "open-overlay",
+      "destination": "5142935e-e171-8029-8008-ab1b904cc503",
+      "positionRelativeTo": null,
+      "preserveScroll": false,
+      "overlayPosType": "center",
+      "closeClickOutside": true,
+      "backgroundOverlay": true
+    }
+  ],
   "constraintsH": "left",
   "positionData": [
     {
+      "x": 3316,
       "y": 254.77272772789001,
+      "width": 118.70455932617188,
+      "height": 14.545454978942871,
+      "x1": 0,
+      "y1": 0.7272727489471436,
+      "x2": 118.70455932617188,
+      "y2": 15.272727727890015,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "500",
-      "y1": 0.7272727489471436,
-      "width": 147.4886474609375,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 3316,
-      "x1": 0,
-      "y2": 15.272727727890015,
       "fills": [
         {
           "fillColor": "#101828",
           "fillOpacity": 1
         }
       ],
-      "x2": 147.4886474609375,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "text": "STARTED \u00b7 claimed by "
+    },
+    {
+      "x": 3434.704559326172,
+      "y": 254.77272772789001,
+      "width": 28.795440673828125,
       "height": 14.545454978942871,
-      "text": "STARTED \u00b7 claimed by alpha"
+      "x1": 118.70455932617188,
+      "y1": 0.7272727489471436,
+      "x2": 147.5,
+      "y2": 15.272727727890015,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "12px",
+      "fontWeight": "500",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#175cd3",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "alpha"
     }
   ]
 }

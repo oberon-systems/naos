@@ -1,5 +1,12 @@
 {
   "id": "c3596e37-1bac-8007-8008-ab0c1a1543fe",
   "name": "Audit",
+  "flows": {
+    "dbbafd92-e887-807a-8008-b3e71bb3291d": {
+      "id": "dbbafd92-e887-807a-8008-b3e71bb3291d",
+      "name": "Flow 1",
+      "startingFrame": "c3596e37-1bac-8007-8008-ab0c414f4bf7"
+    }
+  },
   "index": 4
 }
