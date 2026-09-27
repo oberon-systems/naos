@@ -3,9 +3,10 @@ from typing import Annotated, Any, Literal, Self
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, create_model, model_validator
-from sqlmodel import Session, and_, col, or_, select
+from sqlmodel import Session, and_, col, func, or_, select
 
 from naos_api.clock import now_ts
+from naos_api.errors import NotFoundError
 from naos_api.lifecycle import RunStatus
 from naos_api.models import AuditEvent, Lease, Run
 
@@ -44,6 +45,7 @@ API_EVENTS: dict[str, frozenset[str]] = {
     "profile_deleted": frozenset({"profile_id", "name"}),
     "console_attached": frozenset(),
     "console_typing": frozenset({"view"}),
+    "runner_events_refused": frozenset({"count"}),
 }
 
 _VM = {"vm_id": Id, "run_id": Id}
@@ -133,10 +135,12 @@ def record(
     unknown = sorted(set(data) - API_EVENTS[event])
     if unknown:
         raise ValueError(f"{event} does not carry {', '.join(unknown)}")
+    at = now_ts()
     session.add(
         AuditEvent(
             id=f"evt_{uuid4().hex}",
-            at=now_ts(),
+            at=at,
+            received_at=at,
             source="api",
             event=event,
             actor=actor,
@@ -190,6 +194,7 @@ def ingest(
     refused = [e.id for e in events if "run_id" in e.fields and e.fields["run_id"] not in held]
     for attempt in range(2):
         seen = _stored(session, [event.id for event in events]) | set(refused)
+        received = now_ts()
         accepted = 0
         for event in events:
             if event.id in seen:
@@ -200,6 +205,7 @@ def ingest(
                 AuditEvent(
                     id=event.id,
                     at=event.at,
+                    received_at=received,
                     source="runner",
                     event=event.event,
                     actor="runner",
@@ -210,6 +216,14 @@ def ingest(
                 )
             )
             accepted += 1
+        if refused:
+            record(
+                session,
+                "runner_events_refused",
+                actor="runner",
+                runner_id=runner_id,
+                count=len(refused),
+            )
         try:
             session.commit()
         except Exception:
@@ -236,15 +250,18 @@ def search(
     session: Session,
     *,
     runner_id: str | None,
-    event: str | None,
+    events: Sequence[str],
     since: int | None,
     after: int | None,
     limit: int,
     newest_first: bool = False,
     image_id: str | None = None,
     profile_id: str | None = None,
+    run_id: str | None = None,
 ) -> Sequence[AuditEvent]:
     statement = select(AuditEvent)
+    if run_id is not None:
+        statement = statement.where(col(AuditEvent.run_id) == run_id)
     if runner_id is not None:
         statement = statement.where(col(AuditEvent.runner_id) == runner_id)
     if image_id is not None:
@@ -261,11 +278,65 @@ def search(
             col(AuditEvent.data)["profile_id"].as_string() == profile_id,
         )
         statement = statement.where(or_(own, col(AuditEvent.run_id).in_(copied)))
-    if event is not None:
-        statement = statement.where(col(AuditEvent.event) == event)
+    if events:
+        statement = statement.where(col(AuditEvent.event).in_(events))
     if since is not None:
         statement = statement.where(col(AuditEvent.at) >= since)
     if after is not None:
         statement = statement.where(col(AuditEvent.seq) > after)
     order = col(AuditEvent.seq).desc() if newest_first else col(AuditEvent.seq)
     return session.exec(statement.order_by(order).limit(limit)).all()
+
+
+def find(session: Session, event_id: str) -> AuditEvent:
+    found = session.exec(select(AuditEvent).where(col(AuditEvent.id) == event_id)).first()
+    if found is None:
+        raise NotFoundError(f"audit event {event_id} does not exist")
+    return found
+
+
+DAY = 86_400
+DENIALS = {"network_denied": "network", "shell_denied": "shell"}
+
+
+class Summary(BaseModel):
+    total: int
+    last_seq: int | None
+    events_24h: int
+    sources: list[str]
+    denials: dict[str, int]
+    refused_24h: int
+    spool_lag: int | None
+
+
+def _count(session: Session, *where: Any) -> int:
+    return session.exec(select(func.count()).select_from(AuditEvent).where(*where)).one()
+
+
+def summary(session: Session, now: int) -> Summary:
+    since = col(AuditEvent.at) >= now - DAY
+    denials = {
+        gate: _count(session, since, col(AuditEvent.event) == name)
+        for name, gate in DENIALS.items()
+    }
+    denials["mcp"] = _count(
+        session,
+        since,
+        col(AuditEvent.event) == "mcp_call",
+        col(AuditEvent.data)["decision"].as_string() == "deny",
+    )
+    refused = session.exec(
+        select(AuditEvent.data).where(since, col(AuditEvent.event) == "runner_events_refused")
+    ).all()
+    runner_events = select(AuditEvent).where(col(AuditEvent.source) == "runner")
+    latest = session.exec(runner_events.order_by(col(AuditEvent.seq).desc())).first()
+    sources = session.exec(select(AuditEvent.source).where(since).distinct()).all()
+    return Summary(
+        total=_count(session),
+        last_seq=session.exec(select(func.max(AuditEvent.seq))).one(),
+        events_24h=_count(session, since),
+        sources=sorted(sources),
+        denials=denials,
+        refused_24h=sum(int(data["count"]) for data in refused),
+        spool_lag=None if latest is None else max(latest.received_at - latest.at, 0),
+    )

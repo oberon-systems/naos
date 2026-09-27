@@ -4,6 +4,7 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
 from naos_api import audit, runs
+from naos_api.clock import NowDep
 from naos_api.models import AuditEvent
 from naos_api.routes.deps import SessionDep
 
@@ -12,6 +13,7 @@ class AuditEventRead(BaseModel):
     seq: int
     id: str
     at: int
+    received_at: int
     source: str
     event: str
     actor: str
@@ -44,7 +46,8 @@ def search_events(
     runner_id: str | None = None,
     image_id: str | None = None,
     profile_id: str | None = None,
-    event: str | None = None,
+    run_id: str | None = None,
+    event: Annotated[list[str] | None, Query(max_length=100)] = None,
     since: Annotated[int | None, Query(ge=0)] = None,
     after: Annotated[int | None, Query(ge=0)] = None,
     limit: Annotated[int, Query(ge=1, le=1000)] = 100,
@@ -53,12 +56,23 @@ def search_events(
     found = audit.search(
         session,
         runner_id=runner_id,
-        event=event,
+        events=event or [],
         since=since,
         after=after,
         limit=limit,
         newest_first=order == "desc",
         image_id=image_id,
         profile_id=profile_id,
+        run_id=run_id,
     )
     return [AuditEventRead.of(row) for row in found]
+
+
+@router.get("/audit/summary")
+def summarize_events(session: SessionDep, now: NowDep) -> audit.Summary:
+    return audit.summary(session, now)
+
+
+@router.get("/audit/{event_id}")
+def read_event(event_id: str, session: SessionDep) -> AuditEventRead:
+    return AuditEventRead.of(audit.find(session, event_id))

@@ -31,8 +31,8 @@ Eventually expose metrics for active Runs, startup time, duration, gate requests
 ## Audit trail
 
 Every audit event is one row of the `audit_events` table in the API. A row
-holds `seq`, the order of arrival, an event `id`, the time `at`, its
-`source` (`api` or `runner`), the `event` name, the `actor` (`operator`,
+holds `seq`, the order of arrival, an event `id`, the time `at`, the time
+`received_at` the API stored it, its `source` (`api` or `runner`), the `event` name, the `actor` (`operator`,
 `runner` or `system`), the `run_id`, `vm_id` and `runner_id` it concerns, and
 `data`.
 
@@ -69,6 +69,7 @@ describe, so a change and its event land or fail together.
 | `image_registered` | operator | `image_id`, `version`, `digest` |
 | `secret_created` | operator | `name` only |
 | `console_attached` | operator | none; the Run is `run_id` |
+| `runner_events_refused` | runner | `count` of the events in one batch that named a Run the runner never held |
 
 A lease that expires fails its active Runs, and each of those is a
 `run_transition` by `system` with the reason `runner lease expired`.
@@ -113,9 +114,14 @@ Both endpoints need the operator token.
   `at` and then `seq`, up to `limit` rows (1000 by default, at most 10000).
   An unknown Run gets 404.
 - `GET /api/v1/audit` lists every event in `seq` order, filtered by
-  `runner_id`, `event` and `since` (an `at` in seconds), `limit` rows at a
-  time (100 by default, at most 1000). Pass the last `seq` as `after` for the
-  next page.
+  `run_id`, `runner_id`, `event` (repeat it for several names) and `since`
+  (an `at` in seconds), `limit` rows at a time (100 by default, at most
+  1000). Pass the last `seq` as `after` for the next page.
+- `GET /api/v1/audit/{event_id}` is one event. An unknown id gets 404.
+- `GET /api/v1/audit/summary` counts the trail: `total`, `last_seq`, and
+  over the last 24 hours `events_24h`, the `sources` seen, gate `denials`
+  per gate and `refused_24h`. `spool_lag` is how many seconds the latest
+  runner event took from the runner's log to the API.
 
 ```bash
 curl -fsS -H "Authorization: Bearer $operator" "$api/api/v1/runs/$run/events"

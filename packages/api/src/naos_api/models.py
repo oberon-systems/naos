@@ -121,6 +121,7 @@ class AuditEvent(SQLModel, table=True):
     seq: int | None = Field(default=None, primary_key=True)
     id: str = Field(unique=True)
     at: int
+    received_at: int
     source: str
     event: str = Field(index=True)
     actor: str

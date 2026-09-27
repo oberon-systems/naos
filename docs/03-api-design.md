@@ -84,6 +84,8 @@ GET /api/v1/images/{image_id}
 POST /api/v1/secrets
 GET /api/v1/secrets/{name}
 GET /api/v1/audit
+GET /api/v1/audit/summary
+GET /api/v1/audit/{event_id}
 ```
 
 Do not allow clients to arbitrarily set Run status. Validate legal transitions centrally.
@@ -427,8 +429,8 @@ and the API moves the Run ([09](09-overlay-and-merge.md#merge)).
 
 ### Audit events
 
-`GET /api/v1/runs/{run_id}/events` and `GET /api/v1/audit` read the audit
-trail, and `POST .../events` takes the runner's own events; the catalogue and
+`GET /api/v1/runs/{run_id}/events`, `GET /api/v1/audit` and its `summary`
+and `{event_id}` read the audit trail, and `POST .../events` takes the runner's own events; the catalogue and
 the schemas are in [11](11-observability.md#audit-trail).
 
 Secrets must never be returned accidentally.

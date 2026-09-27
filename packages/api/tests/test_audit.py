@@ -224,6 +224,26 @@ def test_runner_events_are_validated(
     assert [(row.id, row.run_id, row.runner_id) for row in stored] == [
         (mine["id"], run_id, runner["runner_id"])
     ]
+    refusals = [row for row in _rows(session) if row.event == "runner_events_refused"]
+    assert [(row.actor, row.runner_id, row.data) for row in refusals] == [
+        ("runner", runner["runner_id"], {"count": 1}),
+        ("runner", other["runner_id"], {"count": 1}),
+    ]
+
+
+def test_a_runner_event_keeps_when_it_reached_the_api(
+    client: TestClient, register: Register, session: Session
+) -> None:
+    runner = register()
+    written = _event("lease_fenced", vms=1) | {"at": now_ts() - 30}
+    _post_events(client, runner, [written])
+
+    row = client.get(f"/api/v1/audit/{written['id']}").json()
+    assert row["at"] == written["at"]
+    assert row["received_at"] - row["at"] >= 30
+    api_row = client.get("/api/v1/audit", params={"event": "runner_registered"}).json()[0]
+    assert api_row["received_at"] == api_row["at"]
+    assert client.get(f"/api/v1/audit/evt_{'0' * 32}").status_code == 404
 
 
 def test_runner_events_need_runner_credentials(client: TestClient, register: Register) -> None:
@@ -286,6 +306,71 @@ def test_a_run_is_reconstructed_from_its_timeline(
     assert len(page) == 4
     rest = client.get("/api/v1/audit", params={"after": page[-1]["seq"], "event": "vm_created"})
     assert [row["event"] for row in rest.json()] == ["vm_created"]
+    both = client.get(
+        "/api/v1/audit", params={"run_id": run_id, "event": ["vm_created", "changes_archived"]}
+    )
+    assert [row["event"] for row in both.json()] == ["vm_created", "changes_archived"]
+    assert client.get("/api/v1/audit", params={"run_id": "run_missing"}).json() == []
+
+
+def test_the_summary_counts_the_last_day(
+    client: TestClient,
+    register: Register,
+    create_run: CreateRun,
+    session: Session,
+    advance: Advance,
+    clock: Callable[[], int],
+) -> None:
+    advance(now_ts() - clock())
+    run_id = create_run("key-1")
+    runner = register()
+    _heartbeat(client, runner)
+    net = {"run_id": run_id, "protocol": "https", "host": "registry.example.com", "rule": "none"}
+    shell = {"run_id": run_id, "capability": "read_file", "path": "/workspace/a"}
+    mcp = {
+        "run_id": run_id,
+        "server": "alpha",
+        "tool": "search",
+        "resource": "",
+        "duration_ms": 3,
+        "category": "read",
+    }
+    old = _event("network_denied", **net, reason="no rule") | {"at": now_ts() - 2 * 86_400}
+    _post_events(
+        client,
+        runner,
+        [
+            old,
+            _event("network_denied", **net, reason="no rule"),
+            _event("shell_denied", **shell, reason="outside the workspace"),
+            _event("mcp_call", **mcp, decision="deny"),
+            _event("mcp_call", **mcp, decision="allow"),
+            _event("run_claimed", run_id="run_stranger"),
+        ],
+    )
+
+    summary = client.get("/api/v1/audit/summary").json()
+    rows = _rows(session)
+    assert summary["total"] == len(rows)
+    assert summary["last_seq"] == rows[-1].seq
+    assert summary["events_24h"] == len(rows) - 1
+    assert summary["sources"] == ["api", "runner"]
+    assert summary["denials"] == {"network": 1, "shell": 1, "mcp": 1}
+    assert summary["refused_24h"] == 1
+    assert summary["spool_lag"] is not None and summary["spool_lag"] >= 0
+
+
+def test_an_empty_trail_has_no_spool_lag(client: TestClient) -> None:
+    summary = client.get("/api/v1/audit/summary").json()
+    assert summary == {
+        "total": 0,
+        "last_seq": None,
+        "events_24h": 0,
+        "sources": [],
+        "denials": {"network": 0, "shell": 0, "mcp": 0},
+        "refused_24h": 0,
+        "spool_lag": None,
+    }
 
 
 def test_no_credential_reaches_the_audit_table(
