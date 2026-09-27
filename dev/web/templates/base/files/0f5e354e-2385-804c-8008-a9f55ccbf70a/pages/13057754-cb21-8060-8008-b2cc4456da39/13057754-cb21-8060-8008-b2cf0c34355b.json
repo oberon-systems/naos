@@ -1,0 +1,105 @@
+{
+  "id": "13057754-cb21-8060-8008-b2cf0c34355b",
+  "name": "server alpha",
+  "type": "frame",
+  "x": 2304,
+  "y": 1312,
+  "width": 592,
+  "height": 236,
+  "rotation": 0,
+  "selrect": {
+    "x": 2304,
+    "y": 1312,
+    "width": 592,
+    "height": 236,
+    "x1": 2304,
+    "y1": 1312,
+    "x2": 2896,
+    "y2": 1548
+  },
+  "points": [
+    {
+      "x": 2304,
+      "y": 1312
+    },
+    {
+      "x": 2896,
+      "y": 1312
+    },
+    {
+      "x": 2896,
+      "y": 1548
+    },
+    {
+      "x": 2304,
+      "y": 1548
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "13057754-cb21-8060-8008-b2cf0c582af5",
+  "frameId": "13057754-cb21-8060-8008-b2cf0c582af5",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 12,
+    "p2": 12,
+    "p3": 12,
+    "p4": 12
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 8,
+  "layoutItemHSizing": "fix",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 10,
+    "columnGap": 10
+  },
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
+  "layoutItemVSizing": "auto",
+  "r3": 8,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 8,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [
+    {
+      "strokeStyle": "solid",
+      "strokeColor": "#e4e7ec",
+      "strokeOpacity": 1,
+      "strokeAlignment": "inner",
+      "strokeWidth": 1
+    }
+  ],
+  "proportion": 1,
+  "r4": 8,
+  "fills": [],
+  "shapes": [
+    "13057754-cb21-8060-8008-b2cf0c211c5f",
+    "13057754-cb21-8060-8008-b2cf0b54a624",
+    "13057754-cb21-8060-8008-b2cf0ac9505c",
+    "13057754-cb21-8060-8008-b2cf0a442e70"
+  ]
+}

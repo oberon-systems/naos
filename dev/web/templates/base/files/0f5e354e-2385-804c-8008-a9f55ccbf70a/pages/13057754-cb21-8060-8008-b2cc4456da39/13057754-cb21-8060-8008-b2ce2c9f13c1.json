@@ -1,0 +1,173 @@
+{
+  "id": "13057754-cb21-8060-8008-b2ce2c9f13c1",
+  "name": "note",
+  "type": "text",
+  "x": 5316,
+  "y": 500,
+  "width": 324,
+  "height": 31,
+  "rotation": 0,
+  "selrect": {
+    "x": 5316,
+    "y": 500,
+    "width": 324,
+    "height": 31,
+    "x1": 5316,
+    "y1": 500,
+    "x2": 5640,
+    "y2": 531
+  },
+  "points": [
+    {
+      "x": 5316,
+      "y": 500
+    },
+    {
+      "x": 5640,
+      "y": 500
+    },
+    {
+      "x": 5640,
+      "y": 531
+    },
+    {
+      "x": 5316,
+      "y": 531
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "13057754-cb21-8060-8008-b2ce2cb9e3dc",
+  "frameId": "13057754-cb21-8060-8008-b2ce2cb9e3dc",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-height",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "11",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#98a2b3",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "Names only. Credentials are issued to the runner per Run and never shown here."
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "11",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#98a2b3",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "layoutItemHSizing": "fill",
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "y": 514.5454547405243,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "y1": 0.7272727489471436,
+      "width": 318.6363830566406,
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "x": 5316,
+      "x1": 0,
+      "y2": 14.545454740524292,
+      "fills": [
+        {
+          "fillColor": "#98a2b3",
+          "fillOpacity": 1
+        }
+      ],
+      "x2": 318.6363830566406,
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "height": 13.818181991577148,
+      "text": "Names only. Credentials are issued to the runner per Run and never "
+    },
+    {
+      "y": 529.9431819915771,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "y1": 16.125,
+      "width": 57.681819915771484,
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "x": 5316,
+      "x1": 0,
+      "y2": 29.94318199157715,
+      "fills": [
+        {
+          "fillColor": "#98a2b3",
+          "fillOpacity": 1
+        }
+      ],
+      "x2": 57.681819915771484,
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "height": 13.818181991577148,
+      "text": "shown here."
+    }
+  ]
+}

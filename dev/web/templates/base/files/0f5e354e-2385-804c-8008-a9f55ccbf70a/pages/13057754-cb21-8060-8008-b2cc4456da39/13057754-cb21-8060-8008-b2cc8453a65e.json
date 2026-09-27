@@ -1,0 +1,209 @@
+{
+  "id": "13057754-cb21-8060-8008-b2cc8453a65e",
+  "name": "message",
+  "type": "text",
+  "x": 3064,
+  "y": 1222,
+  "width": 432,
+  "height": 55,
+  "rotation": 0,
+  "selrect": {
+    "x": 3064,
+    "y": 1222,
+    "width": 432,
+    "height": 55,
+    "x1": 3064,
+    "y1": 1222,
+    "x2": 3496,
+    "y2": 1277
+  },
+  "points": [
+    {
+      "x": 3064,
+      "y": 1222
+    },
+    {
+      "x": 3496,
+      "y": 1222
+    },
+    {
+      "x": 3496,
+      "y": 1277
+    },
+    {
+      "x": 3064,
+      "y": 1277
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "13057754-cb21-8060-8008-b2cc8453a658",
+  "frameId": "13057754-cb21-8060-8008-b2cc8453a658",
+  "flipX": null,
+  "flipY": null,
+  "layoutItemAbsolute": false,
+  "growType": "auto-height",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "13",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#344054",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "This document resolves to a policy the API already holds, so nothing new was created. Equivalent documents share one digest and one id; pick that id in a profile."
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "13",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#344054",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "layoutItemHSizing": "fill",
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
+  "layoutItemVSizing": "fix",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "y": 1238.7272734642029,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "y1": 1.454545497894287,
+      "width": 406.6363830566406,
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "x": 3064,
+      "x1": 0,
+      "y2": 16.72727346420288,
+      "fills": [
+        {
+          "fillColor": "#344054",
+          "fillOpacity": 1
+        }
+      ],
+      "x2": 406.6363830566406,
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "height": 15.272727966308594,
+      "text": "This document resolves to a policy the API already holds, so nothing new "
+    },
+    {
+      "y": 1256.9204559326172,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "y1": 19.647727966308594,
+      "width": 424.6591491699219,
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "x": 3064,
+      "x1": 0,
+      "y2": 34.92045593261719,
+      "fills": [
+        {
+          "fillColor": "#344054",
+          "fillOpacity": 1
+        }
+      ],
+      "x2": 424.6591491699219,
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "height": 15.272727966308594,
+      "text": "was created. Equivalent documents share one digest and one id; pick that id "
+    },
+    {
+      "y": 1275.1136436462402,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "y1": 37.840911865234375,
+      "width": 59.7613639831543,
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "x": 3064,
+      "x1": 0,
+      "y2": 53.113643646240234,
+      "fills": [
+        {
+          "fillColor": "#344054",
+          "fillOpacity": 1
+        }
+      ],
+      "x2": 59.7613639831543,
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "height": 15.27273178100586,
+      "text": "in a profile."
+    }
+  ],
+  "strokes": [],
+  "shadow": [],
+  "layoutItemMargin": {
+    "m1": 0,
+    "m2": 0,
+    "m3": 0,
+    "m4": 0
+  },
+  "layoutItemZIndex": 0
+}

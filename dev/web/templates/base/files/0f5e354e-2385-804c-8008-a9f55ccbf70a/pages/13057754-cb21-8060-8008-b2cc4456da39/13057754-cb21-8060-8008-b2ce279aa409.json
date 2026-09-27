@@ -1,0 +1,148 @@
+{
+  "id": "13057754-cb21-8060-8008-b2ce279aa409",
+  "name": "note",
+  "type": "text",
+  "x": 3196,
+  "y": 528,
+  "width": 324,
+  "height": 16,
+  "rotation": 0,
+  "selrect": {
+    "x": 3196,
+    "y": 528,
+    "width": 324,
+    "height": 16,
+    "x1": 3196,
+    "y1": 528,
+    "x2": 3520,
+    "y2": 544
+  },
+  "points": [
+    {
+      "x": 3196,
+      "y": 528
+    },
+    {
+      "x": 3520,
+      "y": 528
+    },
+    {
+      "x": 3520,
+      "y": 544
+    },
+    {
+      "x": 3196,
+      "y": 544
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "13057754-cb21-8060-8008-b2ce27b376d2",
+  "frameId": "13057754-cb21-8060-8008-b2ce27b376d2",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-height",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "11",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#98a2b3",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "The host never receives a write from the guest directly."
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "11",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#98a2b3",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "layoutItemHSizing": "fill",
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "y": 542.5454547405243,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "y1": 0.7272727489471436,
+      "width": 257.6363830566406,
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "x": 3196,
+      "x1": 0,
+      "y2": 14.545454740524292,
+      "fills": [
+        {
+          "fillColor": "#98a2b3",
+          "fillOpacity": 1
+        }
+      ],
+      "x2": 257.6363830566406,
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "height": 13.818181991577148,
+      "text": "The host never receives a write from the guest directly."
+    }
+  ]
+}

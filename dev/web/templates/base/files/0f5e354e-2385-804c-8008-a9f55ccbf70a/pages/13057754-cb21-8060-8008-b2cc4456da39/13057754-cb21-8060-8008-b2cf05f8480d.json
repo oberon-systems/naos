@@ -1,0 +1,172 @@
+{
+  "id": "13057754-cb21-8060-8008-b2cf05f8480d",
+  "name": "Text",
+  "type": "text",
+  "x": 784,
+  "y": 1376,
+  "width": 592,
+  "height": 31,
+  "rotation": 0,
+  "selrect": {
+    "x": 784,
+    "y": 1376,
+    "width": 592,
+    "height": 31,
+    "x1": 784,
+    "y1": 1376,
+    "x2": 1376,
+    "y2": 1407
+  },
+  "points": [
+    {
+      "x": 784,
+      "y": 1376
+    },
+    {
+      "x": 1376,
+      "y": 1376
+    },
+    {
+      "x": 1376,
+      "y": 1407
+    },
+    {
+      "x": 784,
+      "y": 1407
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "13057754-cb21-8060-8008-b2cf06033207",
+  "frameId": "13057754-cb21-8060-8008-b2cf06033207",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-height",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "11",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#98a2b3",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "Mounted at /naos/<last segment of the host path> and used as the workdir. rw writes land on the upper disk and reach the host only through a merge."
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "11",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#98a2b3",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "y": 1390.5454547405243,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "y1": 0.7272727489471436,
+      "width": 577.7159423828125,
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "x": 784,
+      "x1": 0,
+      "y2": 14.545454740524292,
+      "fills": [
+        {
+          "fillColor": "#98a2b3",
+          "fillOpacity": 1
+        }
+      ],
+      "x2": 577.7159423828125,
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "height": 13.818181991577148,
+      "text": "Mounted at /naos/<last segment of the host path> and used as the workdir. rw writes land on the upper disk and reach the "
+    },
+    {
+      "y": 1405.9431819915771,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "y1": 16.125,
+      "width": 126.38636779785156,
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "x": 784,
+      "x1": 0,
+      "y2": 29.94318199157715,
+      "fills": [
+        {
+          "fillColor": "#98a2b3",
+          "fillOpacity": 1
+        }
+      ],
+      "x2": 126.38636779785156,
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "height": 13.818181991577148,
+      "text": "host only through a merge."
+    }
+  ]
+}

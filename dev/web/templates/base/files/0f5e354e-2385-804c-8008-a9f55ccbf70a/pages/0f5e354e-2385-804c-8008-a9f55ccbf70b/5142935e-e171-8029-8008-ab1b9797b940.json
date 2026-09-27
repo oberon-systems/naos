@@ -82,7 +82,7 @@
                 "letterSpacing": "0",
                 "fills": [
                   {
-                    "fillColor": "#344054",
+                    "fillColor": "#98a2b3",
                     "fillOpacity": 1
                   }
                 ],
@@ -105,7 +105,7 @@
                 "letterSpacing": "0",
                 "fills": [
                   {
-                    "fillColor": "#344054",
+                    "fillColor": "#175cd3",
                     "fillOpacity": 1
                   }
                 ],
@@ -127,7 +127,7 @@
             "letterSpacing": "0",
             "fills": [
               {
-                "fillColor": "#344054",
+                "fillColor": "#98a2b3",
                 "fillOpacity": 1
               }
             ],
@@ -139,7 +139,18 @@
   },
   "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
   "constraintsV": "top",
-  "interactions": [],
+  "interactions": [
+    {
+      "eventType": "click",
+      "actionType": "open-overlay",
+      "destination": "5142935e-e171-8029-8008-ab1b2ec55a82",
+      "positionRelativeTo": null,
+      "preserveScroll": false,
+      "overlayPosType": "center",
+      "closeClickOutside": true,
+      "backgroundOverlay": true
+    }
+  ],
   "constraintsH": "left",
   "positionData": [
     {
