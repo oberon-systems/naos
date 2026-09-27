@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 2144,
       "y": 3641.0909111499786,
-      "width": 130.5454559326172,
-      "height": 21.81818389892578,
-      "x1": 0,
-      "y1": -0.7272727489471436,
-      "x2": 130.5454559326172,
-      "y2": 21.090911149978638,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "18px",
       "fontWeight": "700",
+      "y1": -0.7272727489471436,
+      "width": 130.5454559326172,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 2144,
+      "x1": 0,
+      "y2": 21.090911149978638,
       "fills": [
         {
           "fillColor": "#101828",
           "fillOpacity": 1
         }
       ],
+      "x2": 130.5454559326172,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 21.81818389892578,
       "text": "Merge nothing?"
     }
   ]

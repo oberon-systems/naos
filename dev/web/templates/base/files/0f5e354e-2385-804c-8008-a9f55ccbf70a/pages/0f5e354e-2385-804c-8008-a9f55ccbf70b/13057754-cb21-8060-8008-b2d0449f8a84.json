@@ -114,34 +114,34 @@
       }
     ]
   },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 5320,
       "y": 3373.727273464203,
-      "width": 315.6363830566406,
-      "height": 15.272727966308594,
-      "x1": 0,
-      "y1": 1.454545497894287,
-      "x2": 315.6363830566406,
-      "y2": 16.72727346420288,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "600",
+      "y1": 1.454545497894287,
+      "width": 315.6363830566406,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 5320,
+      "x1": 0,
+      "y2": 16.72727346420288,
       "fills": [
         {
           "fillColor": "#101828",
           "fillOpacity": 1
         }
       ],
+      "x2": 315.6363830566406,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 15.272727966308594,
       "text": "Decided by operator 3m ago \u00b7 9 paths \u00b7 take 1 \u00b7 export 1"
     }
-  ],
-  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b"
+  ]
 }

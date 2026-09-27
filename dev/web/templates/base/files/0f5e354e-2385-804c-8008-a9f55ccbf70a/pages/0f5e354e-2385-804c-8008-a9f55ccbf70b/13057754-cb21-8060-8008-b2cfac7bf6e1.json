@@ -115,84 +115,84 @@
     ]
   },
   "layoutItemHSizing": "fill",
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 2256,
       "y": 3025.5454547405243,
-      "width": 376.227294921875,
-      "height": 13.818181991577148,
-      "x1": 0,
-      "y1": 0.7272727489471436,
-      "x2": 376.227294921875,
-      "y2": 14.545454740524292,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 0.7272727489471436,
+      "width": 376.227294921875,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 2256,
+      "x1": 0,
+      "y2": 14.545454740524292,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 376.227294921875,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 13.818181991577148,
       "text": "The base is the host file at collection time; the merge applies only while the host "
     },
     {
-      "x": 2256,
       "y": 3040.943181991577,
-      "width": 363.352294921875,
-      "height": 13.818181991577148,
-      "x1": 0,
-      "y1": 16.125,
-      "x2": 363.352294921875,
-      "y2": 29.94318199157715,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 16.125,
+      "width": 363.352294921875,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 2256,
+      "x1": 0,
+      "y2": 29.94318199157715,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 363.352294921875,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 13.818181991577148,
       "text": "still matches it. Export leaves the host alone and writes the agent's version to "
     },
     {
-      "x": 2256,
       "y": 3056.3409118652344,
-      "width": 69.9772720336914,
-      "height": 13.818183898925781,
-      "x1": 0,
-      "y1": 31.522727966308594,
-      "x2": 69.9772720336914,
-      "y2": 45.340911865234375,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 31.522727966308594,
+      "width": 69.9772720336914,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 2256,
+      "x1": 0,
+      "y2": 45.340911865234375,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 69.9772720336914,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 13.818183898925781,
       "text": "merge/export/."
     }
-  ],
-  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b"
+  ]
 }

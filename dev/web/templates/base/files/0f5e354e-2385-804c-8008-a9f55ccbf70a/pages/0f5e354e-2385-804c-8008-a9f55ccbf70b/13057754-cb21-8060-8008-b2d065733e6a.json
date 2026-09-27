@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 1584,
       "y": 3824.3181822299966,
-      "width": 148.2954559326172,
-      "height": 14.545454978942871,
-      "x1": 0,
-      "y1": -0.7272727489471436,
-      "x2": 148.2954559326172,
-      "y2": 13.818182229995728,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "400",
+      "y1": -0.7272727489471436,
+      "width": 148.2954559326172,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 1584,
+      "x1": 0,
+      "y2": 13.818182229995728,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 148.2954559326172,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 14.545454978942871,
       "text": "the audit keeps who decided"
     }
   ]

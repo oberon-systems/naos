@@ -115,59 +115,59 @@
     ]
   },
   "layoutItemHSizing": "fill",
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 5316,
       "y": 514.5454547405243,
-      "width": 318.6363830566406,
-      "height": 13.818181991577148,
-      "x1": 0,
-      "y1": 0.7272727489471436,
-      "x2": 318.6363830566406,
-      "y2": 14.545454740524292,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 0.7272727489471436,
+      "width": 318.6363830566406,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 5316,
+      "x1": 0,
+      "y2": 14.545454740524292,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 318.6363830566406,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 13.818181991577148,
       "text": "Names only. Credentials are issued to the runner per Run and never "
     },
     {
-      "x": 5316,
       "y": 529.9431819915771,
-      "width": 57.681819915771484,
-      "height": 13.818181991577148,
-      "x1": 0,
-      "y1": 16.125,
-      "x2": 57.681819915771484,
-      "y2": 29.94318199157715,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 16.125,
+      "width": 57.681819915771484,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 5316,
+      "x1": 0,
+      "y2": 29.94318199157715,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 57.681819915771484,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 13.818181991577148,
       "text": "shown here."
     }
-  ],
-  "pageId": "13057754-cb21-8060-8008-b2cc4456da39"
+  ]
 }

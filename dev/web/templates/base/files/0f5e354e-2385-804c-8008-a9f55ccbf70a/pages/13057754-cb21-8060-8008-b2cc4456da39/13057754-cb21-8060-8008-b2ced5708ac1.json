@@ -114,59 +114,59 @@
       }
     ]
   },
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 24,
       "y": 1584.5454547405243,
-      "width": 567.352294921875,
-      "height": 13.818181991577148,
-      "x1": 0,
-      "y1": 0.7272727489471436,
-      "x2": 567.352294921875,
-      "y2": 14.545454740524292,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 0.7272727489471436,
+      "width": 567.352294921875,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 24,
+      "x1": 0,
+      "y2": 14.545454740524292,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 567.352294921875,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 13.818181991577148,
       "text": "A rule sets at least one of protocol, host or ip. Hosts are lowercased and lose a trailing dot; an address goes in ip, never in "
     },
     {
-      "x": 24,
       "y": 1599.9431819915771,
-      "width": 119.2727279663086,
-      "height": 13.818181991577148,
-      "x1": 0,
-      "y1": 16.125,
-      "x2": 119.2727279663086,
-      "y2": 29.94318199157715,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 16.125,
+      "width": 119.2727279663086,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 24,
+      "x1": 0,
+      "y2": 29.94318199157715,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 119.2727279663086,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 13.818181991577148,
       "text": "host; localhost is refused."
     }
-  ],
-  "pageId": "13057754-cb21-8060-8008-b2cc4456da39"
+  ]
 }

@@ -114,59 +114,59 @@
       }
     ]
   },
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 784,
       "y": 1390.5454547405243,
-      "width": 577.7159423828125,
-      "height": 13.818181991577148,
-      "x1": 0,
-      "y1": 0.7272727489471436,
-      "x2": 577.7159423828125,
-      "y2": 14.545454740524292,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 0.7272727489471436,
+      "width": 577.7159423828125,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 784,
+      "x1": 0,
+      "y2": 14.545454740524292,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 577.7159423828125,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 13.818181991577148,
       "text": "Mounted at /naos/<last segment of the host path> and used as the workdir. rw writes land on the upper disk and reach the "
     },
     {
-      "x": 784,
       "y": 1405.9431819915771,
-      "width": 126.38636779785156,
-      "height": 13.818181991577148,
-      "x1": 0,
-      "y1": 16.125,
-      "x2": 126.38636779785156,
-      "y2": 29.94318199157715,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 16.125,
+      "width": 126.38636779785156,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 784,
+      "x1": 0,
+      "y2": 29.94318199157715,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 126.38636779785156,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 13.818181991577148,
       "text": "host only through a merge."
     }
-  ],
-  "pageId": "13057754-cb21-8060-8008-b2cc4456da39"
+  ]
 }

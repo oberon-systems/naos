@@ -122,28 +122,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 24,
       "y": 1181.77272772789,
-      "width": 499.5113830566406,
-      "height": 14.545454978942871,
-      "x1": 0,
-      "y1": 0.7272727489471436,
-      "x2": 499.5113830566406,
-      "y2": 15.272727727890015,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "400",
+      "y1": 0.7272727489471436,
+      "width": 499.5113830566406,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 24,
+      "x1": 0,
+      "y2": 15.272727727890015,
       "fills": [
         {
           "fillColor": "#667085",
           "fillOpacity": 1
         }
       ],
+      "x2": 499.5113830566406,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 14.545454978942871,
       "text": "A policy never changes once created. The same document returns the policy that already holds it."
     }
   ],

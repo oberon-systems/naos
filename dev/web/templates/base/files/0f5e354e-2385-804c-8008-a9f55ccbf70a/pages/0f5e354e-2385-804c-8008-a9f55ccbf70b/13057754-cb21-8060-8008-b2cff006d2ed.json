@@ -114,59 +114,59 @@
       }
     ]
   },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 3496,
       "y": 2957.5454547405243,
-      "width": 332.4432067871094,
-      "height": 13.818181991577148,
-      "x1": 0,
-      "y1": 0.7272727489471436,
-      "x2": 332.4432067871094,
-      "y2": 14.545454740524292,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 0.7272727489471436,
+      "width": 332.4432067871094,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 3496,
+      "x1": 0,
+      "y2": 14.545454740524292,
       "fills": [
         {
           "fillColor": "#667085",
           "fillOpacity": 1
         }
       ],
+      "x2": 332.4432067871094,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 13.818181991577148,
       "text": "Take \u2014 the agent's version is applied; the host's current one moves to "
     },
     {
-      "x": 3496,
       "y": 2972.943181991577,
-      "width": 74.32954406738281,
-      "height": 13.818181991577148,
-      "x1": 0,
-      "y1": 16.125,
-      "x2": 74.32954406738281,
-      "y2": 29.94318199157715,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 16.125,
+      "width": 74.32954406738281,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 3496,
+      "x1": 0,
+      "y2": 29.94318199157715,
       "fills": [
         {
           "fillColor": "#667085",
           "fillOpacity": 1
         }
       ],
+      "x2": 74.32954406738281,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 13.818181991577148,
       "text": "merge/backup/."
     }
-  ],
-  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b"
+  ]
 }

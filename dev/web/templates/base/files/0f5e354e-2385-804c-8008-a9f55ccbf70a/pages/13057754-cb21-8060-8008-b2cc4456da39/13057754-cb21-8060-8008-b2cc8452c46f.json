@@ -122,28 +122,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 2263,
       "y": 44.72727346420288,
-      "width": 81.05682373046875,
-      "height": 15.272727966308594,
-      "x1": 0,
-      "y1": 1.454545497894287,
-      "x2": 81.05682373046875,
-      "y2": 16.72727346420288,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "600",
+      "y1": 1.454545497894287,
+      "width": 81.05682373046875,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 2263,
+      "x1": 0,
+      "y2": 16.72727346420288,
       "fills": [
         {
           "fillColor": "#344054",
           "fillOpacity": 1
         }
       ],
+      "x2": 81.05682373046875,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 15.272727966308594,
       "text": "New from this"
     }
   ],

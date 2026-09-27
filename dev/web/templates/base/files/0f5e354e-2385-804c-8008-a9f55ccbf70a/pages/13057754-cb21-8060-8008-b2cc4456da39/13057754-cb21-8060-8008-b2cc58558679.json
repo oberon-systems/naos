@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 24,
       "y": 37.818182706832886,
-      "width": 38.2613639831543,
-      "height": 21.090909957885742,
-      "x1": 0,
-      "y1": 0.7272727489471436,
-      "x2": 38.2613639831543,
-      "y2": 21.818182706832886,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "17px",
       "fontWeight": "700",
+      "y1": 0.7272727489471436,
+      "width": 38.2613639831543,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 24,
+      "x1": 0,
+      "y2": 21.818182706832886,
       "fills": [
         {
           "fillColor": "#101828",
           "fillOpacity": 1
         }
       ],
+      "x2": 38.2613639831543,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 21.090909957885742,
       "text": "naos"
     }
   ]
