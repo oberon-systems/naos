@@ -247,7 +247,12 @@ document is described in [06](06-network-gate.md), the shell document in
 [07](07-shell-gate.md), the MCP document in [08](08-mcp-gate.md).
 
 `GET /policies` lists every policy newest first; `kind` narrows it to one
-kind. The web form reads it to offer a policy per kind.
+kind, and `q` to the policies whose id or digest holds the substring, ignoring
+case. Each policy, here and in `GET /policies/{policy_id}`, carries
+`profiles`, the ids of the profiles naming it now, and `runs_open` and
+`runs_total`, the Runs whose spec names it that are not terminal and ever.
+`GET /profiles?policy=` and `GET /runs?policy=` list those profiles and Runs.
+The web form reads the list to offer a policy per kind.
 
 ## Profiles
 

@@ -79,8 +79,9 @@ def list_profiles(
     q: Annotated[str | None, Query(max_length=128)] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 100,
     offset: Annotated[int, Query(ge=0)] = 0,
+    policy: str | None = None,
 ) -> list[ProfileRead]:
-    page = profiles.list_profiles(session, q, limit, offset)
+    page = profiles.list_profiles(session, q, limit, offset, policy)
     return [ProfileRead.viewed(view) for view in profiles.view_profiles(session, page, now)]
 
 

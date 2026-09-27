@@ -321,6 +321,46 @@ def test_policies_are_listed_by_kind(
     assert client.get("/api/v1/policies", params={"kind": "disk"}).status_code == 422
 
 
+def test_policies_are_searched_by_id_or_digest(
+    client: TestClient, network_body: dict[str, Any], shell_body: dict[str, Any]
+) -> None:
+    network = client.post("/api/v1/policies", json={"kind": "network", "document": network_body})
+    client.post("/api/v1/policies", json={"kind": "shell", "document": shell_body})
+    found = network.json()
+
+    by_id = client.get("/api/v1/policies", params={"q": found["id"][-8:].upper()}).json()
+    by_digest = client.get("/api/v1/policies", params={"q": found["digest"][:12]}).json()
+
+    assert [row["id"] for row in by_id] == [found["id"]]
+    assert [row["id"] for row in by_digest] == [found["id"]]
+
+
+def test_a_policy_counts_its_profiles_and_runs(
+    client: TestClient, network_body: dict[str, Any], image: dict[str, Any]
+) -> None:
+    policy = client.post(
+        "/api/v1/policies", json={"kind": "network", "document": network_body}
+    ).json()
+    unused = client.post(
+        "/api/v1/policies", json={"kind": "network", "document": {"deny": [{"ip": "192.0.2.10"}]}}
+    ).json()
+    alpha = _create(client, "alpha", {**PROFILE_SPEC, "network": {"policy": policy["id"]}})
+    _create(client, "beta")
+    run = _run(client, alpha["id"], image)
+
+    read = client.get(f"/api/v1/policies/{policy['id']}").json()
+    listed = {row["id"]: row for row in client.get("/api/v1/policies").json()}
+    profiles_of = client.get("/api/v1/profiles", params={"policy": policy["id"]}).json()
+    runs_of = client.get("/api/v1/runs", params={"policy": policy["id"]}).json()
+
+    assert (read["profiles"], read["runs_open"], read["runs_total"]) == ([alpha["id"]], 1, 1)
+    assert listed[unused["id"]]["profiles"] == []
+    assert listed[unused["id"]]["runs_total"] == 0
+    assert [row["id"] for row in profiles_of] == [alpha["id"]]
+    assert [row["id"] for row in runs_of] == [run["id"]]
+    assert client.get("/api/v1/runs", params={"policy": unused["id"]}).json() == []
+
+
 @pytest.mark.parametrize(
     ("method", "path"),
     [

@@ -1,6 +1,6 @@
 from typing import Annotated, Any, Literal, Self
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Query, Response
 from pydantic import BaseModel, Field
 
 from naos_api import policies
@@ -45,16 +45,27 @@ class PolicyRead(BaseModel):
     digest: str
     document: dict[str, Any]
     created_at: int
+    profiles: list[str]
+    runs_open: int
+    runs_total: int
 
     @classmethod
-    def of(cls, policy: Policy) -> Self:
+    def viewed(cls, view: policies.PolicyView) -> Self:
+        policy = view.policy
         return cls(
             id=policy.id,
             kind=policy.kind,
             digest=policy.digest,
             document=policy.document,
             created_at=policy.created_at,
+            profiles=view.profiles,
+            runs_open=view.runs_open,
+            runs_total=view.runs_total,
         )
+
+
+def _read(session: SessionDep, policy: Policy) -> PolicyRead:
+    return PolicyRead.viewed(policies.view_policies(session, [policy])[0])
 
 
 router = APIRouter()
@@ -74,14 +85,19 @@ def create_policy(
         policy, created = policies.create_mcp_policy(session, body.document)
     if not created:
         response.status_code = 200
-    return PolicyRead.of(policy)
+    return _read(session, policy)
 
 
 @router.get("/policies")
-def list_policies(session: SessionDep, kind: PolicyKind | None = None) -> list[PolicyRead]:
-    return [PolicyRead.of(policy) for policy in policies.list_policies(session, kind)]
+def list_policies(
+    session: SessionDep,
+    kind: PolicyKind | None = None,
+    q: Annotated[str | None, Query(max_length=128)] = None,
+) -> list[PolicyRead]:
+    page = policies.list_policies(session, kind, q)
+    return [PolicyRead.viewed(view) for view in policies.view_policies(session, page)]
 
 
 @router.get("/policies/{policy_id}")
 def get_policy(policy_id: str, session: SessionDep) -> PolicyRead:
-    return PolicyRead.of(policies.get_policy(session, policy_id))
+    return _read(session, policies.get_policy(session, policy_id))

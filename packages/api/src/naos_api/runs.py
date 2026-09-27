@@ -18,7 +18,7 @@ from naos_api.errors import (
 from naos_api.images.service import booted_image, check_image
 from naos_api.lifecycle import ACTIVE, TERMINAL, RunStatus, ensure_transition
 from naos_api.models import Lease, Merge, Policy, Profile, Run, Runner
-from naos_api.policies import check_refs
+from naos_api.policies import check_refs, names_policy
 from naos_api.spec import PolicyKind, RunSpec, digest_of
 
 MAX_REASON_LENGTH = 500
@@ -174,6 +174,7 @@ def list_runs(
     runner: str | None = None,
     image: str | None = None,
     profile: str | None = None,
+    policy: str | None = None,
 ) -> Sequence[Run]:
     statement = select(Run)
     if status is not None:
@@ -187,6 +188,8 @@ def list_runs(
         statement = statement.where(booted_image() == image)
     if profile is not None:
         statement = statement.where(col(Run.profile_id) == profile)
+    if policy is not None:
+        statement = statement.where(names_policy(policy))
     statement = statement.order_by(col(Run.seq).desc()).offset(offset).limit(limit)
     return session.exec(statement).all()
 

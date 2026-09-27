@@ -10,7 +10,7 @@ from naos_api.clock import now_ts
 from naos_api.errors import NotFoundError, ProfileBusyError, ProfileConflictError
 from naos_api.lifecycle import TERMINAL, RunStatus
 from naos_api.models import Profile, Run
-from naos_api.policies import check_refs
+from naos_api.policies import check_refs, profiles_naming
 from naos_api.runs import create_run
 from naos_api.spec import ImageRef, ProfileSpec, RunSpec, digest_of
 
@@ -61,9 +61,17 @@ def get_profile(session: Session, profile_id: str) -> Profile:
 
 
 def list_profiles(
-    session: Session, query: str | None = None, limit: int = 100, offset: int = 0
+    session: Session,
+    query: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+    policy: str | None = None,
 ) -> Sequence[Profile]:
     statement = select(Profile)
+    if policy is not None:
+        statement = statement.where(
+            col(Profile.id).in_([profile.id for profile in profiles_naming(session, policy)])
+        )
     if query:
         needle = query.lower()
         statement = statement.where(
