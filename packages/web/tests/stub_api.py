@@ -992,6 +992,71 @@ def get_run(run_id: str) -> Row | JSONResponse:
     return found if found else _missing(f"run {run_id}")
 
 
+def _entry(path: str, change: str, kind: str = "file", **fields: Any) -> Row:
+    return {"path": path, "change": change, "kind": kind} | fields
+
+
+def _sha(head: str, tail: str) -> str:
+    return head + "0" * 56 + tail
+
+
+MERGES: dict[str, Row] = {
+    "run_5be317": {
+        "run_id": "run_5be317",
+        "entries": [
+            _entry(".github/workflows/ci.yml", "modified", size=1331, mode=0o644, sensitive=True),
+            _entry("Makefile", "modified", size=2048, mode=0o644, sensitive=True),
+            _entry("docs/notes.md", "created", size=2150, mode=0o644),
+            _entry("latest", "created", "symlink", target="build/out"),
+            _entry("src/api/__init__.py", "modified", size=212, mode=0o644),
+            _entry(
+                "src/api/handlers.py",
+                "modified",
+                size=4300,
+                mode=0o644,
+                base_mode=0o644,
+                sha256=_sha("e3b7", "41c2"),
+                base_sha256=_sha("9a0d", "77fe"),
+            ),
+            _entry("src/api/legacy.py", "deleted", size=1843),
+            _entry("src/api/routes.py", "renamed", size=3482, **{"from": "src/api/router.py"}),
+            _entry("src/api/util", "created", "dir", mode=0o755),
+            _entry("src/api/util/strings.py", "created", size=640, mode=0o644),
+            _entry("tests/fixtures/sock", "rejected", "other", reason="special file"),
+            _entry("tests/test_handlers.py", "modified", size=5734, mode=0o644),
+        ],
+        "decision": None,
+        "conflicts": None,
+        "report": None,
+        "updated_at": NOW - 240,
+    },
+    "run_0d4492": {
+        "run_id": "run_0d4492",
+        "entries": [
+            _entry("added.txt", "created", size=6, mode=0o644),
+            _entry("notes.txt", "modified", size=5, mode=0o644),
+            _entry("old.txt", "deleted", size=4),
+            _entry("renamed.txt", "renamed", size=14, **{"from": "moved.txt"}),
+        ],
+        "decision": {"paths": ["added.txt", "notes.txt", "old.txt", "renamed.txt"]},
+        "conflicts": None,
+        "report": {
+            "applied": ["added.txt", "notes.txt", "old.txt", "renamed.txt"],
+            "skipped": [],
+            "exported": [],
+            "backed_up": ["notes.txt", "old.txt"],
+        },
+        "updated_at": NOW - 1869,
+    },
+}
+
+
+@stub.get("/api/v1/runs/{run_id}/merge", response_model=None)
+def get_merge(run_id: str) -> Row | JSONResponse:
+    found = MERGES.get(run_id)
+    return found if found else _missing(f"merge of {run_id}")
+
+
 @stub.get("/api/v1/runs/{run_id}/events")
 def run_events(run_id: str) -> list[Row]:
     return RUN_EVENTS if run_id == "run_9f21c4" else []

@@ -1,0 +1,98 @@
+{% from "components.html" import pill with context %}
+{% set base = "/runs/" ~ run.id ~ "/changes" %}
+{% macro entry(row) -%}
+    <span class="changes__change">{{ pill(row.change, row.tone) }}</span>
+    <span class="changes__path">
+        <span class="changes__name">{{ row.path }}</span>
+        {% if row.source %}
+            <span class="changes__from">← <span class="changes__name">{{ row.source }}</span></span>
+        {% endif %}
+    </span>
+    <span class="changes__right">
+        {% if row.sensitive %}{{ pill('sensitive', 'amber') }}{% endif %}
+        <span class="changes__detail">{{ row.detail }}</span>
+    </span>
+{%- endmacro %}
+<div class="run__body run__body--changes">
+    <div class="changes__banner tone-{{ diff.banner.tone }}">
+        <p class="changes__banner-title">{{ diff.banner.title }}</p>
+        <p class="changes__banner-text">{{ diff.banner.text }}</p>
+    </div>
+    <section class="card changes__list">
+        <div class="changes__filters">
+            {% for key, label in change_filters %}
+                {% set href = base ~ ("" if key == "all" else "?change=" ~ key) %}
+                <a class="changes__filter{{ " changes__filter--active" if key == diff.shown }}"
+                   href="{{ href }}"
+                   hx-get="{{ href }}"
+                   hx-target="#overlay">{{ label }} {{ diff.counts[key] }}</a>
+            {% endfor %}
+        </div>
+        <div class="changes__head">
+            <span>CHANGE</span>
+            <span>PATH</span>
+        </div>
+        {% for row in diff.rows %}
+            {% if row.rejected %}
+                <div class="changes__row changes__row--rejected">{{ entry(row) }}</div>
+            {% else %}
+                {% set href = base ~ "?" ~ ("" if diff.shown == "all" else "change=" ~ diff.shown ~ "&") ~ "entry=" ~ row.index %}
+                <a class="changes__row{{ " changes__row--picked" if diff.picked and diff.picked.index == row.index }}"
+                   href="{{ href }}"
+                   hx-get="{{ href }}"
+                   hx-target="#overlay">{{ entry(row) }}</a>
+            {% endif %}
+        {% else %}
+            <p class="changes__empty">No entries.</p>
+        {% endfor %}
+        <p class="changes__footer">{{ list_note }}</p>
+    </section>
+    <div class="run__column">
+        {% if diff.picked %}
+            <section class="card run__card">
+                <div class="run__card-header">
+                    <h3 class="run__card-title">SELECTED ENTRY</h3>
+                </div>
+                <p class="changes__picked">{{ diff.picked.path }}</p>
+                <dl class="run__facts">
+                    <dt>Change</dt>
+                    <dd>
+                        {{ pill(diff.picked.change, diff.picked.tone) }}
+                    </dd>
+                    {% for fact in diff.picked.facts %}
+                        <dt>{{ fact.label }}</dt>
+                        <dd {% if fact.mono %}class="run__mono"{% endif %}>{{ fact.value }}</dd>
+                    {% endfor %}
+                </dl>
+                <p class="changes__note">{{ entry_note }}</p>
+            </section>
+        {% endif %}
+        {% if diff.sensitive %}
+            <section class="card run__card">
+                <div class="run__card-header">
+                    <h3 class="run__card-title">SENSITIVE · {{ diff.sensitive | length }}</h3>
+                </div>
+                <ul class="changes__paths">
+                    {% for path in diff.sensitive %}<li>{{ path }}</li>{% endfor %}
+                </ul>
+                <p class="changes__note">{{ sensitive_note }}</p>
+            </section>
+        {% endif %}
+        {% if diff.rejected %}
+            <section class="card run__card">
+                <div class="run__card-header">
+                    <h3 class="run__card-title">REJECTED · {{ diff.rejected | length }}</h3>
+                </div>
+                <dl class="run__facts changes__rejected">
+                    {% for row in diff.rejected %}
+                        <dt>{{ row.path }}</dt>
+                        <dd>
+                            {{ row.detail }}
+                        </dd>
+                    {% endfor %}
+                </dl>
+                <p class="changes__note">{{ rejected_note }}</p>
+            </section>
+        {% endif %}
+    </div>
+</div>

@@ -60,6 +60,7 @@ class RunDetail:
     images: list[Row]
     profile: Row | None
     runners: dict[str, str]
+    merge: Row | None
 
 
 @dataclass(frozen=True)
@@ -194,6 +195,10 @@ class ApiClient:
     async def run_events(self, run_id: str) -> list[Row]:
         rows: list[Row] = await self._call("GET", f"/runs/{run_id}/events")
         return rows
+
+    async def run_merge(self, run_id: str) -> Row:
+        row: Row = await self._call("GET", f"/runs/{run_id}/merge")
+        return row
 
     async def console_log(self, run_id: str) -> bytes:
         return (await self._request("GET", f"/runs/{run_id}/console")).content
@@ -358,16 +363,21 @@ class ApiClient:
                 return None
             raise
 
+    # Only a Run whose diff was collected has a merge to read.
+    async def _collected(self, run: Row) -> Row | None:
+        return await self.run_merge(run["id"]) if run["merge"] else None
+
     # The policies are the ones the spec names, so the card shows what this Run was given.
     async def run_detail(self, run_id: str) -> RunDetail:
         run = await self.run(run_id)
         spec = run["spec"]
         named = [spec[kind]["policy"] for kind in ("network", "mcp") if spec[kind]["policy"]]
-        events, runners, images, policies = await asyncio.gather(
+        events, runners, images, policies, merge = await asyncio.gather(
             self.run_events(run_id),
             self.runners(),
             self.images(),
             asyncio.gather(*(self.policy(policy_id) for policy_id in named)),
+            self._collected(run),
         )
         profile = await self._source_profile(run.get("profile_id"))
         holder = run["runner"]["id"] if run["runner"] else spec.get("runner")
@@ -379,6 +389,7 @@ class ApiClient:
             images=images,
             profile=profile,
             runners={row["id"]: row["name"] for row in runners},
+            merge=merge,
         )
 
     async def choices(self) -> Choices:

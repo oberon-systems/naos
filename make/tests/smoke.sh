@@ -342,6 +342,24 @@ if missing or probes:
 PY
 }
 
+# The Changes tab of the waiting run: every collected entry, told apart, and no credential.
+check_changes_tab() {
+    curl -fsS "$web/runs/$run/changes" | "$VENV/bin/python" -c '
+import sys
+body = sys.stdin.read()
+wanted = [
+    "run__tab run__tab--active", "Waiting for your decision", "renamed.txt", "moved.txt",
+    ">created</span>", ">modified</span>", ">deleted</span>", ">renamed</span>", ">rejected</span>",
+    "SELECTED ENTRY", "REJECTED",
+]
+missing = [text for text in wanted if text not in body]
+if missing:
+    sys.exit(f"the changes tab is missing {missing}")
+if "Bearer" in body or "Authorization" in body:
+    sys.exit("the changes tab carries the operator credential")
+'
+}
+
 check_merge() {
     local workspace="$TEMP_DIR/workspaces/alpha" kept
     kept="$(echo "$TEMP_DIR"/runs/archive/*/merge)"
@@ -892,6 +910,8 @@ if [ "$(workspace_tree)" != "$tree_before" ]; then
     exit 1
 fi
 check_diff
+echo "reading the diff on the changes tab..."
+check_changes_tab
 echo "editing the host workspace and merging, which conflicts..."
 printf 'local\n' >"$TEMP_DIR/workspaces/alpha/notes.txt"
 decide '{}'

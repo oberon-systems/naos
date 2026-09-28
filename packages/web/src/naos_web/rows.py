@@ -79,7 +79,7 @@ def _action(run: Row) -> Action:
         href=action.href.format(id=run["id"]),
         post=action.post,
         confirm=action.confirm.format(seq=run["seq"]),
-        overlay=action.href == OPEN_ACTION.href,
+        overlay=action.overlay,
     )
 
 

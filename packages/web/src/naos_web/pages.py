@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 from urllib.parse import quote
 
-Tone = Literal["blue", "green", "amber", "red", "grey", "faint"]
+Tone = Literal["blue", "green", "amber", "red", "grey", "faint", "violet"]
 
 
 @dataclass(frozen=True)
@@ -286,16 +286,17 @@ class RowAction:
     href: str
     post: bool = False
     confirm: str = ""
+    overlay: bool = False
 
 
 # Cancel is the one action that changes a Run, so it asks first; the api authorizes it either way.
 ROW_ACTIONS: dict[str, RowAction] = {
     "PENDING": RowAction("Cancel", "/runs/{id}/cancel", post=True, confirm="Cancel run #{seq}?"),
-    "WAITING_MERGE": RowAction("Review", "/runs/{id}"),
-    "COMPLETED": RowAction("Diff", "/runs/{id}"),
+    "WAITING_MERGE": RowAction("Review", "/runs/{id}/changes", overlay=True),
+    "COMPLETED": RowAction("Diff", "/runs/{id}/changes", overlay=True),
     "FAILED": RowAction("Logs", "/runs/{id}/logs"),
 }
-OPEN_ACTION = RowAction("Open", "/runs/{id}")
+OPEN_ACTION = RowAction("Open", "/runs/{id}", overlay=True)
 
 RUN_COLUMNS = ("RUN", "STATUS", "SPEC", "RUNNER", "STARTED", "DURATION", "")
 

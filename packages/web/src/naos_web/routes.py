@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from naos_web import audit as trail
-from naos_web import confirm, events, new_run, profiles, register, terminal
+from naos_web import changes, confirm, events, new_run, profiles, register, terminal
 from naos_web import policies as documents
 from naos_web.client import ApiClient, ApiError, Choices, Dashboard, Row, RunDetail
 from naos_web.clock import NowDep
@@ -69,7 +69,7 @@ from naos_web.rows import (
 )
 
 State = Literal["all", "active", "queued", "waiting_merge", "failed"]
-Tab = Literal["overview", "terminal", "logs"]
+Tab = Literal["overview", "terminal", "logs", "changes"]
 StateQuery = Annotated[State, Query()]
 Fleet = Literal["all", "live", "stale", "revoked"]
 FleetQuery = Annotated[Fleet, Query()]
@@ -416,20 +416,50 @@ def _detail_row(detail: RunDetail, now: int) -> RunDetailRow:
     )
 
 
+def _changes(
+    detail: RunDetail, now: int, shown: changes.Filter, entry: int | None
+) -> changes.Changes | None:
+    if detail.merge is None:
+        return None
+    run = detail.run
+    banner = changes.banner(
+        detail.merge,
+        run["spec"]["merge"]["policy"],
+        run["workspace"] or "",
+        run["runner"]["name"] if run["runner"] else "",
+        now,
+    )
+    return changes.changes(detail.merge, shown, entry, banner)
+
+
 async def _run_panel(
-    request: Request, run_id: str, now: int, tab: Tab, kind: events.Kind = "all"
+    request: Request,
+    run_id: str,
+    now: int,
+    tab: Tab,
+    kind: events.Kind = "all",
+    shown: changes.Filter = "all",
+    entry: int | None = None,
 ) -> HTMLResponse:
     api: ApiClient = request.app.state.api
     try:
         detail = await api.run_detail(run_id)
     except ApiError as err:
         return failed_overlay(request, PAGES["runs"], err)
+    diff = _changes(detail, now, shown, entry)
     return render(
         request,
         PAGES["runs"],
         template="run_overlay.html" if wants_fragment(request) else "run_overlay_page.html",
         run=_detail_row(detail, now),
-        tab=tab,
+        tab="overview" if tab == "changes" and diff is None else tab,
+        diff=diff,
+        diff_total=len(detail.merge["entries"]) if detail.merge else 0,
+        change_filters=changes.FILTERS,
+        list_note=changes.LIST_NOTE,
+        entry_note=changes.ENTRY_NOTE,
+        sensitive_note=changes.SENSITIVE_NOTE,
+        rejected_note=changes.REJECTED_NOTE,
         terminal=terminal_view(request, run_id, detail.run["status"]),
         log_kinds=LOG_KINDS,
         log_kind=kind,
@@ -468,6 +498,17 @@ async def run_logs(
     request: Request, run_id: str, now: NowDep, kind: events.Kind = "all"
 ) -> HTMLResponse:
     return await _run_panel(request, run_id, now, "logs", kind)
+
+
+@router.get("/runs/{run_id}/changes", response_class=HTMLResponse)
+async def run_changes(
+    request: Request,
+    run_id: str,
+    now: NowDep,
+    change: changes.Filter = "all",
+    entry: Annotated[int | None, Query(ge=0)] = None,
+) -> HTMLResponse:
+    return await _run_panel(request, run_id, now, "changes", shown=change, entry=entry)
 
 
 @router.get("/runs/{run_id}/logs/export")

@@ -28,7 +28,7 @@ def test_every_run_row_opens_the_overlay(client: TestClient) -> None:
 
     opened = set(re.findall(r'<tr class="runs-table__row"[^>]*hx-get="/runs/(run_\w+)"', body))
     assert opened == {row["id"] for row in RUNS}
-    assert re.search(r'hx-get="/runs/run_0d4492"\s+hx-target="#overlay">Diff</a>', body)
+    assert re.search(r'hx-get="/runs/run_0d4492/changes"\s+hx-target="#overlay">Diff</a>', body)
     assert 'href="/runs/run_1e0c6b/logs">Logs</a>' in body
 
 
