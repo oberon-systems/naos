@@ -1,11 +1,11 @@
 {% from "components.html" import pill %}
-<div class="run__body run__body--logs">
+<div class="run__body run__body--logs policy__used-body">
     <section class="card run__card">
         <div class="run__card-header">
             <h3 class="run__card-title">PROFILES · {{ used.profiles | length }}</h3>
             <span class="table__secondary">profiles that name this policy now</span>
         </div>
-        <table class="table policy__used">
+        <table class="table policy__used policy__used--profiles">
             <thead>
                 <tr>
                     <th>PROFILE</th>
@@ -20,7 +20,7 @@
                     <tr>
                         <td>
                             <div class="run__strong">{{ profile.name }}</div>
-                            <div class="table__id">{{ profile.short_id }}</div>
+                            <div class="table__id" title="{{ profile.id }}">{{ profile.short_id }}</div>
                         </td>
                         <td class="run__mono">{{ profile.runtime }}</td>
                         <td>{{ pill(profile.merge, profile.merge_tone) }}</td>
@@ -48,7 +48,7 @@
             <h3 class="run__card-title">RUNS · {{ used.runs | length }}</h3>
             <span class="table__secondary">{{ used.opened }} open · {{ used.finished }} finished · a row opens the run</span>
         </div>
-        <table class="table policy__used">
+        <table class="table policy__used policy__used--runs">
             <thead>
                 <tr>
                     <th>RUN</th>
@@ -67,7 +67,7 @@
                         hx-trigger="click, keyup[key=='Enter']">
                         <td>
                             <div class="run__strong">#{{ item.row.seq }}</div>
-                            <div class="table__id">{{ item.row.id }}</div>
+                            <div class="table__id" title="{{ item.row.id }}">{{ item.row.id }}</div>
                         </td>
                         <td>{{ pill(item.row.status, item.row.tone) }}</td>
                         <td>{{ item.profile }}</td>

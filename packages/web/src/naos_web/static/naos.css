@@ -2320,9 +2320,43 @@ body {
   word-break: break-all;
 }
 
+.policy__used-body {
+  align-items: stretch;
+}
+
+.policy__used {
+  table-layout: fixed;
+}
+
 .policy__used td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   vertical-align: middle;
 }
+
+.policy__used .table__id {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.policy__used--profiles th:nth-child(1) { width: 240px; }
+
+.policy__used--profiles th:nth-child(2) { width: 200px; }
+
+.policy__used--profiles th:nth-child(3) { width: 170px; }
+
+.policy__used--profiles th:nth-child(4) { width: 150px; }
+
+.policy__used--profiles td:last-child { text-align: right; }
+
+.policy__used--runs th:nth-child(1) { width: 170px; }
+
+.policy__used--runs th:nth-child(2) { width: 130px; }
+
+.policy__used--runs th:nth-child(3) { width: 130px; }
+
+.policy__used--runs th:nth-child(5) { width: 100px; }
 
 .policy__kinds {
   margin-top: 6px;
