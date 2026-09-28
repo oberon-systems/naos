@@ -3,36 +3,36 @@
   "name": "s",
   "type": "frame",
   "x": 6270,
-  "y": 561.5,
-  "width": 150,
+  "y": 561.5000000000001,
+  "width": 204,
   "height": 17,
   "rotation": 0,
   "selrect": {
     "x": 6270,
-    "y": 561.5,
-    "width": 150,
+    "y": 561.5000000000001,
+    "width": 204,
     "height": 17,
     "x1": 6270,
-    "y1": 561.5,
-    "x2": 6420,
-    "y2": 578.5
+    "y1": 561.5000000000001,
+    "x2": 6474,
+    "y2": 578.5000000000001
   },
   "points": [
     {
       "x": 6270,
-      "y": 561.5
+      "y": 561.5000000000001
     },
     {
-      "x": 6420,
-      "y": 561.5
+      "x": 6474,
+      "y": 561.5000000000001
     },
     {
-      "x": 6420,
-      "y": 578.5
+      "x": 6474,
+      "y": 578.5000000000001
     },
     {
       "x": 6270,
-      "y": 578.5
+      "y": 578.5000000000001
     }
   ],
   "transform": {
@@ -69,14 +69,14 @@
   "layoutAlignItems": "center",
   "layoutPaddingType": "simple",
   "r2": 0,
-  "layoutItemHSizing": "auto",
+  "layoutItemHSizing": "fix",
   "proportionLock": false,
   "layoutGap": {
     "rowGap": 8,
     "columnGap": 8
   },
   "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
-  "layoutItemVSizing": "auto",
+  "layoutItemVSizing": "fix",
   "r3": 0,
   "layoutJustifyContent": "start",
   "constraintsV": "top",
