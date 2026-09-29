@@ -143,53 +143,53 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 3316,
       "y": 254.77272772789001,
-      "width": 118.70455932617188,
-      "height": 14.545454978942871,
-      "x1": 0,
-      "y1": 0.7272727489471436,
-      "x2": 118.70455932617188,
-      "y2": 15.272727727890015,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "500",
+      "y1": 0.7272727489471436,
+      "width": 118.70455932617188,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 3316,
+      "x1": 0,
+      "y2": 15.272727727890015,
       "fills": [
         {
           "fillColor": "#101828",
           "fillOpacity": 1
         }
       ],
+      "x2": 118.70455932617188,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 14.545454978942871,
       "text": "STARTED \u00b7 claimed by "
     },
     {
-      "x": 3434.704559326172,
       "y": 254.77272772789001,
-      "width": 28.795440673828125,
-      "height": 14.545454978942871,
-      "x1": 118.70455932617188,
-      "y1": 0.7272727489471436,
-      "x2": 147.5,
-      "y2": 15.272727727890015,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "500",
+      "y1": 0.7272727489471436,
+      "width": 28.795440673828125,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 3434.704559326172,
+      "x1": 118.70455932617188,
+      "y2": 15.272727727890015,
       "fills": [
         {
           "fillColor": "#175cd3",
           "fillOpacity": 1
         }
       ],
+      "x2": 147.5,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 14.545454978942871,
       "text": "alpha"
     }
   ]

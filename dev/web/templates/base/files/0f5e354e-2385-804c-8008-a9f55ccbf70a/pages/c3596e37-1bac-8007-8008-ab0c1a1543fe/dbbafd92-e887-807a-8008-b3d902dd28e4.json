@@ -96,8 +96,8 @@
       "id": "dbbafd92-e887-807a-8008-b3d902f1c5e1",
       "style": "drop-shadow",
       "color": {
-        "color": "#000000",
-        "opacity": 0.2
+        "opacity": 0.2,
+        "color": "#000000"
       },
       "offsetX": 0,
       "offsetY": 18,

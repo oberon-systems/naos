@@ -120,28 +120,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 3276,
       "y": 311.5,
-      "width": 187.2045440673828,
-      "height": 16,
-      "x1": 0,
-      "y1": 0,
-      "x2": 187.2045440673828,
-      "y2": 16,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "500",
+      "y1": 0,
+      "width": 187.2045440673828,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 3276,
+      "x1": 0,
+      "y2": 16,
       "fills": [
         {
           "fillColor": "#175cd3",
           "fillOpacity": 1
         }
       ],
+      "x2": 187.2045440673828,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
+      "height": 16,
       "text": "naos-ubuntu-24.04 \u00b7 v1.4.2"
     }
   ]

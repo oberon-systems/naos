@@ -166,78 +166,78 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 4080,
       "y": 2695.727273464203,
-      "width": 129.625,
-      "height": 15.272727966308594,
-      "x1": 0,
-      "y1": 1.454545497894287,
-      "x2": 129.625,
-      "y2": 16.72727346420288,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "600",
+      "y1": 1.454545497894287,
+      "width": 129.625,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 4080,
+      "x1": 0,
+      "y2": 16.72727346420288,
       "fills": [
         {
           "fillColor": "#175cd3",
           "fillOpacity": 1
         }
       ],
+      "x2": 129.625,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 15.272727966308594,
       "text": "Decision sent \u00b7 runner "
     },
     {
-      "x": 4209.625,
       "y": 2695.727273464203,
-      "width": 32.034088134765625,
-      "height": 15.272727966308594,
-      "x1": 129.625,
-      "y1": 1.454545497894287,
-      "x2": 161.65908813476562,
-      "y2": 16.72727346420288,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "600",
+      "y1": 1.454545497894287,
+      "width": 32.034088134765625,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 4209.625,
+      "x1": 129.625,
+      "y2": 16.72727346420288,
       "fills": [
         {
           "fillColor": "#175cd3",
           "fillOpacity": 1
         }
       ],
+      "x2": 161.65908813476562,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 15.272727966308594,
       "text": "alpha"
     },
     {
-      "x": 4241.659088134766,
       "y": 2695.727273464203,
-      "width": 75.21591186523438,
-      "height": 15.272727966308594,
-      "x1": 161.65908813476562,
-      "y1": 1.454545497894287,
-      "x2": 236.875,
-      "y2": 16.72727346420288,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "600",
+      "y1": 1.454545497894287,
+      "width": 75.21591186523438,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 4241.659088134766,
+      "x1": 161.65908813476562,
+      "y2": 16.72727346420288,
       "fills": [
         {
           "fillColor": "#175cd3",
           "fillOpacity": 1
         }
       ],
+      "x2": 236.875,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 15.272727966308594,
       "text": " is applying it"
     }
   ]
