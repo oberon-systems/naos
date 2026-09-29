@@ -1,5 +1,43 @@
-{% from "components.html" import pill with context %}
-{% set base = "/runs/" ~ run.id ~ "/changes" %}
+{% from "components.html" import dot, pill with context %}
+{% macro tick(row) -%}
+    {% if diff.live and not row.rejected %}
+        <button class="changes__tick{{ " changes__tick--on" if row.selected }}"
+                type="button"
+                role="checkbox"
+                aria-checked="{{ "true" if row.selected else "false" }}"
+                aria-label="Select {{ row.path }}"
+                hx-get="{{ diff.link(toggle=row.path) }}"
+                hx-include="#merge-state"
+                hx-target="#overlay"></button>
+    {% else %}
+        <span class="changes__tick changes__tick--off{{ " changes__tick--on" if row.selected }}"
+              role="checkbox"
+              aria-checked="{{ "true" if row.selected else "false" }}"
+              aria-disabled="true"></span>
+    {% endif %}
+{%- endmacro %}
+{% macro switch(path, options, current, on) -%}
+    <span class="changes__switch{{ " changes__switch--off" if not on }}"
+          role="radiogroup"
+          aria-label="On merge for {{ path }}">
+        {% for key, label in options %}
+            {% if on %}
+                <button class="changes__option{{ " changes__option--on" if key == current }}"
+                        type="button"
+                        role="radio"
+                        aria-checked="{{ "true" if key == current else "false" }}"
+                        hx-get="{{ diff.link(resolve=path, to=key) }}"
+                        hx-include="#merge-state"
+                        hx-target="#overlay">{{ label }}</button>
+            {% else %}
+                <span class="changes__option{{ " changes__option--on" if key == current }}"
+                      role="radio"
+                      aria-checked="{{ "true" if key == current else "false" }}"
+                      aria-disabled="true">{{ label }}</span>
+            {% endif %}
+        {% endfor %}
+    </span>
+{%- endmacro %}
 {% macro entry(row) -%}
     <span class="changes__change">{{ pill(row.change, row.tone) }}</span>
     <span class="changes__path">
@@ -9,8 +47,14 @@
         {% endif %}
     </span>
     <span class="changes__right">
-        {% if row.sensitive %}{{ pill('sensitive', 'amber') }}{% endif %}
-        <span class="changes__detail">{{ row.detail }}</span>
+        {% if row.outcome %}
+            {{ pill(row.outcome, row.outcome_tone) }}
+        {% elif row.conflict is not none %}
+            {{ pill('conflict', 'red') }}
+        {% else %}
+            {% if row.sensitive %}{{ pill('sensitive', 'amber') }}{% endif %}
+            <span class="changes__detail">{{ row.detail }}</span>
+        {% endif %}
     </span>
 {%- endmacro %}
 <div class="run__body run__body--changes">
@@ -18,29 +62,71 @@
         <p class="changes__banner-title">{{ diff.banner.title }}</p>
         <p class="changes__banner-text">{{ diff.banner.text }}</p>
     </div>
+    {% if diff.live %}
+        <form id="merge-state" hidden>
+            <input type="hidden" name="touched" value="1">
+            {% for name, value in diff.selection.fields() %}
+                <input type="hidden" name="{{ name }}" value="{{ value }}">
+            {% endfor %}
+        </form>
+    {% endif %}
     <section class="card changes__list">
         <div class="changes__filters">
-            {% for key, label in change_filters %}
-                {% set href = base ~ ("" if key == "all" else "?change=" ~ key) %}
+            {% for key, label in diff.filters %}
+                {% set href = diff.link(change=key) %}
                 <a class="changes__filter{{ " changes__filter--active" if key == diff.shown }}"
                    href="{{ href }}"
                    hx-get="{{ href }}"
+                   {% if diff.live %}hx-include="#merge-state"{% endif %}
                    hx-target="#overlay">{{ label }} {{ diff.counts[key] }}</a>
             {% endfor %}
+            {% if diff.live %}
+                <span class="changes__bulk">
+                    <button class="changes__link"
+                            type="button"
+                            hx-get="{{ diff.link(select='all') }}"
+                            hx-include="#merge-state"
+                            hx-target="#overlay">Select all</button>
+                    <button class="changes__link"
+                            type="button"
+                            hx-get="{{ diff.link(select='none') }}"
+                            hx-include="#merge-state"
+                            hx-target="#overlay">Clear</button>
+                </span>
+            {% elif diff.state == "sent" %}
+                <span class="changes__bulk">
+                    <span class="changes__link changes__link--off">Select all</span>
+                    <span class="changes__link changes__link--off">Clear</span>
+                </span>
+            {% endif %}
         </div>
-        <div class="changes__head">
+        {% set plain = diff.state == "merged" %}
+        <div class="changes__head{{ " changes__head--plain" if plain }}">
             <span>CHANGE</span>
             <span>PATH</span>
         </div>
         {% for row in diff.rows %}
-            {% if row.rejected %}
-                <div class="changes__row changes__row--rejected">{{ entry(row) }}</div>
+            {% if plain %}
+                <div class="changes__row changes__row--plain{{ " changes__row--rejected" if row.rejected }}">
+                    <span class="changes__pick">{{ entry(row) }}</span>
+                </div>
             {% else %}
-                {% set href = base ~ "?" ~ ("" if diff.shown == "all" else "change=" ~ diff.shown ~ "&") ~ "entry=" ~ row.index %}
-                <a class="changes__row{{ " changes__row--picked" if diff.picked and diff.picked.index == row.index }}"
-                   href="{{ href }}"
-                   hx-get="{{ href }}"
-                   hx-target="#overlay">{{ entry(row) }}</a>
+                <div class="changes__row{{ " changes__row--picked" if diff.focus == row.index }}{{ " changes__row--conflict" if row.conflict is not none }}{{ " changes__row--rejected" if row.rejected }}">
+                    {{ tick(row) }}
+                    {% if row.rejected %}
+                        <span class="changes__pick">{{ entry(row) }}</span>
+                    {% else %}
+                        {% set href = diff.link(entry=row.index) %}
+                        <a class="changes__pick"
+                           href="{{ href }}"
+                           hx-get="{{ href }}"
+                           {% if diff.live %}hx-include="#merge-state"{% endif %}
+                           hx-target="#overlay">{{ entry(row) }}</a>
+                    {% endif %}
+                    {% if row.conflict is not none %}
+                        {{ switch(row.path, on_conflict, row.resolution, row.selected) }}
+                    {% endif %}
+                </div>
             {% endif %}
         {% else %}
             <p class="changes__empty">No entries.</p>
@@ -49,11 +135,12 @@
     </section>
     <div class="run__column">
         {% if diff.picked %}
+            {% set path = diff.picked.path %}
             <section class="card run__card">
                 <div class="run__card-header">
                     <h3 class="run__card-title">SELECTED ENTRY</h3>
                 </div>
-                <p class="changes__picked">{{ diff.picked.path }}</p>
+                <p class="changes__picked">{{ path }}</p>
                 <dl class="run__facts">
                     <dt>Change</dt>
                     <dd>
@@ -63,22 +150,62 @@
                         <dt>{{ fact.label }}</dt>
                         <dd {% if fact.mono %}class="run__mono"{% endif %}>{{ fact.value }}</dd>
                     {% endfor %}
+                    <dt>On merge</dt>
+                    <dd>
+                        {{ switch(path, on_merge, diff.selection.resolutions.get(path, "apply"), diff.live and path in diff.selection.paths) }}
+                    </dd>
                 </dl>
                 <p class="changes__note">{{ entry_note }}</p>
             </section>
         {% endif %}
-        {% if diff.sensitive %}
+        {% if diff.conflict %}
+            {% set conflict = diff.conflict %}
             <section class="card run__card">
                 <div class="run__card-header">
-                    <h3 class="run__card-title">SENSITIVE · {{ diff.sensitive | length }}</h3>
+                    <h3 class="run__card-title">CONFLICT · {{ conflict.position }} OF {{ conflict.total }}</h3>
+                </div>
+                <p class="changes__picked">{{ conflict.path }}</p>
+                <dl class="run__facts">
+                    <dt>Reason</dt>
+                    <dd class="changes__reason">
+                        {{ conflict.reason }}
+                    </dd>
+                    {% for fact in conflict.facts %}
+                        <dt>{{ fact.label }}</dt>
+                        <dd {% if fact.mono %}class="run__mono"{% endif %}>{{ fact.value }}</dd>
+                    {% endfor %}
+                    <dt>Resolution</dt>
+                    <dd>
+                        {{ switch(conflict.path, on_conflict, conflict.resolution, conflict.path in diff.selection.paths) }}
+                    </dd>
+                </dl>
+                <ul class="changes__notes">
+                    {% for note in conflict_notes %}<li>{{ note }}</li>{% endfor %}
+                </ul>
+            </section>
+        {% endif %}
+        {% if diff.sensitive and not plain %}
+            <section class="card run__card">
+                <div class="run__card-header">
+                    <h3 class="run__card-title">
+                        {% if diff.sensitive_left %}
+                            SENSITIVE · {{ diff.sensitive_left }} LEFT OUT
+                        {% else %}
+                            SENSITIVE · {{ diff.sensitive | length }}
+                        {% endif %}
+                    </h3>
                 </div>
                 <ul class="changes__paths">
-                    {% for path in diff.sensitive %}<li>{{ path }}</li>{% endfor %}
+                    {% for row in diff.sensitive %}
+                        <li>
+                            {{ tick(row) }}<span class="changes__name">{{ row.path }}</span>
+                        </li>
+                    {% endfor %}
                 </ul>
                 <p class="changes__note">{{ sensitive_note }}</p>
             </section>
         {% endif %}
-        {% if diff.rejected %}
+        {% if diff.rejected and not plain %}
             <section class="card run__card">
                 <div class="run__card-header">
                     <h3 class="run__card-title">REJECTED · {{ diff.rejected | length }}</h3>
@@ -94,5 +221,80 @@
                 <p class="changes__note">{{ rejected_note }}</p>
             </section>
         {% endif %}
+        {% if diff.report %}
+            <section class="card run__card">
+                <div class="run__card-header">
+                    <h3 class="run__card-title">REPORT</h3>
+                </div>
+                <dl class="run__facts">
+                    {% for fact in diff.report %}
+                        <dt>{{ fact.label }}</dt>
+                        <dd>
+                            {{ fact.value }}
+                        </dd>
+                    {% endfor %}
+                </dl>
+                <p class="changes__note">{{ report_note }}</p>
+            </section>
+        {% endif %}
+        {% if diff.where %}
+            <section class="card run__card">
+                <div class="run__card-header">
+                    <h3 class="run__card-title">WHERE THINGS WENT</h3>
+                </div>
+                <dl class="run__facts">
+                    <dt>Backup</dt>
+                    <dd class="run__mono">
+                        merge/backup/
+                    </dd>
+                    <dt>Export</dt>
+                    <dd class="run__mono">
+                        merge/export/
+                    </dd>
+                    <dt>Runner</dt>
+                    <dd class="run__mono">
+                        {% if diff.where.runner_id %}
+                            <a class="changes__runner"
+                               href="/runners/{{ diff.where.runner_id }}"
+                               hx-get="/runners/{{ diff.where.runner_id }}"
+                               hx-target="#overlay">{{ diff.where.runner }}</a>
+                        {% else %}
+                            {{ diff.where.runner }}
+                        {% endif %}
+                        · {{ diff.where.archive }}
+                    </dd>
+                </dl>
+                <p class="changes__note">{{ where_note }}</p>
+            </section>
+        {% endif %}
     </div>
+    {% set bar = diff.bar %}
+    <section class="card changes__bar"
+             {% if diff.state == "sent" %}hx-get="{{ diff.link() }}" hx-trigger="every 2s" hx-target="#overlay"{% endif %}>
+        <div>
+            <p class="changes__bar-title">{{ bar.title }}</p>
+            <p class="changes__bar-text">{{ bar.text }}</p>
+            {% if diff.error %}<p class="changes__bar-error" role="alert">{{ diff.error }}</p>{% endif %}
+        </div>
+        {% if bar.action in ("merge", "again") %}
+            {% set query = diff.selection.query() %}
+            <div class="changes__bar-actions">
+                <a class="button button--outline-danger"
+                   href="/runs/{{ run.id }}/merge/reject?{{ query }}"
+                   hx-get="/runs/{{ run.id }}/merge/reject?{{ query }}"
+                   hx-target="#overlay">Merge nothing</a>
+                {% set label = "Send decision again" if bar.action == "again" else "Merge " ~ bar.count ~ (" path" if bar.count == 1 else " paths") %}
+                {% if bar.ready %}
+                    <a class="button"
+                       href="/runs/{{ run.id }}/merge?{{ query }}"
+                       hx-get="/runs/{{ run.id }}/merge?{{ query }}"
+                       hx-target="#overlay">{{ label }}</a>
+                {% else %}
+                    <button class="button" type="button" disabled>{{ label }}</button>
+                {% endif %}
+            </div>
+        {% elif bar.action == "applying" %}
+            <span class="changes__applying">{{ dot("blue", small=true) }} Applying on {{ run.runner }}</span>
+        {% endif %}
+    </section>
 </div>

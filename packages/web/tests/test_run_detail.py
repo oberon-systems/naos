@@ -127,7 +127,7 @@ def test_the_stop_confirm_asks_before_it_posts(client: TestClient) -> None:
     assert "Stop run?</h2>" in body
     assert f"Are you sure you want to stop {STARTED}?" in body
     assert f'hx-post="/runs/{STARTED}/stop"' in body
-    assert 'class="button button--danger" type="submit">Yes' in body
+    assert re.search(r'class="button button--danger"\s+type="submit">Yes', body)
     assert f'href="/runs/{STARTED}"' in body
     assert ">No</a>" in body
 

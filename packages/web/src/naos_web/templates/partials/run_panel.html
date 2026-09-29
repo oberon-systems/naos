@@ -56,7 +56,7 @@
             <a class="run__tab{{ " run__tab--active" if tab == "changes" }}"
                href="/runs/{{ run.id }}/changes"
                hx-get="/runs/{{ run.id }}/changes"
-               hx-target="#overlay">Changes · {{ diff_total }}</a>
+               hx-target="#overlay">{{ diff.label }}</a>
         {% endif %}
     </nav>
     {% if tab == "terminal" %}

@@ -1,6 +1,7 @@
 import asyncio
 import json
 from dataclasses import replace
+from http import HTTPStatus
 from typing import Annotated, Literal
 from urllib.parse import parse_qsl, urlsplit
 from uuid import uuid4
@@ -416,20 +417,36 @@ def _detail_row(detail: RunDetail, now: int) -> RunDetailRow:
     )
 
 
+def _merge_context(detail: RunDetail, now: int) -> changes.Context:
+    run = detail.run
+    decided = [row for row in detail.events if row["event"] == "merge_decided"]
+    vms = [row["vm_id"] for row in detail.events if row.get("vm_id")]
+    return changes.Context(
+        run_id=run["id"],
+        workspace=run["workspace"] or "",
+        runner=run["runner"]["name"] if run["runner"] else "",
+        runner_id=run["runner"]["id"] if run["runner"] else None,
+        vm_id=vms[-1] if vms else None,
+        decided=decided[-1] if decided else None,
+        now=now,
+    )
+
+
 def _changes(
-    detail: RunDetail, now: int, shown: changes.Filter, entry: int | None
+    detail: RunDetail,
+    now: int,
+    shown: changes.Filter,
+    entry: int | None,
+    ask: changes.Asked | None = None,
+    error: str | None = None,
 ) -> changes.Changes | None:
     if detail.merge is None:
         return None
-    run = detail.run
+    ctx = _merge_context(detail, now)
     banner = changes.banner(
-        detail.merge,
-        run["spec"]["merge"]["policy"],
-        run["workspace"] or "",
-        run["runner"]["name"] if run["runner"] else "",
-        now,
+        detail.merge, detail.run["spec"]["merge"]["policy"], ctx.workspace, ctx.runner, now
     )
-    return changes.changes(detail.merge, shown, entry, banner)
+    return changes.changes(detail.merge, shown, entry, banner, ctx, ask, error)
 
 
 async def _run_panel(
@@ -440,13 +457,15 @@ async def _run_panel(
     kind: events.Kind = "all",
     shown: changes.Filter = "all",
     entry: int | None = None,
+    ask: changes.Asked | None = None,
+    error: str | None = None,
 ) -> HTMLResponse:
     api: ApiClient = request.app.state.api
     try:
         detail = await api.run_detail(run_id)
     except ApiError as err:
         return failed_overlay(request, PAGES["runs"], err)
-    diff = _changes(detail, now, shown, entry)
+    diff = _changes(detail, now, shown, entry, ask, error)
     return render(
         request,
         PAGES["runs"],
@@ -454,8 +473,11 @@ async def _run_panel(
         run=_detail_row(detail, now),
         tab="overview" if tab == "changes" and diff is None else tab,
         diff=diff,
-        diff_total=len(detail.merge["entries"]) if detail.merge else 0,
-        change_filters=changes.FILTERS,
+        on_merge=changes.ON_MERGE,
+        on_conflict=changes.ON_CONFLICT,
+        conflict_notes=changes.CONFLICT_NOTES,
+        report_note=changes.REPORT_NOTE,
+        where_note=changes.WHERE_NOTE,
         list_note=changes.LIST_NOTE,
         entry_note=changes.ENTRY_NOTE,
         sensitive_note=changes.SENSITIVE_NOTE,
@@ -508,7 +530,79 @@ async def run_changes(
     change: changes.Filter = "all",
     entry: Annotated[int | None, Query(ge=0)] = None,
 ) -> HTMLResponse:
-    return await _run_panel(request, run_id, now, "changes", shown=change, entry=entry)
+    ask = changes.asked(request.query_params.multi_items())
+    return await _run_panel(request, run_id, now, "changes", shown=change, entry=entry, ask=ask)
+
+
+async def _merge_confirm(request: Request, run_id: str, now: int, nothing: bool) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        detail = await api.run_detail(run_id)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["runs"], err)
+    if detail.merge is None:
+        return await _run_panel(request, run_id, now, "changes")
+    ask = changes.asked(request.query_params.multi_items())
+    chosen = changes.selection(detail.merge, ask)
+    ctx = _merge_context(detail, now)
+    back = f"/runs/{run_id}/changes?{chosen.query()}"
+    asked = (
+        confirm.merge_nothing(run_id, ctx.workspace, detail.merge, back)
+        if nothing
+        else confirm.merge(run_id, ctx.workspace, detail.merge, chosen, back)
+    )
+    return render(
+        request,
+        PAGES["runs"],
+        template="run_confirm_overlay.html" if wants_fragment(request) else "run_confirm_page.html",
+        run=_detail_row(detail, now),
+        confirm=asked,
+    )
+
+
+@router.get("/runs/{run_id}/merge", response_class=HTMLResponse)
+async def merge_confirm(request: Request, run_id: str, now: NowDep) -> HTMLResponse:
+    return await _merge_confirm(request, run_id, now, nothing=False)
+
+
+@router.get("/runs/{run_id}/merge/reject", response_class=HTMLResponse)
+async def reject_confirm(request: Request, run_id: str, now: NowDep) -> HTMLResponse:
+    return await _merge_confirm(request, run_id, now, nothing=True)
+
+
+# A refused selection comes back with the api's words; a stale one reloads the tab as it is now.
+async def _decided(
+    request: Request, run_id: str, now: int, ask: changes.Asked, err: ApiError | None
+) -> Response:
+    if err is not None and err.status == HTTPStatus.UNPROCESSABLE_ENTITY:
+        return await _run_panel(request, run_id, now, "changes", ask=ask, error=str(err))
+    if err is not None and err.status != HTTPStatus.CONFLICT:
+        return failed_overlay(request, PAGES["runs"], err)
+    if wants_fragment(request):
+        return await _run_panel(request, run_id, now, "changes")
+    return RedirectResponse(f"/runs/{run_id}/changes", status_code=303)
+
+
+@router.post("/runs/{run_id}/merge", response_class=HTMLResponse)
+async def merge_run(request: Request, run_id: str, now: NowDep) -> Response:
+    api: ApiClient = request.app.state.api
+    body = (await request.body()).decode()
+    ask = replace(changes.asked(parse_qsl(body, keep_blank_values=True)), touched=True)
+    try:
+        await api.decide_merge(run_id, list(ask.paths), dict(ask.resolutions))
+    except ApiError as err:
+        return await _decided(request, run_id, now, ask, err)
+    return await _decided(request, run_id, now, ask, None)
+
+
+@router.post("/runs/{run_id}/merge/reject", response_class=HTMLResponse)
+async def reject_run(request: Request, run_id: str, now: NowDep) -> Response:
+    api: ApiClient = request.app.state.api
+    try:
+        await api.reject_merge(run_id)
+    except ApiError as err:
+        return await _decided(request, run_id, now, changes.Asked(), err)
+    return await _decided(request, run_id, now, changes.Asked(), None)
 
 
 @router.get("/runs/{run_id}/logs/export")

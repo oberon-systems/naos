@@ -79,7 +79,8 @@ def test_the_selected_entry_shows_only_its_own_fields(client: TestClient) -> Non
 
     assert _card(body, "SELECTED ENTRY").startswith(
         "SELECTED ENTRY src/api/handlers.py Change modified Kind file Size 4.2 KiB "
-        "Mode 0644 · base 0644 sha256 e3b7\u202641c2 Base sha256 9a0d\u202677fe The base is"
+        "Mode 0644 · base 0644 sha256 e3b7\u202641c2 Base sha256 9a0d\u202677fe "
+        "On merge Apply Skip Export The base is"
     )
     assert "changes__row changes__row--picked" in body
     link = _card(client.get(f"/runs/{WAITING}/changes?entry=3", headers=HX).text, "SELECTED")
@@ -94,7 +95,7 @@ def test_a_rejected_entry_cannot_be_picked(client: TestClient) -> None:
     assert "entry=10" not in body
     assert _card(body, "REJECTED · 1").startswith("REJECTED · 1 tests/fixtures/sock special file")
     assert _card(body, "SENSITIVE · 2").startswith(
-        "SENSITIVE · 2 .github/workflows/ci.yml Makefile"
+        "SENSITIVE · 2 LEFT OUT .github/workflows/ci.yml Makefile"
     )
 
 

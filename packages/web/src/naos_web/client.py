@@ -200,6 +200,15 @@ class ApiClient:
         row: Row = await self._call("GET", f"/runs/{run_id}/merge")
         return row
 
+    async def decide_merge(self, run_id: str, paths: list[str], resolutions: dict[str, str]) -> Row:
+        body = {"paths": paths, "resolutions": resolutions}
+        row: Row = await self._call("POST", f"/runs/{run_id}/merge", json=body)
+        return row
+
+    async def reject_merge(self, run_id: str) -> Row:
+        row: Row = await self._call("POST", f"/runs/{run_id}/merge/reject")
+        return row
+
     async def console_log(self, run_id: str) -> bytes:
         return (await self._request("GET", f"/runs/{run_id}/console")).content
 

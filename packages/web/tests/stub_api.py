@@ -1057,9 +1057,53 @@ def get_merge(run_id: str) -> Row | JSONResponse:
     return found if found else _missing(f"merge of {run_id}")
 
 
+def _refused(detail: str, code: int) -> JSONResponse:
+    return JSONResponse({"detail": detail}, status_code=code)
+
+
+# The api's own checks, in its order: a pending decision, then a path outside the diff.
+@stub.post("/api/v1/runs/{run_id}/merge", response_model=None)
+def decide_merge(run_id: str, body: Row) -> Row | JSONResponse:
+    WRITES.append(("POST", f"/runs/{run_id}/merge", body, None))
+    merge = MERGES.get(run_id)
+    if merge is None:
+        return _missing(f"merge of {run_id}")
+    if merge["decision"] is not None or merge["report"] is not None:
+        return _refused(f"run {run_id} already has a merge decision pending", 409)
+    live = {entry["path"] for entry in merge["entries"] if entry["change"] != "rejected"}
+    unknown = sorted((set(body["paths"]) | set(body["resolutions"])) - live)
+    if unknown:
+        return _refused(f"{unknown[0]} is not a mergeable path of the diff", 422)
+    merge["decision"] = {"paths": sorted(body["paths"]), "resolutions": body["resolutions"]}
+    merge["conflicts"], merge["updated_at"] = None, NOW
+    return merge
+
+
+@stub.post("/api/v1/runs/{run_id}/merge/reject", response_model=None)
+def reject_merge(run_id: str) -> Row | JSONResponse:
+    WRITES.append(("POST", f"/runs/{run_id}/merge/reject", {}, None))
+    merge = MERGES.get(run_id)
+    if merge is None:
+        return _missing(f"merge of {run_id}")
+    if merge["decision"] is not None or merge["report"] is not None:
+        return _refused(f"run {run_id} already has a merge decision pending", 409)
+    merge["decision"] = {"paths": [], "resolutions": {}}
+    merge["conflicts"], merge["updated_at"] = None, NOW
+    return merge
+
+
+# The merged run keeps who decided and the VM its archive is named after.
+MERGE_EVENTS: dict[str, list[Row]] = {
+    "run_0d4492": [
+        _runner(1, NOW - 2270, "vm_created", {}, vm_id="vm_3f0a"),
+        _event(2, NOW - 1980, "merge_decided", {"paths": 4, "resolutions": 0}, actor="operator"),
+    ],
+}
+
+
 @stub.get("/api/v1/runs/{run_id}/events")
 def run_events(run_id: str) -> list[Row]:
-    return RUN_EVENTS if run_id == "run_9f21c4" else []
+    return RUN_EVENTS if run_id == "run_9f21c4" else MERGE_EVENTS.get(run_id, [])
 
 
 CONSOLE = b"login: naos\r\n$ pytest -q\r\n"

@@ -75,14 +75,27 @@ merge_state() {
     curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/merge"
 }
 
-# Selects every mergeable path of the collected diff, with the given resolutions.
+# Selects every mergeable path with the given resolutions, the way the operator does: through
+# the web's confirm, then posting the form it renders.
 decide() {
     merge_state | "$VENV/bin/python" -c '
-import json, sys
+import html, json, re, sys
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
+web, run = sys.argv[2], sys.argv[3]
 entries = json.load(sys.stdin)["entries"]
 paths = sorted({entry["path"] for entry in entries if entry["change"] != "rejected"})
-print(json.dumps({"paths": paths, "resolutions": json.loads(sys.argv[1])}))
-' "$1" | curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/merge" -o /dev/null -d @-
+chosen = [(kind, path) for path, kind in json.loads(sys.argv[1]).items()]
+query = urlencode([("touched", "1")] + [("path", path) for path in paths] + chosen)
+page = urlopen(f"{web}/runs/{run}/merge?{query}").read().decode()
+if "the audit keeps who decided" not in page:
+    sys.exit("the merge confirm is missing")
+fields = re.findall(r"<input type=\"hidden\" name=\"([^\"]+)\" value=\"([^\"]*)\">", page)
+body = urlencode([(name, html.unescape(value)) for name, value in fields]).encode()
+answer = urlopen(Request(f"{web}/runs/{run}/merge", data=body)).read().decode()
+if "role=\"alert\"" in answer:
+    sys.exit("the web refused the merge decision")
+' "$1" "$web" "$run"
 }
 
 conflicted() {
@@ -358,6 +371,21 @@ if missing:
 if "Bearer" in body or "Authorization" in body:
     sys.exit("the changes tab carries the operator credential")
 '
+}
+
+# The Changes tab after a decision: the conflict waiting for its resolution, then the report.
+check_merge_tab() {
+    curl -fsS "$web/runs/$run/changes" | "$VENV/bin/python" -c '
+import sys
+body = sys.stdin.read()
+wanted = {
+    "conflicts": ["1 conflict · nothing was written", "CONFLICT · 1 OF 1", "Send decision again"],
+    "merged": ["Changes · merged", "REPORT", "WHERE THINGS WENT", "Decided by operator"],
+}[sys.argv[1]]
+missing = [text for text in wanted if text not in body]
+if missing:
+    sys.exit(f"the changes tab is missing {missing}")
+' "$1"
 }
 
 check_merge() {
@@ -916,10 +944,12 @@ echo "editing the host workspace and merging, which conflicts..."
 printf 'local\n' >"$TEMP_DIR/workspaces/alpha/notes.txt"
 decide '{}'
 wait_for 60 conflicted
+check_merge_tab conflicts
 [ ! -e "$TEMP_DIR/workspaces/alpha/added.txt" ] || fail "a conflicted merge wrote to the workspace"
 echo "taking the agent's version of notes.txt..."
 decide '{"notes.txt": "take"}'
 wait_for 120 completed
+check_merge_tab merged
 check_run_view COMPLETED finished
 check_summary COMPLETED 0
 check_merge

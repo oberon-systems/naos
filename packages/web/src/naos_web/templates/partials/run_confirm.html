@@ -16,6 +16,7 @@
           hx-post="{{ confirm.action }}"
           hx-target="#overlay">
         {% if confirm.key %}<input type="hidden" name="key" value="{{ confirm.key }}">{% endif %}
+        {% for name, value in confirm.fields %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
         <div class="dialog__body">
             <p class="confirm__question">{{ confirm.question }}</p>
             {% if confirm.note %}<p class="confirm__note">{{ confirm.note }}</p>{% endif %}
@@ -30,7 +31,8 @@
             <span class="table__secondary">{{ confirm.footer }}</span>
             <div class="dialog__actions">
                 {{ closer(confirm.back, get=confirm.back, label="No", klass="button button--secondary") }}
-                <button class="button{{ " button--danger" if confirm.danger }}" type="submit">Yes</button>
+                <button class="button{{ " button--danger" if confirm.danger }}"
+                        type="submit">{{ confirm.button }}</button>
             </div>
         </div>
     </form>

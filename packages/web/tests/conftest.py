@@ -13,16 +13,18 @@ from naos_web.clock import get_now
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from stub_api import NOW, RUNNERS, RUNS, stub  # noqa: E402
+from stub_api import MERGES, NOW, RUNNERS, RUNS, stub  # noqa: E402
 
 
 # The stub's writes edit its rows in place; each test starts from the rows the board draws.
 @pytest.fixture(autouse=True)
 def fresh_runs() -> Iterator[None]:
-    saved, runners = copy.deepcopy(RUNS), copy.deepcopy(RUNNERS)
+    saved, runners, merges = copy.deepcopy(RUNS), copy.deepcopy(RUNNERS), copy.deepcopy(MERGES)
     yield
     RUNS[:] = saved
     RUNNERS[:] = runners
+    MERGES.clear()
+    MERGES.update(merges)
 
 
 @pytest.fixture
