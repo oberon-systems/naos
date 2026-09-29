@@ -30,9 +30,10 @@ Order:
 15. `10o-web-mcp.md` — MCP registry and live MCP policy change.
 16. `10p-web-models.md` — Model policies and the Run's token budget.
 17. `10q-web-secrets.md` — Secrets: list, usage, create, rotate, expiry, delete.
-
-Not covered, because no board exists yet: per-gate event screens. Draw the
-board first.
+18. `10r-web-gate-network.md` — Gates tab of a Run: network events.
+19. `10s-web-gate-shell.md` — Gates tab: shell events.
+20. `10t-web-gate-mcp.md` — Gates tab: MCP calls and secret reads.
+21. `10u-web-gate-model.md` — Gates tab: model calls and token budget.
 
 The UI is never an authorization boundary. Every action goes through API
 authorization. Dangerous actions require confirmation. Never display secrets.
