@@ -4,6 +4,9 @@ PROJECT := naos
 VENV    := .venv
 PIP     := $(VENV)/bin/pip
 
+# lint reads NUL-separated names with `read -d`, which dash's read lacks.
+SHELL := /bin/bash
+
 # Hook environments live in the repository, not in ~/.cache/pre-commit.
 export PRE_COMMIT_HOME := $(CURDIR)/.pre-commit
 
@@ -33,8 +36,12 @@ test test-api test-image test-web smoke:
 
 
 # linters
+# --all-files sees only what git tracks; this adds untracked files not ignored
+# and drops tracked ones deleted from the tree, which hooks cannot open.
 lint:
-	$(VENV)/bin/pre-commit run --all-files
+	@git ls-files -z --cached --others --exclude-standard | \
+	while IFS= read -r -d '' f; do [ -e "$$f" ] && printf '%s\0' "$$f"; done | \
+	xargs -0 -s $$(( $$(getconf ARG_MAX) - 65536 )) $(VENV)/bin/pre-commit run --files
 
 
 # runs
