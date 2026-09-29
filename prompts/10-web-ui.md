@@ -26,9 +26,13 @@ Order:
 11. `10k-web-policies.md` — Policies list, policy documents and form.
 12. `10l-web-changes.md` — Changes tab, the filesystem diff viewer.
 13. `10m-web-merge.md` — Merge decision, conflicts and report.
+14. `10n-web-content.md` — Content of a changed entry, streamed from the upper disk.
+15. `10o-web-mcp.md` — MCP registry and live MCP policy change.
+16. `10p-web-models.md` — Model policies and the Run's token budget.
+17. `10q-web-secrets.md` — Secrets: list, usage, create, rotate, expiry, delete.
 
-Not covered, because no board exists yet: per-gate event screens and any
-secrets UI. Draw the board first.
+Not covered, because no board exists yet: per-gate event screens. Draw the
+board first.
 
 The UI is never an authorization boundary. Every action goes through API
 authorization. Dangerous actions require confirmation. Never display secrets.
