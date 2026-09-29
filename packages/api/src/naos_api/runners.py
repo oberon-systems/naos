@@ -10,7 +10,7 @@ from sqlmodel import Session, col, func, or_, select, update
 from naos_api import audit, runs
 from naos_api.errors import InvalidTransitionError, LeaseError, NotFoundError
 from naos_api.images.service import check_image
-from naos_api.lifecycle import TERMINAL, RunStatus
+from naos_api.lifecycle import CREDENTIAL_BOUND, TERMINAL, RunStatus
 from naos_api.models import Lease, Merge, Policy, Run, Runner
 from naos_api.secrets import IssuedCredential, issue_credentials
 from naos_api.spec import PolicyKind, RunSpec
@@ -19,7 +19,6 @@ S = RunStatus
 LEASE_EXPIRED_REASON = "runner lease expired"
 REVOKED_REASON = "runner revoked"
 LEASE_BOUND = frozenset({S.STARTING, S.STARTED, S.STOPPING, S.COLLECTING})
-CREDENTIAL_BOUND = frozenset({S.PENDING, S.STARTING, S.STARTED})
 RUNNER_TRANSITIONS = frozenset(
     {
         (S.PENDING, S.STARTING),

@@ -68,6 +68,10 @@ describe, so a change and its event land or fail together.
 | `policy_created` | operator | `policy_id`, `kind` |
 | `image_registered` | operator | `image_id`, `version`, `digest` |
 | `secret_created` | operator | `name` only |
+| `secret_rotated` | operator | `name` only |
+| `secret_expiry_changed` | operator | `name`, `from` and `to` expiry, null for never |
+| `secret_deleted` | operator | `name` only |
+| `secret_delete_refused` | operator | `name`, `named_by` count, `held_by` Run ids |
 | `console_attached` | operator | none; the Run is `run_id` |
 | `runner_events_refused` | runner | `count` of the events in one batch that named a Run the runner never held |
 

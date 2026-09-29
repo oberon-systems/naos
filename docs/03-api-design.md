@@ -82,7 +82,11 @@ POST /api/v1/images
 GET /api/v1/images
 GET /api/v1/images/{image_id}
 POST /api/v1/secrets
+GET /api/v1/secrets
 GET /api/v1/secrets/{name}
+POST /api/v1/secrets/{name}/rotate
+PATCH /api/v1/secrets/{name}
+DELETE /api/v1/secrets/{name}
 GET /api/v1/audit
 GET /api/v1/audit/summary
 GET /api/v1/audit/{event_id}
@@ -289,14 +293,39 @@ unset lets any runner claim it. An unknown or revoked runner returns 422.
 ## Secrets
 
 A secret is a provider credential an MCP policy names by `name`. The API
-stores it as given, without encryption for now, and never returns its value.
+stores it as given, without encryption for now, and never returns its value:
+no response, error or audit event carries it.
 
 - `POST /api/v1/secrets` takes `name`, `value` and an optional `expires_at`
-  and answers 201 with `id`, `name`, `expires_at` and `created_at`.
-- `name` matches `^[a-z0-9][a-z0-9._-]{0,63}$`, `value` is 1 to 8192 visible
-  ASCII characters; anything else gets 422.
-- A name that already exists gets 409, and `GET /api/v1/secrets/{name}`
-  returns the same metadata or 404.
+  and answers 201 with the secret as `GET` reads it. A name that already
+  exists gets 409.
+- `name` matches `^[a-z0-9][a-z0-9._-]{0,63}$`. `value` is 1 to 8192
+  characters of visible ASCII, spaces, tabs and line breaks, so a JSON key
+  file fits, and not only whitespace. Anything else gets 422.
+- `GET /api/v1/secrets` lists by name and takes `q`, matched against the
+  name, the id and what names the secret, `state` and `used`.
+- `GET /api/v1/secrets/{name}` returns one secret with its `runs`, or 404.
+- `POST /api/v1/secrets/{name}/rotate` takes a new `value` and sets
+  `rotated_at`. The name and the id stay, and the next issue to a runner
+  carries the new value; a Run holding the old one keeps it until its TTL.
+- `PATCH /api/v1/secrets/{name}` takes `expires_at` only, a timestamp or
+  null for never.
+- `DELETE /api/v1/secrets/{name}` answers 204. While anything in `named_by`
+  or `held_by` exists it answers 409, names them in `detail` and records
+  `secret_delete_refused`.
+
+Each secret carries these fields beside `id`, `name`, `expires_at`,
+`created_at` and `rotated_at`:
+
+| Field | Meaning |
+| --- | --- |
+| `state` | `valid`, `expiring` within 7 days, or `expired` |
+| `named_by` | `kind` `cred`, the MCP policy `id` and the `server` it is the credential of |
+| `held_by` | The PENDING, STARTING and STARTED Runs it was issued to: `run_id`, `seq`, `status`, `profile_id` |
+| `runs` | `GET` of one secret only: every Run it was ever issued to, with `issued` count and `last_at` |
+
+`GET /api/v1/audit?secret=<name>` returns the secret's own events and the
+`credentials_issued` events that name it.
 
 ## Images
 

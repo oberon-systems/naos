@@ -47,6 +47,7 @@ def search_events(
     image_id: str | None = None,
     profile_id: str | None = None,
     run_id: str | None = None,
+    secret: str | None = None,
     event: Annotated[list[str] | None, Query(max_length=100)] = None,
     since: Annotated[int | None, Query(ge=0)] = None,
     after: Annotated[int | None, Query(ge=0)] = None,
@@ -64,6 +65,7 @@ def search_events(
         image_id=image_id,
         profile_id=profile_id,
         run_id=run_id,
+        secret=secret,
     )
     return [AuditEventRead.of(row) for row in found]
 

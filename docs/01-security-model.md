@@ -34,6 +34,12 @@ If a gate is unavailable, deny the protected operation.
 
 Separate IDs from credentials. Prefer scoped short-lived runner, Run, gate, and console tokens. Never expose long-lived infrastructure credentials to the agent.
 
+A secret value is write-only. The operator types it once, and no API
+response, error or audit event carries it afterwards. A rotation reaches the
+next issue to a runner; a Run already holding the old value keeps it until its
+credential TTL ends. A secret cannot be deleted while a policy names it or an
+open Run holds it.
+
 ## Security acceptance
 
 Prove an untrusted agent cannot:

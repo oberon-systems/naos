@@ -51,6 +51,7 @@ def targets(current: RunStatus) -> frozenset[RunStatus]:
 
 TERMINAL = frozenset(status for status in RunStatus if not targets(status))
 ACTIVE = frozenset(RunStatus) - TERMINAL - {RunStatus.PENDING}
+CREDENTIAL_BOUND = frozenset({S.PENDING, S.STARTING, S.STARTED})
 
 
 def ensure_transition(current: RunStatus, target: RunStatus) -> None:

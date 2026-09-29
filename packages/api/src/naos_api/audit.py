@@ -3,6 +3,7 @@ from typing import Annotated, Any, Literal, Self
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, create_model, model_validator
+from sqlalchemy import ColumnElement
 from sqlmodel import Session, and_, col, func, or_, select
 
 from naos_api.clock import now_ts
@@ -40,6 +41,10 @@ API_EVENTS: dict[str, frozenset[str]] = {
     "policy_created": frozenset({"policy_id", "kind"}),
     "image_registered": frozenset({"image_id", "version", "digest"}),
     "secret_created": frozenset({"name"}),
+    "secret_rotated": frozenset({"name"}),
+    "secret_expiry_changed": frozenset({"name", "from", "to"}),
+    "secret_deleted": frozenset({"name"}),
+    "secret_delete_refused": frozenset({"name", "named_by", "held_by"}),
     "profile_created": frozenset({"profile_id", "name"}),
     "profile_updated": frozenset({"profile_id", "name"}),
     "profile_deleted": frozenset({"profile_id", "name"}),
@@ -246,6 +251,11 @@ def timeline(session: Session, run_id: str, limit: int) -> Sequence[AuditEvent]:
     return session.exec(statement).all()
 
 
+def names_secret(name: str) -> ColumnElement[bool]:
+    names: ColumnElement[str] = col(AuditEvent.data)["names"].as_string()
+    return names.contains(f'"{name}"', autoescape=True)
+
+
 def search(
     session: Session,
     *,
@@ -258,6 +268,7 @@ def search(
     image_id: str | None = None,
     profile_id: str | None = None,
     run_id: str | None = None,
+    secret: str | None = None,
 ) -> Sequence[AuditEvent]:
     statement = select(AuditEvent)
     if run_id is not None:
@@ -278,6 +289,13 @@ def search(
             col(AuditEvent.data)["profile_id"].as_string() == profile_id,
         )
         statement = statement.where(or_(own, col(AuditEvent.run_id).in_(copied)))
+    if secret is not None:
+        own = and_(
+            col(AuditEvent.event).startswith("secret_"),
+            col(AuditEvent.data)["name"].as_string() == secret,
+        )
+        issued = and_(col(AuditEvent.event) == "credentials_issued", names_secret(secret))
+        statement = statement.where(or_(own, issued))
     if events:
         statement = statement.where(col(AuditEvent.event).in_(events))
     if since is not None:

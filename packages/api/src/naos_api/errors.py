@@ -30,6 +30,10 @@ class SecretConflictError(DomainError):
     """A secret with this name already exists."""
 
 
+class SecretBusyError(DomainError):
+    """The secret cannot be deleted while something names or holds it."""
+
+
 class MergeError(DomainError):
     """The merge selection does not fit the collected diff."""
 

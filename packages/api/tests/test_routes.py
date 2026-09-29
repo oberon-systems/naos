@@ -25,6 +25,10 @@ def test_runs_api_denies_without_principal(settings: Settings, spec_body: dict[s
     assert client.get("/api/v1/images").status_code == 401
     assert client.post("/api/v1/secrets", json={}).status_code == 401
     assert client.get("/api/v1/secrets/alpha-token").status_code == 401
+    assert client.get("/api/v1/secrets").status_code == 401
+    assert client.post("/api/v1/secrets/alpha-token/rotate", json={}).status_code == 401
+    assert client.patch("/api/v1/secrets/alpha-token", json={}).status_code == 401
+    assert client.delete("/api/v1/secrets/alpha-token").status_code == 401
 
 
 def test_create_and_replay(client: TestClient, spec_body: dict[str, Any]) -> None:
@@ -189,7 +193,7 @@ def test_secret_value_is_never_returned(client: TestClient) -> None:
 
     assert created.status_code == 201
     assert created.json()["id"].startswith("sec_")
-    assert fetched.json() == created.json()
+    assert fetched.json() == {**created.json(), "runs": []}
     assert "secret-alpha-value" not in created.text + fetched.text
     assert client.post("/api/v1/secrets", json=body).status_code == 409
     assert client.get("/api/v1/secrets/beta-token").status_code == 404
@@ -200,7 +204,7 @@ def test_secret_value_is_never_returned(client: TestClient) -> None:
     [
         {"name": "Alpha", "value": "v"},
         {"name": "alpha", "value": ""},
-        {"name": "alpha", "value": "has space"},
+        {"name": "alpha", "value": "  \n"},
         {"name": "alpha", "value": "v", "expires_at": -1},
         {"name": "alpha", "value": "v", "extra": 1},
     ],

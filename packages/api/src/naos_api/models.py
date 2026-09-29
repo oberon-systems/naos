@@ -105,14 +105,19 @@ class Merge(SQLModel, table=True):
     updated_at: int = Field(default_factory=now_ts)
 
 
-class Secret(SQLModel, table=True):
-    __tablename__ = "secrets"
-
+# The value lives on the table class only, so nothing built from SecretMeta can carry it.
+class SecretMeta(SQLModel):
     id: str = Field(primary_key=True)
     name: str = Field(unique=True)
-    value: str
     expires_at: int | None = None
     created_at: int = Field(default_factory=now_ts)
+    rotated_at: int | None = None
+
+
+class Secret(SecretMeta, table=True):
+    __tablename__ = "secrets"
+
+    value: str
 
 
 class AuditEvent(SQLModel, table=True):
