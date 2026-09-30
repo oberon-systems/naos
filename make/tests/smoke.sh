@@ -13,6 +13,7 @@ cleanup() {
         if [ -n "$group" ]; then kill -- "-$group" 2>/dev/null || true; fi
     done
     if [ -n "${logs:-}" ]; then kill "$logs" 2>/dev/null || true; fi
+    if [ -n "${stub:-}" ]; then kill "$stub" 2>/dev/null || true; fi
     pkill -f -- "$TEMP_DIR/runs" 2>/dev/null || true
     rm -rf "$TEMP_DIR"
 }
@@ -160,13 +161,36 @@ guest() {
         done
         sleep 25
     } | NAOS_AGENT_IMAGE_DIR="$TEMP_DIR/vms" NAOS_AGENT_VM_DIR="$TEMP_DIR/runs" \
-        cargo run -q -p naos-runner -- console "$run" >>"$TEMP_DIR/console.log" 2>&1
+        cargo run -q -p naos-runner --features smoke-stubs -- console "$run" >>"$TEMP_DIR/console.log" 2>&1
 }
 
 # Every gate call the guest makes is one audit line of the runner, which took the decision.
 mcp_calls() {
     grep '"event":"mcp_call"' "$TEMP_DIR/agent.log" |
         grep -c "\"server\":\"$1\",\"tool\":\"$2\",.*\"decision\":\"$3\"" || true
+}
+
+model_calls() {
+    grep '"event":"model_call"' "$TEMP_DIR/agent.log" |
+        grep -c "\"provider\":\"$1\",.*\"decision\":\"$2\".*\"category\":\"$3\"" || true
+}
+
+# Both dialects answer through the gateway, a foreign model and a spent budget do not, and no key
+# the runner set ever reaches the guest, a log or the audit.
+check_models() {
+    grep -q 'MODEL-ENV http://127.0.0.1:4000/v1 http://127.0.0.1:4000' "$TEMP_DIR/console.log" ||
+        fail "the guest environment does not point at the model gateway"
+    grep -q 'echo-<redacted>' "$TEMP_DIR/console.log" || fail "the echoed key was not redacted"
+    for call in "alpha allow none" "beta allow none" "unknown deny denied" "alpha deny budget"; do
+        # shellcheck disable=SC2086  # the three fields are one argument each
+        [ "$(model_calls $call)" -ge 1 ] || fail "no model_call for: $call"
+    done
+    [ "$(events model_attached)" -ge 1 ] || fail "model_attached is missing from the agent log"
+    for value in "$openai_key" "$anthropic_key"; do
+        if grep -qF -- "$value" "$TEMP_DIR/console.log" "$TEMP_DIR/agent.log"; then
+            fail "a provider key reached the guest or the runner log"
+        fi
+    done
 }
 
 # The read model the operator screens render, rather than the raw row.
@@ -419,10 +443,12 @@ rows = json.load(sys.stdin)
 seen = {row["event"] for row in rows}
 seen |= {("to", row["data"]["to"]) for row in rows if row["event"] == "run_transition"}
 seen |= {("mcp_call", row["data"]["decision"]) for row in rows if row["event"] == "mcp_call"}
+seen |= {("model_call", row["data"]["decision"]) for row in rows if row["event"] == "model_call"}
 statuses = ("STARTING", "STARTED", "STOPPING", "COLLECTING", "WAITING_MERGE", "COMPLETED")
 expected = {
     "run_created", "run_assigned", "vm_created", "workspace_shared", "network_allowed", "network_denied",
     "shell_allowed", "shell_denied", ("mcp_call", "allow"), ("mcp_call", "deny"),
+    ("model_call", "allow"), ("model_call", "deny"),
     "workspace_collected", "diff_reported", "merge_decided", "merge_conflict", "merge_applied",
     "changes_archived", *(("to", status) for status in statuses),
 }
@@ -439,7 +465,7 @@ check_secrets() {
         after="$(printf '%s' "$page" | "$VENV/bin/python" -c 'import json, sys; print(json.load(sys.stdin)[-1]["seq"])')"
     done
     [ "$(stat -c %a "$spool")" = 600 ] || fail "$spool is not 0600"
-    for value in "$operator" "$(cat "$TEMP_DIR/enrollment")" "$secret" \
+    for value in "$operator" "$(cat "$TEMP_DIR/enrollment")" "$secret" "$openai_key" "$anthropic_key" \
         "$(field token <"$TEMP_DIR/state/credentials.json")"; do
         if grep -qF -- "$value" "$TEMP_DIR/audit.json" "$spool"; then
             fail "a credential reached the audit trail"
@@ -564,8 +590,8 @@ new_run() {
     local location
     location="$(curl -fsS -o /dev/null -w '%{redirect_url}' "$web/runs/new" \
         --data-urlencode "key=$dialog_key" \
-        --data-urlencode "profile=" \
-        --data-urlencode "mode=new" \
+        --data-urlencode "profile=$smoke_profile" \
+        --data-urlencode "mode=update" \
         --data-urlencode "name=smoke" \
         --data-urlencode "cpu=2" \
         --data-urlencode "memory_mib=2048" \
@@ -667,7 +693,8 @@ start_agent() {
         NAOS_AGENT_ENROLLMENT_TOKEN_FILE="$TEMP_DIR/enrollment" \
         NAOS_AGENT_IMAGE_DIR="$TEMP_DIR/vms" \
         NAOS_AGENT_VM_DIR="$TEMP_DIR/runs" \
-        setsid cargo run -q -p naos-runner >>"$TEMP_DIR/agent.log" 2>&1 &
+        NAOS_AGENT_SMOKE_CA_FILE="$TEMP_DIR/ca.crt" \
+        setsid cargo run -q -p naos-runner --features smoke-stubs >>"$TEMP_DIR/agent.log" 2>&1 &
     agent=$!
 }
 
@@ -695,6 +722,24 @@ auth=(-H "Authorization: Bearer $operator" -H "Content-Type: application/json")
 touch "$TEMP_DIR/api.log" "$TEMP_DIR/web.log" "$TEMP_DIR/agent.log" "$TEMP_DIR/console.log"
 tail -f "$TEMP_DIR/api.log" "$TEMP_DIR/web.log" "$TEMP_DIR/agent.log" &
 logs=$!
+
+# The stubs answer on loopback under a CA of their own; only the smoke-stubs runner reaches them.
+echo "starting the stub model providers..."
+openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=naos-smoke-ca \
+    -keyout "$TEMP_DIR/ca.key" -out "$TEMP_DIR/ca.crt" 2>/dev/null
+openssl req -newkey rsa:2048 -nodes -subj /CN=naos-smoke-stub \
+    -keyout "$TEMP_DIR/stub.key" -out "$TEMP_DIR/stub.csr" 2>/dev/null
+printf '%s\n' 'subjectAltName=DNS:openai.example.com,DNS:anthropic.example.com' \
+    'basicConstraints=CA:FALSE' 'extendedKeyUsage=serverAuth' >"$TEMP_DIR/stub.ext"
+openssl x509 -req -in "$TEMP_DIR/stub.csr" -CA "$TEMP_DIR/ca.crt" -CAkey "$TEMP_DIR/ca.key" \
+    -CAcreateserial -days 1 -extfile "$TEMP_DIR/stub.ext" -out "$TEMP_DIR/stub.crt" 2>/dev/null
+openai_key="$(token)"
+anthropic_key="$(token)"
+stub_port="$("$VENV/bin/python" -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
+STUB_OPENAI_KEY="$openai_key" STUB_ANTHROPIC_KEY="$anthropic_key" \
+    "$VENV/bin/python" "$ROOT/make/tests/stub_provider.py" "$stub_port" \
+    "$TEMP_DIR/stub.crt" "$TEMP_DIR/stub.key" >"$TEMP_DIR/stub.log" 2>&1 &
+stub=$!
 
 echo "starting api..."
 NAOS_OPERATOR_TOKEN_SHA256="$(printf '%s' "$operator" | sha256sum | cut -d' ' -f1)" \
@@ -847,6 +892,31 @@ mcp_policy="$(
 {"kind": "mcp", "document": {"servers": [{"name": "alpha", "url": "https://example.com/mcp", "tools": ["search"], "resources": [], "credential": "alpha-token"}]}}
 EOF
 )"
+for name in openai anthropic; do
+    key_var="${name}_key"
+    curl -fsS "${auth[@]}" "$api/api/v1/secrets" -o /dev/null -d @- <<EOF
+{"name": "$name-key", "value": "${!key_var}"}
+EOF
+done
+# Two calls of 5 output tokens each spend the budget, so the third is refused.
+model_policy="$(
+    curl -fsS "${auth[@]}" "$api/api/v1/policies" -d @- <<EOF | field id
+{"kind": "model", "document": {"providers": [
+  {"name": "alpha", "api": "openai", "url": "https://openai.example.com:$stub_port", "credential": "openai-key", "models": ["alpha-mini"]},
+  {"name": "beta", "api": "anthropic", "url": "https://anthropic.example.com:$stub_port", "credential": "anthropic-key", "models": ["beta-large"]}
+], "max_input_tokens": 1000, "max_output_tokens": 10}}
+EOF
+)"
+# The dialog has no model field until the model screens exist, so it runs a profile that names one.
+smoke_profile="$(
+    curl -fsS "${auth[@]}" "$api/api/v1/profiles" -d @- <<EOF | field id
+{"name": "smoke", "spec": {
+  "runtime": {"cpu": 2, "memory_mib": 2048, "disk_gib": 8}, "timeout": 3600, "merge": {"policy": "ask"},
+  "mounts": {"policy": "$mount_policy"}, "network": {"policy": "$network_policy"},
+  "shell": {"policy": "$shell_policy"}, "mcp": {"policy": "$mcp_policy"}, "model": {"policy": "$model_policy"}
+}}
+EOF
+)"
 echo "creating the run from the new run dialog..."
 new_run
 new_run
@@ -898,6 +968,7 @@ check_policies_page
 check_run_detail STARTED
 check_confirms
 echo "editing the workspace and calling the gates from the console..."
+# shellcheck disable=SC2016  # the guest shell expands these, not this one
 guest \
     "cd /naos/alpha" \
     "printf 'beta\n' > notes.txt" \
@@ -919,8 +990,23 @@ guest \
     '{"jsonrpc":"2.0","id":11,"method":"ping"}' \
     "JSON" \
     "{ cat /tmp/rpc; sleep 20; } | naos-mcp" \
+    'echo "MODEL-ENV $OPENAI_BASE_URL $ANTHROPIC_BASE_URL"' \
+    "cat > /tmp/chat <<'JSON'" \
+    '{"model":"alpha-mini","messages":[{"role":"user","content":"hi"}]}' \
+    "JSON" \
+    "cat > /tmp/messages <<'JSON'" \
+    '{"model":"beta-large","max_tokens":16,"stream":true,"messages":[{"role":"user","content":"hi"}]}' \
+    "JSON" \
+    "cat > /tmp/foreign <<'JSON'" \
+    '{"model":"gamma","messages":[]}' \
+    "JSON" \
+    'wget -q -O - --header "content-type: application/json" --header "authorization: Bearer $OPENAI_API_KEY" --post-file /tmp/chat "$OPENAI_BASE_URL/chat/completions"; echo' \
+    'wget -q -O - --header "content-type: application/json" --header "x-api-key: $ANTHROPIC_API_KEY" --header "anthropic-version: 2023-06-01" --post-file /tmp/messages "$ANTHROPIC_BASE_URL/v1/messages"; echo' \
+    'wget -O - --header "content-type: application/json" --post-file /tmp/foreign "$OPENAI_BASE_URL/chat/completions"; echo' \
+    'wget -O - --header "content-type: application/json" --post-file /tmp/chat "$OPENAI_BASE_URL/chat/completions"; echo' \
     "echo NAOS-SMOKE-DONE"
 check_gates
+check_models
 echo "reading the console through the api and the terminal tab..."
 wait_for 30 console_shipped
 check_terminal
