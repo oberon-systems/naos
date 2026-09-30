@@ -1,0 +1,34 @@
+#!/sbin/openrc-run
+# shellcheck shell=sh
+# shellcheck disable=SC2034  # openrc reads these variables itself
+#
+# The model gateway of this Run on 127.0.0.1:4000. socat only pipes one connection
+# at a time to the naos.model port; the runner answers and holds the keys.
+
+description="Pipe the model gateway to the runner"
+command=/usr/bin/socat
+command_args="-t 0 TCP-LISTEN:4000,bind=127.0.0.1,reuseaddr,fork,max-children=1 GOPEN:/run/naos/model"
+command_user=naos:naos
+command_background=true
+pidfile=/run/naos-model.pid
+
+depend() {
+    need localmount
+    before naos-session
+}
+
+# The port is root-owned when it appears; naos gets it under a stable name.
+start_pre() {
+    for name in /sys/class/virtio-ports/*/name; do
+        [ "$(cat "$name" 2> /dev/null)" = naos.model ] || continue
+        port=${name%/name}
+        port=/dev/${port##*/}
+        chgrp naos "$port" || return 1
+        chmod 0660 "$port" || return 1
+        install -d -m 0755 /run/naos
+        ln -sfn "$port" /run/naos/model
+        return 0
+    done
+    eerror "no naos.model port, the Run has no model gateway"
+    return 1
+}

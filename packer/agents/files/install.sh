@@ -23,10 +23,13 @@ install -m 0644 "$files/gemini/settings.json" /etc/gemini-cli/settings.json
 
 install -m 0755 "$files/naos-session" /etc/init.d/naos-session
 install -m 0755 "$files/naos-mcp" /usr/local/bin/naos-mcp
+install -m 0755 "$files/naos-model" /etc/init.d/naos-model
+install -m 0644 "$files/naos-model.sh" /etc/profile.d/naos-model.sh
 install -m 0755 "$files/naos-resize" /etc/init.d/naos-resize
 install -m 0755 "$files/naos-resize.sh" /usr/local/bin/naos-resize
 install -m 0644 "$files/naos-console.sh" /etc/profile.d/naos-console.sh
 rc-update add naos-session default
+rc-update add naos-model default
 rc-update add naos-resize default
 
 # The agents keep their state in these directories, so they stay naos-owned;
@@ -39,5 +42,8 @@ for agent in .claude .gemini; do
         "$home/$agent/skills/naos-environment/SKILL.md"
 done
 ln -sf /etc/naos/AGENTS.md "$home/.gemini/GEMINI.md"
+
+# Claude Code asks before it uses a key from the environment; the placeholder is approved here.
+install -o naos -g naos -m 0600 "$files/claude/claude.json" "$home/.claude.json"
 
 rm -rf "$files" /root/.npm /var/cache/apk/*

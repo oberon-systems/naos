@@ -23,9 +23,9 @@ report() {
     echo "$1" > /dev/ttyS1 2> /dev/null || true
 }
 
-mcp_port() {
+virtio_port() {
     for name in /sys/class/virtio-ports/*/name; do
-        [ "$(cat "$name" 2> /dev/null)" = naos.mcp ] || continue
+        [ "$(cat "$name" 2> /dev/null)" = "$1" ] || continue
         port=${name%/name}
         echo "/dev/${port##*/}"
         return 0
@@ -107,11 +107,12 @@ start() {
         esac
     done
 
-    if port=$(mcp_port); then
+    if port=$(virtio_port naos.mcp); then
         mcp_ping "$port" || failures="$failures mcp-ping"
     else
         failures="$failures mcp-port"
     fi
+    virtio_port naos.model > /dev/null || failures="$failures model-port"
 
     if [ -z "$failures" ]; then
         report "naos-probe ok"
