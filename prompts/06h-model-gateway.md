@@ -20,7 +20,8 @@ URL works, whichever vendor made it.
 2. API — resolves the policy like the others and issues the provider
    credentials with the Run's other credentials. They are never listed by
    `secrets__list` nor returned by `secrets__get`.
-3. Runner — a gate per Run behind its own virtio-serial port `naos.model`:
+3. Runner — a gate per Run behind its own vsock device (a virtio-serial port
+   has no connection boundaries, see `docs/13-model-gateway.md`):
    - `POST /v1/chat/completions` and `GET /v1/models` for `openai` providers,
      `POST /v1/messages` for `anthropic` ones; any other path is 404;
    - it routes by the request's model, refuses one the policy does not
@@ -32,7 +33,7 @@ URL works, whichever vendor made it.
    - request bodies are bounded, and a gate or provider failure is an error,
      never a retry to another provider.
 4. Guest — the image ships a unit like `naos-mcp`: `socat` from
-   `127.0.0.1:4000` to the port. The Run's environment carries
+   `127.0.0.1:4000` to the runner's vsock port. The Run's environment carries
    `OPENAI_BASE_URL=http://127.0.0.1:4000/v1`,
    `ANTHROPIC_BASE_URL=http://127.0.0.1:4000` and a placeholder key for
    both. Bump the image as the packer rules require.
