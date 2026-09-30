@@ -193,3 +193,27 @@ def mcp_body() -> dict[str, Any]:
             }
         ]
     }
+
+
+@pytest.fixture
+def model_body() -> dict[str, Any]:
+    return {
+        "providers": [
+            {
+                "name": "alpha",
+                "api": "openai",
+                "url": "https://models.example.com",
+                "credential": "alpha-key",
+                "models": ["alpha-mini"],
+            },
+            {
+                "name": "beta",
+                "api": "anthropic",
+                "url": "https://beta.example.com",
+                "credential": "beta-key",
+                "models": ["beta-large"],
+            },
+        ],
+        "max_input_tokens": 100000,
+        "max_output_tokens": 10000,
+    }

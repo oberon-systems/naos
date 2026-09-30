@@ -49,13 +49,13 @@ class McpPolicy(StrictModel):
     servers: list[McpServer]
 
 
-def _url(raw: str) -> str:
+def https_url(raw: str, what: str = "server") -> str:
     match = _URL.fullmatch(raw)
     if match is None or "?" in raw or "#" in raw:
-        raise PolicyError(f"server url {raw!r} must be https without userinfo, query or fragment")
+        raise PolicyError(f"{what} url {raw!r} must be https without userinfo, query or fragment")
     host, port, path = match.groups()
     if port is not None and not 0 < int(port) < 65536:
-        raise PolicyError(f"server url {raw!r} has an invalid port")
+        raise PolicyError(f"{what} url {raw!r} has an invalid port")
     authority = resolve_host(host) + (f":{int(port)}" if port and int(port) != 443 else "")
     return f"https://{authority}{path or '/'}"
 
@@ -71,7 +71,7 @@ def _server(server: McpServerIn) -> McpServer:
         raise PolicyError(f"server {server.name} must allow at least one tool or resource")
     return McpServer(
         name=server.name,
-        url=_url(server.url),
+        url=https_url(server.url),
         tools=_unique(server.tools, "tool", server.name),
         resources=_unique(server.resources, "resource", server.name),
         credential=server.credential,

@@ -10,6 +10,7 @@ from naos_api import audit
 from naos_api.errors import NotFoundError, PolicyError
 from naos_api.lifecycle import TERMINAL
 from naos_api.mcp import McpPolicyIn, resolve_mcp_policy
+from naos_api.model import ModelPolicyIn, resolve_model_policy
 from naos_api.models import Policy, Profile, Run
 from naos_api.mounts import MountPolicyIn, resolve_mount_policy
 from naos_api.network import NetworkPolicyIn, resolve_network_policy
@@ -21,6 +22,7 @@ ID_PREFIX = {
     PolicyKind.NETWORK: "netpol",
     PolicyKind.SHELL: "shellpol",
     PolicyKind.MCP: "mcppol",
+    PolicyKind.MODEL: "modelpol",
 }
 
 
@@ -73,6 +75,11 @@ def create_mcp_policy(session: Session, policy: McpPolicyIn) -> tuple[Policy, bo
     return _store(session, PolicyKind.MCP, resolved.model_dump(mode="json"))
 
 
+def create_model_policy(session: Session, policy: ModelPolicyIn) -> tuple[Policy, bool]:
+    resolved = resolve_model_policy(policy)
+    return _store(session, PolicyKind.MODEL, resolved.model_dump(mode="json"))
+
+
 def list_policies(
     session: Session, kind: PolicyKind | None = None, query: str | None = None
 ) -> Sequence[Policy]:
@@ -102,6 +109,7 @@ RUN_COLUMNS = {
     PolicyKind.NETWORK: Run.network_policy_id,
     PolicyKind.SHELL: Run.shell_policy_id,
     PolicyKind.MCP: Run.mcp_policy_id,
+    PolicyKind.MODEL: Run.model_policy_id,
 }
 
 

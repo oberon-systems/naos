@@ -246,6 +246,31 @@ def test_a_runner_event_keeps_when_it_reached_the_api(
     assert client.get(f"/api/v1/audit/evt_{'0' * 32}").status_code == 404
 
 
+def test_model_calls_are_typed(
+    client: TestClient, register: Register, create_run: CreateRun
+) -> None:
+    run_id = create_run("key-1")
+    runner = register()
+    _heartbeat(client, runner)
+    call = {
+        "run_id": run_id,
+        "provider": "alpha",
+        "model": "alpha-mini",
+        "input_tokens": 12,
+        "output_tokens": 3,
+        "decision": "allow",
+        "duration_ms": 40,
+        "category": "none",
+    }
+
+    accepted = _post_events(client, runner, [_event("model_call", **call)])
+    prompt = _post_events(client, runner, [_event("model_call", **call, prompt="hello")])
+    negative = _post_events(client, runner, [_event("model_call", **(call | {"input_tokens": -1}))])
+
+    assert accepted.json() == {"accepted": 1, "refused": []}
+    assert (prompt.status_code, negative.status_code) == (422, 422)
+
+
 def test_runner_events_need_runner_credentials(client: TestClient, register: Register) -> None:
     runner = register()
     response = client.post(

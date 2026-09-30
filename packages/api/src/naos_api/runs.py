@@ -133,6 +133,7 @@ def create_run(
             network_policy_id=refs[PolicyKind.NETWORK],
             shell_policy_id=refs[PolicyKind.SHELL],
             mcp_policy_id=refs[PolicyKind.MCP],
+            model_policy_id=refs[PolicyKind.MODEL],
             profile_id=profile_id,
             runner_id=spec.runner,
             idempotency_key=idempotency_key,

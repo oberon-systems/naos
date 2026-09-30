@@ -35,7 +35,7 @@ class IssuedCredential:
 
 
 class Usage(BaseModel):
-    kind: Literal["cred"]
+    kind: Literal["cred", "model"]
     id: str
     server: str | None
 
@@ -104,8 +104,14 @@ def state_of(secret: Secret, now: int) -> SecretState:
 # Policy documents are JSON, so the secrets they name are read in Python, not queried.
 def _naming(session: Session) -> dict[str, list[Usage]]:
     naming: dict[str, list[Usage]] = {}
-    statement = select(Policy).where(col(Policy.kind) == PolicyKind.MCP).order_by(col(Policy.id))
+    kinds = (PolicyKind.MCP, PolicyKind.MODEL)
+    statement = select(Policy).where(col(Policy.kind).in_(kinds)).order_by(col(Policy.id))
     for policy in session.exec(statement).all():
+        if policy.kind == PolicyKind.MODEL:
+            for provider in policy.document["providers"]:
+                usage = Usage(kind="model", id=policy.id, server=provider["name"])
+                naming.setdefault(provider["credential"], []).append(usage)
+            continue
         for server in policy.document["servers"]:
             if server["credential"]:
                 usage = Usage(kind="cred", id=policy.id, server=server["name"])
@@ -234,7 +240,8 @@ def set_expiry(session: Session, name: str, expires_at: int | None) -> Secret:
 
 
 def _busy_detail(view: SecretView) -> str:
-    named = [f"{usage.id} (server {usage.server})" for usage in view.named_by]
+    role = {"cred": "server", "model": "provider"}
+    named = [f"{usage.id} ({role[usage.kind]} {usage.server})" for usage in view.named_by]
     held = [f"#{holder.seq} {holder.status}" for holder in view.held_by]
     parts = []
     if named:

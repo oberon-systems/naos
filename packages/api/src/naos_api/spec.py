@@ -16,6 +16,7 @@ class PolicyKind(StrEnum):
     NETWORK = "network"
     SHELL = "shell"
     MCP = "mcp"
+    MODEL = "model"
 
 
 PolicyId = Annotated[str, Field(pattern=r"^[a-z]+_[0-9a-f]{32}$")]
@@ -49,6 +50,7 @@ class ProfileSpec(StrictModel):
     network: PolicyRef = PolicyRef()
     shell: PolicyRef = PolicyRef()
     mcp: PolicyRef = PolicyRef()
+    model: PolicyRef = PolicyRef()
     merge: MergeSpec = MergeSpec()
     timeout: Annotated[StrictInt, Field(ge=60, le=86400)]
 
@@ -58,6 +60,7 @@ class ProfileSpec(StrictModel):
             PolicyKind.NETWORK: self.network.policy,
             PolicyKind.SHELL: self.shell.policy,
             PolicyKind.MCP: self.mcp.policy,
+            PolicyKind.MODEL: self.model.policy,
         }
 
 

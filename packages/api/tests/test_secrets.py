@@ -159,6 +159,21 @@ def test_delete_is_refused_while_named(client: TestClient, mcp_body: dict[str, A
     assert event["data"] == {"name": "alpha-token", "named_by": 1, "held_by": []}
 
 
+def test_a_model_provider_names_its_credential(
+    client: TestClient, model_body: dict[str, Any]
+) -> None:
+    _secret(client, "beta-key")
+    created = client.post("/api/v1/policies", json={"kind": "model", "document": model_body})
+    policy_id = created.json()["id"]
+
+    row = client.get("/api/v1/secrets/beta-key").json()
+    refused = client.delete("/api/v1/secrets/beta-key")
+
+    assert row["named_by"] == [{"kind": "model", "id": policy_id, "server": "beta"}]
+    assert refused.status_code == 409
+    assert f"{policy_id} (provider beta)" in refused.json()["detail"]
+
+
 def test_delete_of_an_unused_secret(client: TestClient) -> None:
     _secret(client, "alpha-token")
 

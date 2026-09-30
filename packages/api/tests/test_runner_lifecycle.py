@@ -337,6 +337,62 @@ def test_credentials_reach_only_leased_runs_before_they_stop(
     assert credentials() == {}
 
 
+def test_model_provider_credentials_are_issued_with_the_run(
+    client: TestClient,
+    register: Register,
+    spec_body: dict[str, Any],
+    mcp_body: dict[str, Any],
+    model_body: dict[str, Any],
+    clock: Callable[[], int],
+) -> None:
+    for name in ("alpha-token", "alpha-key", "beta-key"):
+        client.post("/api/v1/secrets", json={"name": name, "value": f"value-{name}"})
+    mcp = client.post("/api/v1/policies", json={"kind": "mcp", "document": mcp_body}).json()
+    model = client.post("/api/v1/policies", json={"kind": "model", "document": model_body}).json()
+    spec_body["mcp"] = {"policy": mcp["id"]}
+    spec_body["model"] = {"policy": model["id"]}
+    created = client.post("/api/v1/runs", json=spec_body, headers={"Idempotency-Key": "k"})
+    runner = register()
+    _heartbeat(client, runner, capacity=1)
+
+    [run] = _desired(client, runner).json()["runs"]
+
+    assert run["id"] == created.json()["id"]
+    assert run["policies"]["model"] == model["document"]
+    assert set(run["credentials"]) == {"alpha-token", "alpha-key", "beta-key"}
+    assert run["credentials"]["beta-key"] == {
+        "value": "value-beta-key",
+        "expires_at": clock() + 300,
+    }
+
+
+def test_an_expired_provider_credential_is_withheld(
+    client: TestClient,
+    register: Register,
+    spec_body: dict[str, Any],
+    model_body: dict[str, Any],
+    clock: Callable[[], int],
+    advance: Callable[[int], None],
+) -> None:
+    client.post("/api/v1/secrets", json={"name": "alpha-key", "value": "value-alpha"})
+    client.post(
+        "/api/v1/secrets",
+        json={"name": "beta-key", "value": "value-beta", "expires_at": clock() + 1},
+    )
+    model = client.post("/api/v1/policies", json={"kind": "model", "document": model_body}).json()
+    spec_body["model"] = {"policy": model["id"]}
+    client.post("/api/v1/runs", json=spec_body, headers={"Idempotency-Key": "k"})
+    runner = register()
+    _heartbeat(client, runner, capacity=1)
+
+    assert set(_desired(client, runner).json()["runs"][0]["credentials"]) == {
+        "alpha-key",
+        "beta-key",
+    }
+    advance(2)
+    assert set(_desired(client, runner).json()["runs"][0]["credentials"]) == {"alpha-key"}
+
+
 def test_operator_stop_reaches_the_runner(
     client: TestClient, register: Register, create_run: CreateRun
 ) -> None:

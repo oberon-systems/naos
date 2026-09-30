@@ -229,6 +229,7 @@ def test_an_update_is_refused_while_a_run_is_active(
         "network": {"policy": None},
         "shell": {"policy": None},
         "mcp": {"policy": None},
+        "model": {"policy": None},
     }
 
 

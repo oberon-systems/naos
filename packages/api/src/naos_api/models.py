@@ -69,6 +69,7 @@ class Run(SQLModel, table=True):
     network_policy_id: str | None = None
     shell_policy_id: str | None = None
     mcp_policy_id: str | None = None
+    model_policy_id: str | None = None
     profile_id: str | None = Field(default=None, index=True)
     runner_id: str | None = Field(default=None, index=True)
     lease_id: str | None = Field(default=None, index=True)

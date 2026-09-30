@@ -94,6 +94,19 @@ RUNNER_EVENTS: dict[str, dict[str, Any]] = {
         "duration_ms": Count,
         "category": Name,
     },
+    "model_policy_configured": _RUN,
+    "model_attached": _RUN,
+    "model_rejected": _RUN | {"reason": Text},
+    "model_call": _RUN
+    | {
+        "provider": Name,
+        "model": Name,
+        "input_tokens": Count,
+        "output_tokens": Count,
+        "decision": Literal["allow", "deny"],
+        "duration_ms": Count,
+        "category": Name,
+    },
     "audit_dropped": {"dropped": Count},
 }
 
