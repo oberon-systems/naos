@@ -14,7 +14,7 @@ Implement and verify:
 - audit integrity;
 - metrics;
 - backups;
-- migrations;
+- migrations, covered by `11a-db-migrations.md`;
 - alerting.
 
 For every item document the threat, enforcement point, fail-closed behavior, tests, and operational guidance.
