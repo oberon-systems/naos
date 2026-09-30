@@ -1,3 +1,10 @@
+## image-0.4.0 (2026-09-30)
+
+### Features
+
+- **image**: pipe the model gateway to the runner and point agents at it
+- **image**: follow the console size the runner sends
+
 ## image-0.3.1 (2026-09-17)
 
 ### Bug Fixes
