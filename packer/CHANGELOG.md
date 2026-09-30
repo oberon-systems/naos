@@ -1,3 +1,9 @@
+## image-0.4.1 (2026-09-30)
+
+### Bug Fixes
+
+- **image**: reach the model gateway over vsock
+
 ## image-0.4.0 (2026-09-30)
 
 ### Features
