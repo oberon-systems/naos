@@ -59,6 +59,7 @@ def run(
 
 NETPOL = "netpol_9a07" + "0" * 28
 MCPPOL = "mcppol_5b2d" + "0" * 28
+MODELPOL = "modelpol_7c1e" + "0" * 28
 MNTPOL = "mntpol_4c1e" + "0" * 28
 SHELLPOL = "shellpol_c42f" + "0" * 26
 PREFIXES = {"mount": "mntpol", "network": "netpol", "shell": "shellpol", "mcp": "mcppol"}
@@ -694,6 +695,30 @@ POLICIES: list[Row] = [
         "profiles": [],
         "runs_open": 1,
         "runs_total": 1,
+    },
+    {
+        "id": MODELPOL,
+        "kind": "model",
+        "digest": "5" * 64,
+        "document": {
+            "providers": [
+                {
+                    "name": "alpha",
+                    "api": "openai",
+                    "url": "https://models.example.com",
+                    "credential": "alpha-key",
+                    "models": ["alpha-mini"],
+                    "timeout_seconds": 600,
+                    "max_requests_per_minute": 60,
+                }
+            ],
+            "max_input_tokens": 100000,
+            "max_output_tokens": 10000,
+        },
+        "created_at": NOW - 9500,
+        "profiles": [],
+        "runs_open": 0,
+        "runs_total": 0,
     },
 ]
 SECRETS: dict[str, Row] = {

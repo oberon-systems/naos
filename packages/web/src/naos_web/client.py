@@ -20,6 +20,10 @@ async def _send(ws: AsyncWebSocketSession, outbox: "asyncio.Queue[bytes | str]")
             await ws.send_bytes(frame)
 
 
+# Model policies get their own screens; until then the policy pages show only these kinds.
+SHOWN_KINDS = ("mount", "network", "shell", "mcp")
+
+
 class ApiError(Exception):
     """The api refused or never answered, so the page says so instead of inventing data."""
 
@@ -237,6 +241,8 @@ class ApiClient:
 
     async def policy(self, policy_id: str) -> Row:
         row: Row = await self._call("GET", f"/policies/{policy_id}")
+        if row["kind"] not in SHOWN_KINDS:
+            raise ApiError(f"policy {policy_id} is a {row['kind']} policy, not shown here", 404)
         return row
 
     async def create_run(self, spec: Row, idempotency_key: str) -> Row:
@@ -293,7 +299,7 @@ class ApiClient:
         if query:
             params["q"] = query
         rows: list[Row] = await self._call("GET", "/policies", params=params)
-        return rows
+        return [row for row in rows if row["kind"] in SHOWN_KINDS]
 
     # The api answers 201 for a new policy and 200 for the one an equivalent document holds.
     async def create_policy(self, kind: str, document: Row) -> tuple[Row, bool]:

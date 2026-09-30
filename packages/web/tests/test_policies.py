@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from stub_api import MCPPOL, MNTPOL, NETPOL, SHELLPOL, WRITES
+from stub_api import MCPPOL, MNTPOL, MODELPOL, NETPOL, SHELLPOL, WRITES
 
 HX = {"HX-Request": "true"}
 ROW = '<tr class="runs-table__row"'
@@ -159,3 +159,13 @@ def test_no_view_renders_a_secret_value(client: TestClient) -> None:
     for path in ("/policies", f"/policies/{MCPPOL}", f"/policies/{MCPPOL}/new"):
         body = client.get(path).text
         assert "sec_alpha" not in body and "Bearer" not in body
+
+
+def test_a_model_policy_waits_for_its_own_screens(client: TestClient) -> None:
+    listed = client.get("/policies").text
+    opened = client.get(f"/policies/{MODELPOL}", headers=HX)
+
+    assert MODELPOL not in listed
+    assert listed.count(ROW) == 4
+    assert opened.status_code == 200
+    assert "not shown here" in opened.text
