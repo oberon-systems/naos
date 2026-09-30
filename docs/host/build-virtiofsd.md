@@ -70,3 +70,18 @@ sudo dpkg-divert --local --rename --remove /usr/libexec/virtiofsd
 ```
 
 Expected: the version of the `virtiofsd` package again.
+
+## Script
+
+`scripts/virtiofsd-install.sh` runs the same steps as the sections above:
+
+| Command | Does |
+|---|---|
+| `scripts/virtiofsd-install.sh` | the procedure, skipped when `/usr/libexec/virtiofsd` is already 1.13 or newer, then the check |
+| `scripts/virtiofsd-install.sh check` | the verification: the version, the diversion of a built 1.14.0, `uidmap` and your id ranges, and a three-second start in the namespace sandbox |
+| `scripts/virtiofsd-install.sh remove` | the rollback, when a diversion is in place |
+
+A passing check prints one green `[ok]` line per check, then
+`virtiofsd ok for <you>`; a failing one prints a red `[fail]` line with the
+reason. The warnings of an unprivileged virtiofsd listed above show only when
+the start fails.

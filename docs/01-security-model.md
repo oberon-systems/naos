@@ -44,9 +44,20 @@ open Run holds it.
 A model provider's key never enters the VM. The model gateway
 ([13](13-model-gateway.md)) drops every auth header the agent sends, sets the
 provider's own on the host and redacts the key in every answer, so the agent
-only ever holds a placeholder. The runner build with the `smoke-stubs` feature
-lets the gateway reach loopback and trust an extra CA; it exists for `make
-smoke` and is never a release.
+only ever holds a placeholder.
+
+## Host risks
+
+What a feature costs the host, and how it is kept small. A feature adds its
+line here when it lands.
+
+| Risk | Where it comes from | How it is limited |
+|---|---|---|
+| A guest reaches any vsock service of the host | A Run with a model policy has a vsock device, and vsock lets the guest connect to every listener at the host's CID 2, not only the gateway | The runner host runs no other vsock service; [host/vhost-vsock.md](host/vhost-vsock.md) checks it with `ss --vsock -l`, and `scripts/vhost-vsock-install.sh check` fails when one listens. Only a Run with a model policy gets the device |
+| A process of the runner's user takes a guest CID | Read and write on `/dev/vhost-vsock` lets any process of that user register a free CID. It cannot take the CID of a running VM, but it can take one a stopped VM of another hypervisor used, and receive the host's connections to it, or hold CIDs so VMs fail to start | The ACL covers `/dev/vhost-vsock` only and only the runner's user, never the `kvm` group. In production the runner runs as a user of its own. The runner picks a random CID and serves a connection only from the CID of its VM, so a host process at CID 1 or another VM is refused |
+| A larger kernel surface for the runner's user | The vhost ioctls of `/dev/vhost-vsock` become reachable | Small next to `/dev/kvm`, which the runner already needs |
+| A Run spends past its token budget | Calls already in flight when the budget runs out still finish, and the budget lives in the runner's memory, so a restarted runner starts it afresh | Bounded by the calls in flight and by the Run's rate limit per provider |
+| A test build weakens the gateway | The `smoke-stubs` feature lets the gateway reach loopback and trust the CA in `NAOS_AGENT_SMOKE_CA_FILE` | Off by default and only built by `make smoke`; no release enables it |
 
 ## Security acceptance
 

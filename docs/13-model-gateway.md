@@ -10,31 +10,36 @@ URL works, whichever vendor made it.
 
 ## Transport
 
-The agent reaches the gateway over its own virtio-serial port:
+A Run with a model policy gets a vsock device, and each guest connection is
+its own vsock stream to the runner:
 
 ```text
-agent -> 127.0.0.1:4000 -> socat -> /run/naos/model -> virtio-serial naos.model -> model.sock -> runner
+agent -> 127.0.0.1:4000 -> socat -> vsock host:<port> -> runner
 ```
 
-The guest side has no logic. `naos-model` runs `socat` with `fork` and
-`max-children=1`, so the port carries one HTTP connection at a time and a
-parallel call waits in the listen backlog. Every answer carries
-`Connection: close`, which makes the client close and lets the next
-connection in.
+The runner picks a random guest CID from 1000 to 2^31 - 1, keeps it in
+`vm.json` and gives it to the guest as `model_port` in the session
+parameters; the port is the CID. The runner listens on that port for as
+long as the VM runs, and after a restart it listens there again. A
+connection from any other CID, such as another VM or a host process, is
+refused and written as `model_rejected`.
 
-A virtio-serial port is one byte stream with no connection boundaries. The
-runner learns them from the second QMP monitor, `events.sock`, which reports
-`VSERPORT_CHANGE` when the guest opens or closes `naos-model`:
+The guest side has no logic. `naos-model` runs `socat` with `fork`, so
+parallel calls of the agent are parallel connections. Every connection
+carries one request, and every answer carries `Connection: close`. A client
+that closes before the answer drops the provider call; one that closes
+during a stream ends the relay.
 
-| Event | What the runner does |
-|---|---|
-| close, nothing written yet | drops a partial request and keeps the socket |
-| close after an answer, or during one | aborts the provider call, reopens `model.sock` and carries over what the next connection already sent |
-| bytes after an answer, before the close | drops them, the connection is over |
+QEMU opens `/dev/vhost-vsock` as the runner's user, and the runner checks
+that it can before it starts such a Run. A host where the user lacks access
+follows [host/vhost-vsock.md](host/vhost-vsock.md). What vsock and that
+access cost the host is in
+[01](01-security-model.md#host-risks).
 
-Reopening the socket is what keeps the unread tail of an aborted answer away
-from the next connection: QEMU drops unread bytes when the runner hangs up,
-and a guest write waits until the runner is back.
+A virtio-serial port was tried first and dropped: it is one byte stream
+with no connection boundaries, and the `VSERPORT_CHANGE` events that could
+mark them are limited to one per second per port by QEMU, which merges a
+close and the next open.
 
 ## Routes
 
@@ -113,8 +118,9 @@ stream reports no usage.
 Each Run books its usage against its own budget, so one Run never spends
 another's. A call is refused once the input or output budget is spent. A
 call that starts under the budget runs to its end, so the budget can be
-overshot by at most one call. The budget and the rate window live in the
-runner's memory, and a restart of the runner starts them afresh.
+overshot by the calls in flight at that moment. The budget and the rate
+window live in the runner's memory, and a restart of the runner starts them
+afresh. Both are listed in [01](01-security-model.md#host-risks).
 
 ## Failure behavior
 
@@ -147,7 +153,7 @@ The gateway writes to the `audit` target ([11](11-observability.md)):
 | `model_rejected` | `run_id`, `reason` |
 | `model_call` | `run_id`, `provider`, `model`, `input_tokens`, `output_tokens`, `decision`, `duration_ms`, `category` |
 
-`model_rejected` is a request the framing refused. `provider` is `naos` for
+`model_rejected` is a request the framing refused or a connection from another CID. `provider` is `naos` for
 the model list and `unknown` before a model is routed. `model` is `none`
 when the request named none, and `invalid` when the name is not a model name.
 `decision` is `allow` or `deny`. `category` is `none`, `invalid`, `denied`,
@@ -159,7 +165,8 @@ completions and keys are never logged.
 The network gate refuses loopback, so `make smoke` builds the runner with the
 cargo feature `smoke-stubs`. With it, the gateway resolves every provider
 host to `127.0.0.1` and trusts the CA in `NAOS_AGENT_SMOKE_CA_FILE`. The
-feature weakens the gate and is off in every other build.
+feature weakens the gate and is off in every other build
+([01](01-security-model.md#host-risks)).
 
 ## Acceptance
 
@@ -175,9 +182,9 @@ The tests in `packages/runner/src/libs/model/tests.rs` verify that:
 - a provider error is passed on once, a slow provider times out, and an
   echoed key is redacted, also across chunks;
 - usage is read from both event streams;
-- over the port, a request is answered, a close after it reopens the socket
-  with the next request carried over, malformed requests are refused, and a
-  close during a stream aborts it.
+- over a connection, a request is answered and the connection ends,
+  connections are served side by side, malformed requests are refused, and a
+  client that leaves before or during the answer ends the call.
 
 The API tests in `packages/api/tests/test_model.py`,
 `test_runner_lifecycle.py`, `test_secrets.py` and `test_audit.py` cover the
