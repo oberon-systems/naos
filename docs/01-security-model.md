@@ -18,6 +18,7 @@ Explicit capabilities:
 - network destination/protocol;
 - shell operation;
 - MCP server/method/resource;
+- model provider/model and token budget;
 - credentials.
 
 Default deny. Deny overrides allow.
@@ -40,6 +41,13 @@ next issue to a runner; a Run already holding the old value keeps it until its
 credential TTL ends. A secret cannot be deleted while a policy names it or an
 open Run holds it.
 
+A model provider's key never enters the VM. The model gateway
+([13](13-model-gateway.md)) drops every auth header the agent sends, sets the
+provider's own on the host and redacts the key in every answer, so the agent
+only ever holds a placeholder. The runner build with the `smoke-stubs` feature
+lets the gateway reach loopback and trust an extra CA; it exists for `make
+smoke` and is never a release.
+
 ## Security acceptance
 
 Prove an untrusted agent cannot:
@@ -51,6 +59,7 @@ Prove an untrusted agent cannot:
 - execute unauthorized host commands;
 - access another Run/VM;
 - call unauthorized MCP methods;
-- obtain infrastructure credentials.
+- reach a model outside its policy or past its token budget;
+- obtain infrastructure credentials or a model provider's key.
 
 Prompt instructions are never enforcement.

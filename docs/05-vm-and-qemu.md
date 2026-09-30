@@ -52,8 +52,10 @@ shell. Everything the guest can reach is on this list:
 | `-device virtio-blk-pci,drive=disk` | the single disk the guest sees |
 | `-chardev socket` + `-serial` | `ttyS0` on `console.sock` |
 | `-device virtio-serial-pci` + `-device virtserialport,name=naos.mcp` | the MCP port on `mcp.sock` |
+| `-device virtserialport,name=naos.model,id=naos-model` | the model gateway port on `model.sock` |
 | `-chardev file` + `-serial` | `ttyS1` into `boot.log` |
 | `-qmp unix:qmp.sock` | monitor for readiness and power-down |
+| `-qmp unix:events.sock` | monitor the runner only listens on, for the model port's open and close events |
 | `-fw_cfg name=opt/naos/session` | per-Run parameters from `session.json` |
 
 A Run whose mount policy has a workspace adds:
@@ -89,18 +91,24 @@ In `ro` mode the share is bound read-only at `/naos/<name>`. The agent's tmux se
 
 ## Console and session
 
-The guest has two serial ports and one virtio-serial port. `ttyS0` is
+The guest has two serial ports and two virtio-serial ports for gates. `ttyS0` is
 interactive: the runner exposes it as `console.sock`, and the image logs `naos`
 in there and attaches to the agent's tmux session. `ttyS1` carries kernel
 messages and the isolation probes into `boot.log`. The virtio-serial port
-`naos.mcp` is the only way from the agent to the gates: the runner serves it on
-`mcp.sock`, and [08](08-mcp-gate.md) describes what flows over it.
+`naos.mcp` is the agent's way to the gates: the runner serves it on
+`mcp.sock`, and [08](08-mcp-gate.md) describes what flows over it. The port
+`naos.model` carries the agent's model calls to the model gateway on
+`model.sock` ([13](13-model-gateway.md)).
 
 At boot `naos-probe` finds the port by name and sends it a `ping`; a missing
 port or a missing answer fails the probe, so a VM that cannot reach its gates
 never counts as booted. `naos-session` then hands the port to `naos` as
 `/run/naos/mcp`, and `/usr/local/bin/naos-mcp` pipes stdio into it. Claude Code
-and Gemini CLI register that command as the MCP server `naos`.
+and Gemini CLI register that command as the MCP server `naos`. The probe also
+fails without a `naos.model` port. `naos-model` hands that port to `naos` as
+`/run/naos/model` and runs `socat` from `127.0.0.1:4000` to it, one
+connection at a time, and `/etc/profile.d/naos-model.sh` points
+`OPENAI_BASE_URL` and `ANTHROPIC_BASE_URL` at it with placeholder keys.
 
 The guest reads `/sys/firmware/qemu_fw_cfg/by_name/opt/naos/session/raw` for
 its per-Run parameters: `run_id`, `vm_id`, `agent`, which selects `claude`
@@ -121,15 +129,16 @@ gates.
 
 ## Credentials and gates
 
-No credential is baked into an image or passed in `session.json`. Until the
-gates exist, an agent starts in its session but cannot log in to its provider,
-and that is the expected state of this runtime.
+No credential is baked into an image or passed in `session.json`. The keys
+in the guest environment are placeholders that the model gateway throws away.
 
-- The network gate ([06](06-network-gate.md)) enforces the policy host-side and
-  will carry provider traffic with credentials attached there, so a key never
-  enters the VM. Its only caller today is the `http_request` tool of the MCP
-  broker ([08](08-mcp-gate.md)); the session does not yet point the agents at
-  the gate instead of the provider.
+- The model gateway ([13](13-model-gateway.md)) carries the agent's model
+  calls. The runner sets the provider's key on each call, so a key never
+  enters the VM, and a Run without a model policy reaches no model.
+- The network gate ([06](06-network-gate.md)) enforces the policy host-side.
+  Its callers are the `http_request` tool of the MCP broker
+  ([08](08-mcp-gate.md)) and the model gateway, which gets one gate per
+  provider.
 - The MCP gate ([P3](12-roadmap.md)) will hand out short-lived per-Run tokens
   where a provider cannot be proxied.
 - An interactive login inside the VM, such as an OAuth flow, will only be

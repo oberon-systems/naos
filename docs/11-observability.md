@@ -83,11 +83,12 @@ A lease that expires fails its active Runs, and each of those is a
 The runner writes each event as a JSON line of its log under the `audit`
 target, and appends it to its spool. The events are those of the runtime
 ([04](04-runner-design.md#runtime)), the console and the gates
-([06](06-network-gate.md), [07](07-shell-gate.md), [08](08-mcp-gate.md)):
-`run_claimed`, `run_failed`, `orphan_destroyed`, `lease_fenced`,
-`runner_registered`, `runner_credentials_dropped`, `console_attached`, and
-every gate decision, `network_allowed`, `network_denied`, `shell_allowed`,
-`shell_denied` and `mcp_call`.
+([06](06-network-gate.md), [07](07-shell-gate.md), [08](08-mcp-gate.md),
+[13](13-model-gateway.md)): `run_claimed`, `run_failed`, `orphan_destroyed`,
+`lease_fenced`, `runner_registered`, `runner_credentials_dropped`,
+`console_attached`, and every gate decision, `network_allowed`,
+`network_denied`, `shell_allowed`, `shell_denied`, `mcp_call` and
+`model_call`.
 
 `POST /api/v1/runners/{runner_id}/events` takes a batch of up to 1000 of
 them. An event that names a Run this runner never held is refused and

@@ -242,13 +242,14 @@ curl -fsS "$api/api/v1/policies" -d '{"kind": "network", "document": {"allow": [
 
 The API resolves the document into its canonical form before storing it, so
 equivalent documents share one digest and therefore one id. Ids carry the kind:
-`mntpol_`, `netpol_`, `shellpol_`, `mcppol_`.
+`mntpol_`, `netpol_`, `shellpol_`, `mcppol_`, `modelpol_`.
 
-A Run names a policy per kind under `spec.mounts`, `spec.network`, `spec.shell`
-and `spec.mcp`, and the reference is immutable once the Run starts. The runner
-receives the resolved document as a snapshot rather than the id. The network
-document is described in [06](06-network-gate.md), the shell document in
-[07](07-shell-gate.md), the MCP document in [08](08-mcp-gate.md).
+A Run names a policy per kind under `spec.mounts`, `spec.network`, `spec.shell`,
+`spec.mcp` and `spec.model`, and the reference is immutable once the Run
+starts. The runner receives the resolved document as a snapshot rather than
+the id. The network document is described in [06](06-network-gate.md), the
+shell document in [07](07-shell-gate.md), the MCP document in
+[08](08-mcp-gate.md), the model document in [13](13-model-gateway.md).
 
 `GET /policies` lists every policy newest first; `kind` narrows it to one
 kind, and `q` to the policies whose id or digest holds the substring, ignoring
@@ -261,7 +262,7 @@ The web form reads the list to offer a policy per kind.
 ## Profiles
 
 A profile is a named, reusable Run spec without `image` and `runner`: the
-`runtime`, the four policy references, `merge` and `timeout`. A Run copies the
+`runtime`, the five policy references, `merge` and `timeout`. A Run copies the
 profile and never references it, so a later update reaches no started Run.
 
 - `POST /profiles` takes `name` and `spec`; `name` matches
@@ -292,7 +293,7 @@ unset lets any runner claim it. An unknown or revoked runner returns 422.
 
 ## Secrets
 
-A secret is a provider credential an MCP policy names by `name`. The API
+A secret is a provider credential an MCP or model policy names by `name`. The API
 stores it as given, without encryption for now, and never returns its value:
 no response, error or audit event carries it.
 
@@ -320,7 +321,7 @@ Each secret carries these fields beside `id`, `name`, `expires_at`,
 | Field | Meaning |
 | --- | --- |
 | `state` | `valid`, `expiring` within 7 days, or `expired` |
-| `named_by` | `kind` `cred`, the MCP policy `id` and the `server` it is the credential of |
+| `named_by` | `kind` `cred` with the MCP policy `id` and the `server`, or `kind` `model` with the model policy `id` and the provider in `server` |
 | `held_by` | The PENDING, STARTING and STARTED Runs it was issued to: `run_id`, `seq`, `status`, `profile_id` |
 | `runs` | `GET` of one secret only: every Run it was ever issued to, with `issued` count and `last_at` |
 
@@ -417,7 +418,7 @@ POST /api/v1/runners/{runner_id}/events                      runner token
   live lease, with its spec, the `image_url` of its image, the resolved
   policy documents, `credentials` and `merge`, the merge decision of a
   WAITING_MERGE Run or null.
-- `credentials` maps each secret the MCP policy names to `value` and
+- `credentials` maps each secret the MCP and model policies name to `value` and
   `expires_at`, only for PENDING, STARTING and STARTED Runs, so the start that
   follows a claim already has them. A missing or expired secret is left out,
   and `expires_at` is at most `NAOS_RUN_CREDENTIAL_TTL_SECONDS` away, so a
