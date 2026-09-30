@@ -97,22 +97,29 @@ start() {
         [ "$name" = lo ] || failures="$failures interface=$name"
     done
 
-    # Disks (2) and serial ports (3), plus the workspace share (0x1a) when the Run has one.
+    # Disks (2) and serial ports (3), plus the workspace share (0x1a) and the model
+    # gateway's vsock (0x13) when the Run has them.
+    model_port=$(sed -n 's/.*"model_port": *\([0-9][0-9]*\).*/\1/p' "$session_config" 2> /dev/null)
+    vsock=0
     for device in /sys/bus/virtio/devices/*/device; do
         [ -e "$device" ] || continue
         case "$(cat "$device")" in
             0x0002 | 0x0003) ;;
             0x001a) [ -n "$workspace" ] || failures="$failures virtio=0x001a" ;;
+            0x0013)
+                vsock=1
+                [ -n "$model_port" ] || failures="$failures virtio=0x0013"
+                ;;
             *) failures="$failures virtio=$(cat "$device")" ;;
         esac
     done
+    [ -z "$model_port" ] || [ "$vsock" = 1 ] || failures="$failures model-vsock"
 
     if port=$(virtio_port naos.mcp); then
         mcp_ping "$port" || failures="$failures mcp-ping"
     else
         failures="$failures mcp-port"
     fi
-    virtio_port naos.model > /dev/null || failures="$failures model-port"
 
     if [ -z "$failures" ]; then
         report "naos-probe ok"

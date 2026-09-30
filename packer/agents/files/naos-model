@@ -2,14 +2,11 @@
 # shellcheck shell=sh
 # shellcheck disable=SC2034  # openrc reads these variables itself
 #
-# The model gateway of this Run on 127.0.0.1:4000. socat only pipes one connection
-# at a time to the naos.model port; the runner answers and holds the keys.
+# The model gateway of this Run on 127.0.0.1:4000. socat pipes each connection
+# to the runner over vsock; the runner answers and holds the keys.
 
 description="Pipe the model gateway to the runner"
-command=/usr/bin/socat
-command_args="-t 0 TCP-LISTEN:4000,bind=127.0.0.1,reuseaddr,fork,max-children=1 GOPEN:/run/naos/model"
-command_user=naos:naos
-command_background=true
+session_config=/sys/firmware/qemu_fw_cfg/by_name/opt/naos/session/raw
 pidfile=/run/naos-model.pid
 
 depend() {
@@ -17,18 +14,27 @@ depend() {
     before naos-session
 }
 
-# The port is root-owned when it appears; naos gets it under a stable name.
-start_pre() {
-    for name in /sys/class/virtio-ports/*/name; do
-        [ "$(cat "$name" 2> /dev/null)" = naos.model ] || continue
-        port=${name%/name}
-        port=/dev/${port##*/}
-        chgrp naos "$port" || return 1
-        chmod 0660 "$port" || return 1
-        install -d -m 0755 /run/naos
-        ln -sfn "$port" /run/naos/model
+model_port() {
+    sed -n 's/.*"model_port": *\([0-9][0-9]*\).*/\1/p' "$session_config" 2> /dev/null
+}
+
+start() {
+    port=$(model_port)
+    if [ -z "$port" ]; then
+        einfo "The Run has no model policy, so no model gateway"
         return 0
-    done
-    eerror "no naos.model port, the Run has no model gateway"
-    return 1
+    fi
+    modprobe vmw_vsock_virtio_transport 2> /dev/null || true
+    ebegin "Starting the model gateway"
+    start-stop-daemon --start --background --make-pidfile --pidfile "$pidfile" \
+        --user naos:naos --exec /usr/bin/socat -- \
+        TCP-LISTEN:4000,bind=127.0.0.1,reuseaddr,fork "VSOCK-CONNECT:2:$port"
+    eend $?
+}
+
+stop() {
+    [ -f "$pidfile" ] || return 0
+    ebegin "Stopping the model gateway"
+    start-stop-daemon --stop --pidfile "$pidfile"
+    eend $?
 }
