@@ -122,28 +122,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 2136,
       "y": 193.5454547405243,
-      "width": 98.76136779785156,
-      "height": 13.818181991577148,
-      "x1": 0,
-      "y1": 0.7272727489471436,
-      "x2": 98.76136779785156,
-      "y2": 14.545454740524292,
       "fontStyle": "normal",
       "textTransform": "uppercase",
       "fontSize": "11px",
       "fontWeight": "600",
+      "y1": 0.7272727489471436,
+      "width": 98.76136779785156,
       "textDecoration": "none",
       "letterSpacing": "0.6px",
+      "x": 2136,
+      "x1": 0,
+      "y2": 14.545454740524292,
       "fills": [
         {
           "fillColor": "#667085",
           "fillOpacity": 1
         }
       ],
+      "x2": 98.76136779785156,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 13.818181991577148,
       "text": "Held by \u00b7 2 runs"
     }
   ],

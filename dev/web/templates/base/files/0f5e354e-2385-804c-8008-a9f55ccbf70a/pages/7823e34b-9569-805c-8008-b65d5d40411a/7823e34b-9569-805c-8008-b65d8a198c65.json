@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 2900,
       "y": 275.50000000000006,
-      "width": 108,
-      "height": 16,
-      "x1": 0,
-      "y1": 0,
-      "x2": 108,
-      "y2": 16,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "500",
+      "y1": 0,
+      "width": 108,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 2900,
+      "x1": 0,
+      "y2": 16,
       "fills": [
         {
           "fillColor": "#344054",
           "fillOpacity": 1
         }
       ],
+      "x2": 108,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
+      "height": 16,
       "text": "registry server"
     }
   ]

@@ -122,53 +122,53 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 1600,
       "y": 639.5454547405238,
-      "width": 483.1591491699219,
-      "height": 13.818181991577148,
-      "x1": 0,
-      "y1": 0.7272727489471436,
-      "x2": 483.1591491699219,
-      "y2": 14.545454740524292,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 0.7272727489471436,
+      "width": 483.1591491699219,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 1600,
+      "x1": 0,
+      "y2": 14.545454740524292,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 483.1591491699219,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 13.818181991577148,
       "text": "A grant hands the value to the agent: from then on it may reach the model provider and the upper disk. "
     },
     {
-      "x": 1600,
       "y": 654.9431819915767,
-      "width": 148.76136779785156,
-      "height": 13.818181991577148,
-      "x1": 0,
-      "y1": 16.125,
-      "x2": 148.76136779785156,
-      "y2": 29.94318199157715,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 16.125,
+      "width": 148.76136779785156,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 1600,
+      "x1": 0,
+      "y2": 29.94318199157715,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 148.76136779785156,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 13.818181991577148,
       "text": "A row opens its server or policy."
     }
   ],

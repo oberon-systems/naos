@@ -122,28 +122,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 1544,
       "y": 1147.7727274894714,
-      "width": 134.2045440673828,
-      "height": 21.81818199157715,
-      "x1": 0,
-      "y1": 1.454545497894287,
-      "x2": 134.2045440673828,
-      "y2": 23.272727489471436,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "18px",
       "fontWeight": "700",
+      "y1": 1.454545497894287,
+      "width": 134.2045440673828,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 1544,
+      "x1": 0,
+      "y2": 23.272727489471436,
       "fills": [
         {
           "fillColor": "#101828",
           "fillOpacity": 1
         }
       ],
+      "x2": 134.2045440673828,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 21.81818199157715,
       "text": "Rotate gh-token"
     }
   ],

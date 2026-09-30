@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 1010.0000000000001,
       "y": 383.36363673210144,
-      "width": 47.7613639831543,
-      "height": 11.636363983154297,
-      "x1": 0,
-      "y1": 0.7272727489471436,
-      "x2": 47.7613639831543,
-      "y2": 12.36363673210144,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "10px",
       "fontWeight": "600",
+      "y1": 0.7272727489471436,
+      "width": 47.7613639831543,
       "textDecoration": "none",
       "letterSpacing": "0.6px",
+      "x": 1010.0000000000001,
+      "x1": 0,
+      "y2": 12.36363673210144,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 47.7613639831543,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 11.636363983154297,
       "text": "TIMEOUT"
     }
   ]

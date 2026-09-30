@@ -122,28 +122,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 784,
       "y": 1147.7727274894714,
-      "width": 93.31818389892578,
-      "height": 21.81818199157715,
-      "x1": 0,
-      "y1": 1.454545497894287,
-      "x2": 93.31818389892578,
-      "y2": 23.272727489471436,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "18px",
       "fontWeight": "700",
+      "y1": 1.454545497894287,
+      "width": 93.31818389892578,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 784,
+      "x1": 0,
+      "y2": 23.272727489471436,
       "fills": [
         {
           "fillColor": "#101828",
           "fillOpacity": 1
         }
       ],
+      "x2": 93.31818389892578,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 21.81818199157715,
       "text": "New secret"
     }
   ],
