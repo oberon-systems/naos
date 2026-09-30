@@ -28,6 +28,7 @@ use crate::libs::error::AgentError;
 use crate::libs::ids::random_hex;
 use crate::libs::image::{ImageCache, ImageSource};
 use crate::libs::mcp::{self, McpGate};
+use crate::libs::model::{self, Ending, ModelGate};
 use crate::libs::network::NetworkGate;
 use crate::libs::overlay::merge::{Decision, Outcome};
 use crate::libs::overlay::{self, Diff};
@@ -128,6 +129,7 @@ pub struct RunGates {
     pub network: NetworkGate,
     pub shell: ShellGate,
     pub mcp: McpGate,
+    pub model: ModelGate,
 }
 
 pub struct QemuRuntime {
@@ -139,6 +141,7 @@ pub struct QemuRuntime {
     virtiofsd_binary: PathBuf,
     gates: Mutex<HashMap<String, Arc<RunGates>>>,
     sessions: Mutex<HashMap<String, AbortHandle>>,
+    model_sessions: Mutex<HashMap<String, AbortHandle>>,
 }
 
 impl QemuRuntime {
@@ -154,6 +157,7 @@ impl QemuRuntime {
             virtiofsd_binary: config.virtiofsd_binary.clone(),
             gates: Mutex::new(HashMap::new()),
             sessions: Mutex::new(HashMap::new()),
+            model_sessions: Mutex::new(HashMap::new()),
         })
     }
 
@@ -170,11 +174,12 @@ impl QemuRuntime {
                 &self.git_binary,
             )?,
             mcp: McpGate::from_snapshot(&run.id, policy("mcp"))?,
+            model: ModelGate::from_snapshot(&run.id, policy("model"))?,
         };
         let granted: Vec<&str> = run
             .granted_policies()
             .into_iter()
-            .filter(|kind| !matches!(*kind, "network" | "shell" | "mount" | "mcp"))
+            .filter(|kind| !matches!(*kind, "network" | "shell" | "mount" | "mcp" | "model"))
             .collect();
         if !granted.is_empty() {
             return Err(AgentError::Runtime(format!(
@@ -185,13 +190,15 @@ impl QemuRuntime {
         }
         // The policy is immutable for the life of the Run, so a reconcile keeps the gate it
         // registered: rebuilding it would hand the Run a fresh request budget every tick.
-        self.gates
+        let kept = self
+            .gates
             .lock()
             .expect("gates")
             .entry(run.id.clone())
             .or_insert_with(|| Arc::new(gates))
-            .mcp
-            .refresh(&run.credentials);
+            .clone();
+        kept.mcp.refresh(&run.credentials);
+        kept.model.refresh(&run.credentials);
         Ok(())
     }
 
@@ -200,9 +207,18 @@ impl QemuRuntime {
         self.gates.lock().expect("gates").get(run_id).cloned()
     }
 
-    /// Serves the guest's MCP port unless a live session already does; a session that ended is
+    /// Serves the guest's gate ports unless live sessions already do; a session that ended is
     /// replaced, which is also how a restarted runner reattaches to a running VM.
     fn attach(&self, vm: &LocalVm, paths: &VmPaths) {
+        let Some(gates) = self.gates(&vm.run_id) else {
+            tracing::warn!(run_id = %vm.run_id, "no gates registered, the ports stay closed");
+            return;
+        };
+        self.attach_mcp(vm, paths, Arc::clone(&gates));
+        self.attach_model(vm, paths, gates);
+    }
+
+    fn attach_mcp(&self, vm: &LocalVm, paths: &VmPaths, gates: Arc<RunGates>) {
         let mut sessions = self.sessions.lock().expect("sessions");
         if sessions
             .get(&vm.run_id)
@@ -210,10 +226,6 @@ impl QemuRuntime {
         {
             return;
         }
-        let Some(gates) = self.gates(&vm.run_id) else {
-            tracing::warn!(run_id = %vm.run_id, "no gates registered, the mcp port stays closed");
-            return;
-        };
         let run_id = vm.run_id.clone();
         let socket = paths.mcp();
         let task = tokio::spawn(async move {
@@ -228,6 +240,51 @@ impl QemuRuntime {
             let (read, write) = stream.into_split();
             if let Err(err) = mcp::serve(&run_id, &gates, read, write).await {
                 tracing::warn!(run_id = %run_id, error = %err, "mcp session ended");
+            }
+        });
+        sessions.insert(vm.run_id.clone(), task.abort_handle());
+    }
+
+    /// Serves the guest's model port for as long as the VM runs. A connection the guest closed
+    /// after the host wrote to it reopens the socket, so an unread answer never reaches the next one.
+    fn attach_model(&self, vm: &LocalVm, paths: &VmPaths, gates: Arc<RunGates>) {
+        let mut sessions = self.model_sessions.lock().expect("sessions");
+        if sessions
+            .get(&vm.run_id)
+            .is_some_and(|session| !session.is_finished())
+        {
+            return;
+        }
+        let run_id = vm.run_id.clone();
+        let socket = paths.model();
+        let events = paths.events();
+        let task = tokio::spawn(async move {
+            let mut monitor = match qemu::monitor(&events).await {
+                Ok(monitor) => monitor,
+                Err(err) => {
+                    tracing::warn!(run_id = %run_id, error = %err, "cannot reach the event monitor");
+                    return;
+                }
+            };
+            audit::model_attached(&run_id);
+            let mut carry = Vec::new();
+            loop {
+                let stream = match UnixStream::connect(&socket).await {
+                    Ok(stream) => stream,
+                    Err(err) => {
+                        tracing::warn!(run_id = %run_id, error = %err, "cannot reach the model port");
+                        return;
+                    }
+                };
+                let (read, write) = stream.into_split();
+                match model::serve(&gates.model, read, write, &mut monitor.lines, carry).await {
+                    Ok(Ending::Reconnect(rest)) => carry = rest,
+                    Ok(Ending::Closed) => return,
+                    Err(err) => {
+                        tracing::warn!(run_id = %run_id, error = %err, "model session ended");
+                        return;
+                    }
+                }
             }
         });
         sessions.insert(vm.run_id.clone(), task.abort_handle());
@@ -529,6 +586,9 @@ impl Runtime for QemuRuntime {
                 if granted("mcp") {
                     audit::mcp_policy_configured(&vm.run_id);
                 }
+                if granted("model") {
+                    audit::model_policy_configured(&vm.run_id);
+                }
                 if let Some(workspace) = &workspace {
                     audit::workspace_shared(&vm.run_id, mode_name(workspace.mode));
                 }
@@ -648,6 +708,14 @@ impl QemuRuntime {
         }
         self.gates.lock().expect("gates").remove(&vm.run_id);
         if let Some(session) = self.sessions.lock().expect("sessions").remove(&vm.run_id) {
+            session.abort();
+        }
+        if let Some(session) = self
+            .model_sessions
+            .lock()
+            .expect("sessions")
+            .remove(&vm.run_id)
+        {
             session.abort();
         }
         audit::vm_destroyed(&vm.vm_id, &vm.run_id);

@@ -16,6 +16,7 @@ publish = true
 dotenvy = "0.15.7"
 envy = "0.4.2"
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
+httparse = "1.10.1"
 nix = { version = "0.30", features = ["dir", "hostname", "process", "signal", "term"] }
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
 serde = { version = "1", features = ["derive"] }
@@ -27,6 +28,11 @@ tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 url = "2"
+
+[features]
+# Smoke only: the model gateway reaches stub providers on loopback and trusts
+# NAOS_AGENT_SMOKE_CA_FILE. It weakens the gate, so no release is built with it.
+smoke-stubs = []
 
 [dev-dependencies]
 serial_test = "4.0.1"

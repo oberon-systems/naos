@@ -250,5 +250,43 @@ pub fn mcp_call(
     );
 }
 
+pub fn model_policy_configured(run_id: &str) {
+    audit!(info, "model_policy_configured", run_id = run_id);
+}
+
+pub fn model_attached(run_id: &str) {
+    audit!(info, "model_attached", run_id = run_id);
+}
+
+pub fn model_rejected(run_id: &str, reason: &str) {
+    audit!(warn, "model_rejected", run_id = run_id, reason = reason);
+}
+
+// Prompts, completions and keys never reach this line: only who answered and what it cost.
+#[allow(clippy::too_many_arguments)]
+pub fn model_call(
+    run_id: &str,
+    provider: &str,
+    model: &str,
+    input_tokens: u64,
+    output_tokens: u64,
+    decision: &str,
+    duration_ms: u64,
+    category: &str,
+) {
+    audit!(
+        info,
+        "model_call",
+        run_id = run_id,
+        provider = provider,
+        model = model,
+        input_tokens = input_tokens,
+        output_tokens = output_tokens,
+        decision = decision,
+        duration_ms = duration_ms,
+        category = category
+    );
+}
+
 #[cfg(test)]
 mod tests;

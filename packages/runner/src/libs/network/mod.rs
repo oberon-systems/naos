@@ -100,8 +100,10 @@ pub struct NetworkGate {
     deny: Vec<Rule>,
     window: Mutex<(Instant, u32)>,
     forbidden: fn(IpAddr) -> bool,
-    #[cfg(test)]
+    #[cfg(any(test, feature = "smoke-stubs"))]
     resolved: Option<Vec<IpAddr>>,
+    #[cfg(any(test, feature = "smoke-stubs"))]
+    roots: Vec<reqwest::Certificate>,
 }
 
 impl NetworkGate {
@@ -129,8 +131,10 @@ impl NetworkGate {
                 .collect::<Result<_, _>>()?,
             window: Mutex::new((Instant::now(), 0)),
             forbidden,
-            #[cfg(test)]
+            #[cfg(any(test, feature = "smoke-stubs"))]
             resolved: None,
+            #[cfg(any(test, feature = "smoke-stubs"))]
+            roots: Vec::new(),
         })
     }
 
@@ -140,27 +144,40 @@ impl NetworkGate {
 
     /// The whole egress surface: budget, authorization, the pinned request and a bounded body.
     pub async fn send(&self, request: GateRequest) -> Result<GateResponse, AgentError> {
-        let url = Url::parse(&request.url)
-            .map_err(|err| AgentError::Runtime(format!("network deny: invalid URL: {err}")))?;
-        let protocol = url.scheme().to_owned();
-        let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
-        self.spend(&protocol, &host)?;
-
-        let client = self.client_for(&url).await?;
-        let mut builder = client.request(request.method, url).headers(request.headers);
-        if let Some(body) = request.body {
-            builder = builder.body(body);
-        }
-        let response = builder
-            .send()
-            .await
-            .map_err(|err| AgentError::Runtime(format!("network deny: request failed: {err}")))?;
+        let (protocol, host) = destination(&request.url)?;
+        let response = self.open(request, REQUEST_TIMEOUT).await?;
         let status = response.status();
         let headers = response.headers().clone();
         Ok(GateResponse {
             status,
             headers,
             body: self.read_body(response, &protocol, &host).await?,
+        })
+    }
+
+    /// The same checks as `send`, but the answer is handed over unread for the caller to stream;
+    /// `timeout` bounds the whole exchange, body included.
+    pub async fn open(
+        &self,
+        request: GateRequest,
+        timeout: Duration,
+    ) -> Result<Response, AgentError> {
+        let url = Url::parse(&request.url)
+            .map_err(|err| AgentError::Runtime(format!("network deny: invalid URL: {err}")))?;
+        let (protocol, host) = destination(url.as_str())?;
+        self.spend(&protocol, &host)?;
+
+        let client = self.client_for(&url, timeout).await?;
+        let mut builder = client.request(request.method, url).headers(request.headers);
+        if let Some(body) = request.body {
+            builder = builder.body(body);
+        }
+        builder.send().await.map_err(|err| {
+            if err.is_timeout() {
+                AgentError::Runtime("network deny: request timed out".into())
+            } else {
+                AgentError::Runtime(format!("network deny: request failed: {err}"))
+            }
         })
     }
 
@@ -255,7 +272,7 @@ impl NetworkGate {
 
     /// Resolution is pinned, redirects are disabled so each Location is re-authorized, and the
     /// environment's proxy settings are ignored so neither can be routed around.
-    async fn client_for(&self, url: &Url) -> Result<Client, AgentError> {
+    async fn client_for(&self, url: &Url, timeout: Duration) -> Result<Client, AgentError> {
         let host = url
             .host_str()
             .ok_or_else(|| AgentError::Runtime("network deny: URL has no hostname".into()))?;
@@ -269,7 +286,11 @@ impl NetworkGate {
         let mut builder = Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .no_proxy()
-            .timeout(REQUEST_TIMEOUT);
+            .timeout(timeout);
+        #[cfg(any(test, feature = "smoke-stubs"))]
+        {
+            builder = builder.tls_certs_merge(self.roots.clone());
+        }
         // One call per address would overwrite the pin instead of adding to it, leaving the last
         // address as the only one the request can reach.
         let pinned: Vec<SocketAddr> = ips.iter().map(|ip| SocketAddr::new(*ip, port)).collect();
@@ -280,7 +301,7 @@ impl NetworkGate {
     }
 
     async fn lookup(&self, host: &str, port: u16) -> Result<Vec<IpAddr>, AgentError> {
-        #[cfg(test)]
+        #[cfg(any(test, feature = "smoke-stubs"))]
         if let Some(ips) = &self.resolved {
             return Ok(ips.clone());
         }
@@ -296,11 +317,33 @@ impl NetworkGate {
 impl NetworkGate {
     /// Test-only: reaches a local server by allowing loopback and answering DNS from `ips`.
     pub(crate) fn local(document: &Value, ips: Vec<IpAddr>) -> Result<Self, AgentError> {
-        let mut gate = Self::from_snapshot("run_a", Some(document))?;
+        Self::stub("run_a", document, ips, Vec::new())
+    }
+}
+
+#[cfg(any(test, feature = "smoke-stubs"))]
+impl NetworkGate {
+    /// Loopback allowed, DNS answered from `ips` and `roots` trusted: only tests and the smoke
+    /// build reach a stub this way, never a release binary.
+    pub(crate) fn stub(
+        run_id: &str,
+        document: &Value,
+        ips: Vec<IpAddr>,
+        roots: Vec<reqwest::Certificate>,
+    ) -> Result<Self, AgentError> {
+        let mut gate = Self::from_snapshot(run_id, Some(document))?;
         gate.forbidden = |ip| !ip.is_loopback() && forbidden(ip);
         gate.resolved = Some(ips);
+        gate.roots = roots;
         Ok(gate)
     }
+}
+
+fn destination(raw: &str) -> Result<(String, String), AgentError> {
+    let url = Url::parse(raw)
+        .map_err(|err| AgentError::Runtime(format!("network deny: invalid URL: {err}")))?;
+    let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
+    Ok((url.scheme().to_owned(), host))
 }
 
 fn invalid(reason: &str) -> AgentError {

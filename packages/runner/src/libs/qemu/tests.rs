@@ -109,7 +109,7 @@ fn base_is_read_only_under_a_writable_overlay() {
 }
 
 #[test]
-fn the_guest_gets_exactly_one_disk_and_the_two_ports_it_needs() {
+fn the_guest_gets_exactly_one_disk_and_the_three_ports_it_needs() {
     let args = args();
 
     assert_eq!(
@@ -118,10 +118,21 @@ fn the_guest_gets_exactly_one_disk_and_the_two_ports_it_needs() {
             "virtio-blk-pci,drive=disk",
             "virtio-serial-pci,id=naos-serial",
             "virtserialport,bus=naos-serial.0,chardev=mcp,name=naos.mcp",
+            "virtserialport,bus=naos-serial.0,chardev=model,name=naos.model,id=naos-model",
             "virtserialport,bus=naos-serial.0,chardev=control,name=naos.ctl",
         ]
     );
     let chardevs = value_of(&args, "-chardev");
+    assert!(chardevs.contains(
+        &format!("socket,id=model,path={VM_DIR}/model.sock,server=on,wait=off").as_str()
+    ));
+    assert_eq!(
+        value_of(&args, "-qmp"),
+        vec![
+            format!("unix:{VM_DIR}/qmp.sock,server=on,wait=off"),
+            format!("unix:{VM_DIR}/events.sock,server=on,wait=off"),
+        ]
+    );
     assert!(chardevs
         .contains(&format!("socket,id=mcp,path={VM_DIR}/mcp.sock,server=on,wait=off").as_str()));
     assert!(chardevs.contains(
@@ -171,4 +182,17 @@ fn without_a_workspace_the_command_line_has_no_shared_memory() {
 
     assert_eq!(value_of(&args, "-machine"), vec!["q35"]);
     assert!(value_of(&args, "-object").is_empty());
+}
+
+#[test]
+fn only_a_close_of_the_model_port_counts() {
+    let event = |id: &str, open: bool| {
+        json!({ "event": "VSERPORT_CHANGE", "data": { "id": id, "open": open } }).to_string()
+    };
+
+    assert!(port_closed(&event(MODEL_DEVICE, false), MODEL_DEVICE));
+    assert!(!port_closed(&event(MODEL_DEVICE, true), MODEL_DEVICE));
+    assert!(!port_closed(&event("naos-other", false), MODEL_DEVICE));
+    assert!(!port_closed(r#"{"event": "SHUTDOWN"}"#, MODEL_DEVICE));
+    assert!(!port_closed("not json", MODEL_DEVICE));
 }

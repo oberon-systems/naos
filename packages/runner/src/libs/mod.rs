@@ -9,6 +9,7 @@ pub mod ids;
 pub mod image;
 pub mod lease;
 pub mod mcp;
+pub mod model;
 pub mod network;
 pub mod overlay;
 pub mod placement;

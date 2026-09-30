@@ -8,6 +8,7 @@ use wiremock::{Mock, MockServer, Request, ResponseTemplate};
 
 use super::*;
 use crate::libs::api::RunCredential;
+use crate::libs::model::ModelGate;
 use crate::libs::network::NetworkGate;
 use crate::libs::shell::ShellGate;
 
@@ -22,11 +23,16 @@ fn no_mcp() -> McpGate {
     McpGate::from_snapshot("run_a", None).expect("policy")
 }
 
+fn no_model() -> ModelGate {
+    ModelGate::from_snapshot("run_a", None).expect("policy")
+}
+
 fn no_gates() -> RunGates {
     RunGates {
         network: NetworkGate::from_snapshot("run_a", None).expect("policy"),
         shell: no_shell(),
         mcp: no_mcp(),
+        model: no_model(),
     }
 }
 
@@ -49,6 +55,7 @@ fn shell_gates(dir: &TempDir, allow: &[&str]) -> RunGates {
         )
         .expect("policy"),
         mcp: no_mcp(),
+        model: no_model(),
     }
 }
 
@@ -61,6 +68,7 @@ fn http_gates(address: SocketAddr) -> RunGates {
         .expect("policy"),
         shell: no_shell(),
         mcp: no_mcp(),
+        model: no_model(),
     }
 }
 
@@ -503,6 +511,7 @@ fn upstream_gates(address: SocketAddr, server: Value) -> RunGates {
         network: NetworkGate::from_snapshot("run_a", None).expect("policy"),
         shell: no_shell(),
         mcp: McpGate::local(&json!({ "servers": [document] }), vec![address.ip()]).expect("policy"),
+        model: no_model(),
     };
     grant(&gates, u64::MAX);
     gates

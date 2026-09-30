@@ -144,6 +144,34 @@ async fn malformed_mcp_policy_is_refused_before_anything_happens() {
 }
 
 #[tokio::test]
+async fn malformed_model_policy_is_refused_before_anything_happens() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let runtime =
+        QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
+    let source = FakeSource::new(IMAGE);
+    let mut run = run_of(IMAGE);
+    run.policies.insert(
+        "model".into(),
+        Some(json!({
+            "providers": [{
+                "name": "alpha", "api": "openai", "url": "http://example.com",
+                "credential": "alpha-key", "models": ["alpha-mini"],
+                "timeout_seconds": 60, "max_requests_per_minute": 60,
+            }],
+            "max_input_tokens": 10, "max_output_tokens": 10,
+        })),
+    );
+
+    let outcome = runtime.ensure(&run, &source).await;
+
+    assert!(
+        matches!(outcome, Err(AgentError::Runtime(message)) if message.contains("invalid model policy"))
+    );
+    assert_eq!(source.calls(), 0);
+    assert!(vm_dirs(&dir).is_empty());
+}
+
+#[tokio::test]
 async fn a_failed_start_leaves_no_gate_behind() {
     let dir = tempfile::tempdir().expect("tempdir");
     let runtime =

@@ -3,7 +3,8 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use serde_json::json;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines};
+use tokio::net::unix::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::UnixStream;
 
 use crate::libs::api::RuntimeSpec;
@@ -13,6 +14,8 @@ pub const QMP_TIMEOUT: Duration = Duration::from_secs(10);
 pub const PROCESS_PREFIX: &str = "naos-";
 pub const SESSION_FW_CFG: &str = "opt/naos/session";
 pub const MCP_PORT: &str = "naos.mcp";
+pub const MODEL_PORT: &str = "naos.model";
+pub const MODEL_DEVICE: &str = "naos-model";
 pub const CONTROL_PORT: &str = "naos.ctl";
 pub const WORKSPACE_TAG: &str = "naos-workspace";
 pub const UPPER_SERIAL: &str = "naos-upper";
@@ -61,6 +64,14 @@ impl VmPaths {
 
     pub fn mcp(&self) -> PathBuf {
         self.dir.join("mcp.sock")
+    }
+
+    pub fn model(&self) -> PathBuf {
+        self.dir.join("model.sock")
+    }
+
+    pub fn events(&self) -> PathBuf {
+        self.dir.join("events.sock")
     }
 
     pub fn control(&self) -> PathBuf {
@@ -164,6 +175,12 @@ pub fn argv(
         "-device".into(),
         format!("virtserialport,bus=naos-serial.0,chardev=mcp,name={MCP_PORT}"),
         "-chardev".into(),
+        format!("socket,id=model,path={},server=on,wait=off", text(paths.model())),
+        "-device".into(),
+        format!(
+            "virtserialport,bus=naos-serial.0,chardev=model,name={MODEL_PORT},id={MODEL_DEVICE}"
+        ),
+        "-chardev".into(),
         format!(
             "socket,id=control,path={},server=on,wait=off",
             text(paths.control())
@@ -176,6 +193,9 @@ pub fn argv(
         "chardev:boot".into(),
         "-qmp".into(),
         format!("unix:{},server=on,wait=off", text(paths.qmp())),
+        // A second monitor that only listens: the model port's open and close events arrive here.
+        "-qmp".into(),
+        format!("unix:{},server=on,wait=off", text(paths.events())),
         "-fw_cfg".into(),
         format!("name={SESSION_FW_CFG},file={}", text(paths.session())),
     ];
@@ -236,6 +256,55 @@ async fn session(socket: &Path, command: &str) -> Result<(), AgentError> {
         }
     }
     Ok(())
+}
+
+/// The event monitor of a VM, past its capabilities handshake; the write half keeps it open.
+pub struct Monitor {
+    pub lines: Lines<BufReader<OwnedReadHalf>>,
+    _write: OwnedWriteHalf,
+}
+
+pub async fn monitor(socket: &Path) -> Result<Monitor, AgentError> {
+    tokio::time::timeout(QMP_TIMEOUT, open_monitor(socket))
+        .await
+        .map_err(|_| AgentError::Runtime("qmp event monitor timed out".into()))?
+}
+
+async fn open_monitor(socket: &Path) -> Result<Monitor, AgentError> {
+    let stream = UnixStream::connect(socket).await?;
+    let (read, mut write) = stream.into_split();
+    let mut lines = BufReader::new(read).lines();
+    lines.next_line().await?;
+    let request = format!("{}\n", json!({ "execute": "qmp_capabilities" }));
+    write.write_all(request.as_bytes()).await?;
+    loop {
+        let line = lines
+            .next_line()
+            .await?
+            .ok_or_else(|| AgentError::Runtime("qmp closed during qmp_capabilities".into()))?;
+        let reply: serde_json::Value = serde_json::from_str(&line)
+            .map_err(|err| AgentError::Runtime(format!("qmp reply: {err}")))?;
+        if reply.get("return").is_some() {
+            return Ok(Monitor {
+                lines,
+                _write: write,
+            });
+        }
+        if let Some(error) = reply.get("error") {
+            return Err(AgentError::Runtime(format!(
+                "qmp qmp_capabilities: {error}"
+            )));
+        }
+    }
+}
+
+/// Whether a monitor line says the guest closed the virtio-serial port `device`.
+pub fn port_closed(line: &str, device: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(line).is_ok_and(|event| {
+        event["event"] == "VSERPORT_CHANGE"
+            && event["data"]["id"] == device
+            && event["data"]["open"] == false
+    })
 }
 
 #[cfg(test)]
