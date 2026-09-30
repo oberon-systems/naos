@@ -1,13 +1,11 @@
-//! HTTP/1.1 over the model port, one connection at a time. The port is one byte stream, so the
-//! guest's open and close events on the QMP monitor are what mark where a connection ends.
-use std::time::Duration;
+//! HTTP/1.1 over one guest connection: one request, one answer, then the connection is closed.
+use std::future::Future;
 
 use reqwest::StatusCode;
-use tokio::io::{AsyncBufRead, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, Lines};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use super::{ModelGate, Relay, Reply, Request};
 use crate::libs::error::AgentError;
-use crate::libs::qemu;
 
 const MAX_HEAD: usize = 64 * 1024;
 const MAX_BODY: usize = 32 * 1024 * 1024;
@@ -15,17 +13,6 @@ const MAX_HEADERS: usize = 64;
 const READ_CHUNK: usize = 64 * 1024;
 const CONTINUE: &[u8] = b"HTTP/1.1 100 Continue\r\n\r\n";
 const LAST_CHUNK: &[u8] = b"0\r\n\r\n";
-
-/// Why a session over the port ended.
-#[derive(Debug, PartialEq, Eq)]
-pub enum Ending {
-    /// The port or its monitor is gone.
-    Closed,
-    /// The guest closed a connection after the host wrote to it. Whatever the guest never read
-    /// still sits in the socket and would reach the next connection, so the socket is reopened;
-    /// `carry` holds what the next connection had already sent.
-    Reconnect(Vec<u8>),
-}
 
 enum Parsed {
     Partial {
@@ -39,272 +26,139 @@ enum Parsed {
     },
 }
 
-/// Serves the port until the guest closes a connection that was written to, or the port goes away.
-pub async fn serve<R, W, E>(
-    gate: &ModelGate,
-    read: R,
-    write: W,
-    events: &mut Lines<E>,
-    carry: Vec<u8>,
-) -> Result<Ending, AgentError>
-where
-    R: AsyncRead + Unpin,
-    W: AsyncWrite + Unpin,
-    E: AsyncBufRead + Unpin,
-{
-    Session {
-        gate,
-        read,
-        write,
-        buffer: carry,
-        wrote: false,
-        answered: false,
-        continued: false,
-    }
-    .run(events)
-    .await
-}
-
-struct Session<'a, R, W> {
-    gate: &'a ModelGate,
-    read: R,
-    write: W,
-    buffer: Vec<u8>,
-    wrote: bool,
-    // After an answer the connection is over: anything more it sends is dropped until it closes.
-    answered: bool,
-    continued: bool,
-}
-
-impl<R, W> Session<'_, R, W>
+/// Answers the one request a guest connection carries. A guest that goes away first drops the
+/// provider call; one that stops reading fails the write and ends the relay.
+pub async fn serve<R, W>(gate: &ModelGate, mut read: R, mut write: W) -> Result<(), AgentError>
 where
     R: AsyncRead + Unpin,
     W: AsyncWrite + Unpin,
 {
-    async fn run<E: AsyncBufRead + Unpin>(
-        &mut self,
-        events: &mut Lines<E>,
-    ) -> Result<Ending, AgentError> {
-        if !self.buffer.is_empty() {
-            if let Some(ending) = self.process(events).await? {
-                return Ok(ending);
-            }
-        }
-        let mut chunk = vec![0; READ_CHUNK];
-        loop {
-            // Events first: a close the guest made before the next connection wrote must be seen first.
-            tokio::select! {
-                biased;
-                line = events.next_line() => {
-                    let Some(line) = line? else {
-                        return Ok(Ending::Closed);
-                    };
-                    if qemu::port_closed(&line, qemu::MODEL_DEVICE) {
-                        if self.wrote {
-                            return Ok(Ending::Reconnect(drain(&mut self.read).await));
-                        }
-                        self.reset();
-                    }
-                }
-                read = self.read.read(&mut chunk) => {
-                    let read = read?;
-                    if read == 0 {
-                        return Ok(Ending::Closed);
-                    }
-                    if self.answered {
-                        continue;
-                    }
-                    self.buffer.extend_from_slice(&chunk[..read]);
-                    if let Some(ending) = self.process(events).await? {
-                        return Ok(ending);
-                    }
-                }
-            }
-        }
-    }
-
-    fn reset(&mut self) {
-        self.buffer.clear();
-        self.answered = false;
-        self.continued = false;
-    }
-
-    async fn process<E: AsyncBufRead + Unpin>(
-        &mut self,
-        events: &mut Lines<E>,
-    ) -> Result<Option<Ending>, AgentError> {
-        match parse(&self.buffer) {
-            Parsed::Partial { expects_continue } => {
-                if expects_continue && !self.continued {
-                    self.continued = true;
-                    if !self.put(events, CONTINUE).await? {
-                        return Ok(Some(Ending::Reconnect(drain(&mut self.read).await)));
-                    }
-                }
-                Ok(None)
-            }
+    let mut buffer = Vec::new();
+    let mut chunk = vec![0; READ_CHUNK];
+    let mut continued = false;
+    let request = loop {
+        match parse(&buffer) {
+            Parsed::Complete(request) => break request,
             Parsed::Refused {
                 path,
                 status,
                 message,
             } => {
-                self.buffer.clear();
-                self.answered = true;
-                let body = self.gate.refuse(&path, status, message);
-                self.local(events, status, &body).await
+                let body = gate.refuse(&path, status, message);
+                return local(&mut write, status, &body).await;
             }
-            Parsed::Complete(request) => {
-                self.buffer.clear();
-                self.answered = true;
-                let gate = self.gate;
-                let handling = gate.handle(request);
-                tokio::pin!(handling);
-                // A guest that gives up while the provider thinks drops the call before any answer.
-                let reply = loop {
-                    tokio::select! {
-                        biased;
-                        line = events.next_line() => {
-                            let Some(line) = line? else {
-                                return Ok(Some(Ending::Closed));
-                            };
-                            if qemu::port_closed(&line, qemu::MODEL_DEVICE) {
-                                gate.abandoned();
-                                if self.wrote {
-                                    return Ok(Some(Ending::Reconnect(drain(&mut self.read).await)));
-                                }
-                                self.reset();
-                                return Ok(None);
-                            }
-                        }
-                        reply = &mut handling => break reply,
-                    }
-                };
-                match reply {
-                    Reply::Local { status, body } => self.local(events, status, &body).await,
-                    Reply::Relay(relay) => self.relay(events, *relay).await,
+            Parsed::Partial { expects_continue } => {
+                if expects_continue && !continued {
+                    continued = true;
+                    write.write_all(CONTINUE).await?;
+                    write.flush().await?;
                 }
             }
         }
-    }
+        let read = read.read(&mut chunk).await?;
+        if read == 0 {
+            return Ok(());
+        }
+        buffer.extend_from_slice(&chunk[..read]);
+    };
 
-    async fn local<E: AsyncBufRead + Unpin>(
-        &mut self,
-        events: &mut Lines<E>,
-        status: u16,
-        body: &[u8],
-    ) -> Result<Option<Ending>, AgentError> {
-        let mut answer = head(
-            status,
-            &[
-                ("content-type".into(), "application/json".into()),
-                ("content-length".into(), body.len().to_string()),
-            ],
-        );
-        answer.extend_from_slice(body);
-        if self.put(events, &answer).await? {
-            Ok(None)
-        } else {
-            Ok(Some(Ending::Reconnect(drain(&mut self.read).await)))
-        }
-    }
-
-    async fn relay<E: AsyncBufRead + Unpin>(
-        &mut self,
-        events: &mut Lines<E>,
-        mut relay: Relay,
-    ) -> Result<Option<Ending>, AgentError> {
-        let mut headers = relay.headers.clone();
-        headers.push(("transfer-encoding".into(), "chunked".into()));
-        if !self.put(events, &head(relay.status, &headers)).await? {
-            return self.aborted(&relay).await;
-        }
-        loop {
-            let next = tokio::select! {
-                biased;
-                line = events.next_line() => {
-                    let Some(line) = line? else {
-                        self.gate.finish(&relay, Err("aborted"));
-                        return Ok(Some(Ending::Closed));
-                    };
-                    if qemu::port_closed(&line, qemu::MODEL_DEVICE) {
-                        return self.aborted(&relay).await;
-                    }
-                    continue;
-                }
-                next = relay.chunk() => next,
-            };
-            let (bytes, outcome) = match next {
-                Ok(Some(bytes)) => (framed(&bytes), None),
-                Ok(None) => (LAST_CHUNK.to_vec(), Some(Ok(()))),
-                Err(reason) => {
-                    let mut bytes = relay
-                        .stream_error(&reason)
-                        .map(|error| framed(&error))
-                        .unwrap_or_default();
-                    bytes.extend_from_slice(LAST_CHUNK);
-                    (bytes, Some(Err(reason)))
-                }
-            };
-            if !self.put(events, &bytes).await? {
-                return self.aborted(&relay).await;
-            }
-            if let Some(outcome) = outcome {
-                self.gate
-                    .finish(&relay, outcome.as_ref().map_err(String::as_str).copied());
-                return Ok(None);
-            }
-        }
-    }
-
-    async fn aborted(&mut self, relay: &Relay) -> Result<Option<Ending>, AgentError> {
-        self.gate.finish(relay, Err("aborted"));
-        Ok(Some(Ending::Reconnect(drain(&mut self.read).await)))
-    }
-
-    /// Writes all of `bytes` unless the guest closes the port first, which answers `false`: a
-    /// guest that stopped reading would otherwise block the write forever.
-    async fn put<E: AsyncBufRead + Unpin>(
-        &mut self,
-        events: &mut Lines<E>,
-        mut bytes: &[u8],
-    ) -> Result<bool, AgentError> {
-        while !bytes.is_empty() {
-            tokio::select! {
-                biased;
-                line = events.next_line() => {
-                    let Some(line) = line? else {
-                        return Err(AgentError::Runtime("model port monitor closed".into()));
-                    };
-                    if qemu::port_closed(&line, qemu::MODEL_DEVICE) {
-                        return Ok(false);
-                    }
-                }
-                written = self.write.write(bytes) => {
-                    let written = written?;
-                    if written == 0 {
-                        return Err(AgentError::Runtime("model port closed".into()));
-                    }
-                    self.wrote = true;
-                    bytes = &bytes[written..];
-                }
-            }
-        }
-        self.write.flush().await?;
-        Ok(true)
+    let Some(reply) = until_closed(&mut read, gate.handle(request)).await else {
+        gate.abandoned();
+        return Ok(());
+    };
+    match reply {
+        Reply::Local { status, body } => local(&mut write, status, &body).await,
+        Reply::Relay(relay) => relay_to(gate, &mut read, &mut write, *relay).await,
     }
 }
 
-/// What the next connection already sent: everything readable right now, without waiting.
-async fn drain<R: AsyncRead + Unpin>(read: &mut R) -> Vec<u8> {
-    let mut carry = Vec::new();
-    let mut chunk = vec![0; READ_CHUNK];
-    while let Ok(Ok(read)) = tokio::time::timeout(Duration::ZERO, read.read(&mut chunk)).await {
-        if read == 0 || carry.len() > MAX_HEAD + MAX_BODY {
-            break;
+/// Runs `work` unless the guest closes its side first, which answers `None`.
+async fn until_closed<R, F>(read: &mut R, work: F) -> Option<F::Output>
+where
+    R: AsyncRead + Unpin,
+    F: Future,
+{
+    tokio::pin!(work);
+    let mut sink = vec![0; READ_CHUNK];
+    loop {
+        tokio::select! {
+            biased;
+            output = &mut work => return Some(output),
+            read = read.read(&mut sink) => {
+                // Bytes after the request mean nothing on a one-request connection; only the close counts.
+                if matches!(read, Ok(0) | Err(_)) {
+                    return None;
+                }
+            }
         }
-        carry.extend_from_slice(&chunk[..read]);
     }
-    carry
+}
+
+async fn local<W: AsyncWrite + Unpin>(
+    write: &mut W,
+    status: u16,
+    body: &[u8],
+) -> Result<(), AgentError> {
+    let mut answer = head(
+        status,
+        &[
+            ("content-type".into(), "application/json".into()),
+            ("content-length".into(), body.len().to_string()),
+        ],
+    );
+    answer.extend_from_slice(body);
+    write.write_all(&answer).await?;
+    write.shutdown().await?;
+    Ok(())
+}
+
+async fn relay_to<R, W>(
+    gate: &ModelGate,
+    read: &mut R,
+    write: &mut W,
+    mut relay: Relay,
+) -> Result<(), AgentError>
+where
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
+    let mut headers = relay.headers.clone();
+    headers.push(("transfer-encoding".into(), "chunked".into()));
+    if write
+        .write_all(&head(relay.status, &headers))
+        .await
+        .is_err()
+    {
+        gate.finish(&relay, Err("aborted"));
+        return Ok(());
+    }
+    loop {
+        let Some(next) = until_closed(read, relay.chunk()).await else {
+            gate.finish(&relay, Err("aborted"));
+            return Ok(());
+        };
+        let (bytes, outcome) = match next {
+            Ok(Some(bytes)) => (framed(&bytes), None),
+            Ok(None) => (LAST_CHUNK.to_vec(), Some(Ok(()))),
+            Err(reason) => {
+                let mut bytes = relay
+                    .stream_error(&reason)
+                    .map(|error| framed(&error))
+                    .unwrap_or_default();
+                bytes.extend_from_slice(LAST_CHUNK);
+                (bytes, Some(Err(reason)))
+            }
+        };
+        if write.write_all(&bytes).await.is_err() || write.flush().await.is_err() {
+            gate.finish(&relay, Err("aborted"));
+            return Ok(());
+        }
+        if let Some(outcome) = outcome {
+            gate.finish(&relay, outcome.as_ref().map_err(String::as_str).copied());
+            let _ = write.shutdown().await;
+            return Ok(());
+        }
+    }
 }
 
 fn parse(buffer: &[u8]) -> Parsed {

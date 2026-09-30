@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, DuplexStream};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, DuplexStream};
 use wiremock::matchers::{header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -8,7 +8,6 @@ use super::*;
 
 const OPENAI_KEY: &str = "secret-alpha-value";
 const ANTHROPIC_KEY: &str = "secret-beta-value";
-const CLOSED: &str = r#"{"event": "VSERPORT_CHANGE", "data": {"id": "naos-model", "open": false}}"#;
 
 fn document(address: SocketAddr, budget: (u64, u64), rate: u32) -> Value {
     let url = format!("http://example.com:{}", address.port());
@@ -420,16 +419,11 @@ async fn usage_is_read_from_both_event_streams() {
     assert_eq!(sent["stream_options"]["include_usage"], true);
 }
 
-// The port as the guest sees it: `guest` carries the bytes, `events` the monitor lines.
-struct Port {
-    guest: DuplexStream,
-    events: DuplexStream,
-}
-
 fn wire(request: &str, body: &str) -> Vec<u8> {
     format!("{request}\r\ncontent-length: {}\r\n\r\n{body}", body.len()).into_bytes()
 }
 
+/// Reads one answer the way the guest's client does, up to the end of its body.
 async fn read_answer(guest: &mut DuplexStream) -> (u16, String) {
     let mut seen = Vec::new();
     let mut byte = [0u8; 1];
@@ -476,85 +470,86 @@ async fn read_answer(guest: &mut DuplexStream) -> (u16, String) {
     (status, String::from_utf8(body).expect("utf-8"))
 }
 
-async fn close(events: &mut DuplexStream) {
-    events
-        .write_all(format!("{CLOSED}\n").as_bytes())
-        .await
-        .expect("event");
-}
-
-/// Runs `serve` against a guest script and answers how the session ended.
-async fn drive<F, Fut>(gate: &ModelGate, carry: Vec<u8>, guest: F) -> Ending
+/// Serves one connection while `guest` plays the client on its other end.
+async fn connect<F, Fut>(gate: &ModelGate, guest: F)
 where
-    F: FnOnce(Port) -> Fut,
+    F: FnOnce(DuplexStream) -> Fut,
     Fut: std::future::Future<Output = ()>,
 {
     let (guest_end, host_end) = tokio::io::duplex(1 << 20);
-    let (events_end, monitor_end) = tokio::io::duplex(1 << 16);
     let (read, write) = tokio::io::split(host_end);
-    let mut lines = BufReader::new(monitor_end).lines();
-    let script = guest(Port {
-        guest: guest_end,
-        events: events_end,
-    });
-    let (ending, ()) = tokio::join!(serve(gate, read, write, &mut lines, carry), script);
-    ending.expect("session")
+    let (served, ()) = tokio::join!(serve(gate, read, write), guest(guest_end));
+    served.expect("connection");
 }
 
 #[tokio::test]
-async fn a_request_over_the_port_is_answered_and_its_close_reopens_the_socket() {
+async fn a_request_over_a_connection_is_answered_and_the_connection_ends() {
     let server = MockServer::start().await;
     Mock::given(path(CHAT))
         .respond_with(openai_answer(1, 1))
         .mount(&server)
         .await;
     let gate = gate(&server);
-    let next = wire("GET /v1/models HTTP/1.1\r\nhost: 127.0.0.1", "");
 
-    let ending = drive(&gate, vec![], |mut port| {
-        let next = next.clone();
-        async move {
-            let body = json!({"model": "alpha-mini", "messages": []}).to_string();
-            port.guest
-                .write_all(&wire(
-                    "POST /v1/chat/completions HTTP/1.1\r\nhost: 127.0.0.1",
-                    &body,
-                ))
-                .await
-                .expect("request");
-            let (status, answer) = read_answer(&mut port.guest).await;
-            assert_eq!(status, 200);
-            assert!(answer.contains("alpha"), "{answer}");
-            // The close of this connection comes before the next one writes, as on a real port.
-            close(&mut port.events).await;
-            port.guest.write_all(&next).await.expect("next");
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        }
-    })
-    .await;
-
-    assert_eq!(ending, Ending::Reconnect(next));
-}
-
-#[tokio::test]
-async fn a_carried_request_is_answered_first() {
-    let server = MockServer::start().await;
-    let gate = gate(&server);
-    let carried = wire("GET /v1/models HTTP/1.1\r\nhost: 127.0.0.1", "");
-
-    let ending = drive(&gate, carried, |mut port| async move {
-        let (status, answer) = read_answer(&mut port.guest).await;
+    connect(&gate, |mut guest| async move {
+        let body = json!({"model": "alpha-mini", "messages": []}).to_string();
+        guest
+            .write_all(&wire(
+                "POST /v1/chat/completions HTTP/1.1\r\nhost: 127.0.0.1",
+                &body,
+            ))
+            .await
+            .expect("request");
+        let (status, answer) = read_answer(&mut guest).await;
         assert_eq!(status, 200);
-        assert!(answer.contains("alpha-mini"), "{answer}");
-        drop(port.events);
+        assert!(answer.contains("alpha"), "{answer}");
+        let mut rest = Vec::new();
+        guest.read_to_end(&mut rest).await.expect("end");
+        assert!(rest.is_empty());
     })
     .await;
+}
 
-    assert_eq!(ending, Ending::Closed);
+async fn chat_call(gate: &ModelGate) {
+    connect(gate, |mut guest| async move {
+        let body = json!({"model": "alpha-mini", "messages": []}).to_string();
+        guest
+            .write_all(&wire("POST /v1/chat/completions HTTP/1.1", &body))
+            .await
+            .expect("request");
+        assert_eq!(read_answer(&mut guest).await.0, 200);
+    })
+    .await;
 }
 
 #[tokio::test]
-async fn malformed_requests_are_refused_and_the_rest_of_the_connection_dropped() {
+async fn connections_are_served_side_by_side() {
+    let server = MockServer::start().await;
+    Mock::given(path(CHAT))
+        .respond_with(openai_answer(1, 1).set_delay(Duration::from_millis(300)))
+        .mount(&server)
+        .await;
+    let gate = gate(&server);
+    let started = std::time::Instant::now();
+
+    tokio::join!(chat_call(&gate), chat_call(&gate), chat_call(&gate));
+
+    assert!(
+        started.elapsed() < Duration::from_millis(800),
+        "{:?}",
+        started.elapsed()
+    );
+    assert_eq!(
+        gate.spent(),
+        Usage {
+            input: 3,
+            output: 3
+        }
+    );
+}
+
+#[tokio::test]
+async fn malformed_requests_are_refused() {
     let server = MockServer::start().await;
     let gate = gate(&server);
 
@@ -570,20 +565,11 @@ async fn malformed_requests_are_refused_and_the_rest_of_the_connection_dropped()
         ),
         (b"\x00\x01 not http\r\n\r\n".to_vec(), 400),
     ] {
-        let ending = drive(&gate, vec![], |mut port| async move {
-            port.guest.write_all(&request).await.expect("request");
-            let (status, _) = read_answer(&mut port.guest).await;
-            assert_eq!(status, expected);
-            port.guest
-                .write_all(b"GET /v1/models HTTP/1.1\r\n\r\n")
-                .await
-                .expect("more");
-            tokio::time::sleep(Duration::from_millis(50)).await;
-            close(&mut port.events).await;
-            tokio::time::sleep(Duration::from_millis(50)).await;
+        connect(&gate, |mut guest| async move {
+            guest.write_all(&request).await.expect("request");
+            assert_eq!(read_answer(&mut guest).await.0, expected);
         })
         .await;
-        assert_eq!(ending, Ending::Reconnect(vec![]));
     }
     assert!(server
         .received_requests()
@@ -597,55 +583,50 @@ async fn a_client_waiting_for_continue_gets_it() {
     let server = MockServer::start().await;
     let gate = gate(&server);
 
-    drive(&gate, vec![], |mut port| async move {
-        port.guest
+    connect(&gate, |mut guest| async move {
+        guest
             .write_all(b"POST /v1/chat/completions HTTP/1.1\r\nexpect: 100-continue\r\ncontent-length: 2\r\n\r\n")
             .await
             .expect("head");
         let mut interim = [0u8; 25];
-        port.guest.read_exact(&mut interim).await.expect("continue");
+        guest.read_exact(&mut interim).await.expect("continue");
         assert_eq!(&interim, b"HTTP/1.1 100 Continue\r\n\r\n");
-        port.guest.write_all(b"{}").await.expect("body");
-        let (status, _) = read_answer(&mut port.guest).await;
-        assert_eq!(status, 400);
-        drop(port.events);
+        guest.write_all(b"{}").await.expect("body");
+        assert_eq!(read_answer(&mut guest).await.0, 400);
     })
     .await;
 }
 
 #[tokio::test]
-async fn a_close_before_any_answer_keeps_the_socket() {
+async fn a_client_that_leaves_before_the_answer_drops_the_call() {
     let server = MockServer::start().await;
     Mock::given(path(CHAT))
         .respond_with(openai_answer(1, 1).set_delay(Duration::from_secs(2)))
         .mount(&server)
         .await;
     let gate = gate(&server);
+    let started = std::time::Instant::now();
 
-    let ending = drive(&gate, vec![], |mut port| async move {
+    connect(&gate, |mut guest| async move {
         let body = json!({"model": "alpha-mini", "messages": []}).to_string();
-        port.guest
+        guest
             .write_all(&wire("POST /v1/chat/completions HTTP/1.1", &body))
             .await
             .expect("request");
-        tokio::time::sleep(Duration::from_millis(200)).await;
-        close(&mut port.events).await;
-        port.guest
-            .write_all(b"GET /v1/models HTTP/1.1\r\n\r\n")
-            .await
-            .expect("next");
-        let (status, answer) = read_answer(&mut port.guest).await;
-        assert_eq!(status, 200);
-        assert!(answer.contains("alpha-mini"), "{answer}");
-        drop(port.events);
+        tokio::time::sleep(Duration::from_millis(100)).await;
     })
     .await;
 
-    assert_eq!(ending, Ending::Closed);
+    assert!(
+        started.elapsed() < Duration::from_secs(1),
+        "{:?}",
+        started.elapsed()
+    );
+    assert_eq!(gate.spent(), Usage::default());
 }
 
 #[tokio::test]
-async fn a_close_during_a_stream_aborts_it_and_reopens_the_socket() {
+async fn a_client_that_leaves_during_a_stream_ends_the_relay() {
     let server = MockServer::start().await;
     let long = "data: {\"choices\":[{\"delta\":{\"content\":\"a\"}}]}\n\n".repeat(100_000);
     Mock::given(path(CHAT))
@@ -654,21 +635,14 @@ async fn a_close_during_a_stream_aborts_it_and_reopens_the_socket() {
         .await;
     let gate = gate(&server);
 
-    let ending = drive(&gate, vec![], |mut port| async move {
+    connect(&gate, |mut guest| async move {
         let body = json!({"model": "alpha-mini", "stream": true}).to_string();
-        port.guest
+        guest
             .write_all(&wire("POST /v1/chat/completions HTTP/1.1", &body))
             .await
             .expect("request");
         let mut first = [0u8; 64];
-        port.guest
-            .read_exact(&mut first)
-            .await
-            .expect("first bytes");
-        close(&mut port.events).await;
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        guest.read_exact(&mut first).await.expect("first bytes");
     })
     .await;
-
-    assert_eq!(ending, Ending::Reconnect(vec![]));
 }

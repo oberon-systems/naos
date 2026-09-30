@@ -8,6 +8,10 @@ fn args() -> Vec<String> {
 }
 
 fn args_with(workspace: Option<WorkspaceMode>) -> Vec<String> {
+    args_for(workspace, None)
+}
+
+fn args_for(workspace: Option<WorkspaceMode>, model_cid: Option<u32>) -> Vec<String> {
     let runtime = RuntimeSpec {
         cpu: 2,
         memory_mib: 1024,
@@ -19,6 +23,7 @@ fn args_with(workspace: Option<WorkspaceMode>) -> Vec<String> {
         &VmPaths::new(VM_DIR.into()),
         &runtime,
         workspace,
+        model_cid,
     )
     .into_iter()
     .map(|arg| arg.into_string().expect("utf-8"))
@@ -109,7 +114,7 @@ fn base_is_read_only_under_a_writable_overlay() {
 }
 
 #[test]
-fn the_guest_gets_exactly_one_disk_and_the_three_ports_it_needs() {
+fn the_guest_gets_exactly_one_disk_and_the_two_ports_it_needs() {
     let args = args();
 
     assert_eq!(
@@ -118,21 +123,11 @@ fn the_guest_gets_exactly_one_disk_and_the_three_ports_it_needs() {
             "virtio-blk-pci,drive=disk",
             "virtio-serial-pci,id=naos-serial",
             "virtserialport,bus=naos-serial.0,chardev=mcp,name=naos.mcp",
-            "virtserialport,bus=naos-serial.0,chardev=model,name=naos.model,id=naos-model",
             "virtserialport,bus=naos-serial.0,chardev=control,name=naos.ctl",
         ]
     );
     let chardevs = value_of(&args, "-chardev");
-    assert!(chardevs.contains(
-        &format!("socket,id=model,path={VM_DIR}/model.sock,server=on,wait=off").as_str()
-    ));
-    assert_eq!(
-        value_of(&args, "-qmp"),
-        vec![
-            format!("unix:{VM_DIR}/qmp.sock,server=on,wait=off"),
-            format!("unix:{VM_DIR}/events.sock,server=on,wait=off"),
-        ]
-    );
+
     assert!(chardevs
         .contains(&format!("socket,id=mcp,path={VM_DIR}/mcp.sock,server=on,wait=off").as_str()));
     assert!(chardevs.contains(
@@ -185,14 +180,19 @@ fn without_a_workspace_the_command_line_has_no_shared_memory() {
 }
 
 #[test]
-fn only_a_close_of_the_model_port_counts() {
-    let event = |id: &str, open: bool| {
-        json!({ "event": "VSERPORT_CHANGE", "data": { "id": id, "open": open } }).to_string()
+fn only_a_run_with_a_model_policy_gets_a_vsock_device() {
+    let vsock = |args: &[String]| {
+        value_of(args, "-device")
+            .into_iter()
+            .filter(|device| device.starts_with("vhost-vsock"))
+            .map(str::to_owned)
+            .collect::<Vec<_>>()
     };
 
-    assert!(port_closed(&event(MODEL_DEVICE, false), MODEL_DEVICE));
-    assert!(!port_closed(&event(MODEL_DEVICE, true), MODEL_DEVICE));
-    assert!(!port_closed(&event("naos-other", false), MODEL_DEVICE));
-    assert!(!port_closed(r#"{"event": "SHUTDOWN"}"#, MODEL_DEVICE));
-    assert!(!port_closed("not json", MODEL_DEVICE));
+    assert!(vsock(&args()).is_empty());
+    assert_eq!(
+        vsock(&args_for(None, Some(4242))),
+        vec!["vhost-vsock-pci,guest-cid=4242"]
+    );
+    assert_no_implicit_host_path(&args_for(Some(WorkspaceMode::ReadWrite), Some(4242)));
 }

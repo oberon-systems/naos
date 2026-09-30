@@ -19,7 +19,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::net::UnixStream;
 use tokio::process::Command;
-use tokio::task::AbortHandle;
+use tokio::task::{AbortHandle, JoinSet};
+use tokio_vsock::{VsockAddr, VsockListener, VMADDR_CID_ANY};
 
 use crate::libs::api::DesiredRun;
 use crate::libs::audit;
@@ -28,7 +29,7 @@ use crate::libs::error::AgentError;
 use crate::libs::ids::random_hex;
 use crate::libs::image::{ImageCache, ImageSource};
 use crate::libs::mcp::{self, McpGate};
-use crate::libs::model::{self, Ending, ModelGate};
+use crate::libs::model::{self, ModelGate};
 use crate::libs::network::NetworkGate;
 use crate::libs::overlay::merge::{Decision, Outcome};
 use crate::libs::overlay::{self, Diff};
@@ -46,6 +47,10 @@ const DEFAULT_AGENT: &str = "claude";
 const VIRTIOFSD_MIN: (u64, u64) = (1, 13);
 // The uid and gid of `naos`, the first user setup-alpine creates in the image.
 const GUEST_ID: u32 = 1000;
+const VHOST_VSOCK: &str = "/dev/vhost-vsock";
+// Guest CIDs are host-wide; 0 to 2 are reserved and low numbers are what other tools pick.
+const CID_FIRST: u32 = 1000;
+const CID_LAST: u32 = 0x7fff_ffff;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalVm {
@@ -100,6 +105,8 @@ struct VmMeta {
     run_id: String,
     image_id: String,
     digest: String,
+    #[serde(default)]
+    model_cid: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -245,9 +252,12 @@ impl QemuRuntime {
         sessions.insert(vm.run_id.clone(), task.abort_handle());
     }
 
-    /// Serves the guest's model port for as long as the VM runs. A connection the guest closed
-    /// after the host wrote to it reopens the socket, so an unread answer never reaches the next one.
+    /// Serves the model gateway of a Run with a model policy: one vsock listener per VM, each
+    /// guest connection its own task, and a connection from any other CID refused.
     fn attach_model(&self, vm: &LocalVm, paths: &VmPaths, gates: Arc<RunGates>) {
+        let Some(cid) = read_meta(&paths.dir).and_then(|meta| meta.model_cid) else {
+            return;
+        };
         let mut sessions = self.model_sessions.lock().expect("sessions");
         if sessions
             .get(&vm.run_id)
@@ -256,34 +266,39 @@ impl QemuRuntime {
             return;
         }
         let run_id = vm.run_id.clone();
-        let socket = paths.model();
-        let events = paths.events();
         let task = tokio::spawn(async move {
-            let mut monitor = match qemu::monitor(&events).await {
-                Ok(monitor) => monitor,
+            // The port is the guest's CID, so every VM listens on its own and a restart finds it again.
+            let listener = match VsockListener::bind(VsockAddr::new(VMADDR_CID_ANY, cid)) {
+                Ok(listener) => listener,
                 Err(err) => {
-                    tracing::warn!(run_id = %run_id, error = %err, "cannot reach the event monitor");
+                    tracing::warn!(run_id = %run_id, error = %err, "cannot listen for the model gateway");
                     return;
                 }
             };
             audit::model_attached(&run_id);
-            let mut carry = Vec::new();
+            let mut connections = JoinSet::new();
             loop {
-                let stream = match UnixStream::connect(&socket).await {
-                    Ok(stream) => stream,
-                    Err(err) => {
-                        tracing::warn!(run_id = %run_id, error = %err, "cannot reach the model port");
-                        return;
-                    }
-                };
-                let (read, write) = stream.into_split();
-                match model::serve(&gates.model, read, write, &mut monitor.lines, carry).await {
-                    Ok(Ending::Reconnect(rest)) => carry = rest,
-                    Ok(Ending::Closed) => return,
-                    Err(err) => {
-                        tracing::warn!(run_id = %run_id, error = %err, "model session ended");
-                        return;
-                    }
+                tokio::select! {
+                    accepted = listener.accept() => match accepted {
+                        Ok((stream, peer)) if peer.cid() == cid => {
+                            let gates = Arc::clone(&gates);
+                            connections.spawn(async move {
+                                let (read, write) = tokio::io::split(stream);
+                                if let Err(err) = model::serve(&gates.model, read, write).await {
+                                    tracing::debug!(error = %err, "model connection ended");
+                                }
+                            });
+                        }
+                        Ok((_, peer)) => audit::model_rejected(
+                            &run_id,
+                            &format!("connection from cid {}", peer.cid()),
+                        ),
+                        Err(err) => {
+                            tracing::warn!(run_id = %run_id, error = %err, "model gateway stopped");
+                            return;
+                        }
+                    },
+                    Some(_) = connections.join_next(), if !connections.is_empty() => {}
                 }
             }
         });
@@ -436,12 +451,14 @@ impl QemuRuntime {
         paths: &VmPaths,
         base: &Path,
         workspace: Option<&Workspace>,
+        model_cid: Option<u32>,
     ) -> Result<(), AgentError> {
         let meta = VmMeta {
             vm_id: vm_id.to_owned(),
             run_id: run.id.clone(),
             image_id: run.spec.image.id.clone(),
             digest: run.spec.image.digest.clone(),
+            model_cid,
         };
         write_private(
             &paths.meta(),
@@ -453,6 +470,7 @@ impl QemuRuntime {
             "agent": DEFAULT_AGENT,
             "workspace": workspace.map(|workspace| workspace.guest.as_str()),
             "workspace_mode": workspace.map(|workspace| mode_name(workspace.mode)),
+            "model_port": model_cid,
         });
         write_private(&paths.session(), session.to_string().as_bytes())?;
 
@@ -498,6 +516,7 @@ impl QemuRuntime {
                 paths,
                 &run.spec.runtime,
                 workspace.map(|workspace| workspace.mode),
+                model_cid,
             ))
             .current_dir(&paths.dir)
             .stdin(Stdio::null())
@@ -550,6 +569,12 @@ impl Runtime for QemuRuntime {
         if workspace.is_some() {
             self.check_virtiofsd().await?;
         }
+        let model_cid = if run.policies.get("model").is_some_and(Option::is_some) {
+            check_vhost_vsock()?;
+            Some(random_cid()?)
+        } else {
+            None
+        };
         let digest = run.spec.image.digest.clone();
         self.images.fetch(images, &run.image_url, &digest).await?;
         let cache = self.images.clone();
@@ -571,7 +596,14 @@ impl Runtime for QemuRuntime {
         let paths = self.paths(&vm.vm_id)?;
         DirBuilder::new().mode(0o700).create(&paths.dir)?;
         let launched = self
-            .launch(run, &vm.vm_id, &paths, &base_path, workspace.as_ref())
+            .launch(
+                run,
+                &vm.vm_id,
+                &paths,
+                &base_path,
+                workspace.as_ref(),
+                model_cid,
+            )
             .await;
         drop(base);
         match launched {
@@ -912,6 +944,25 @@ fn mode_name(mode: WorkspaceMode) -> &'static str {
         WorkspaceMode::ReadOnly => "ro",
         WorkspaceMode::ReadWrite => "rw",
     }
+}
+
+fn check_vhost_vsock() -> Result<(), AgentError> {
+    OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(VHOST_VSOCK)
+        .map(drop)
+        .map_err(|err| {
+            AgentError::Runtime(format!(
+                "a model policy needs read and write access to {VHOST_VSOCK} ({err}), \
+                 see docs/host/vhost-vsock.md"
+            ))
+        })
+}
+
+fn random_cid() -> Result<u32, AgentError> {
+    let raw = u32::from_str_radix(&random_hex(4)?, 16).map_err(runtime_error)?;
+    Ok(CID_FIRST + raw % (CID_LAST - CID_FIRST))
 }
 
 fn read_meta(dir: &Path) -> Option<VmMeta> {

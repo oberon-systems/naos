@@ -1,4 +1,4 @@
-//! The model gateway a guest reaches through its virtio-serial port: plain HTTP in, the provider's HTTPS out.
+//! The model gateway a guest reaches over vsock: plain HTTP in, the provider's HTTPS out.
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -14,7 +14,7 @@ use crate::libs::error::AgentError;
 use crate::libs::network::{GateRequest, NetworkGate};
 
 mod http;
-pub use http::{serve, Ending};
+pub use http::serve;
 
 const WINDOW: Duration = Duration::from_secs(60);
 const REDACTED: &[u8] = b"<redacted>";
