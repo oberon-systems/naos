@@ -708,6 +708,10 @@ printf 'keep\n' >"$TEMP_DIR/workspaces/alpha/dir/keep.txt"
 printf 'gone\n' >"$TEMP_DIR/workspaces/alpha/dir/gone.txt"
 tree_before="$(workspace_tree)"
 echo "smoke test of $release/$image, working dir: $TEMP_DIR"
+if [ ! -r /dev/vhost-vsock ] || [ ! -w /dev/vhost-vsock ]; then
+    echo "the model gateway needs /dev/vhost-vsock, see docs/host/vhost-vsock.md" >&2
+    exit 1
+fi
 
 digest="$(curl -fsSL "$release/SHA256SUMS" | awk -v name="$image" '$2 == name { print "sha256:" $1 }')"
 if [ -z "$digest" ]; then
