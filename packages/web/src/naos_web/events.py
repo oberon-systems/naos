@@ -132,6 +132,15 @@ def _mcp_call(data: Row) -> str:
     )
 
 
+def _model_call(data: Row) -> str:
+    return _joined(
+        f"{data['provider']}/{data['model']}",
+        data["decision"],
+        f"{data['input_tokens']}\u2192{data['output_tokens']} tokens",
+        f"{data['duration_ms']}ms",
+    )
+
+
 MERGE_COUNTS = ("applied", "skipped", "exported", "backed_up")
 NETWORK: dict[str, Check] = {"protocol": _text, "host": _text, "rule": _text}
 SHELL: dict[str, Check] = {"capability": _text, "path": _text}
@@ -274,6 +283,22 @@ RUNNER: dict[str, Schema] = {
             "category": _text,
         },
         _data(_mcp_call),
+        lambda d: d["decision"] == "deny",
+    ),
+    "model_policy_configured": Schema({}, _none),
+    "model_attached": Schema({}, _none),
+    "model_rejected": Schema({"reason": _text}, _data(_reason), lambda d: True),
+    "model_call": Schema(
+        {
+            "provider": _text,
+            "model": _text,
+            "input_tokens": _count,
+            "output_tokens": _count,
+            "decision": _one_of("allow", "deny"),
+            "duration_ms": _count,
+            "category": _text,
+        },
+        _data(_model_call),
         lambda d: d["decision"] == "deny",
     ),
 }

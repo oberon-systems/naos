@@ -120,6 +120,27 @@ def test_a_failed_transition_and_a_denied_call_are_errors() -> None:
     assert (denied.error, denied.detail) == (True, "alpha/read · deny · 3ms")
 
 
+def test_a_model_call_renders_and_a_denied_one_is_an_error() -> None:
+    call = {
+        "provider": "alpha",
+        "model": "alpha-mini",
+        "input_tokens": 3,
+        "output_tokens": 5,
+        "decision": "allow",
+        "duration_ms": 84,
+        "category": "none",
+    }
+    allowed = events.log_row(_event("model_call", call, source="runner"), {})
+    denied = events.log_row(
+        _event("model_call", call | {"decision": "deny", "category": "budget"}, source="runner"),
+        {},
+    )
+
+    assert (allowed.refused, allowed.error) == (False, False)
+    assert allowed.detail == "alpha/alpha-mini \u00b7 allow \u00b7 3\u21925 tokens \u00b7 84ms"
+    assert (denied.refused, denied.error) == (False, True)
+
+
 def test_a_wrongly_typed_field_is_refused() -> None:
     row = events.log_row(_event("run_queued", {"position": "2"}), {})
 

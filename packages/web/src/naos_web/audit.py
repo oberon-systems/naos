@@ -57,11 +57,15 @@ KINDS: dict[str, Kind] = {
     "shell_allowed": DECISION,
     "shell_denied": DECISION,
     "mcp_call": DECISION,
+    "model_call": DECISION,
     "network_policy_configured": GATE,
     "shell_policy_configured": GATE,
     "mcp_policy_configured": GATE,
     "mcp_attached": GATE,
     "mcp_rejected": GATE,
+    "model_policy_configured": GATE,
+    "model_attached": GATE,
+    "model_rejected": GATE,
     "workspace_collected": MERGE,
     "diff_reported": MERGE,
     "merge_decided": MERGE,
@@ -91,7 +95,7 @@ KINDS: dict[str, Kind] = {
     "console_attached": CONSOLE,
     "console_typing": CONSOLE,
 }
-GATES = {"network_": "network", "shell_": "shell", "mcp_call": "mcp"}
+GATES = {"network_": "network", "shell_": "shell", "mcp_call": "mcp", "model_call": "model"}
 
 
 def params(category: Category, query: str) -> Row | None:
