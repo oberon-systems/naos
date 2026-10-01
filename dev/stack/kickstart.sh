@@ -144,7 +144,7 @@ kickstart() {
     write_env
     settings
     build
-    "$MAKE" -C "$compose" up
+    "$MAKE" -C "$compose" up NAOS_DATABASE_AUTO_MIGRATE=true
     trap rollback EXIT
     if ! wait_for 5 curl -fs -o /dev/null "$api/healthz"; then
         (cd "$compose" && docker compose logs --tail 20 api) >&2

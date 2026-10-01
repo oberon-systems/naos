@@ -54,9 +54,22 @@ sits in front.
 
 ```bash
 docker compose pull
+docker compose run --rm api naos-api migrate
 docker compose up -d
 docker compose ps
 ```
+
+The api starts only on a database at the schema its image ships, and a new
+database is empty, so `migrate` brings it there first. It prints the revision
+the database ended at:
+
+```text
+database at 0001
+```
+
+Set `NAOS_DATABASE_AUTO_MIGRATE=true` in `.env` to let the api bring an empty
+database to its schema by itself. It never upgrades one that already holds
+data; see [Schema](../docs/03-api-design.md#schema).
 
 To run the images built from this working tree instead of the published ones,
 set `NAOS_TAG` in `.env` to a tag of your own, `local` for instance, and build
@@ -64,6 +77,7 @@ them:
 
 ```bash
 make -C docker images
+make -C docker migrate
 make -C docker up
 ```
 
@@ -71,8 +85,8 @@ make -C docker up
 For a local stack with the runner and the tokens already wired up, use
 [dev/stack](../dev/stack/README.md) instead.
 
-The api waits for the database to report healthy and creates its schema on
-startup. Check both services:
+The api waits for the database to report healthy and refuses to start on a
+database behind its schema. Check both services:
 
 ```bash
 curl -fsS http://127.0.0.1:8080/healthz
@@ -124,12 +138,19 @@ curl -fsS -H "Authorization: Bearer $NAOS_OPERATOR_TOKEN" \
 There is no operator route listing runners yet, and the web ui is still a shell
 that makes no api calls, so the audit trail is the place to look.
 
-Upgrading is a new tag and a restart; the schema follows the api image:
+Upgrading is a new tag, a migration and a restart. The api refuses to start
+on a database behind the schema of its image, so take a backup (below) and
+migrate before `up`:
 
 ```bash
 docker compose pull
+docker compose run --rm api naos-api migrate
 docker compose up -d
 ```
+
+A database the api built before migrations existed has tables but no
+revision. `migrate` checks that its tables match the first revision and stamps
+it there; when they differ it names them and changes nothing.
 
 The directory `NAOS_DB_DATA` names is the only state the stack keeps. Back it
 up with the database stopped, or with `pg_dump` while it runs:

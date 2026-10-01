@@ -23,6 +23,7 @@ services:
     restart: unless-stopped
     environment:
       NAOS_DATABASE_URL: postgresql+psycopg://${NAOS_DB_USER:-naos}:${NAOS_DB_PASSWORD:?set NAOS_DB_PASSWORD in .env}@${NAOS_DB_HOST:-db}:${NAOS_DB_PORT:-5432}/${NAOS_DB_NAME:-naos}
+      NAOS_DATABASE_AUTO_MIGRATE: ${NAOS_DATABASE_AUTO_MIGRATE:-false}
       NAOS_OPERATOR_TOKEN_SHA256: ${NAOS_OPERATOR_TOKEN_SHA256:?sha256 of the operator token}
       NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256: ${NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256:?sha256 of the runner enrollment token}
       # Host paths as the runner sees them; the api only validates the strings.

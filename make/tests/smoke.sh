@@ -749,6 +749,7 @@ echo "starting api..."
 NAOS_OPERATOR_TOKEN_SHA256="$(printf '%s' "$operator" | sha256sum | cut -d' ' -f1)" \
 NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256="$(sha256sum "$TEMP_DIR/enrollment" | cut -d' ' -f1)" \
 NAOS_DATABASE_URL="sqlite:///$TEMP_DIR/naos.db" \
+NAOS_DATABASE_AUTO_MIGRATE=true \
 NAOS_ALLOWED_MOUNT_ROOTS="[\"$TEMP_DIR/workspaces\"]" \
     setsid "$MAKE" -C "$ROOT" run-api >"$TEMP_DIR/api.log" 2>&1 &
 server=$!

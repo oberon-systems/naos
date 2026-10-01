@@ -25,7 +25,9 @@ make kickstart
 
 The first run writes both tokens, fills `docker/.env` from `.env.example` with
 their hashes and `NAOS_TAG=local`, builds the two images and `naos-runner`,
-starts compose, waits for `/healthz` and starts the runner in the background.
+starts compose with `NAOS_DATABASE_AUTO_MIGRATE=true`, so the api brings the
+empty database to its schema, waits for `/healthz` and starts the runner in
+the background.
 Every later run reuses the same tokens and skips whatever is already up.
 
 Every run builds all three from this tree, before anything starts. Docker caches
@@ -71,8 +73,8 @@ background one with `down` first.
 `down` stops the runner and compose and then empties the database from inside a
 container, because the cluster belongs to root: `docker/data/db` stays as an
 empty directory. Tokens and `docker/.env` are left alone, so the next
-`kickstart` comes back on the same credentials and a schema the api creates
-again.
+`kickstart` comes back on the same credentials and an empty database the api
+migrates again.
 
 `clean` is `down` plus the tokens, the agent state and `docker/.env`, which
 leaves nothing behind for the next `kickstart` to reuse.

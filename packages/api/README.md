@@ -34,6 +34,7 @@ behind it answer 401.
 | Variable | Default | Meaning |
 |---|---|---|
 | `NAOS_DATABASE_URL` | required | For example `postgresql+psycopg://naos@db.example.com/naos` |
+| `NAOS_DATABASE_AUTO_MIGRATE` | `false` | Bring an empty database to the schema on start |
 | `NAOS_ALLOWED_MOUNT_ROOTS` | `[]` | Host directories a mount policy may name |
 | `NAOS_OPERATOR_TOKEN_SHA256` | unset | SHA-256 of the operator token |
 | `NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256` | unset | SHA-256 of the enrollment token |
@@ -47,8 +48,11 @@ The full table, the endpoints and the runner interface are in
 ```bash
 export NAOS_DATABASE_URL=postgresql+psycopg://naos@127.0.0.1/naos
 export NAOS_OPERATOR_TOKEN_SHA256=$(printf %s "$NAOS_OPERATOR_TOKEN" | sha256sum | cut -d' ' -f1)
+naos-api migrate
 uvicorn --factory naos_api.app:create_app --host 127.0.0.1
 ```
 
 `create_app()` builds the application and starts the background sweep that
-expires runner leases; the schema is created on startup.
+expires runner leases. It refuses to start on a database that is not at the
+schema this package ships; `naos-api migrate` brings it there, see
+[Schema](https://github.com/oberon-systems/naos/blob/main/docs/03-api-design.md#schema).

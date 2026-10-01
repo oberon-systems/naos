@@ -6,7 +6,7 @@
 NAOS_REGISTRY ?= ghcr.io/oberon-systems
 NAOS_TAG      ?= latest
 
-.PHONY: images image-api image-web up down
+.PHONY: images image-api image-web migrate up down
 
 
 # images
@@ -20,6 +20,9 @@ image-web:
 
 
 # stack
+migrate:
+	docker compose run --rm api naos-api migrate
+
 up:
 	docker compose up -d
 

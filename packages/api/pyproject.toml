@@ -9,12 +9,16 @@ description = "Control plane for naos: owns Runs, their policies and the runners
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+  "alembic",
   "fastapi",
   "naos-common",
   "pydantic-settings",
   "sqlmodel",
   "transitions",
 ]
+
+[project.scripts]
+naos-api = "naos_api.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/oberon-systems/naos"

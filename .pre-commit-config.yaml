@@ -48,6 +48,7 @@ repos:
     hooks:
       - id: mypy
         additional_dependencies:
+          - alembic==1.20.0
           - fastapi==0.141.1
           - httpx==0.28.1
           - httpx-ws==0.9.0
@@ -104,6 +105,13 @@ repos:
           docker compose --file docker/compose.yaml config --quiet
         language: system
         files: ^docker/compose\.yaml$
+        pass_filenames: false
+      # A model change the migrations do not follow fails here, as it fails make test.
+      - id: migrations
+        name: migrations match the models
+        entry: .venv/bin/pytest -q packages/api/tests/test_migrations.py
+        language: system
+        files: ^packages/api/src/naos_api/((models|spec|lifecycle)\.py$|migrations/)
         pass_filenames: false
       - id: packer-fmt
         name: packer fmt

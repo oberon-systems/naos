@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel
 
+from naos_api import schema
 from naos_api.app import create_app
 from naos_api.auth import require_principal
 from naos_api.clock import get_now
@@ -56,6 +57,7 @@ def configure(monkeypatch: pytest.MonkeyPatch) -> Iterator[Configure]:
 def settings(tmp_path: Path, configure: Configure) -> Settings:
     settings = configure(
         database_url=EXTERNAL_DATABASE_URL or f"sqlite:///{tmp_path / 'naos.db'}",
+        database_auto_migrate=True,
         allowed_mount_roots=MOUNT_ROOTS,
         runner_enrollment_token_sha256=hashlib.sha256(ENROLLMENT_TOKEN.encode()).hexdigest(),
         lease_ttl_seconds=LEASE_TTL,
@@ -63,7 +65,9 @@ def settings(tmp_path: Path, configure: Configure) -> Settings:
     )
     if EXTERNAL_DATABASE_URL:
         external = Database(EXTERNAL_DATABASE_URL)
-        SQLModel.metadata.drop_all(external.engine)
+        with external.engine.begin() as connection:
+            SQLModel.metadata.drop_all(connection)
+            connection.exec_driver_sql(f"DROP TABLE IF EXISTS {schema.VERSION_TABLE}")
         external.engine.dispose()
     return settings
 
@@ -84,7 +88,7 @@ def advance(clock: _Clock) -> Callable[[int], None]:
 @pytest.fixture
 def db(settings: Settings) -> Iterator[Database]:
     db = Database(settings.database_url)
-    db.create_schema()
+    schema.migrate(db.engine)
     yield db
     db.engine.dispose()
 

@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager, suppress
 from fastapi import APIRouter, Depends, FastAPI
 from sqlmodel import Session
 
+from naos_api import schema
 from naos_api.auth import require_principal
 from naos_api.clock import now_ts
 from naos_api.console_hub import ConsoleHub
@@ -65,7 +66,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="naos", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.state.db = Database(settings.database_url)
     app.state.console_hub = ConsoleHub()
-    app.state.db.create_schema()
+    schema.ensure(app.state.db.engine, settings.database_auto_migrate)
     app.add_exception_handler(DomainError, domain_error_handler)
 
     @app.get("/healthz")

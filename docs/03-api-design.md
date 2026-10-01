@@ -8,7 +8,8 @@ Implement the control-plane API as a thin HTTP layer over application/domain ser
 
 Python 3.12+, FastAPI, Pydantic, SQLModel. `NAOS_DATABASE_URL` names any
 database SQLAlchemy supports. The schema is plain tables with no triggers,
-stored procedures or foreign keys, so the same SQL runs everywhere. The Run
+stored procedures or foreign keys, so the same SQL runs everywhere, and
+[Alembic](https://alembic.sqlalchemy.org) owns it ([Schema](#schema)). The Run
 lifecycle is a [transitions](https://github.com/pytransitions/transitions)
 state machine.
 
@@ -27,6 +28,7 @@ process. List values are JSON. Every route depends only on the values it uses.
 | Variable | Default | Meaning |
 |---|---|---|
 | `NAOS_DATABASE_URL` | required | Database URL, for example `postgresql+psycopg://naos@db.example.com/naos` |
+| `NAOS_DATABASE_AUTO_MIGRATE` | `false` | Bring an empty database to head on start ([Schema](#schema)) |
 | `NAOS_ALLOWED_MOUNT_ROOTS` | `[]` | Host directories a mount policy may name |
 | `NAOS_OPERATOR_TOKEN_SHA256` | unset | SHA-256 of the operator token; unset closes every operator route |
 | `NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256` | unset | SHA-256 of the enrollment token; unset closes registration |
@@ -35,6 +37,53 @@ process. List values are JSON. Every route depends only on the values it uses.
 | `NAOS_LEASE_SWEEP_INTERVAL_SECONDS` | `15` | Background lease sweep period, 1 to 3600 |
 | `NAOS_RUN_CREDENTIAL_TTL_SECONDS` | `300` | Lifetime of a credential issued to a runner, 60 to 3600 |
 | `NAOS_CONSOLE_LIMIT_BYTES` | `8388608` | Console output kept per Run, 4096 to 1073741824 |
+
+## Schema
+
+Alembic owns the schema and every change to it; the api never creates a table
+itself. The revisions live in `naos_api/migrations/versions/`, ship in the
+wheel and the api image, and run on the connection `NAOS_DATABASE_URL` names.
+There is no `alembic.ini`.
+
+On start the api compares the revision in the database with the head it ships:
+
+| Database | What the api does |
+|---|---|
+| At head | Starts |
+| Empty | Upgrades to head when `NAOS_DATABASE_AUTO_MIGRATE` is true, refuses otherwise |
+| Behind head | Refuses and names both revisions |
+| At a revision it does not know | Refuses and names both revisions |
+| Tables but no revision | Refuses and points at `naos-api migrate` |
+
+`NAOS_DATABASE_AUTO_MIGRATE` is on in the tests, `make smoke` and
+`make kickstart`, and off by default. A revision the api does not know usually
+means a newer api migrated the database, so `migrate` refuses it as well.
+
+| Command | What it does |
+|---|---|
+| `naos-api migrate`, `make migrate` | Brings the database to head |
+| `naos-api downgrade` | Takes the database one revision back |
+
+A database `create_all` built before Alembic took over has tables but no
+revision. `naos-api migrate` builds revision `0001` on an empty SQLite,
+compares tables, columns, nullability and indexes with it, and stamps the
+database at `0001` when they match. When they differ it names the tables and
+stamps nothing.
+
+A revision whose change cannot be undone says so in its `downgrade()`, which
+then refuses. Revision `0001` goes back to an empty database.
+
+### Changing a model
+
+Until the first stack-wide release no revision is added: a model change edits
+`0001`, and a database built from an older `0001` is thrown away. From the
+first release on, every model change comes with its own revision in the same
+commit. Autogenerate may draft it, and a person reviews it.
+
+`make test` runs every revision from empty to head and back, and fails when
+autogenerate finds a difference between head and the models. The `migrations`
+pre-commit hook runs the same test whenever the models or the migrations
+change.
 
 ## Operator credentials
 

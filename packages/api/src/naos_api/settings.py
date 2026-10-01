@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="NAOS_")
 
     database_url: str
+    database_auto_migrate: bool = False
     allowed_mount_roots: list[str] = []
     operator_token_sha256: TokenHash = None
     runner_enrollment_token_sha256: TokenHash = None
