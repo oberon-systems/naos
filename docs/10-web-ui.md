@@ -15,6 +15,7 @@ Views:
 - merge approval;
 - profiles;
 - policies, immutable: find by id or digest, read the resolved document and who uses it, create one of each kind;
+- secrets, write-only: see state, expiry, who names and which Runs hold each one, create, rotate, re-date and delete; a value is typed once and never rendered;
 - images.
 
 Run creation should make image, host directory, mount mode, network/shell/MCP policy, merge policy, timeout, and runtime settings explicit.
