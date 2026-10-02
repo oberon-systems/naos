@@ -682,6 +682,54 @@ for name, texts in wanted.items():
 PY
 }
 
+# The web posts a value and answers with a redirect that names the secret only.
+secret_post() {
+    printf '%s' "$2" | curl -fsS -o /dev/null -w '%{redirect_url}' -X POST "$web/secrets/$1" \
+        --data-urlencode "value@-" "${@:3}"
+}
+
+# A secret is created, rotated and deleted through the web; one in use is refused, none is shown.
+check_secrets_page() {
+    local first second
+    first="$(token)"
+    second="$(token)"
+    [ "$(secret_post _new "$first" --data-urlencode "name=beta-token" --data-urlencode "term=1h")" = \
+        "$web/secrets/beta-token" ] || fail "the web did not create the secret"
+    [ "$(secret_post beta-token/rotate "$second")" = "$web/secrets/beta-token" ] ||
+        fail "the web did not rotate the secret"
+    curl -fsS "${auth[@]}" "$api/api/v1/secrets/beta-token" | "$VENV/bin/python" -c '
+import json, sys
+row = json.load(sys.stdin)
+if row["rotated_at"] is None or row["expires_at"] is None or "value" in row:
+    sys.exit(f"the secret the web made is wrong: {row}")
+'
+    curl -fsS "$web/secrets" >"$TEMP_DIR/secrets-list.html"
+    curl -fsS "$web/secrets/beta-token/events" >"$TEMP_DIR/secrets-events.html"
+    curl -fsS "$web/secrets/alpha-token/used" >"$TEMP_DIR/secrets-used.html"
+    curl -fsS -X POST "$web/secrets/alpha-token/delete" >"$TEMP_DIR/secrets-refused.html"
+    curl -fsS "${auth[@]}" "$api/api/v1/audit?secret=beta-token" >"$TEMP_DIR/secrets-audit.html"
+    [ "$(curl -fsS -o /dev/null -w '%{redirect_url}' -X POST "$web/secrets/beta-token/delete")" = \
+        "$web/secrets" ] || fail "the web did not delete the unused secret"
+    "$VENV/bin/python" - "$TEMP_DIR" "$run" "$first" "$second" "$secret" "$operator" <<'PY' || fail "the secrets page is wrong"
+import sys
+temp, run, *secrets = sys.argv[1:]
+wanted = {
+    "list": ["beta-token", "alpha-token", "tile__number"],
+    "events": ["secret_created", "secret_rotated"],
+    "used": ["Open policy", run],
+    "refused": ["alpha-token cannot be deleted", "the api answered 409"],
+    "audit": ["secret_created", "secret_rotated"],
+}
+for name, texts in wanted.items():
+    body = open(f"{temp}/secrets-{name}.html").read()
+    missing = [text for text in texts if text not in body]
+    if missing:
+        sys.exit(f"secrets {name} is missing {missing}")
+    if any(value in body for value in secrets) or "Bearer" in body:
+        sys.exit(f"secrets {name} carries a credential")
+PY
+}
+
 share_gone() {
     ! pgrep -f -- "--socket-path=$TEMP_DIR/runs" >/dev/null
 }
@@ -970,6 +1018,8 @@ check_page_filters active
 check_runners_page
 check_profile_locked
 check_policies_page
+echo "creating, rotating and deleting a secret through the web..."
+check_secrets_page
 check_run_detail STARTED
 check_confirms
 echo "editing the workspace and calling the gates from the console..."
