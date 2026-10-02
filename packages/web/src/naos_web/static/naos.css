@@ -2794,3 +2794,104 @@ body {
 .policy__server-row--limits {
   grid-template-columns: minmax(0, 1fr) 130px 130px;
 }
+
+/* secrets */
+
+.secrets-table th:nth-child(1),
+.secrets-table td:nth-child(1) { width: 260px; }
+
+.secrets-table th:nth-child(2),
+.secrets-table td:nth-child(2) { width: 190px; }
+
+.secrets-table th:nth-child(3),
+.secrets-table td:nth-child(3) { width: 240px; }
+
+.secrets-table th:nth-child(5),
+.secrets-table td:nth-child(5) { width: 150px; }
+
+.secrets-table th:nth-child(6),
+.secrets-table td:nth-child(6) { width: 170px; }
+
+.secrets-table th:nth-child(7),
+.secrets-table td:nth-child(7) { width: 80px; }
+
+.secret__name--muted {
+  color: var(--soft);
+}
+
+.secret__used--named th:nth-child(1) { width: 240px; }
+
+.secret__used--named th:nth-child(2) { width: 200px; }
+
+.secret__used--named th:nth-child(3) { width: 170px; }
+
+.secret__used--named td:last-child { text-align: right; }
+
+.secret__used--runs th:nth-child(1) { width: 170px; }
+
+.secret__used--runs th:nth-child(2) { width: 130px; }
+
+.secret__used--runs th:nth-child(3) { width: 130px; }
+
+.secret__used--runs th:nth-child(5) { width: 100px; }
+
+.secret__value {
+  position: relative;
+  display: flex;
+}
+
+.secret__input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 44px 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--strip);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--ink);
+  resize: vertical;
+  outline: none;
+}
+
+.secret__input--masked {
+  -webkit-text-security: disc;
+}
+
+.secret__eye {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.secret__eye[aria-pressed="true"] .secret__eye-off,
+.secret__eye[aria-pressed="false"] .secret__eye-on {
+  display: none;
+}
+
+.secret__term {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.secret__term .field__select {
+  width: 160px;
+}
+
+.secret__term-note {
+  font-size: 11px;
+  color: var(--text);
+}
+
+.secret__fixed {
+  background: var(--grey-bg);
+  color: var(--soft);
+}

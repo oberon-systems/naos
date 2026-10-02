@@ -85,6 +85,15 @@ class ProfileDetail:
 
 
 @dataclass(frozen=True)
+class SecretDetail:
+    secret: Row
+    events: list[Row]
+    secrets: list[Row]
+    policies: list[Row]
+    profiles: list[Row]
+
+
+@dataclass(frozen=True)
 class ImageDetail:
     image: Row
     runs: list[Row]
@@ -317,6 +326,53 @@ class ApiClient:
                 return None
             raise
         return row
+
+    async def secrets(
+        self, state: str | None = None, used: bool | None = None, query: str | None = None
+    ) -> list[Row]:
+        params: dict[str, Any] = {"state": state} if state else {}
+        if used is not None:
+            params["used"] = used
+        if query:
+            params["q"] = query
+        rows: list[Row] = await self._call("GET", "/secrets", params=params)
+        return rows
+
+    # A value goes up in these two bodies and nowhere else; no answer carries it back.
+    async def create_secret(self, name: str, value: str, expires_at: int | None) -> Row:
+        body = {"name": name, "value": value, "expires_at": expires_at}
+        row: Row = await self._call("POST", "/secrets", json=body)
+        return row
+
+    async def rotate_secret(self, name: str, value: str) -> Row:
+        row: Row = await self._call("POST", f"/secrets/{name}/rotate", json={"value": value})
+        return row
+
+    async def set_secret_expiry(self, name: str, expires_at: int | None) -> Row:
+        row: Row = await self._call("PATCH", f"/secrets/{name}", json={"expires_at": expires_at})
+        return row
+
+    async def delete_secret(self, name: str) -> None:
+        await self._request("DELETE", f"/secrets/{name}")
+
+    async def secret_events(self, name: str, limit: int = 500) -> list[Row]:
+        rows: list[Row] = await self._call(
+            "GET", "/audit", params={"secret": name, "limit": limit, "order": "desc"}
+        )
+        return rows
+
+    # Every policy kind is read here: a model policy names a secret before it has a screen.
+    async def secret_detail(self, name: str) -> SecretDetail:
+        secret, events, secrets, policies, profiles = await asyncio.gather(
+            self.secret(name),
+            self.secret_events(name),
+            self.secrets(),
+            self._call("GET", "/policies"),
+            self.profiles(),
+        )
+        if secret is None:
+            raise ApiError(f"the api knows no secret {name}", 404)
+        return SecretDetail(secret, events, secrets, policies, profiles)
 
     async def images(self) -> list[Row]:
         rows: list[Row] = await self._call("GET", "/images")

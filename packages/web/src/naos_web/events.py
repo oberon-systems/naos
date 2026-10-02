@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any, Literal
 
@@ -21,6 +21,10 @@ def _maybe_text(value: Any) -> bool:
 
 def _count(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _maybe_count(value: Any) -> bool:
+    return value is None or _count(value)
 
 
 def _flag(value: Any) -> bool:
@@ -153,7 +157,21 @@ def _registered(data: Row) -> str:
     return f"{data['version']} \u00b7 sha256:{hexes[:8]}\u2026{hexes[-4:]}"
 
 
+def _until(at: int | None) -> str:
+    return "never" if at is None else datetime.fromtimestamp(at, UTC).strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _re_dated(data: Row) -> str:
+    return _joined(data["name"], f"{_until(data['from'])} \u2192 {_until(data['to'])}")
+
+
+def _delete_refused(data: Row) -> str:
+    held = f"held by {_plural(len(data['held_by']), 'run')}"
+    return _joined(data["name"], f"named by {data['named_by']}", held)
+
+
 PROFILE: dict[str, Check] = {"profile_id": _text, "name": _text}
+SECRET: dict[str, Check] = {"name": _text}
 
 API: dict[str, Schema] = {
     "image_registered": Schema(
@@ -162,6 +180,15 @@ API: dict[str, Schema] = {
     "profile_created": Schema(PROFILE, _data(lambda d: str(d["name"]))),
     "profile_updated": Schema(PROFILE, _data(lambda d: f"{d['name']} \u00b7 spec changed")),
     "profile_deleted": Schema(PROFILE, _data(lambda d: str(d["name"]))),
+    "secret_created": Schema(SECRET, _data(lambda d: str(d["name"]))),
+    "secret_rotated": Schema(SECRET, _data(lambda d: f"{d['name']} \u00b7 value replaced")),
+    "secret_expiry_changed": Schema(
+        SECRET | {"from": _maybe_count, "to": _maybe_count}, _data(_re_dated)
+    ),
+    "secret_deleted": Schema(SECRET, _data(lambda d: str(d["name"]))),
+    "secret_delete_refused": Schema(
+        SECRET | {"named_by": _count, "held_by": _names}, _data(_delete_refused), lambda d: True
+    ),
     "run_created": Schema(
         {"workspace": _maybe_text, "profile": _maybe_text},
         _data(_created),
@@ -519,4 +546,52 @@ def profile_audit(
         logged = log_row(row, {})
         if _in_profile_scope(row, logged, scope):
             rows.append(_audit_row(row, logged, seqs, now))
+    return rows
+
+
+SecretScope = Literal["all", "changes", "issued", "reads"]
+SECRET_SCOPES: tuple[tuple[SecretScope, str], ...] = (
+    ("all", "All"),
+    ("changes", "Changes"),
+    ("issued", "Issued"),
+    ("reads", "Reads"),
+)
+
+
+def _in_secret_scope(row: Row, scope: SecretScope) -> bool:
+    event = str(row["event"])
+    if scope == "issued":
+        return event == "credentials_issued"
+    if scope == "reads":
+        return event == "secret_read"
+    if scope == "changes":
+        return event.startswith("secret_") and event != "secret_read"
+    return True
+
+
+def _issued_with(data: Row) -> str:
+    others = len(data["names"]) - 1
+    ttl = f"ttl {data['ttl']}s" if "ttl" in data else None
+    return _joined(f"with {_plural(others, 'other')}" if others else "alone", ttl)
+
+
+# On the secret's own tab its name is the heading, so a detail says only what happened.
+def secret_audit(
+    events: list[Row], seqs: dict[str, int], scope: SecretScope, name: str, now: int
+) -> list[RunnerAuditRow]:
+    rows = []
+    for row in events:
+        if not _in_secret_scope(row, scope):
+            continue
+        logged = log_row(row, {})
+        shown = _audit_row(row, logged, seqs, now)
+        if not logged.refused:
+            issued = row["event"] == "credentials_issued"
+            detail = (
+                _issued_with(row["data"])
+                if issued
+                else logged.detail.removeprefix(f"{name} \u00b7 ")
+            )
+            shown = replace(shown, detail=detail)
+        rows.append(shown)
     return rows

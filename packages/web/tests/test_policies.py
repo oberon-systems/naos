@@ -17,12 +17,13 @@ def writes() -> Iterator[list[Any]]:
     WRITES.clear()
 
 
-def test_the_nav_places_policies_between_profiles_and_audit(client: TestClient) -> None:
+def test_the_nav_places_policies_between_profiles_and_secrets(client: TestClient) -> None:
     body = client.get("/policies").text
 
-    assert re.findall(r'class="nav__item[^"]*"\s+href="(/[a-z]+)"', body)[-3:] == [
+    assert re.findall(r'class="nav__item[^"]*"\s+href="(/[a-z]+)"', body)[-4:] == [
         "/profiles",
         "/policies",
+        "/secrets",
         "/audit",
     ]
 

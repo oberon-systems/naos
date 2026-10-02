@@ -492,11 +492,14 @@ def audit(
     image_id: str | None = None,
     profile_id: str | None = None,
     run_id: str | None = None,
+    secret: str | None = None,
     event: Annotated[list[str] | None, Query()] = None,
     after: int | None = None,
     limit: int = Query(100),
     order: str = "asc",
 ) -> list[Row]:
+    if secret is not None:
+        return SECRET_EVENTS.get(secret, [])[:limit]
     if runner_id is None and image_id is None and profile_id is None:
         TRAIL_QUERIES.append({"run_id": run_id, "event": event, "after": after, "order": order})
         found = [
@@ -721,13 +724,103 @@ POLICIES: list[Row] = [
         "runs_total": 0,
     },
 ]
+DAY = 86400
+HOLDER = {"run_id": "run_9f21c4", "seq": 128, "status": "STARTED", "profile_id": "prof_7a1c30"}
+EARLIER = {"run_id": "run_0d4492", "seq": 121, "status": "COMPLETED", "profile_id": None}
+
+
+def secret(name: str, sid: str, state: str, expires: int | None, **fields: Any) -> Row:
+    return {
+        "id": sid,
+        "name": name,
+        "expires_at": expires,
+        "created_at": NOW - 12 * DAY,
+        "rotated_at": None,
+        "state": state,
+        "named_by": [],
+        "held_by": [],
+        "runs": [],
+    } | fields
+
+
+# One secret per state the board draws: in use, expiring, expired and never used.
 SECRETS: dict[str, Row] = {
-    "alpha-token": {
-        "id": "sec_alpha",
-        "name": "alpha-token",
-        "expires_at": NOW + 12 * 86400,
-        "created_at": NOW - 9000,
+    "alpha-key": secret(
+        "alpha-key",
+        "sec_8c21d0" + "0" * 26,
+        "expiring",
+        NOW + 5 * DAY,
+        named_by=[{"kind": "model", "id": MODELPOL, "server": "alpha"}],
+        held_by=[HOLDER],
+        runs=[HOLDER | {"issued": 1, "last_at": NOW - 133}],
+    ),
+    "alpha-token": secret(
+        "alpha-token",
+        "sec_alpha",
+        "valid",
+        NOW + 12 * DAY,
+        rotated_at=NOW - 3 * DAY,
+        named_by=[{"kind": "cred", "id": MCPPOL, "server": "alpha"}],
+        held_by=[HOLDER],
+        runs=[
+            HOLDER | {"issued": 2, "last_at": NOW - 133},
+            EARLIER | {"issued": 1, "last_at": NOW - 2280},
+        ],
+    ),
+    "beta-token": secret(
+        "beta-token",
+        "sec_2b9c7e" + "0" * 26,
+        "expired",
+        NOW - 2 * DAY,
+        named_by=[{"kind": "cred", "id": MCPPOL, "server": "beta"}],
+    ),
+    "gamma-key": secret("gamma-key", "sec_0f3a55" + "0" * 26, "valid", None),
+}
+
+
+def _secret_event(seq: int, ago: int, event: str, data: Row, run_id: str | None = None) -> Row:
+    return {
+        "seq": seq,
+        "id": f"evt_{seq:032x}",
+        "at": NOW - ago,
+        "source": "api",
+        "event": event,
+        "actor": "runner" if run_id else "operator",
+        "run_id": run_id,
+        "vm_id": None,
+        "runner_id": ALPHA["id"] if run_id else None,
+        "data": data,
     }
+
+
+# Newest first, as the web asks for them.
+SECRET_EVENTS: dict[str, list[Row]] = {
+    "alpha-token": [
+        _secret_event(
+            25,
+            133,
+            "credentials_issued",
+            {"names": ["alpha-key", "alpha-token"], "ttl": 900},
+            "run_9f21c4",
+        ),
+        _secret_event(
+            24,
+            600,
+            "secret_delete_refused",
+            {"name": "alpha-token", "named_by": 1, "held_by": ["run_9f21c4"]},
+        ),
+        _secret_event(
+            23, 2280, "credentials_issued", {"names": ["alpha-token"], "ttl": 900}, "run_0d4492"
+        ),
+        _secret_event(22, 3 * DAY, "secret_rotated", {"name": "alpha-token"}),
+        _secret_event(
+            21,
+            5 * DAY,
+            "secret_expiry_changed",
+            {"name": "alpha-token", "from": None, "to": NOW + 12 * DAY},
+        ),
+        _secret_event(20, 12 * DAY, "secret_created", {"name": "alpha-token"}),
+    ]
 }
 IMAGES: list[Row] = [
     {
@@ -907,10 +1000,71 @@ def create_policy(body: Row) -> Row | JSONResponse:
     return JSONResponse(created, 201)
 
 
+def _in_use(row: Row) -> bool:
+    return bool(row["named_by"] or row["held_by"])
+
+
+def _words(row: Row) -> list[str]:
+    named = [word.lower() for usage in row["named_by"] for word in (usage["id"], usage["server"])]
+    return [row["name"], row["id"], *named]
+
+
+@stub.get("/api/v1/secrets")
+def list_secrets(
+    q: str | None = None, state: str | None = None, used: bool | None = None
+) -> list[Row]:
+    needle = (q or "").lower()
+    return [
+        {key: value for key, value in row.items() if key != "runs"}
+        for row in SECRETS.values()
+        if (state is None or row["state"] == state)
+        and (used is None or _in_use(row) is used)
+        and any(needle in word for word in _words(row))
+    ]
+
+
+# A refused value comes back in the answer, as pydantic echoes it; the web must not show it.
+@stub.post("/api/v1/secrets", response_model=None)
+def create_secret(body: Row) -> JSONResponse:
+    WRITES.append(("POST", "/secrets", body, None))
+    if body["name"] in SECRETS:
+        return _refused(f"secret {body['name']} already exists", 409)
+    if not body["value"].isascii():
+        detail = {"type": "string_pattern_mismatch", "loc": ["body", "value"]}
+        return JSONResponse({"detail": [detail | {"input": body["value"]}]}, 422)
+    created = secret(body["name"], "sec_new001", "valid", body["expires_at"])
+    return JSONResponse({key: value for key, value in created.items() if key != "runs"}, 201)
+
+
 @stub.get("/api/v1/secrets/{name}", response_model=None)
 def get_secret(name: str) -> Row | JSONResponse:
     found = SECRETS.get(name)
     return found if found else _missing(f"secret {name}")
+
+
+@stub.post("/api/v1/secrets/{name}/rotate", response_model=None)
+def rotate_secret(name: str, body: Row) -> Row | JSONResponse:
+    WRITES.append(("POST", f"/secrets/{name}/rotate", body, None))
+    found = SECRETS.get(name)
+    return found | {"rotated_at": NOW} if found else _missing(f"secret {name}")
+
+
+@stub.patch("/api/v1/secrets/{name}", response_model=None)
+def set_expiry(name: str, body: Row) -> Row | JSONResponse:
+    WRITES.append(("PATCH", f"/secrets/{name}", body, None))
+    found = SECRETS.get(name)
+    return found | {"expires_at": body["expires_at"]} if found else _missing(f"secret {name}")
+
+
+@stub.delete("/api/v1/secrets/{name}", response_model=None)
+def delete_secret(name: str) -> Response:
+    WRITES.append(("DELETE", f"/secrets/{name}", {}, None))
+    found = SECRETS.get(name)
+    if found is None:
+        return _missing(f"secret {name}")
+    if _in_use(found):
+        return _refused(f"secret {name} is in use: named by {MCPPOL} (server alpha)", 409)
+    return Response(status_code=204)
 
 
 @stub.get("/api/v1/images")

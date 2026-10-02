@@ -6,30 +6,37 @@ from typing import Annotated, Literal
 from urllib.parse import parse_qsl, urlsplit
 from uuid import uuid4
 
-from fastapi import APIRouter, Query, Request, WebSocket, WebSocketException, status
+from fastapi import APIRouter, Path, Query, Request, WebSocket, WebSocketException, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from naos_web import audit as trail
 from naos_web import changes, confirm, events, new_run, profiles, register, terminal
 from naos_web import policies as documents
+from naos_web import secrets as vault
 from naos_web.client import ApiClient, ApiError, Choices, Dashboard, Row, RunDetail
 from naos_web.clock import NowDep
 from naos_web.format import ago
 from naos_web.pages import (
     COPY_NOTE,
+    ERASED_NOTE,
     EXISTS_NOTE,
     EXITS,
+    EXPIRY_NOTE,
     FENCING,
     FORM_NOTE,
     GATES_NOTE,
+    HELD_NOTE,
     IDENTITY_NOTE,
     IMAGE_COLUMNS,
     IMAGE_FILTERS,
     IMAGE_NOTE,
+    ISSUED_NOTE,
     LEASE_NOTE,
     LIFECYCLE,
+    NAMED_NOTE,
     NAV,
+    NEVER_NOTE,
     OPEN_NOTE,
     PAGES,
     POLICIES_NOTE,
@@ -41,16 +48,22 @@ from naos_web.pages import (
     PROFILE_COLUMNS,
     PROFILE_FILTERS,
     PROFILE_NOTE,
+    ROTATE_NOTE,
     RUN_COLUMNS,
     RUN_FILTERS,
     RUNNER_COLUMNS,
     RUNNER_FILTERS,
     RUNNER_NOTE,
+    SECRET_COLUMNS,
+    SECRET_FILTERS,
     SECRETS_NOTE,
+    SENT_ONCE_NOTE,
     SOURCE_NOTE,
     STATUS_TONE,
+    TYPED_ONCE_NOTE,
     USED_NOTE,
     WORKSPACE_HINT,
+    WRITE_ONLY_NOTE,
     ListPage,
     Summary,
     TileValue,
@@ -1397,6 +1410,262 @@ async def policy_from(request: Request, policy_id: str, now: NowDep) -> HTMLResp
     except ApiError as err:
         return failed_overlay(request, PAGES["policies"], err)
     return await _policy_form(request, now, documents.from_document(found))
+
+
+SecretName = Annotated[str, Path(pattern=r"^[a-z0-9][a-z0-9._-]{0,63}$")]
+SecretTab = Literal["overview", "used", "events"]
+VaultQuery = Annotated[vault.State, Query()]
+# A secret may be named "new", so the dialog lives at a path no name can take.
+VAULT_NEW = "/secrets/_new"
+
+
+def _secret_list(
+    secrets: list[Row], now: int, state: vault.State = "all", query: str = ""
+) -> dict[str, object]:
+    return {
+        "secrets": vault.secret_rows(secrets, now),
+        "secret_filters": SECRET_FILTERS,
+        "secret_columns": SECRET_COLUMNS,
+        "secret_note": TYPED_ONCE_NOTE,
+        "state": state,
+        "query": query,
+    }
+
+
+# Search and filters narrow the table through the api; the tiles always count every secret.
+@router.get("/secrets", response_class=HTMLResponse)
+async def secret_shelf(
+    request: Request, now: NowDep, state: VaultQuery = "all", q: SearchQuery = ""
+) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        every = await api.secrets()
+        shown = (
+            await api.secrets(*vault.api_filter(state), q or None) if state != "all" or q else every
+        )
+    except ApiError as err:
+        return failed(request, PAGES["secrets"], err)
+    return render(
+        request,
+        PAGES["secrets"],
+        vault.shelf(every),
+        template="partials/secrets_body.html" if wants_fragment(request) else "secrets.html",
+        **_secret_list(shown, now, state, q),
+    )
+
+
+def _secret_overlay(
+    request: Request, every: list[Row], now: int, partial: str, **context: object
+) -> HTMLResponse:
+    return render(
+        request,
+        PAGES["secrets"],
+        vault.shelf(every),
+        template="secret_overlay.html" if wants_fragment(request) else "secret_overlay_page.html",
+        **_secret_list(every, now),
+        partial=f"partials/{partial}",
+        never_note=NEVER_NOTE,
+        **context,
+    )
+
+
+# Only the name and the term go back into a form; nothing here reads the value.
+def _term_context(fields: dict[str, str], now: int) -> dict[str, object]:
+    return {
+        "terms": vault.terms(now, vault.shown_term(fields)),
+        "confirmed": vault.confirmed(fields),
+    }
+
+
+async def _new_secret(
+    request: Request, now: int, fields: dict[str, str], notice: str = ""
+) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        every = await api.secrets()
+    except ApiError as err:
+        return failed_overlay(request, PAGES["secrets"], err)
+    return _secret_overlay(
+        request,
+        every,
+        now,
+        "secret_form.html",
+        name=fields.get("name", "").strip(),
+        **_term_context(fields, now),
+        form_note=SENT_ONCE_NOTE,
+        notice=notice,
+    )
+
+
+def _refusal(err: ApiError | new_run.FormError) -> str:
+    unprocessable = isinstance(err, ApiError) and err.status == HTTPStatus.UNPROCESSABLE_ENTITY
+    return vault.REFUSED_NOTE if unprocessable else str(err)
+
+
+@router.get(VAULT_NEW, response_class=HTMLResponse)
+async def new_secret(request: Request, now: NowDep) -> HTMLResponse:
+    return await _new_secret(request, now, {})
+
+
+# The value is read from the body, posted once and dropped: a refused form comes back without it.
+@router.post(VAULT_NEW, response_class=HTMLResponse)
+async def create_secret(request: Request, now: NowDep) -> Response:
+    api: ApiClient = request.app.state.api
+    fields = await _form(request)
+    name = fields.get("name", "").strip()
+    try:
+        created = await api.create_secret(
+            name, vault.value_of(fields), vault.expires_at(fields, now)
+        )
+    except (ApiError, new_run.FormError) as err:
+        return await _new_secret(request, now, fields, _refusal(err))
+    return _moved(request, f"/secrets/{created['name']}")
+
+
+async def _secret_panel(
+    request: Request,
+    name: str,
+    now: int,
+    tab: SecretTab,
+    scope: events.SecretScope = "all",
+) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        detail = await api.secret_detail(name)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["secrets"], err)
+    seqs = {found["run_id"]: found["seq"] for found in detail.secret["runs"]}
+    return _secret_overlay(
+        request,
+        detail.secrets,
+        now,
+        "secret_panel.html",
+        secret=vault.secret_detail(
+            detail.secret, detail.events, detail.policies, detail.profiles, now
+        ),
+        tab=tab,
+        write_only_note=WRITE_ONLY_NOTE,
+        named_note=NAMED_NOTE,
+        held_note=HELD_NOTE,
+        issued_note=ISSUED_NOTE,
+        scopes=events.SECRET_SCOPES,
+        scope=scope,
+        audit_rows=events.secret_audit(detail.events, seqs, scope, name, now),
+    )
+
+
+@router.get("/secrets/{name}", response_class=HTMLResponse)
+async def secret(request: Request, name: SecretName, now: NowDep) -> HTMLResponse:
+    return await _secret_panel(request, name, now, "overview")
+
+
+@router.get("/secrets/{name}/used", response_class=HTMLResponse)
+async def secret_used(request: Request, name: SecretName, now: NowDep) -> HTMLResponse:
+    return await _secret_panel(request, name, now, "used")
+
+
+@router.get("/secrets/{name}/events", response_class=HTMLResponse)
+async def secret_events(
+    request: Request, name: SecretName, now: NowDep, scope: events.SecretScope = "all"
+) -> HTMLResponse:
+    return await _secret_panel(request, name, now, "events", scope)
+
+
+@router.get("/secrets/{name}/events/export")
+async def secret_events_export(request: Request, name: SecretName) -> Response:
+    api: ApiClient = request.app.state.api
+    try:
+        rows = await api.secret_events(name, limit=1000)
+    except ApiError as err:
+        return failed(request, PAGES["secrets"], err)
+    return Response(
+        json.dumps(rows, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{name}-events.json"'},
+    )
+
+
+async def _secret_dialog(
+    request: Request, name: str, now: int, partial: str, **context: object
+) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        detail = await api.secret_detail(name)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["secrets"], err)
+    return _secret_overlay(
+        request,
+        detail.secrets,
+        now,
+        partial,
+        secret=vault.secret_detail(
+            detail.secret, detail.events, detail.policies, detail.profiles, now
+        ),
+        **context,
+    )
+
+
+@router.get("/secrets/{name}/rotate", response_class=HTMLResponse)
+async def rotate_dialog(request: Request, name: SecretName, now: NowDep) -> HTMLResponse:
+    return await _secret_dialog(
+        request, name, now, "secret_rotate.html", form_note=ROTATE_NOTE, notice=""
+    )
+
+
+@router.post("/secrets/{name}/rotate", response_class=HTMLResponse)
+async def rotate_secret(request: Request, name: SecretName, now: NowDep) -> Response:
+    api: ApiClient = request.app.state.api
+    try:
+        await api.rotate_secret(name, vault.value_of(await _form(request)))
+    except (ApiError, new_run.FormError) as err:
+        return await _secret_dialog(
+            request, name, now, "secret_rotate.html", form_note=ROTATE_NOTE, notice=_refusal(err)
+        )
+    return _moved(request, f"/secrets/{name}")
+
+
+def _expiry_context(fields: dict[str, str], now: int, notice: str = "") -> dict[str, object]:
+    return _term_context(fields, now) | {"form_note": EXPIRY_NOTE, "notice": notice}
+
+
+@router.get("/secrets/{name}/expiry", response_class=HTMLResponse)
+async def expiry_dialog(request: Request, name: SecretName, now: NowDep) -> HTMLResponse:
+    context = _expiry_context({}, now)
+    return await _secret_dialog(request, name, now, "secret_expiry.html", **context)
+
+
+@router.post("/secrets/{name}/expiry", response_class=HTMLResponse)
+async def set_secret_expiry(request: Request, name: SecretName, now: NowDep) -> Response:
+    api: ApiClient = request.app.state.api
+    fields = await _form(request)
+    try:
+        await api.set_secret_expiry(name, vault.expires_at(fields, now))
+    except (ApiError, new_run.FormError) as err:
+        context = _expiry_context(fields, now, _refusal(err))
+        return await _secret_dialog(request, name, now, "secret_expiry.html", **context)
+    return _moved(request, f"/secrets/{name}")
+
+
+@router.get("/secrets/{name}/delete", response_class=HTMLResponse)
+async def delete_secret_confirm(request: Request, name: SecretName, now: NowDep) -> HTMLResponse:
+    return await _secret_dialog(
+        request, name, now, "secret_delete.html", delete_note=ERASED_NOTE, refusal=""
+    )
+
+
+# The api decides and audits the refusal; the confirm only asks, it never answers for it.
+@router.post("/secrets/{name}/delete", response_class=HTMLResponse)
+async def delete_secret(request: Request, name: SecretName, now: NowDep) -> Response:
+    api: ApiClient = request.app.state.api
+    try:
+        await api.delete_secret(name)
+    except ApiError as err:
+        if err.status != HTTPStatus.CONFLICT:
+            return failed_overlay(request, PAGES["secrets"], err)
+        return await _secret_dialog(
+            request, name, now, "secret_delete.html", delete_note="", refusal=str(err)
+        )
+    return _moved(request, "/secrets")
 
 
 AuditQuery = Annotated[trail.Category, Query()]

@@ -103,6 +103,19 @@ NAV: tuple[ListPage, ...] = (
         chip=Chip("immutable \u00b7 a new document is a new id", "blue"),
     ),
     ListPage(
+        key="secrets",
+        title="Secrets",
+        href="/secrets",
+        tiles=(
+            Tile("secrets", "Secrets", "blue"),
+            Tile("in_use", "In use", "green"),
+            Tile("expiring", "Expiring", "amber"),
+            Tile("held", "Held by Runs", "grey"),
+        ),
+        action=Action("New secret", "/secrets/_new", overlay=True),
+        chip=Chip("values are never shown", "blue"),
+    ),
+    ListPage(
         key="audit",
         title="Audit",
         href="/audit",
@@ -227,6 +240,51 @@ POLICY_COLUMNS = ("POLICY", "KIND", "DOCUMENT", "USED BY", "CREATED", "")
 POLICY_NOTE = (
     "A policy never changes: the API stores the resolved document once, an equivalent "
     "document returns the same id, and a Run keeps a snapshot of what it started with."
+)
+SECRET_FILTERS: tuple[SearchFilter, ...] = (
+    SearchFilter("all", "All", "/secrets"),
+    SearchFilter("valid", "Valid", "/secrets"),
+    SearchFilter("expiring", "Expiring", "/secrets"),
+    SearchFilter("expired", "Expired", "/secrets"),
+    SearchFilter("used", "Used", "/secrets"),
+    SearchFilter("unused", "Unused", "/secrets"),
+)
+SECRET_COLUMNS = ("SECRET", "STATE", "EXPIRES", "USED BY", "ROTATED", "HELD BY", "")
+TYPED_ONCE_NOTE = (
+    "A value is typed once and never shown again. Rotate keeps the name; the next issue to a "
+    "runner carries the new value. Delete is refused while a server, a policy or an open Run "
+    "names the secret."
+)
+WRITE_ONLY_NOTE = (
+    "The value is write-only: typed once, sent to the API and never shown again \u2014 not "
+    "here, not in a log, not in the audit. Rotate replaces it and keeps the name."
+)
+NAMED_NOTE = (
+    "A credential is put in place by naos and never listed to agents. A row opens its policy."
+)
+HELD_NOTE = (
+    "A Run holds the value from issue until it leaves STARTED. Delete is refused meanwhile; "
+    "every Run it was ever issued to is in Used by."
+)
+ISSUED_NOTE = (
+    "A Run is listed once the secret was issued to it. It holds the value until it leaves "
+    "STARTED; a finished Run stays listed."
+)
+SENT_ONCE_NOTE = (
+    "The value is sent once and never shown again: not in this form, a redirect, an error or a log."
+)
+ROTATE_NOTE = (
+    "The name stays. The next issue to a runner carries the new value; a Run already holding "
+    "the old one keeps it until its credential TTL ends."
+)
+EXPIRY_NOTE = "Changes expires_at only. The value is not touched and nothing is sent to a runner."
+NEVER_NOTE = (
+    "The secret stays valid until someone rotates it, sets a term or deletes it. A Run still "
+    "gets it only for the credential TTL. No keeps the previous choice."
+)
+ERASED_NOTE = (
+    "The value is erased from the API and cannot be brought back. Its audit events stay; "
+    "none of them ever carried the value."
 )
 IDENTITY_NOTE = (
     "A policy is never edited or deleted. A different document is a new policy with its own id."
