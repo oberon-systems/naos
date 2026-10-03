@@ -3,36 +3,36 @@
   "name": "error text",
   "type": "text",
   "x": 4776,
-  "y": 596,
+  "y": 667,
   "width": 452.0000000000073,
   "height": 34,
   "rotation": 0,
   "selrect": {
     "x": 4776,
-    "y": 596,
+    "y": 667,
     "width": 452.0000000000073,
     "height": 34,
     "x1": 4776,
-    "y1": 596,
+    "y1": 667,
     "x2": 5228.000000000007,
-    "y2": 630
+    "y2": 701
   },
   "points": [
     {
       "x": 4776,
-      "y": 596
+      "y": 667
     },
     {
       "x": 5228.000000000007,
-      "y": 596
+      "y": 667
     },
     {
       "x": 5228.000000000007,
-      "y": 630
+      "y": 701
     },
     {
       "x": 4776,
-      "y": 630
+      "y": 701
     }
   ],
   "transform": {
@@ -122,53 +122,53 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 611.27272772789,
+      "x": 4776,
+      "y": 682.9999998211861,
+      "width": 427.2250061035156,
+      "height": 15.199999809265137,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 427.2250061035156,
+      "y2": 15.999999821186066,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "400",
-      "y1": 0.7272727489471436,
-      "width": 427.227294921875,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 4776,
-      "x1": 0,
-      "y2": 15.272727727890015,
       "fills": [
         {
           "fillColor": "#b42318",
           "fillOpacity": 1
         }
       ],
-      "x2": 427.227294921875,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "height": 14.545454978942871,
       "text": "the api answered 409 for /profiles: profile build-medium already exists with another "
     },
     {
-      "y": 628.0681838989258,
+      "x": 4776,
+      "y": 699.7999992370605,
+      "width": 25.024999618530273,
+      "height": 15.19999885559082,
+      "x1": 0,
+      "y1": 17.600000381469727,
+      "x2": 25.024999618530273,
+      "y2": 32.79999923706055,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "400",
-      "y1": 17.522727966308594,
-      "width": 25.022727966308594,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 4776,
-      "x1": 0,
-      "y2": 32.06818389892578,
       "fills": [
         {
           "fillColor": "#b42318",
           "fillOpacity": 1
         }
       ],
-      "x2": 25.022727966308594,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "height": 14.545455932617188,
       "text": "spec"
     }
   ],

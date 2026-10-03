@@ -3,36 +3,36 @@
   "name": "Text",
   "type": "text",
   "x": 5263,
-  "y": 664,
+  "y": 735,
   "width": 79,
   "height": 19,
   "rotation": 0,
   "selrect": {
     "x": 5263,
-    "y": 664,
+    "y": 735,
     "width": 79,
     "height": 19,
     "x1": 5263,
-    "y1": 664,
+    "y1": 735,
     "x2": 5342,
-    "y2": 683
+    "y2": 754
   },
   "points": [
     {
       "x": 5263,
-      "y": 664
+      "y": 735
     },
     {
       "x": 5342,
-      "y": 664
+      "y": 735
     },
     {
       "x": 5342,
-      "y": 683
+      "y": 754
     },
     {
       "x": 5263,
-      "y": 683
+      "y": 754
     }
   ],
   "transform": {
@@ -122,28 +122,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 680.7272734642029,
+      "x": 5263,
+      "y": 751.8000019192696,
+      "width": 78.95000457763672,
+      "height": 16.000001907348633,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 78.95000457763672,
+      "y2": 16.80000191926956,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "600",
-      "y1": 1.454545497894287,
-      "width": 78.875,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 5263,
-      "x1": 0,
-      "y2": 16.72727346420288,
       "fills": [
         {
           "fillColor": "#ffffff",
           "fillOpacity": 1
         }
       ],
-      "x2": 78.875,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "height": 15.272727966308594,
       "text": "Create profile"
     }
   ],

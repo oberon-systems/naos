@@ -1,0 +1,107 @@
+{
+  "id": "68c95bbd-c960-805a-8008-bac5b3bcd8d8",
+  "name": "tab Logs & Audit",
+  "type": "frame",
+  "x": 6558,
+  "y": 102,
+  "width": 96,
+  "height": 44,
+  "rotation": 0,
+  "selrect": {
+    "x": 6558,
+    "y": 102,
+    "width": 96,
+    "height": 44,
+    "x1": 6558,
+    "y1": 102,
+    "x2": 6654,
+    "y2": 146
+  },
+  "points": [
+    {
+      "x": 6558,
+      "y": 102
+    },
+    {
+      "x": 6654,
+      "y": 102
+    },
+    {
+      "x": 6654,
+      "y": 146
+    },
+    {
+      "x": 6558,
+      "y": 146
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "68c95bbd-c960-805a-8008-bac5b3bc937d",
+  "frameId": "68c95bbd-c960-805a-8008-bac5b3bc937d",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "layoutItemHSizing": "fix",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 9,
+    "columnGap": 9
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "fix",
+  "r3": 0,
+  "layoutJustifyContent": "end",
+  "constraintsV": "top",
+  "interactions": [
+    {
+      "eventType": "click",
+      "actionType": "open-overlay",
+      "destination": "5142935e-e171-8029-8008-ab1b57f70f2a",
+      "positionRelativeTo": null,
+      "preserveScroll": false,
+      "overlayPosType": "center",
+      "closeClickOutside": true,
+      "backgroundOverlay": true
+    }
+  ],
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": [],
+  "shapes": [
+    "68c95bbd-c960-805a-8008-bac5b3bcd8db",
+    "68c95bbd-c960-805a-8008-bac5b3bcd8dc"
+  ]
+}

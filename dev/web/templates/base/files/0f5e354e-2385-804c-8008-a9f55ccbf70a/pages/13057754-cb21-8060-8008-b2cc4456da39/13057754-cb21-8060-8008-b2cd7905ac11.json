@@ -3,36 +3,36 @@
   "name": "Text",
   "type": "text",
   "x": 410,
-  "y": 605,
+  "y": 664,
   "width": 75,
   "height": 14,
   "rotation": 0,
   "selrect": {
     "x": 410,
-    "y": 605,
+    "y": 664,
     "width": 75,
     "height": 14,
     "x1": 410,
-    "y1": 605,
+    "y1": 664,
     "x2": 485,
-    "y2": 619
+    "y2": 678
   },
   "points": [
     {
       "x": 410,
-      "y": 605
+      "y": 664
     },
     {
       "x": 485,
-      "y": 605
+      "y": 664
     },
     {
       "x": 485,
-      "y": 619
+      "y": 678
     },
     {
       "x": 410,
-      "y": 619
+      "y": 678
     }
   ],
   "transform": {
@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 617.3636367321014,
+      "x": 410,
+      "y": 676.8000000119209,
+      "width": 74.7750015258789,
+      "height": 12,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 74.7750015258789,
+      "y2": 12.800000011920929,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "10px",
       "fontWeight": "400",
-      "y1": 0.7272727489471436,
-      "width": 74.7727279663086,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 410,
-      "x1": 0,
-      "y2": 12.36363673210144,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
-      "x2": 74.7727279663086,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "height": 11.636363983154297,
       "text": "4 of 5 capabilities"
     }
   ]

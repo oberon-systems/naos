@@ -1,0 +1,147 @@
+{
+  "id": "68c95bbd-c960-805a-8008-baaf6328c92d",
+  "name": "Text",
+  "type": "text",
+  "x": 410,
+  "y": 408,
+  "width": 385,
+  "height": 17,
+  "rotation": 0,
+  "selrect": {
+    "x": 410,
+    "y": 408,
+    "width": 385,
+    "height": 17,
+    "x1": 410,
+    "y1": 408,
+    "x2": 795,
+    "y2": 425
+  },
+  "points": [
+    {
+      "x": 410,
+      "y": 408
+    },
+    {
+      "x": 795,
+      "y": 408
+    },
+    {
+      "x": 795,
+      "y": 425
+    },
+    {
+      "x": 410,
+      "y": 425
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "68c95bbd-c960-805a-8008-baaf6328c924",
+  "frameId": "68c95bbd-c960-805a-8008-baaf6328c924",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-width",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "12",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#344054",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "2 providers \u00b7 3 models \u00b7 secrets alpha-key, beta-key \u2014 values never shown"
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "12",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#344054",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 410,
+      "y": 423.99999982118607,
+      "width": 384.0500183105469,
+      "height": 15.199999809265137,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 384.0500183105469,
+      "y2": 15.999999821186066,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#344054",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "2 providers \u00b7 3 models \u00b7 secrets alpha-key, beta-key \u2014 values never shown"
+    }
+  ]
+}

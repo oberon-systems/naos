@@ -2,36 +2,36 @@
   "id": "13057754-cb21-8060-8008-b2cc58549f36",
   "name": "head",
   "type": "frame",
-  "x": 1096,
+  "x": 884.8000000000002,
   "y": 168,
-  "width": 304,
+  "width": 233.5999999999999,
   "height": 16,
   "rotation": 0,
   "selrect": {
-    "x": 1096,
+    "x": 884.8000000000002,
     "y": 168,
-    "width": 304,
+    "width": 233.5999999999999,
     "height": 16,
-    "x1": 1096,
+    "x1": 884.8000000000002,
     "y1": 168,
-    "x2": 1400,
+    "x2": 1118.4,
     "y2": 184
   },
   "points": [
     {
-      "x": 1096,
+      "x": 884.8000000000001,
       "y": 168
     },
     {
-      "x": 1400,
+      "x": 1118.4,
       "y": 168
     },
     {
-      "x": 1400,
+      "x": 1118.4,
       "y": 184
     },
     {
-      "x": 1096,
+      "x": 884.8000000000001,
       "y": 184
     }
   ],
@@ -69,7 +69,7 @@
   "layoutAlignItems": "center",
   "layoutPaddingType": "simple",
   "r2": 0,
-  "layoutItemHSizing": "fix",
+  "layoutItemHSizing": "fill",
   "proportionLock": false,
   "layoutGap": {
     "rowGap": 6,

@@ -1,0 +1,147 @@
+{
+  "id": "68c95bbd-c960-805a-8008-bac5da942fa0",
+  "name": "Text",
+  "type": "text",
+  "x": 6380,
+  "y": 1025.0000000000002,
+  "width": 599.0000000000036,
+  "height": 16,
+  "rotation": 0,
+  "selrect": {
+    "x": 6380,
+    "y": 1025.0000000000002,
+    "width": 599.0000000000036,
+    "height": 16,
+    "x1": 6380,
+    "y1": 1025.0000000000002,
+    "x2": 6979.000000000004,
+    "y2": 1041.0000000000002
+  },
+  "points": [
+    {
+      "x": 6380,
+      "y": 1025.0000000000002
+    },
+    {
+      "x": 6979.000000000004,
+      "y": 1025.0000000000002
+    },
+    {
+      "x": 6979.000000000004,
+      "y": 1041.0000000000002
+    },
+    {
+      "x": 6380,
+      "y": 1041.0000000000002
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "68c95bbd-c960-805a-8008-bac5b4174e1d",
+  "frameId": "68c95bbd-c960-805a-8008-bac5b4174e1d",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-width",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "11",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#667085",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "Counted from the model_call events of this Run. The runner keeps the budget in memory, so its restart starts the budget afresh."
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "11",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#667085",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 6380,
+      "y": 1038.600000202656,
+      "width": 598.7000122070312,
+      "height": 12.800000190734863,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 598.7000122070312,
+      "y2": 13.600000202655792,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#667085",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "Counted from the model_call events of this Run. The runner keeps the budget in memory, so its restart starts the budget afresh."
+    }
+  ]
+}

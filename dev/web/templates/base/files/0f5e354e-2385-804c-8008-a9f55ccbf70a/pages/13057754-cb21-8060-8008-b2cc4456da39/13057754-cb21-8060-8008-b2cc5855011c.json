@@ -4,17 +4,17 @@
   "type": "frame",
   "x": 40,
   "y": 192,
-  "width": 304,
+  "width": 233.60000000000002,
   "height": 32,
   "rotation": 0,
   "selrect": {
     "x": 40,
     "y": 192,
-    "width": 304,
+    "width": 233.60000000000002,
     "height": 32,
     "x1": 40,
     "y1": 192,
-    "x2": 344,
+    "x2": 273.6,
     "y2": 224
   },
   "points": [
@@ -23,11 +23,11 @@
       "y": 192
     },
     {
-      "x": 344,
+      "x": 273.6,
       "y": 192
     },
     {
-      "x": 344,
+      "x": 273.6,
       "y": 224
     },
     {
@@ -69,7 +69,7 @@
   "layoutAlignItems": "end",
   "layoutPaddingType": "simple",
   "r2": 0,
-  "layoutItemHSizing": "fix",
+  "layoutItemHSizing": "fill",
   "proportionLock": false,
   "layoutGap": {
     "rowGap": 8,

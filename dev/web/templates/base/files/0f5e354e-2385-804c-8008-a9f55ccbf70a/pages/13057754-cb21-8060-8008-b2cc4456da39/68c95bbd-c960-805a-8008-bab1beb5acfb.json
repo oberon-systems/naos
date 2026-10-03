@@ -1,0 +1,147 @@
+{
+  "id": "68c95bbd-c960-805a-8008-bab1beb5acfb",
+  "name": "hint",
+  "type": "text",
+  "x": 3664,
+  "y": 1692.0000000000002,
+  "width": 548,
+  "height": 16,
+  "rotation": 0,
+  "selrect": {
+    "x": 3664,
+    "y": 1692.0000000000002,
+    "width": 548,
+    "height": 16,
+    "x1": 3664,
+    "y1": 1692.0000000000002,
+    "x2": 4212,
+    "y2": 1708.0000000000002
+  },
+  "points": [
+    {
+      "x": 3664,
+      "y": 1692.0000000000002
+    },
+    {
+      "x": 4212,
+      "y": 1692.0000000000002
+    },
+    {
+      "x": 4212,
+      "y": 1708.0000000000002
+    },
+    {
+      "x": 3664,
+      "y": 1708.0000000000002
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "68c95bbd-c960-805a-8008-bab1beb5acf7",
+  "frameId": "68c95bbd-c960-805a-8008-bab1beb5acf7",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-width",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "11",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#98a2b3",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "Credential is the name of a secret, never its value. A model belongs to one provider. The budget is for one whole Run."
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "11",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#98a2b3",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 3664,
+      "y": 1705.600000202656,
+      "width": 547.4375,
+      "height": 12.800000190734863,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 547.4375,
+      "y2": 13.600000202655792,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#98a2b3",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "Credential is the name of a secret, never its value. A model belongs to one provider. The budget is for one whole Run."
+    }
+  ]
+}

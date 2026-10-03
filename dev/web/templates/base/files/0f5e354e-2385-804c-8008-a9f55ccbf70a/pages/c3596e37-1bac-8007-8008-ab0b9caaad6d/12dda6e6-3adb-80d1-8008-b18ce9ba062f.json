@@ -87,7 +87,7 @@
                   }
                 ],
                 "fontFamily": "Inter Tight",
-                "text": "4 of 4 set"
+                "text": "5 of 5 set"
               }
             ],
             "typographyRefId": null,
@@ -119,29 +119,29 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 440.36363673210144,
+      "x": 540,
+      "y": 440.80000001192093,
+      "width": 40.03750228881836,
+      "height": 12,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 40.03750228881836,
+      "y2": 12.800000011920929,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "10px",
       "fontWeight": "400",
-      "y1": 0.7272727489471436,
-      "width": 40.81818771362305,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 540,
-      "x1": 0,
-      "y2": 12.36363673210144,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
-      "x2": 40.81818771362305,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "height": 11.636363983154297,
-      "text": "4 of 4 set"
+      "text": "5 of 5 set"
     }
   ]
 }
