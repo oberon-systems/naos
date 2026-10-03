@@ -3,7 +3,7 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
-from stub_api import RUNS, WRITES
+from stub_api import MODELPOL, RUNS, WRITES
 
 STARTED = "run_9f21c4"
 PENDING = "run_3a90f8"
@@ -55,6 +55,7 @@ def test_the_policy_card_reads_the_run_spec(client: TestClient) -> None:
     assert facts["Timeouts"] == "run 1h \u00b7 idle \u2014"
     assert facts["Network egress"] == "allowlist \u00b7 3 hosts"
     assert facts["Secrets"] == "1 bound \u00b7 never logged"
+    assert facts["Model"] == "1 provider \u00b7 1 model"
     assert facts["Lease fencing"] == "on \u00b7 60s ttl"
     for gap in ("Approvals", "Artifacts"):
         assert facts[gap] == "\u2014"
@@ -65,7 +66,36 @@ def test_a_run_without_policies_says_so(client: TestClient) -> None:
 
     assert facts["Network egress"] == "no policy"
     assert facts["Secrets"] == "none bound"
+    assert facts["Model"] == "no policy"
     assert facts["Lease fencing"] == "off \u00b7 no lease held"
+
+
+def test_the_model_card_follows_the_budget(client: TestClient) -> None:
+    body = client.get(f"/runs/{STARTED}", headers=HX).text
+    facts = _facts(body)
+
+    assert facts["Calls"] == "14 \u00b7 2 refused"
+    assert facts["Input tokens"] == "64 000 of 100 000 \u00b7 64%"
+    assert facts["Output tokens"] == "9 800 of 10 000 \u00b7 98%"
+    assert 'model__meter--green"' in body and 'model__meter--amber"' in body
+    assert 'style="width: 98%"' in body
+    assert "Providers \u00b7 1" in body and ">openai</code>" in body
+    assert "token budget spent" in body and "model outside the policy" in body
+    assert "unknown / beta-max" in body
+
+
+def test_the_model_card_opens_what_it_names(client: TestClient) -> None:
+    body = client.get(f"/runs/{STARTED}", headers=HX).text
+
+    assert body.count(f'hx-get="/policies/{MODELPOL}"') == 2
+    assert 'hx-get="/secrets/alpha-key"' in body
+    assert f'hx-get="/audit/evt_{"b" * 32}"' in body
+
+
+def test_a_run_without_a_model_policy_has_no_model_card(client: TestClient) -> None:
+    body = client.get(f"/runs/{PENDING}", headers=HX).text
+
+    assert "Last refusals" not in body and "model__split" not in body
 
 
 def test_the_runner_card_reads_where_the_runner_is(client: TestClient) -> None:

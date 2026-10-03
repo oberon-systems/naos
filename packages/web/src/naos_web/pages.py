@@ -98,6 +98,7 @@ NAV: tuple[ListPage, ...] = (
             Tile("network", "Network", "green"),
             Tile("shell", "Shell", "amber"),
             Tile("mcp", "MCP", "grey"),
+            Tile("model", "Model", "violet"),
         ),
         action=Action("New policy", "/policies/new", overlay=True),
         chip=Chip("immutable \u00b7 a new document is a new id", "blue"),
@@ -235,6 +236,7 @@ POLICY_FILTERS: tuple[SearchFilter, ...] = (
     SearchFilter("network", "Network", "/policies", "kind"),
     SearchFilter("shell", "Shell", "/policies", "kind"),
     SearchFilter("mcp", "MCP", "/policies", "kind"),
+    SearchFilter("model", "Model", "/policies", "kind"),
 )
 POLICY_COLUMNS = ("POLICY", "KIND", "DOCUMENT", "USED BY", "CREATED", "")
 POLICY_NOTE = (
@@ -290,6 +292,10 @@ IDENTITY_NOTE = (
     "A policy is never edited or deleted. A different document is a new policy with its own id."
 )
 SECRETS_NOTE = "Names only. Credentials are issued to the runner per Run and never shown here."
+BUDGET_NOTE = (
+    "Each Run spends its own budget. A call is refused once either side is spent; calls in "
+    "flight may overshoot it."
+)
 USED_NOTE = (
     "A Run keeps the snapshot it started with, so it stays listed here even after its "
     "profile moves to another policy."
@@ -307,6 +313,8 @@ POLICY_FORM_HINTS = {
     "names, whatever this list grants.",
     "mcp": "Each server needs tools or resource prefixes. Credential is the name of a secret, "
     "never its value; the runner receives it per Run.",
+    "model": "Credential is the name of a secret, never its value. A model belongs to one "
+    "provider. The budget is for one whole Run.",
 }
 WORKSPACE_HINT = (
     "Mounted at /naos/<last segment of the host path> and used as the workdir. rw writes land "
@@ -334,7 +342,7 @@ FORM_NOTE = (
 )
 GATES_NOTE = (
     "Every gate starts closed: none allows nothing until you pick a policy. "
-    "An MCP policy names its secrets; their values never reach this form."
+    "An MCP or a model policy names its secrets; their values never reach this form."
 )
 
 

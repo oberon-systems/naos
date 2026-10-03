@@ -36,10 +36,11 @@ def test_active_nav_item_is_the_current_page(client: TestClient, page) -> None: 
 
 
 @pytest.mark.parametrize("page", NAV, ids=[page.key for page in NAV])
-def test_every_list_page_shows_its_four_tiles(client: TestClient, page) -> None:  # type: ignore[no-untyped-def]
+def test_every_list_page_shows_its_tiles(client: TestClient, page) -> None:  # type: ignore[no-untyped-def]
     body = client.get(page.href).text
-    assert len(page.tiles) == 4
-    assert body.count('class="tile"') == 4
+    count = 5 if page.key == "policies" else 4
+    assert len(page.tiles) == count
+    assert body.count('class="tile"') == count
     for tile in page.tiles:
         assert f'tone-{tile.tone}"></span>' in body
         assert tile.label in body

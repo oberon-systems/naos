@@ -40,6 +40,7 @@ def run(
             "network": {"policy": None},
             "shell": {"policy": None},
             "mcp": {"policy": None},
+            "model": {"policy": None},
             "merge": {"policy": "ask"},
             "timeout": 3600,
             "runner": None,
@@ -62,7 +63,13 @@ MCPPOL = "mcppol_5b2d" + "0" * 28
 MODELPOL = "modelpol_7c1e" + "0" * 28
 MNTPOL = "mntpol_4c1e" + "0" * 28
 SHELLPOL = "shellpol_c42f" + "0" * 26
-PREFIXES = {"mount": "mntpol", "network": "netpol", "shell": "shellpol", "mcp": "mcppol"}
+PREFIXES = {
+    "mount": "mntpol",
+    "network": "netpol",
+    "shell": "shellpol",
+    "mcp": "mcppol",
+    "model": "modelpol",
+}
 ALPHA = {"id": "rnr_8c1f42aa", "name": "alpha"}
 BETA = {"id": "rnr_4ad907bb", "name": "beta"}
 GAMMA = {"id": "rnr_2e77b0cc", "name": "gamma"}
@@ -75,7 +82,11 @@ RUNS: list[Row] = [
         runner=ALPHA,
         started=NOW - 134,
         created=NOW - 140,
-        policies={"network": {"policy": NETPOL}, "mcp": {"policy": MCPPOL}},
+        policies={
+            "network": {"policy": NETPOL},
+            "mcp": {"policy": MCPPOL},
+            "model": {"policy": MODELPOL},
+        },
         extra={"profile_id": "prof_7a1c30", "lease_id": "lease_5d2a91"},
     ),
     run(127, "run_7c08ab", "COLLECTING", runner=BETA, started=NOW - 348, created=NOW - 360),
@@ -300,7 +311,7 @@ def list_runs(
     if profile is not None:
         rows = [r for r in rows if r["profile_id"] == profile]
     if policy is not None:
-        kinds = ("mounts", "network", "shell", "mcp")
+        kinds = ("mounts", "network", "shell", "mcp", "model")
         rows = [r for r in rows if policy in (r["spec"][kind]["policy"] for kind in kinds)]
     if runner is not None:
         rows = [r for r in rows if r["runner"] and r["runner"]["id"] == runner]
@@ -596,6 +607,7 @@ def profile(pid: str, name: str, cpu: int, memory: int, active: Row | None, used
             "network": {"policy": NETPOL},
             "shell": {"policy": None},
             "mcp": {"policy": None},
+            "model": {"policy": None},
             "merge": {"policy": "ask"},
             "timeout": 3600,
         },
@@ -720,8 +732,8 @@ POLICIES: list[Row] = [
         },
         "created_at": NOW - 9500,
         "profiles": [],
-        "runs_open": 0,
-        "runs_total": 0,
+        "runs_open": 1,
+        "runs_total": 1,
     },
 ]
 DAY = 86400
@@ -1283,6 +1295,37 @@ MERGE_EVENTS: dict[str, list[Row]] = {
 @stub.get("/api/v1/runs/{run_id}/events")
 def run_events(run_id: str) -> list[Row]:
     return RUN_EVENTS if run_id == "run_9f21c4" else MERGE_EVENTS.get(run_id, [])
+
+
+# One Run has called its models: the output budget is nearly spent and two calls were refused.
+MODEL_GATE: Row = {
+    "calls": 14,
+    "denied": 2,
+    "input_tokens": 64000,
+    "output_tokens": 9800,
+    "refusals": [
+        {
+            "id": "evt_" + "b" * 32,
+            "at": NOW - 30,
+            "provider": "alpha",
+            "model": "alpha-mini",
+            "category": "budget",
+        },
+        {
+            "id": "evt_" + "c" * 32,
+            "at": NOW - 90,
+            "provider": "unknown",
+            "model": "beta-max",
+            "category": "denied",
+        },
+    ],
+}
+IDLE_GATE: Row = {"calls": 0, "denied": 0, "input_tokens": 0, "output_tokens": 0, "refusals": []}
+
+
+@stub.get("/api/v1/runs/{run_id}/gates/model")
+def model_gate(run_id: str) -> Row:
+    return MODEL_GATE if run_id == RUNS[0]["id"] else IDLE_GATE
 
 
 CONSOLE = b"login: naos\r\n$ pytest -q\r\n"

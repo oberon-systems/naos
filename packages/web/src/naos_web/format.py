@@ -65,5 +65,9 @@ def left(then: int, now: int) -> int:
     return max(then - now, 0)
 
 
+def grouped(number: int) -> str:
+    return f"{number:,}".replace(",", " ")
+
+
 def short_id(identifier: str) -> str:
     return identifier[:10]

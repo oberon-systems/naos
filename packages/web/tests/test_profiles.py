@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 import stub_api
 from fastapi.testclient import TestClient
-from stub_api import MCPPOL, NETPOL, PROFILES, WRITES
+from stub_api import MCPPOL, MODELPOL, NETPOL, PROFILES, WRITES
 
 BUSY = "prof_7a1c30"
 IDLE = "prof_a93e07"
@@ -36,16 +36,18 @@ def writes() -> Iterator[list[Any]]:
 def test_the_tiles_count_profiles_policies_secrets_and_runs(client: TestClient) -> None:
     body = client.get("/profiles", params={"state": "unused"}).text
 
-    assert re.findall(r'class="tile__number">([^<]+)<', body) == ["3", "4", "1", "6"]
-    assert "mount \u00b7 net \u00b7 shell \u00b7 mcp" in body
-    assert "3 profiles \u00b7 4 policies \u00b7 1 secret" in body
+    assert re.findall(r'class="tile__number">([^<]+)<', body) == ["3", "5", "2", "6"]
+    assert "mount \u00b7 net \u00b7 shell \u00b7 mcp \u00b7 model" in body
+    assert "3 profiles \u00b7 5 policies \u00b7 2 secrets" in body
+    assert "named by mcp and model policies" in body
 
 
 def test_a_row_shows_runtime_gates_merge_timeout_and_runs(client: TestClient) -> None:
     body = client.get("/profiles").text
 
     assert "2 cpu \u00b7 4096 MiB" in body
-    assert "no mounts, no shell, no mcp" in body
+    assert "no mounts, no shell, no mcp, no model" in body
+    assert 'class="profile__tag profile__tag--off">mdl<' in body
     assert 'class="profile__tag profile__tag--off">mnt<' in body
     assert 'class="profile__tag">net<' in body
     assert "nothing to merge" in body
@@ -88,8 +90,10 @@ def test_the_runs_and_audit_tabs_read_the_profile(client: TestClient) -> None:
 def test_a_new_profile_opens_with_every_gate_closed(client: TestClient) -> None:
     body = client.get("/profiles/new", headers=HX).text
 
-    for closed in ("nothing mounted", "no network", "no shell", "no servers, no secrets"):
+    gates = ("nothing mounted", "no network", "no shell", "no servers, no secrets")
+    for closed in (*gates, "no providers, no keys"):
         assert re.search(rf'<option value=""\s*selected>none \u2014 {closed}</option>', body)
+    assert "1 provider \u00b7 1 model</option>" in body
     assert "Every gate starts closed" in body
 
 
@@ -104,6 +108,7 @@ def test_creating_sends_the_spec_and_opens_the_profile(
     assert body["name"] == "build-medium"
     assert body["spec"]["network"] == {"policy": NETPOL}
     assert body["spec"]["mcp"] == {"policy": None}
+    assert body["spec"]["model"] == {"policy": None}
     assert body["spec"]["runtime"] == {"cpu": 4, "memory_mib": 8192, "disk_gib": 40}
 
 
@@ -125,13 +130,15 @@ def test_an_edit_the_api_refuses_shows_why(client: TestClient) -> None:
 def test_an_edit_keeps_the_name_and_sends_only_the_spec(
     client: TestClient, writes: list[Any]
 ) -> None:
-    response = client.post(f"/profiles/{IDLE}/edit", data=FORM | {"mcp": MCPPOL}, headers=HX)
+    form = FORM | {"mcp": MCPPOL, "model": MODELPOL}
+    response = client.post(f"/profiles/{IDLE}/edit", data=form, headers=HX)
 
     assert response.headers["HX-Redirect"] == f"/profiles/{IDLE}"
     [(method, _, body, _)] = writes
     assert method == "PUT"
     assert set(body) == {"spec"}
     assert body["spec"]["mcp"] == {"policy": MCPPOL}
+    assert body["spec"]["model"] == {"policy": MODELPOL}
 
 
 def test_a_clone_starts_from_the_source(client: TestClient) -> None:

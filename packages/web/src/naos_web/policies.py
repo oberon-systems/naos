@@ -1,6 +1,6 @@
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Literal
 
@@ -8,23 +8,31 @@ from naos_web import format
 from naos_web.client import Row
 from naos_web.new_run import FormError, short
 from naos_web.pages import Summary, TileValue, Tone
-from naos_web.profiles import ProfileRow, profile_rows, summary_of
+from naos_web.profiles import HOLDERS, ProfileRow, profile_rows, summary_of
 from naos_web.rows import Fact, RunRow, run_rows
 
-Kind = Literal["mount", "network", "shell", "mcp"]
-KINDS: tuple[Kind, ...] = ("mount", "network", "shell", "mcp")
+Kind = Literal["mount", "network", "shell", "mcp", "model"]
+KINDS: tuple[Kind, ...] = ("mount", "network", "shell", "mcp", "model")
 KIND_OF: dict[str, Kind] = {kind: kind for kind in KINDS}
 KIND_LABELS: dict[Kind, str] = {
     "mount": "Mount",
     "network": "Network",
     "shell": "Shell",
     "mcp": "MCP",
+    "model": "Model",
 }
-TAGS: dict[Kind, str] = {"mount": "mnt", "network": "net", "shell": "sh", "mcp": "mcp"}
+TAGS: dict[Kind, str] = {
+    "mount": "mnt",
+    "network": "net",
+    "shell": "sh",
+    "mcp": "mcp",
+    "model": "mdl",
+}
 GUEST_HOME = "/home/naos/"
 MAX_RULES = 64
 MAX_HOME = 32
 MAX_SERVERS = 16
+MAX_PROVIDERS = 16
 CAPABILITIES: dict[str, str] = {
     "read_file": "read a file under a mount",
     "list_dir": "list a directory",
@@ -34,6 +42,7 @@ CAPABILITIES: dict[str, str] = {
 }
 PROTOCOLS = ("any", "http", "https")
 MODES = ("ro", "rw")
+DIALECTS = ("openai", "anthropic")
 
 
 def _plural(count: int, word: str, words: str = "") -> str:
@@ -55,11 +64,10 @@ def _used(policy: Row) -> bool:
 def _secret_names(policies: list[Row]) -> list[str]:
     return sorted(
         {
-            server["credential"]
+            holder["credential"]
             for policy in policies
-            if policy["kind"] == "mcp"
-            for server in policy["document"]["servers"]
-            if server["credential"]
+            for holder in policy["document"].get(HOLDERS.get(policy["kind"], ""), [])
+            if holder["credential"]
         }
     )
 
@@ -70,7 +78,8 @@ def secret_names(policy: Row) -> list[str]:
 
 def shelf(policies: list[Row]) -> Summary:
     count = {kind: sum(policy["kind"] == kind for policy in policies) for kind in KINDS}
-    secrets = len(_secret_names(policies))
+    secrets = len(_secret_names([policy for policy in policies if policy["kind"] == "mcp"]))
+    providers = sum(len(p["document"]["providers"]) for p in policies if p["kind"] == "model")
     kinds = sum(1 for kind in KINDS if count[kind])
     return Summary(
         subtitle=(
@@ -82,6 +91,9 @@ def shelf(policies: list[Row]) -> Summary:
             "network": TileValue(str(count["network"]), "egress allowlists"),
             "shell": TileValue(str(count["shell"]), "capability sets"),
             "mcp": TileValue(str(count["mcp"]), f"{_plural(secrets, 'secret')} named, never shown"),
+            "model": TileValue(
+                str(count["model"]), f"{_plural(providers, 'provider')}, keys never shown"
+            ),
         },
     )
 
@@ -98,6 +110,11 @@ def _document_note(policy: Row) -> str:
         return f"{len(document['allow'])} allow \u00b7 {len(document['deny'])} deny"
     if kind == "shell":
         return f"{len(document['allow'])} of {len(CAPABILITIES)} capabilities"
+    if kind == "model":
+        return (
+            f"{format.grouped(document['max_input_tokens'])} input \u00b7 "
+            f"{format.grouped(document['max_output_tokens'])} output tokens per run"
+        )
     return " \u00b7 ".join(
         f"{server['name']} "
         + (
@@ -190,6 +207,16 @@ class Server:
 
 
 @dataclass(frozen=True)
+class Provider:
+    name: str
+    url: str
+    api: str
+    models: str
+    credential: str
+    limits: str
+
+
+@dataclass(frozen=True)
 class PolicyDetail:
     id: str
     kind: Kind
@@ -202,6 +229,8 @@ class PolicyDetail:
     workdir: str
     capabilities: list[Capability]
     servers: list[Server]
+    providers: list[Provider]
+    budget: list[Fact]
     canonical: str
     canonical_note: str
     identity: list[Fact]
@@ -283,6 +312,30 @@ def _servers(document: Row) -> list[Server]:
     ]
 
 
+def _providers(document: Row) -> list[Provider]:
+    return [
+        Provider(
+            name=provider["name"],
+            url=provider["url"],
+            api=provider["api"],
+            models=" \u00b7 ".join(provider["models"]),
+            credential=provider["credential"],
+            limits=(
+                f"{provider['timeout_seconds']}s timeout \u00b7 "
+                f"{provider['max_requests_per_minute']} requests/min"
+            ),
+        )
+        for provider in document["providers"]
+    ]
+
+
+def _budget(document: Row) -> list[Fact]:
+    return [
+        Fact("Input tokens", format.grouped(document["max_input_tokens"])),
+        Fact("Output tokens", format.grouped(document["max_output_tokens"])),
+    ]
+
+
 def _egress(document: Row) -> str:
     allow = document["allow"]
     if not allow:
@@ -360,6 +413,7 @@ def policy_detail(policy: Row, secrets: dict[str, Row | None], now: int) -> Poli
         "mount": "The document as the API resolved and stored it.",
         "shell": "Stored in a fixed order, so the same set always has one id.",
         "mcp": "",
+        "model": "",
     }
     return PolicyDetail(
         id=policy["id"],
@@ -381,6 +435,8 @@ def policy_detail(policy: Row, secrets: dict[str, Row | None], now: int) -> Poli
         if kind == "shell"
         else [],
         servers=_servers(document) if kind == "mcp" else [],
+        providers=_providers(document) if kind == "model" else [],
+        budget=_budget(document) if kind == "model" else [],
         canonical=json.dumps(document, indent=2),
         canonical_note=notes[kind],
         identity=identity,
@@ -428,8 +484,17 @@ LISTS: dict[Kind, dict[str, tuple[str, ...]]] = {
     "mcp": {
         "servers": ("name", "url", "tools", "resources", "credential", "timeout", "calls"),
     },
+    "model": {
+        "providers": ("name", "api", "url", "models", "credential", "timeout", "requests"),
+    },
 }
-LIMITS = {"home": MAX_HOME, "allow": MAX_RULES, "deny": MAX_RULES, "servers": MAX_SERVERS}
+LIMITS = {
+    "home": MAX_HOME,
+    "allow": MAX_RULES,
+    "deny": MAX_RULES,
+    "servers": MAX_SERVERS,
+    "providers": MAX_PROVIDERS,
+}
 BLANK: dict[str, dict[str, str]] = {
     "home": {"host_path": "", "guest_path": "", "mode": "ro"},
     "allow": {"protocol": "any", "host": "", "ip": ""},
@@ -443,6 +508,15 @@ BLANK: dict[str, dict[str, str]] = {
         "timeout": "30",
         "calls": "60",
     },
+    "providers": {
+        "name": "",
+        "api": "openai",
+        "url": "",
+        "models": "",
+        "credential": "",
+        "timeout": "600",
+        "requests": "60",
+    },
 }
 _ITEM = re.compile(r"^(\w+)\.(\d+)\.(\w+)$")
 
@@ -454,6 +528,8 @@ class PolicyForm:
     workspace: str = ""
     workspace_mode: str = "rw"
     allow: tuple[str, ...] = ()
+    max_input: str = ""
+    max_output: str = ""
 
     def items(self, name: str) -> list[dict[str, str]]:
         return self.lists.get(name, [])
@@ -465,6 +541,7 @@ class PolicyForm:
         pairs = [("kind", self.kind), ("workspace", self.workspace)]
         pairs += [("workspace_mode", self.workspace_mode)]
         pairs += [(f"cap.{name}", "on") for name in self.allow]
+        pairs += [("max_input", self.max_input), ("max_output", self.max_output)]
         for name, items in self.lists.items():
             for index, item in enumerate(items):
                 pairs += [(f"{name}.{index}.{key}", value) for key, value in item.items()]
@@ -480,9 +557,7 @@ class PolicyForm:
             items.append(dict(BLANK[name]))
         elif verb == "drop" and index.isdigit() and int(index) < len(items):
             del items[int(index)]
-        return PolicyForm(
-            self.kind, {**self.lists, name: items}, self.workspace, self.workspace_mode, self.allow
-        )
+        return replace(self, lists={**self.lists, name: items})
 
     def document(self) -> Row:
         if self.kind == "mount":
@@ -495,6 +570,13 @@ class PolicyForm:
             return {name: _rules(self.items(name)) for name in ("allow", "deny")}
         if self.kind == "shell":
             return {"allow": [name for name in CAPABILITIES if name in self.allow]}
+        if self.kind == "model":
+            providers = [item for item in self.items("providers") if item["name"] or item["url"]]
+            return {
+                "providers": [_provider(item) for item in providers],
+                "max_input_tokens": _whole(self.max_input, "max input tokens"),
+                "max_output_tokens": _whole(self.max_output, "max output tokens"),
+            }
         servers = [item for item in self.items("servers") if item["name"] or item["url"]]
         return {"servers": [_server(item) for item in servers]}
 
@@ -531,9 +613,21 @@ def _server(item: dict[str, str]) -> Row:
     }
 
 
+def _provider(item: dict[str, str]) -> Row:
+    return {
+        "name": item["name"],
+        "api": item["api"],
+        "url": item["url"],
+        "credential": item["credential"],
+        "models": _split(item["models"]),
+        "timeout_seconds": _whole(item["timeout"], "timeout"),
+        "max_requests_per_minute": _whole(item["requests"], "requests per minute"),
+    }
+
+
 def new_form(kind: str) -> PolicyForm:
     chosen = KIND_OF.get(kind, "mount")
-    starts = {"network": ["allow"], "mcp": ["servers"]}.get(chosen, [])
+    starts = {"network": ["allow"], "mcp": ["servers"], "model": ["providers"]}.get(chosen, [])
     return PolicyForm(chosen, {name: [dict(BLANK[name])] for name in starts})
 
 
@@ -557,6 +651,8 @@ def read_form(fields: dict[str, str]) -> PolicyForm:
         fields.get("workspace", "").strip(),
         fields.get("workspace_mode", "rw") if fields.get("workspace_mode") in MODES else "rw",
         tuple(name for name in CAPABILITIES if fields.get(f"cap.{name}")),
+        fields.get("max_input", "").strip(),
+        fields.get("max_output", "").strip(),
     )
 
 
@@ -591,6 +687,26 @@ def from_document(policy: Row) -> PolicyForm:
         )
     if kind == "shell":
         return PolicyForm("shell", allow=tuple(document["allow"]))
+    if kind == "model":
+        return PolicyForm(
+            "model",
+            {
+                "providers": [
+                    {
+                        "name": provider["name"],
+                        "api": provider["api"],
+                        "url": provider["url"],
+                        "models": ", ".join(provider["models"]),
+                        "credential": provider["credential"],
+                        "timeout": str(provider["timeout_seconds"]),
+                        "requests": str(provider["max_requests_per_minute"]),
+                    }
+                    for provider in document["providers"]
+                ]
+            },
+            max_input=str(document["max_input_tokens"]),
+            max_output=str(document["max_output_tokens"]),
+        )
     return PolicyForm(
         "mcp",
         {

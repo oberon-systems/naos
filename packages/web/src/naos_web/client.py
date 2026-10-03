@@ -20,10 +20,6 @@ async def _send(ws: AsyncWebSocketSession, outbox: "asyncio.Queue[bytes | str]")
             await ws.send_bytes(frame)
 
 
-# Model policies get their own screens; until then the policy pages show only these kinds.
-SHOWN_KINDS = ("mount", "network", "shell", "mcp")
-
-
 class ApiError(Exception):
     """The api refused or never answered, so the page says so instead of inventing data."""
 
@@ -65,6 +61,7 @@ class RunDetail:
     profile: Row | None
     runners: dict[str, str]
     merge: Row | None
+    model: Row | None
 
 
 @dataclass(frozen=True)
@@ -209,6 +206,10 @@ class ApiClient:
         rows: list[Row] = await self._call("GET", f"/runs/{run_id}/events")
         return rows
 
+    async def run_gate(self, run_id: str, gate: str) -> Row:
+        row: Row = await self._call("GET", f"/runs/{run_id}/gates/{gate}")
+        return row
+
     async def run_merge(self, run_id: str) -> Row:
         row: Row = await self._call("GET", f"/runs/{run_id}/merge")
         return row
@@ -250,8 +251,6 @@ class ApiClient:
 
     async def policy(self, policy_id: str) -> Row:
         row: Row = await self._call("GET", f"/policies/{policy_id}")
-        if row["kind"] not in SHOWN_KINDS:
-            raise ApiError(f"policy {policy_id} is a {row['kind']} policy, not shown here", 404)
         return row
 
     async def create_run(self, spec: Row, idempotency_key: str) -> Row:
@@ -308,7 +307,7 @@ class ApiClient:
         if query:
             params["q"] = query
         rows: list[Row] = await self._call("GET", "/policies", params=params)
-        return [row for row in rows if row["kind"] in SHOWN_KINDS]
+        return rows
 
     # The api answers 201 for a new policy and 200 for the one an equivalent document holds.
     async def create_policy(self, kind: str, document: Row) -> tuple[Row, bool]:
@@ -361,13 +360,12 @@ class ApiClient:
         )
         return rows
 
-    # Every policy kind is read here: a model policy names a secret before it has a screen.
     async def secret_detail(self, name: str) -> SecretDetail:
         secret, events, secrets, policies, profiles = await asyncio.gather(
             self.secret(name),
             self.secret_events(name),
             self.secrets(),
-            self._call("GET", "/policies"),
+            self.policies(),
             self.profiles(),
         )
         if secret is None:
@@ -438,17 +436,23 @@ class ApiClient:
     async def _collected(self, run: Row) -> Row | None:
         return await self.run_merge(run["id"]) if run["merge"] else None
 
+    # Only a Run given a model policy has a budget to read.
+    async def _spent(self, run: Row) -> Row | None:
+        return await self.run_gate(run["id"], "model") if run["spec"]["model"]["policy"] else None
+
     # The policies are the ones the spec names, so the card shows what this Run was given.
     async def run_detail(self, run_id: str) -> RunDetail:
         run = await self.run(run_id)
         spec = run["spec"]
-        named = [spec[kind]["policy"] for kind in ("network", "mcp") if spec[kind]["policy"]]
-        events, runners, images, policies, merge = await asyncio.gather(
+        kinds = ("network", "mcp", "model")
+        named = [spec[kind]["policy"] for kind in kinds if spec[kind]["policy"]]
+        events, runners, images, policies, merge, model = await asyncio.gather(
             self.run_events(run_id),
             self.runners(),
             self.images(),
             asyncio.gather(*(self.policy(policy_id) for policy_id in named)),
             self._collected(run),
+            self._spent(run),
         )
         profile = await self._source_profile(run.get("profile_id"))
         holder = run["runner"]["id"] if run["runner"] else spec.get("runner")
@@ -461,6 +465,7 @@ class ApiClient:
             profile=profile,
             runners={row["id"]: row["name"] for row in runners},
             merge=merge,
+            model=model,
         )
 
     async def choices(self) -> Choices:

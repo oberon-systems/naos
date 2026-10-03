@@ -1,0 +1,83 @@
+<section class="card run__card model">
+    <div class="run__card-header">
+        <h3 class="run__card-title">Model</h3>
+        <a class="card__link"
+           href="/policies/{{ run.model.policy_id }}"
+           hx-get="/policies/{{ run.model.policy_id }}"
+           hx-target="#overlay">Open policy</a>
+    </div>
+    <div class="model__split">
+        <div class="model__budget">
+            <dl class="run__facts model__facts">
+                <dt>Policy</dt>
+                <dd class="run__mono">
+                    <a class="action"
+                       href="/policies/{{ run.model.policy_id }}"
+                       hx-get="/policies/{{ run.model.policy_id }}"
+                       hx-target="#overlay">{{ run.model.policy_id }}</a>
+                </dd>
+                <dt>Calls</dt>
+                <dd>
+                    {{ run.model.calls }}
+                </dd>
+            </dl>
+            {% for meter in run.model.meters %}
+                <dl class="run__facts model__facts">
+                    <dt>{{ meter.label }}</dt>
+                    <dd>
+                        {{ meter.value }}
+                    </dd>
+                </dl>
+                <div class="lease model__meter model__meter--{{ meter.tone }}">
+                    <div class="lease__left" style="width: {{ meter.percent }}%"></div>
+                </div>
+            {% endfor %}
+        </div>
+        <div class="model__providers">
+            <h4 class="run__card-title">Providers · {{ run.model.providers | length }}</h4>
+            {% for provider in run.model.providers %}
+                <div class="model__row">
+                    <span class="model__who">
+                        <strong>{{ provider.name }}</strong>
+                        <code class="profile__tag">{{ provider.api }}</code>
+                        <span class="table__secondary">{{ provider.models }}</span>
+                    </span>
+                    <span class="model__who table__secondary">
+                        credential
+                        <a class="profile__tag model__secret"
+                           href="/secrets/{{ provider.credential }}"
+                           hx-get="/secrets/{{ provider.credential }}"
+                           hx-target="#overlay">{{ provider.credential }}</a>
+                    </span>
+                </div>
+            {% endfor %}
+            <p class="table__secondary model__note">
+                Each provider is reached with its own key; a key shows by the name of its secret only.
+            </p>
+        </div>
+    </div>
+    <h4 class="run__card-title model__section">Last refusals</h4>
+    <div class="model__refusals">
+        {% for refusal in run.model.refusals %}
+            <div class="model__row">
+                <span class="model__who">
+                    <span class="run__mono table__secondary">{{ refusal.time }}</span>
+                    <strong class="model__target">{{ refusal.target }}</strong>
+                    <span class="table__secondary">{{ refusal.reason }}</span>
+                </span>
+                <span class="model__who">
+                    <code class="profile__tag model__category--{{ refusal.tone }}">{{ refusal.category }}</code>
+                    <a class="action"
+                       href="/audit/{{ refusal.id }}"
+                       hx-get="/audit/{{ refusal.id }}"
+                       hx-target="#overlay">Open event</a>
+                </span>
+            </div>
+        {% else %}
+            <p class="table__secondary model__note">no call was refused</p>
+        {% endfor %}
+    </div>
+    <p class="image__hint table__secondary">
+        Counted from the model_call events of this Run. The runner keeps the budget in memory, so its restart starts the budget afresh.
+    </p>
+</section>

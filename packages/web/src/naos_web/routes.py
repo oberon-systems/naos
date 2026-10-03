@@ -18,6 +18,7 @@ from naos_web.client import ApiClient, ApiError, Choices, Dashboard, Row, RunDet
 from naos_web.clock import NowDep
 from naos_web.format import ago
 from naos_web.pages import (
+    BUDGET_NOTE,
     COPY_NOTE,
     ERASED_NOTE,
     EXISTS_NOTE,
@@ -426,6 +427,7 @@ def _detail_row(detail: RunDetail, now: int) -> RunDetailRow:
         detail.policies,
         detail.images,
         detail.profile,
+        detail.model,
         now,
     )
 
@@ -1249,7 +1251,7 @@ async def delete_profile(request: Request, profile_id: str) -> Response:
     return _moved(request, "/profiles")
 
 
-KindFilter = Literal["all", "mount", "network", "shell", "mcp"]
+KindFilter = Literal["all", "mount", "network", "shell", "mcp", "model"]
 KindQuery = Annotated[KindFilter, Query()]
 PolicyTab = Literal["document", "used"]
 
@@ -1322,6 +1324,7 @@ async def _policy_form(
         capabilities=documents.CAPABILITIES,
         protocols=documents.PROTOCOLS,
         modes=documents.MODES,
+        dialects=documents.DIALECTS,
         limits=documents.LIMITS,
         form_note=POLICY_FORM_NOTE,
         form_hint=POLICY_FORM_HINTS[form.kind],
@@ -1388,6 +1391,7 @@ async def _policy_panel(request: Request, policy_id: str, now: int, tab: PolicyT
         tab=tab,
         identity_note=IDENTITY_NOTE,
         secrets_note=SECRETS_NOTE,
+        budget_note=BUDGET_NOTE,
         used_note=USED_NOTE,
     )
 

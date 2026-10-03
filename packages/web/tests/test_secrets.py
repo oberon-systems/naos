@@ -79,11 +79,13 @@ def test_the_overview_reads_metadata_and_who_names_and_holds_it(client: TestClie
         assert f'hx-get="/secrets/alpha-token/{act}"' in body
 
 
-def test_a_model_policy_is_named_without_a_link_until_it_has_a_screen(client: TestClient) -> None:
-    body = flat(client.get("/secrets/alpha-key/used", headers=HX).text)
+def test_a_model_policy_that_names_it_opens_on_click(client: TestClient) -> None:
+    used = flat(client.get("/secrets/alpha-key/used", headers=HX).text)
+    overview = client.get("/secrets/alpha-key", headers=HX).text
 
-    assert "model policy" in body and "provider alpha" in body
-    assert f"/policies/{MODELPOL}" not in body
+    assert "model policy" in used and "provider alpha" in used
+    assert f'hx-get="/policies/{MODELPOL}"' in used
+    assert f'hx-get="/policies/{MODELPOL}"' in overview
 
 
 def test_used_by_lists_what_names_it_and_the_runs_it_reached(client: TestClient) -> None:

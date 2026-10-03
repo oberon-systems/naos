@@ -4,6 +4,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from naos_web import format
+from naos_web.events import clock
 from naos_web.pages import (
     FINISHED,
     LIFECYCLE,
@@ -20,6 +21,16 @@ from naos_web.pages import (
 )
 
 Row = dict[str, Any]
+MODEL_REFUSALS = {
+    "invalid": "malformed request",
+    "denied": "model outside the policy",
+    "budget": "token budget spent",
+    "rate": "request rate reached",
+    "credential": "credential missing or expired",
+    "timeout": "provider timed out",
+    "provider": "provider unreachable",
+    "aborted": "client left",
+}
 
 
 @dataclass(frozen=True)
@@ -370,6 +381,41 @@ class RunRunnerRow:
 
 
 @dataclass(frozen=True)
+class Meter:
+    label: str
+    value: str
+    percent: int
+    tone: Tone
+
+
+@dataclass(frozen=True)
+class RunProvider:
+    name: str
+    api: str
+    models: str
+    credential: str
+
+
+@dataclass(frozen=True)
+class RunRefusal:
+    id: str
+    time: str
+    target: str
+    reason: str
+    category: str
+    tone: Tone
+
+
+@dataclass(frozen=True)
+class RunModelRow:
+    policy_id: str
+    calls: str
+    meters: list[Meter]
+    providers: list[RunProvider]
+    refusals: list[RunRefusal]
+
+
+@dataclass(frozen=True)
 class RunDetailRow:
     id: str
     seq: int
@@ -388,6 +434,7 @@ class RunDetailRow:
     policy: list[Fact]
     holder: RunRunnerRow | None
     steps: list[Step]
+    model: RunModelRow | None
 
 
 def _size(mib: int) -> str:
@@ -422,6 +469,59 @@ def _secrets(policy: Row | None) -> str:
     servers = policy["document"].get("servers", []) if policy else []
     bound = len({server["credential"] for server in servers if server.get("credential")})
     return f"{bound} bound \u00b7 never logged" if bound else "none bound"
+
+
+def model_line(document: Row) -> str:
+    providers = document["providers"]
+    models = sum(len(provider["models"]) for provider in providers)
+    return (
+        f"{len(providers)} provider{'s' if len(providers) != 1 else ''} \u00b7 "
+        f"{models} model{'s' if models != 1 else ''}"
+    )
+
+
+def _meter(label: str, spent: int, budget: int) -> Meter:
+    percent = spent * 100 // budget
+    tone: Tone = "red" if percent >= 100 else "amber" if percent >= 90 else "green"
+    value = f"{format.grouped(spent)} of {format.grouped(budget)} \u00b7 {percent}%"
+    return Meter(label, value, min(percent, 100), tone)
+
+
+# A refusal is told by its category; the gateway never logs a prompt or a reason in words.
+def _refusal(row: Row) -> RunRefusal:
+    category = row["category"]
+    return RunRefusal(
+        id=row["id"],
+        time=clock(row["at"]),
+        target=f"{row['provider']} / {row['model']}",
+        reason=MODEL_REFUSALS.get(category, "refused"),
+        category=category,
+        tone="amber" if category in ("budget", "rate") else "red",
+    )
+
+
+def _model(policy: Row | None, usage: Row | None) -> RunModelRow | None:
+    if policy is None or usage is None:
+        return None
+    document, denied = policy["document"], usage["denied"]
+    return RunModelRow(
+        policy_id=policy["id"],
+        calls=f"{usage['calls']} \u00b7 {denied} refused" if denied else str(usage["calls"]),
+        meters=[
+            _meter("Input tokens", usage["input_tokens"], document["max_input_tokens"]),
+            _meter("Output tokens", usage["output_tokens"], document["max_output_tokens"]),
+        ],
+        providers=[
+            RunProvider(
+                name=provider["name"],
+                api=provider["api"],
+                models=" \u00b7 ".join(provider["models"]),
+                credential=provider["credential"],
+            )
+            for provider in document["providers"]
+        ],
+        refusals=[_refusal(row) for row in usage["refusals"]],
+    )
 
 
 def _fencing(run: Row, runner: Row | None) -> str:
@@ -485,6 +585,7 @@ def run_detail(
     policies: dict[str, Row],
     images: list[Row],
     profile: Row | None,
+    usage: Row | None,
     now: int,
 ) -> RunDetailRow:
     spec = run["spec"]
@@ -492,6 +593,7 @@ def run_detail(
     started = format.ago(run["started_at"], now)
     elapsed = format.duration(run["started_at"], run["finished_at"], now)
     merge = spec["merge"]["policy"]
+    model = policies.get("model")
     size = f"{runtime['cpu']} vCPU \u00b7 {_size(runtime['memory_mib'])}"
     return RunDetailRow(
         id=run["id"],
@@ -525,11 +627,13 @@ def run_detail(
             Fact("Timeouts", f"run {format.coarse(spec['timeout'])} \u00b7 idle {format.DASH}"),
             Fact("Network egress", _egress(policies.get("network"))),
             Fact("Secrets", _secrets(policies.get("mcp"))),
+            Fact("Model", model_line(model["document"]) if model else "no policy"),
             Fact("Artifacts", format.DASH),
             Fact("Lease fencing", _fencing(run, runner)),
         ],
         holder=_holder(runner, now) if runner else None,
         steps=_steps(run, events, now),
+        model=_model(model, usage),
     )
 
 

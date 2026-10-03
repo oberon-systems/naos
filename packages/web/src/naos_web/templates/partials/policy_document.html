@@ -106,6 +106,32 @@
                     A secret appears by name only; its value never leaves the API. A resource prefix routes to one server.
                 </p>
             </section>
+        {% elif policy.kind == "model" %}
+            <section class="card run__card">
+                <div class="run__card-header">
+                    <h3 class="run__card-title">PROVIDERS · {{ policy.providers | length }}</h3>
+                </div>
+                <ul class="policy__servers">
+                    {% for provider in policy.providers %}
+                        <li class="policy__server">
+                            <div>
+                                <strong class="run__mono">{{ provider.name }}</strong>
+                                <span class="run__mono table__secondary">{{ provider.url }}</span>
+                            </div>
+                            <div>api {{ provider.api }}</div>
+                            <div>models {{ provider.models }}</div>
+                            <div class="table__secondary">
+                                credential
+                                <code class="profile__tag">{{ provider.credential }}</code>
+                                {{ provider.limits }}
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+                <p class="image__hint table__secondary">
+                    A key appears by the name of its secret only; its value never leaves the API. One model belongs to one provider.
+                </p>
+            </section>
         {% endif %}
         <section class="card run__card">
             <div class="run__card-header">
@@ -126,7 +152,16 @@
             {{ facts(policy.identity) }}
             <p class="image__hint table__secondary">{{ identity_note }}</p>
         </section>
-        {% if policy.kind == "mcp" %}
+        {% if policy.kind == "model" %}
+            <section class="card run__card">
+                <div class="run__card-header">
+                    <h3 class="run__card-title">BUDGET · PER RUN</h3>
+                </div>
+                {{ facts(policy.budget) }}
+                <p class="image__hint table__secondary">{{ budget_note }}</p>
+            </section>
+        {% endif %}
+        {% if policy.kind in ("mcp", "model") %}
             <section class="card run__card">
                 <div class="run__card-header">
                     <h3 class="run__card-title">SECRETS · {{ policy.secrets | length }}</h3>

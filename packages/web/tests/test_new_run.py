@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from stub_api import WRITES
+from stub_api import MODELPOL, WRITES
 
 HX = {"HX-Request": "true"}
 BUILD_SMALL = "prof_7a1c30"
@@ -94,6 +94,7 @@ def test_configure_copies_the_picked_profile(client: TestClient) -> None:
     assert "any live runner with a free slot · alpha, beta, gamma" in body
     assert "delta" not in body and "epsilon" not in body
     assert "alpha-token" not in body
+    assert re.search(rf'<option value="{MODELPOL}"\s*>1 provider · 1 model</option>', body)
 
 
 def test_configure_marks_edited_fields_with_the_profile_value(client: TestClient) -> None:
@@ -153,6 +154,15 @@ def test_an_edited_profile_is_updated_then_run(client: TestClient, writes: list[
     ]
     assert writes[0][2]["spec"]["runtime"]["cpu"] == 2
     assert writes[1][2]["runner"] == "rnr_4ad907bb"
+
+
+def test_a_picked_model_policy_reaches_the_profile(client: TestClient, writes: list[Any]) -> None:
+    form = draft(DOCS, model=MODELPOL, mode="update")
+    review = client.post("/runs/new/review", data=form, headers=HX).text
+    client.post("/runs/new", data=form, headers=HX)
+
+    assert "none \u2192 1 provider · 1 model" in review
+    assert writes[0][2]["spec"]["model"] == {"policy": MODELPOL}
 
 
 def test_save_as_new_creates_a_profile_under_its_name(

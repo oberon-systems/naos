@@ -122,6 +122,37 @@
                             </label>
                         {% endfor %}
                     </div>
+                {% elif form.kind == "model" %}
+                    <h3 class="run__card-title profile__section">BUDGET · PER RUN</h3>
+                    <div class="dialog__grid">
+                        {{ input("max_input", form.max_input, "Max input tokens", "2000000", mono=true) }}
+                        {{ input("max_output", form.max_output, "Max output tokens", "200000", mono=true) }}
+                    </div>
+                    {% set items = form.items("providers") %}
+                    <h3 class="run__card-title profile__section">PROVIDERS · {{ items | length }}</h3>
+                    {% for item in items %}
+                        {% set at = "providers." ~ loop.index0 ~ "." %}
+                        <div class="policy__server-form">
+                            <div class="policy__server-head">
+                                <strong>Provider {{ item.name or loop.index }}</strong>
+                                {{ step("drop:providers:" ~ loop.index0, "Remove", "policy__remove") }}
+                            </div>
+                            <div class="policy__server-row policy__server-row--name">
+                                {{ input(at ~ "name", item.name, "Name", "alpha", mono=true) }}
+                                {{ input(at ~ "url", item.url, "URL", "https://api.example.com", mono=true) }}
+                            </div>
+                            <div class="dialog__grid">
+                                {{ choose(at ~ "api", item.api, dialects, "API") }}
+                                {{ input(at ~ "models", item.models, "Models", "alpha-large, alpha-mini", mono=true) }}
+                            </div>
+                            <div class="policy__server-row policy__server-row--limits">
+                                {{ input(at ~ "credential", item.credential, "Credential", "alpha-key", mono=true) }}
+                                {{ input(at ~ "timeout", item.timeout, "Timeout, s") }}
+                                {{ input(at ~ "requests", item.requests, "Requests / min") }}
+                            </div>
+                        </div>
+                    {% endfor %}
+                    {% if not form.full("providers") %}{{ step('add:providers', '+ Add provider') }}{% endif %}
                 {% else %}
                     {% set items = form.items("servers") %}
                     <h3 class="run__card-title profile__section">SERVERS · {{ items | length }}</h3>

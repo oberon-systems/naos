@@ -13,19 +13,39 @@ from naos_web.new_run import (
     values_of,
 )
 from naos_web.pages import FINISHED, Summary, TileValue, Tone
-from naos_web.rows import Fact, RunRow, run_rows
+from naos_web.rows import Fact, RunRow, model_line, run_rows
 
 Mode = Literal["new", "edit", "clone"]
-TAGS = {"mounts": "mnt", "network": "net", "shell": "sh", "mcp": "mcp"}
-GATES = {"mounts": "Mount", "network": "Network", "shell": "Shell", "mcp": "MCP"}
-MISSING = {"mounts": "no mounts", "network": "no network", "shell": "no shell", "mcp": "no mcp"}
+TAGS = {"mounts": "mnt", "network": "net", "shell": "sh", "mcp": "mcp", "model": "mdl"}
+GATES = {
+    "mounts": "Mount",
+    "network": "Network",
+    "shell": "Shell",
+    "mcp": "MCP",
+    "model": "Model",
+}
+MISSING = {
+    "mounts": "no mounts",
+    "network": "no network",
+    "shell": "no shell",
+    "mcp": "no mcp",
+    "model": "no model",
+}
 CLOSED = {
     "mounts": "none \u2014 nothing mounted",
     "network": "none \u2014 no network",
     "shell": "none \u2014 no shell",
     "mcp": "none \u2014 no servers, no secrets",
+    "model": "none \u2014 no providers, no keys",
 }
-KIND_NAMES = {"mount": "mount", "network": "net", "shell": "shell", "mcp": "mcp"}
+HOLDERS = {"mcp": "servers", "model": "providers"}
+KIND_NAMES = {
+    "mount": "mount",
+    "network": "net",
+    "shell": "shell",
+    "mcp": "mcp",
+    "model": "model",
+}
 MERGE: dict[str, tuple[str, Tone, str]] = {
     "ask": ("ASK", "amber", "operator decides"),
     "never": ("NEVER", "grey", "workspace untouched"),
@@ -127,14 +147,13 @@ def pick_profiles(profiles: list[Row], state: str, query: str) -> list[Row]:
     ]
 
 
-# Secrets are counted by the names MCP policies bind; their values never reach the web.
+# Secrets are counted by the names MCP and model policies bind; their values never reach the web.
 def _secret_names(policies: list[Row]) -> set[str]:
     return {
-        server["credential"]
+        holder["credential"]
         for policy in policies
-        if policy["kind"] == "mcp"
-        for server in policy["document"].get("servers", [])
-        if server.get("credential")
+        for holder in policy["document"].get(HOLDERS.get(policy["kind"], ""), [])
+        if holder.get("credential")
     }
 
 
@@ -149,7 +168,7 @@ def shelf(profiles: list[Row], policies: list[Row]) -> Summary:
         values={
             "profiles": TileValue(str(len(profiles)), "runtime presets"),
             "policies": TileValue(str(len(policies)), " \u00b7 ".join(kinds) or "none yet"),
-            "secrets": TileValue(str(secrets), "named by mcp policies"),
+            "secrets": TileValue(str(secrets), "named by mcp and model policies"),
             "runs_24h": TileValue(
                 str(sum(profile["runs_24h"] for profile in profiles)), "launched from a profile"
             ),
@@ -176,11 +195,14 @@ def _network(document: Row) -> str:
     return " \u00b7 ".join(allowed + denied)
 
 
+def _bound(holders: list[Row]) -> str:
+    names = sorted({holder["credential"] for holder in holders if holder.get("credential")})
+    return f"secrets {', '.join(names)} \u2014 values never shown" if names else "no secrets"
+
+
 def _mcp(document: Row) -> str:
     servers = document["servers"]
-    names = sorted({server["credential"] for server in servers if server.get("credential")})
-    bound = f"secrets {', '.join(names)} \u2014 values never shown" if names else "no secrets"
-    return f"{_plural(len(servers), 'server')} \u00b7 {bound}"
+    return f"{_plural(len(servers), 'server')} \u00b7 {_bound(servers)}"
 
 
 def summary_of(policy: Row) -> str:
@@ -191,6 +213,8 @@ def summary_of(policy: Row) -> str:
         return _network(document)
     if kind == "shell":
         return " \u00b7 ".join(document["allow"])
+    if kind == "model":
+        return f"{model_line(document)} \u00b7 {_bound(document['providers'])}"
     return _mcp(document)
 
 

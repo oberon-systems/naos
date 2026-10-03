@@ -5,11 +5,18 @@ from typing import Any, Literal
 from uuid import uuid4
 
 from naos_web.client import Choices
+from naos_web.rows import model_line
 
 Row = dict[str, Any]
 Mode = Literal["update", "new"]
 AUTO = "auto"
-POLICY_KINDS = (("mounts", "mount"), ("network", "network"), ("shell", "shell"), ("mcp", "mcp"))
+POLICY_KINDS = (
+    ("mounts", "mount"),
+    ("network", "network"),
+    ("shell", "shell"),
+    ("mcp", "mcp"),
+    ("model", "model"),
+)
 MERGE_NOTES = {
     "never": "never: changes are kept out of the workspace",
     "ask": "ask: changes wait in WAITING_MERGE for approval",
@@ -25,6 +32,7 @@ NEW_PROFILE: dict[str, str] = {
     "network": "",
     "shell": "",
     "mcp": "",
+    "model": "",
 }
 FIELDS = tuple(NEW_PROFILE)
 NUMBERS = {"cpu": "vCPU", "memory_mib": "MiB", "disk_gib": "GiB", "timeout": "s"}
@@ -38,6 +46,7 @@ LABELS = {
     "network": "Network",
     "shell": "Shell",
     "mcp": "MCP",
+    "model": "Model",
 }
 
 
@@ -163,6 +172,8 @@ def policy_label(policy: Row) -> str:
         return f"allowlist · {len(document['allow'])} hosts"
     if kind == "shell":
         return f"{len(document['allow'])} capabilities"
+    if kind == "model":
+        return model_line(document)
     names = ", ".join(server["name"] for server in document["servers"])
     return f"{len(document['servers'])} servers · {names}"
 

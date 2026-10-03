@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from typing import Literal
 
 from naos_web import format
-from naos_web.client import SHOWN_KINDS, Row
+from naos_web.client import Row
 from naos_web.new_run import FormError, short
 from naos_web.pages import STATUS_TONE, Summary, TileValue, Tone
 from naos_web.profiles import Tag
@@ -181,7 +181,7 @@ class NamedBy:
     line: str
     scope: str
     scope_note: str
-    href: str | None
+    href: str
 
 
 @dataclass(frozen=True)
@@ -212,7 +212,6 @@ class SecretDetail:
     runs: list[RunUse]
 
 
-# A model policy has no screen yet, so its row opens nothing until SHOWN_KINDS names it.
 def _named(usage: Row, policies: dict[str, Row]) -> NamedBy:
     kind = POLICY_KIND[usage["kind"]]
     role = f"{ROLE[usage['kind']]} {usage['server']}"
@@ -226,7 +225,7 @@ def _named(usage: Row, policies: dict[str, Row]) -> NamedBy:
         line=f"{kind} policy \u00b7 credential of {role}",
         scope=_plural(len(policy["profiles"]), "profile") if policy else format.DASH,
         scope_note=_plural(policy["runs_total"], "run") if policy else "",
-        href=f"/policies/{usage['id']}" if kind in SHOWN_KINDS else None,
+        href=f"/policies/{usage['id']}",
     )
 
 
