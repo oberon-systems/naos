@@ -115,6 +115,7 @@ GET /api/v1/runs/{run_id}/console
 WS /api/v1/runs/{run_id}/attach
 POST /api/v1/runners/{runner_id}/runs/{run_id}/console
 GET /api/v1/runs/{run_id}/events
+GET /api/v1/runs/{run_id}/gates/{gate}
 GET /api/v1/runs/{run_id}/merge
 POST /api/v1/runs/{run_id}/merge
 POST /api/v1/runs/{run_id}/merge/reject
@@ -173,6 +174,13 @@ shows up unfiltered.
 `GET /runs/summary` is the fleet at a glance, in one call: `counts` per
 status, `open` for the non-terminal ones, `oldest_pending_at`, `failed_24h`
 and `last_failure_reason`, the reason of the newest failure in that window.
+
+`GET /runs/{run_id}/gates/{gate}` is what one gate did for one Run, counted
+from the audit on every read and never stored. The only `gate` so far is
+`model`: `calls`, `denied`, `input_tokens` and `output_tokens` summed over the
+Run's `model_call` events, and `refusals`, the last five denied calls newest
+first, each with `id`, `at`, `provider`, `model` and `category`. The budget
+itself is in the model policy ([13](13-model-gateway.md#budget-and-rate)).
 
 ## Console
 
