@@ -193,6 +193,21 @@ check_models() {
     done
 }
 
+model_card() {
+    curl -fsS "$web/runs/$run" >"$TEMP_DIR/run-model.html"
+    for text in "$model_policy" "of 10 · 100%" "token budget spent" "model outside the policy" "openai-key"; do
+        grep -qF -- "$text" "$TEMP_DIR/run-model.html" || return 1
+    done
+}
+
+# The Run overview follows the budget from the audit and names each key by its secret only.
+check_model_card() {
+    wait_for 60 model_card
+    for value in "$openai_key" "$anthropic_key" "$operator"; do
+        ! grep -qF -- "$value" "$TEMP_DIR/run-model.html" || fail "the model card carries a credential"
+    done
+}
+
 # The read model the operator screens render, rather than the raw row.
 check_run_view() {
     curl -fsS "${auth[@]}" "$api/api/v1/runs/$run" | "$VENV/bin/python" -c '
@@ -602,6 +617,7 @@ new_run() {
         --data-urlencode "network=$network_policy" \
         --data-urlencode "shell=$shell_policy" \
         --data-urlencode "mcp=$mcp_policy" \
+        --data-urlencode "model=$model_policy" \
         --data-urlencode "image=auto" \
         --data-urlencode "runner=auto")"
     [ "$location" = "$web/runs" ] || fail "the new run dialog did not create the run"
@@ -616,8 +632,10 @@ if len(runs) != 1 or runs[0]["status"] != "PENDING":
 spec = runs[0]["spec"]
 if spec["runtime"] != {"cpu": 2, "memory_mib": 2048, "disk_gib": 8} or spec["runner"] is not None:
     sys.exit(f"the run does not carry the spec of the dialog: {spec}")
+if spec["model"]["policy"] != sys.argv[1]:
+    sys.exit(f"the run does not carry the model policy picked in the dialog: {spec}")
 print(runs[0]["id"])
-'
+' "$1"
 }
 
 only_profile() {
@@ -659,14 +677,19 @@ if [row["id"] for row in json.load(sys.stdin)] != [sys.argv[1]]:
     curl -fsS "$web/policies/$network_policy" >"$TEMP_DIR/policies-document.html"
     curl -fsS "$web/policies/$network_policy/used" >"$TEMP_DIR/policies-used.html"
     curl -fsS "$web/policies/$mcp_policy" >"$TEMP_DIR/policies-mcp.html"
+    curl -fsS "$web/policies?kind=model" >"$TEMP_DIR/policies-kind.html"
+    curl -fsS "$web/policies/$model_policy" >"$TEMP_DIR/policies-model.html"
     curl -fsS -X POST "$web/policies/new" --data-urlencode "kind=shell" \
         --data-urlencode "cap.read_file=on" --data-urlencode "cap.list_dir=on" \
         --data-urlencode "cap.grep=on" >"$TEMP_DIR/policies-exists.html"
-    "$VENV/bin/python" - "$TEMP_DIR" "$network_policy" "$shell_policy" "$run" "$secret" "$operator" <<'PY' || fail "the policies page is wrong"
+    "$VENV/bin/python" - "$TEMP_DIR" "$network_policy" "$shell_policy" "$run" "$model_policy" \
+        "$secret" "$operator" "$openai_key" "$anthropic_key" <<'PY' || fail "the policies page is wrong"
 import sys
-temp, network, shell, run, *secrets = sys.argv[1:]
+temp, network, shell, run, model, *secrets = sys.argv[1:]
 wanted = {
     "list": [network, "tile__number"],
+    "kind": [model, "2 providers"],
+    "model": ["PROVIDERS · 2", "BUDGET · PER RUN", "SECRETS · 2", "anthropic-key"],
     "document": ["CANONICAL DOCUMENT", "www.google.com", "New from this"],
     "used": [run, "Open profile"],
     "mcp": ["SECRETS · 1", "alpha-token"],
@@ -951,29 +974,44 @@ for name in openai anthropic; do
 {"name": "$name-key", "value": "${!key_var}"}
 EOF
 done
-# Two calls of 5 output tokens each spend the budget, so the third is refused.
+# The policy form creates it. Two calls of 5 output tokens each spend the budget, so the third
+# is refused.
 model_policy="$(
-    curl -fsS "${auth[@]}" "$api/api/v1/policies" -d @- <<EOF | field id
-{"kind": "model", "document": {"providers": [
-  {"name": "alpha", "api": "openai", "url": "https://openai.example.com:$stub_port", "credential": "openai-key", "models": ["alpha-mini"]},
-  {"name": "beta", "api": "anthropic", "url": "https://anthropic.example.com:$stub_port", "credential": "anthropic-key", "models": ["beta-large"]}
-], "max_input_tokens": 1000, "max_output_tokens": 10}}
-EOF
+    curl -fsS -o /dev/null -w '%{redirect_url}' -X POST "$web/policies/new" \
+        --data-urlencode "kind=model" \
+        --data-urlencode "max_input=1000" \
+        --data-urlencode "max_output=10" \
+        --data-urlencode "providers.0.name=alpha" \
+        --data-urlencode "providers.0.api=openai" \
+        --data-urlencode "providers.0.url=https://openai.example.com:$stub_port" \
+        --data-urlencode "providers.0.models=alpha-mini" \
+        --data-urlencode "providers.0.credential=openai-key" \
+        --data-urlencode "providers.0.timeout=600" \
+        --data-urlencode "providers.0.requests=60" \
+        --data-urlencode "providers.1.name=beta" \
+        --data-urlencode "providers.1.api=anthropic" \
+        --data-urlencode "providers.1.url=https://anthropic.example.com:$stub_port" \
+        --data-urlencode "providers.1.models=beta-large" \
+        --data-urlencode "providers.1.credential=anthropic-key" \
+        --data-urlencode "providers.1.timeout=600" \
+        --data-urlencode "providers.1.requests=60"
 )"
-# The dialog has no model field until the model screens exist, so it runs a profile that names one.
+model_policy="${model_policy##*/}"
+[ "${model_policy#modelpol_}" != "$model_policy" ] || fail "the web did not create the model policy"
+# The profile names no model policy; the dialog picks it and saves it into the profile.
 smoke_profile="$(
     curl -fsS "${auth[@]}" "$api/api/v1/profiles" -d @- <<EOF | field id
 {"name": "smoke", "spec": {
   "runtime": {"cpu": 2, "memory_mib": 2048, "disk_gib": 8}, "timeout": 3600, "merge": {"policy": "ask"},
   "mounts": {"policy": "$mount_policy"}, "network": {"policy": "$network_policy"},
-  "shell": {"policy": "$shell_policy"}, "mcp": {"policy": "$mcp_policy"}, "model": {"policy": "$model_policy"}
+  "shell": {"policy": "$shell_policy"}, "mcp": {"policy": "$mcp_policy"}
 }}
 EOF
 )"
 echo "creating the run from the new run dialog..."
 new_run
 new_run
-run="$(curl -fsS "${auth[@]}" "$api/api/v1/runs" | only_run)"
+run="$(curl -fsS "${auth[@]}" "$api/api/v1/runs" | only_run "$model_policy")"
 profile="$(curl -fsS "${auth[@]}" "$api/api/v1/profiles?q=smoke" | only_profile)"
 
 echo "starting agent..."
@@ -1062,6 +1100,7 @@ guest \
     "echo NAOS-SMOKE-DONE"
 check_gates
 check_models
+check_model_card
 echo "reading the console through the api and the terminal tab..."
 wait_for 30 console_shipped
 check_terminal
