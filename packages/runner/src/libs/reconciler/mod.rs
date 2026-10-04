@@ -126,6 +126,14 @@ pub async fn reconcile<A: Api + Sync, R: Runtime>(
     failures
 }
 
+fn find<'a>(desired: &'a DesiredState, run_id: &str) -> Result<&'a DesiredRun, AgentError> {
+    desired
+        .runs
+        .iter()
+        .find(|run| run.id == run_id)
+        .ok_or_else(|| AgentError::Runtime(format!("run {run_id} is not desired")))
+}
+
 struct Executor<'a, A, R> {
     api: &'a A,
     runtime: &'a R,
@@ -141,9 +149,11 @@ impl<A: Api + Sync, R: Runtime> Executor<'_, A, R> {
                 self.advance(run_id, RunStatus::Pending, RunStatus::Starting, None)
                     .await?;
                 audit::run_claimed(run_id);
-                self.start(run_id).await
+                // A PENDING Run can still change; what it holds is fixed once it is claimed.
+                let claimed = self.api.desired(self.credentials).await?;
+                self.start(find(&claimed, run_id)?).await
             }
-            Action::Start(run_id) => self.start(run_id).await,
+            Action::Start(run_id) => self.start(self.run(run_id)?).await,
             Action::Sync(vm) => self.runtime.sync(self.run(&vm.run_id)?, vm).await,
             Action::Fail {
                 run_id,
@@ -209,15 +219,11 @@ impl<A: Api + Sync, R: Runtime> Executor<'_, A, R> {
     }
 
     fn run(&self, run_id: &str) -> Result<&DesiredRun, AgentError> {
-        self.desired
-            .runs
-            .iter()
-            .find(|run| run.id == run_id)
-            .ok_or_else(|| AgentError::Runtime(format!("run {run_id} is not desired")))
+        find(self.desired, run_id)
     }
 
-    async fn start(&self, run_id: &str) -> Result<(), AgentError> {
-        let run = self.run(run_id)?;
+    async fn start(&self, run: &DesiredRun) -> Result<(), AgentError> {
+        let run_id = run.id.as_str();
         match self.runtime.ensure(run, self.images).await {
             Ok(_) => {
                 self.advance(run_id, RunStatus::Starting, RunStatus::Started, None)

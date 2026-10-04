@@ -387,6 +387,7 @@ pub struct FakeRuntime {
     stopped: Mutex<Vec<LocalVm>>,
     unavailable: AtomicBool,
     fail_ensure: AtomicBool,
+    ensured: Mutex<Vec<DesiredRun>>,
     fail_sync: AtomicBool,
     fail_collect: AtomicBool,
     synced: Mutex<Vec<LocalVm>>,
@@ -413,6 +414,10 @@ impl FakeRuntime {
 
     pub fn make_unavailable(&self) {
         self.unavailable.store(true, Ordering::SeqCst);
+    }
+
+    pub fn ensured(&self) -> Vec<DesiredRun> {
+        lock(&self.ensured).clone()
     }
 
     pub fn fail_ensure(&self) {
@@ -462,6 +467,7 @@ impl Runtime for FakeRuntime {
         if self.fail_ensure.load(Ordering::SeqCst) {
             return Err(AgentError::Runtime("boot failed".into()));
         }
+        lock(&self.ensured).push(run.clone());
         let mut vms = lock(&self.vms);
         if let Some(existing) = vms.iter().find(|vm| vm.run_id == run.id) {
             return Ok(existing.clone());

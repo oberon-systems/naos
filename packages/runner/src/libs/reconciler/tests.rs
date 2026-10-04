@@ -184,6 +184,7 @@ async fn duplicate_delivery_creates_one_vm() {
     let runtime = FakeRuntime::default();
     let state = desired(vec![desired_run("run_a", RunStatus::Pending)]);
     let images = FakeSource::new(IMAGE);
+    api.serve(state.clone());
 
     for _ in 0..2 {
         let actual = runtime.vms();
@@ -228,12 +229,50 @@ async fn starting_run_is_recovered_without_a_second_vm() {
 }
 
 #[tokio::test]
+async fn a_claimed_run_starts_from_what_the_api_holds_after_the_claim() {
+    let api = FakeApi::default();
+    let runtime = FakeRuntime::default();
+    let state = desired(vec![desired_run("run_a", RunStatus::Pending)]);
+    let images = FakeSource::new(IMAGE);
+    let mut claimed = desired_run("run_a", RunStatus::Starting);
+    claimed.policies.insert("mcp".into(), None);
+    api.serve(desired(vec![claimed]));
+
+    let failures = reconcile(&api, &runtime, &images, &api.credentials(), &state, &[]).await;
+
+    assert_eq!(failures, 0);
+    let [started] = &runtime.ensured()[..] else {
+        panic!("one run is started");
+    };
+    assert_eq!(started.status, RunStatus::Starting);
+    assert!(started.policies.contains_key("mcp"));
+}
+
+#[tokio::test]
+async fn a_claim_the_api_cannot_confirm_starts_nothing() {
+    let api = FakeApi::default();
+    let runtime = FakeRuntime::default();
+    let state = desired(vec![desired_run("run_a", RunStatus::Pending)]);
+    let images = FakeSource::new(IMAGE);
+
+    let failures = reconcile(&api, &runtime, &images, &api.credentials(), &state, &[]).await;
+
+    assert_eq!(failures, 1);
+    assert!(runtime.vms().is_empty());
+    assert_eq!(
+        api.transitions(),
+        vec![("run_a".into(), RunStatus::Pending, RunStatus::Starting)]
+    );
+}
+
+#[tokio::test]
 async fn failed_start_is_reported() {
     let api = FakeApi::default();
     let runtime = FakeRuntime::default();
     runtime.fail_ensure();
     let state = desired(vec![desired_run("run_a", RunStatus::Pending)]);
     let images = FakeSource::new(IMAGE);
+    api.serve(state.clone());
 
     let failures = reconcile(&api, &runtime, &images, &api.credentials(), &state, &[]).await;
 
