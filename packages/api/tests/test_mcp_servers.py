@@ -150,6 +150,7 @@ def test_a_run_keeps_the_entry_it_was_created_with(
     client.patch("/api/v1/mcp-servers/alpha", json=changed | {"timeout_seconds": 5})
     assert _run(client, spec_body, policy_id, "key-2").status_code == 201
     first, second = _desired(client, register())
+    read = client.get(f"/api/v1/runs/{first['id']}").json()
 
     assert _servers_of(first) == [
         {
@@ -163,6 +164,8 @@ def test_a_run_keeps_the_entry_it_was_created_with(
         }
     ]
     assert set(first["credentials"]) == {"alpha-token"}
+    assert read["mcp_document"] == first["policies"]["mcp"]
+    assert VALUE not in str(read)
     assert _servers_of(second)[0]["url"] == "https://beta.example.com/mcp"
     assert _servers_of(second)[0]["timeout_seconds"] == 5
     assert set(second["credentials"]) == {"beta-token"}

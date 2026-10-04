@@ -32,6 +32,7 @@ class RunRead(BaseModel):
     spec: RunSpec
     profile_id: str | None = None
     lease_id: str | None = None
+    mcp_document: dict[str, Any] | None = None
     workspace: str | None = None
     runner: RunnerRef | None = None
     merge: MergeSummary | None = None
@@ -50,6 +51,7 @@ class RunRead(BaseModel):
             spec=RunSpec.model_validate(run.spec),
             profile_id=run.profile_id,
             lease_id=run.lease_id,
+            mcp_document=run.mcp_document,
             created_at=run.created_at,
             updated_at=run.updated_at,
             started_at=run.started_at,
