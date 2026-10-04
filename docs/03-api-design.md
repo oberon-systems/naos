@@ -163,7 +163,7 @@ beside the Run itself, resolved by the API rather than by the caller:
 | `workspace` | The workspace the mount policy names, or null |
 | `runner` | `id` and `name` of the runner holding the lease, or null |
 | `lease_id` | The lease that fences the Run, or null while it queues |
-| `mcp_document` | The registry entries the Run holds, as the runner reads them, or null without an `mcp` policy |
+| `mcp_document` | The registry entries and the rules the Run holds, as the runner reads them, or null without an `mcp` policy |
 | `profile_id` | The profile the spec was copied from, or null |
 | `merge` | `changed` and `conflicts` of the collected diff, or null |
 | `started_at` | When the Run reached STARTING, or null while it queues |
@@ -358,9 +358,9 @@ unset lets any runner claim it. An unknown or revoked runner returns 422.
 
 ## MCP servers
 
-The registry is the catalog of MCP servers of the stack. An `mcp` policy
-names servers by registry `name` and keeps only the `tools` and `resources`
-it grants; the url, the credential and the limits live on the registry entry
+The registry is the catalog of MCP servers of the stack. The rules of an
+`mcp` policy name servers by registry `name` ([08](08-mcp-gate.md#rules));
+the url, the credential and the limits live on the registry entry
 ([08](08-mcp-gate.md#external-servers)).
 
 - `POST /api/v1/mcp-servers` registers an external server: `name`, `url`,
@@ -377,20 +377,25 @@ it grants; the url, the credential and the limits live on the registry entry
   no-ops when nothing changes.
 - The built-in servers `shell`, `network` and `secrets` are listed with
   `kind` `built-in` and no url. Registering, changing, disabling or enabling
-  one gets 409, and a policy that names one gets 422.
+  one gets 409. A rule may name one, for the tools it has.
 
 Each external server carries `id`, `name`, `kind` `external`, `url`,
 `credential`, `timeout_seconds`, `max_calls_per_minute`, `disabled_at`,
 `created_at`, `updated_at` and `policies`, the ids of the `mcp` policies
-naming it.
+whose rules name it. A built-in server carries `policies` too.
 
-`POST /policies` refuses an `mcp` document that names a server the registry
-does not hold with 422. `POST /runs` copies the registry entry of every named
-server into the Run, so a later `PATCH` never reaches a Run that exists. A
-name that is unknown or disabled at that moment gets 422.
+`POST /policies` validates the rules of an `mcp` document and answers 422
+for a server the registry does not hold, an unknown tool or argument of a
+built-in server, an invalid pattern and a rule that can never match
+([08](08-mcp-gate.md#rules)). It stores the rules in a fixed order, so
+equivalent documents share one digest. `POST /runs` copies the registry
+entry of every server an allow rule names into the Run beside the rules, so
+a later `PATCH` never reaches a Run that exists. A name that is unknown or
+disabled at that moment gets 422. A Run without an `mcp` policy has no rules
+and so no tools at all.
 
-A disable reaches only Runs that are still PENDING: from STARTING on a Run
-keeps the entry it has. The runner reads the desired state again after its
+A disable reaches only Runs that are still PENDING and removes the server's
+entry, never a rule: from STARTING on a Run keeps the entry it has. The runner reads the desired state again after its
 claim and starts the Run from that answer, so a disable that lands before the
 claim is always in effect.
 
