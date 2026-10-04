@@ -137,6 +137,12 @@ GET /api/v1/secrets/{name}
 POST /api/v1/secrets/{name}/rotate
 PATCH /api/v1/secrets/{name}
 DELETE /api/v1/secrets/{name}
+POST /api/v1/mcp-servers
+GET /api/v1/mcp-servers
+GET /api/v1/mcp-servers/{name}
+PATCH /api/v1/mcp-servers/{name}
+POST /api/v1/mcp-servers/{name}/disable
+POST /api/v1/mcp-servers/{name}/enable
 GET /api/v1/audit
 GET /api/v1/audit/summary
 GET /api/v1/audit/{event_id}
@@ -304,7 +310,8 @@ equivalent documents share one digest and therefore one id. Ids carry the kind:
 A Run names a policy per kind under `spec.mounts`, `spec.network`, `spec.shell`,
 `spec.mcp` and `spec.model`, and the reference is immutable once the Run
 starts. The runner receives the resolved document as a snapshot rather than
-the id. The network document is described in [06](06-network-gate.md), the
+the id. For `mcp` that snapshot is the Run's own, taken when the Run is
+created ([MCP servers](#mcp-servers)). The network document is described in [06](06-network-gate.md), the
 shell document in [07](07-shell-gate.md), the MCP document in
 [08](08-mcp-gate.md), the model document in [13](13-model-gateway.md).
 
@@ -348,11 +355,52 @@ profile and never references it, so a later update reaches no started Run.
 A Run spec may name a `runner` id. The Run is then offered to that runner only;
 unset lets any runner claim it. An unknown or revoked runner returns 422.
 
+## MCP servers
+
+The registry is the catalog of MCP servers of the stack. An `mcp` policy
+names servers by registry `name` and keeps only the `tools` and `resources`
+it grants; the url, the credential and the limits live on the registry entry
+([08](08-mcp-gate.md#external-servers)).
+
+- `POST /api/v1/mcp-servers` registers an external server: `name`, `url`,
+  optional `credential`, `timeout_seconds` and `max_calls_per_minute`. It
+  answers 201, 409 for a name that is taken and 422 for a field that breaks
+  the rules of [08](08-mcp-gate.md#external-servers).
+- `GET /api/v1/mcp-servers` lists the external servers newest first, then
+  the built-in ones. `GET /api/v1/mcp-servers/{name}` answers one or 404.
+- `PATCH /api/v1/mcp-servers/{name}` takes any of `url`, `credential`,
+  `timeout_seconds` and `max_calls_per_minute`; `credential` may be null,
+  the others may not. An empty body gets 422.
+- `POST /api/v1/mcp-servers/{name}/disable` sets `disabled_at` and takes the
+  server out of every PENDING Run. `POST .../enable` clears it. Both are
+  no-ops when nothing changes.
+- The built-in servers `shell`, `network` and `secrets` are listed with
+  `kind` `built-in` and no url. Registering, changing, disabling or enabling
+  one gets 409, and a policy that names one gets 422.
+
+Each external server carries `id`, `name`, `kind` `external`, `url`,
+`credential`, `timeout_seconds`, `max_calls_per_minute`, `disabled_at`,
+`created_at`, `updated_at` and `policies`, the ids of the `mcp` policies
+naming it.
+
+`POST /policies` refuses an `mcp` document that names a server the registry
+does not hold with 422. `POST /runs` copies the registry entry of every named
+server into the Run, so a later `PATCH` never reaches a Run that exists. A
+name that is unknown or disabled at that moment gets 422.
+
+A disable reaches only Runs that are still PENDING: from STARTING on a Run
+keeps the entry it has. A runner that already read the desired state of a
+PENDING Run may start it with the entry it read.
+
+`credential` is a secret name and never a value. It is naos's own access to
+that server: the runner gets the value with the Run's credentials, and the
+agent never lists or receives it.
+
 ## Secrets
 
-A secret is a provider credential an MCP or model policy names by `name`. The API
-stores it as given, without encryption for now, and never returns its value:
-no response, error or audit event carries it.
+A secret is a provider credential a registry server or a model policy names
+by `name`. The API stores it as given, without encryption for now, and never
+returns its value: no response, error or audit event carries it.
 
 - `POST /api/v1/secrets` takes `name`, `value` and an optional `expires_at`
   and answers 201 with the secret as `GET` reads it. A name that already
@@ -378,7 +426,7 @@ Each secret carries these fields beside `id`, `name`, `expires_at`,
 | Field | Meaning |
 | --- | --- |
 | `state` | `valid`, `expiring` within 7 days, or `expired` |
-| `named_by` | `kind` `cred` with the MCP policy `id` and the `server`, or `kind` `model` with the model policy `id` and the provider in `server` |
+| `named_by` | `kind` `reg` with the registry server `id` and its name in `server`, or `kind` `model` with the model policy `id` and the provider in `server` |
 | `held_by` | The PENDING, STARTING and STARTED Runs it was issued to: `run_id`, `seq`, `status`, `profile_id` |
 | `runs` | `GET` of one secret only: every Run it was ever issued to, with `issued` count and `last_at` |
 
@@ -475,7 +523,7 @@ POST /api/v1/runners/{runner_id}/events                      runner token
   live lease, with its spec, the `image_url` of its image, the resolved
   policy documents, `credentials` and `merge`, the merge decision of a
   WAITING_MERGE Run or null.
-- `credentials` maps each secret the MCP and model policies name to `value` and
+- `credentials` maps each secret the Run's MCP snapshot and model policy name to `value` and
   `expires_at`, only for PENDING, STARTING and STARTED Runs, so the start that
   follows a claim already has them. A missing or expired secret is left out,
   and `expires_at` is at most `NAOS_RUN_CREDENTIAL_TTL_SECONDS` away, so a

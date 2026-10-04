@@ -72,6 +72,10 @@ describe, so a change and its event land or fail together.
 | `secret_expiry_changed` | operator | `name`, `from` and `to` expiry, null for never |
 | `secret_deleted` | operator | `name` only |
 | `secret_delete_refused` | operator | `name`, `named_by` count, `held_by` Run ids |
+| `mcp_server_registered` | operator | `name` only |
+| `mcp_server_updated` | operator | `name` and the names of the changed `fields`, never a value |
+| `mcp_server_disabled` | operator | `name` and `runs`, the PENDING Runs it was taken out of |
+| `mcp_server_enabled` | operator | `name` only |
 | `console_attached` | operator | none; the Run is `run_id` |
 | `runner_events_refused` | runner | `count` of the events in one batch that named a Run the runner never held |
 

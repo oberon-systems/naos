@@ -117,8 +117,21 @@ returns. Gate budgets live with the Run, so a new session does not reset them.
 
 ## External servers
 
-The `mcp` policy names the external MCP servers a Run may reach. The API
-resolves it into this document ([03](03-api-design.md)):
+External servers are registered once, in the registry of the API
+([03](03-api-design.md#mcp-servers)). An `mcp` policy names them and says
+what it grants:
+
+```json
+{
+  "servers": [
+    {"name": "alpha", "tools": ["fetch", "search"], "resources": ["docs://alpha/"]}
+  ]
+}
+```
+
+When a Run is created the API copies the registry entry of each named server
+next to the grant. The broker reads this document, and it stays as it is for
+the Run even when the registry changes later:
 
 ```json
 {
@@ -136,14 +149,19 @@ resolves it into this document ([03](03-api-design.md)):
 }
 ```
 
-| Field | Rule |
-|---|---|
-| `name` | `^[a-z0-9][a-z0-9-]{0,31}$`, unique; it prefixes the tool names |
-| `url` | https, a hostname, no userinfo, query or fragment |
-| `tools`, `resources` | at least one of them; tool names are exact, resources are URI prefixes |
-| `credential` | the name of a secret, or `null` |
-| `timeout_seconds` | 1 to 45, default 30 |
-| `max_calls_per_minute` | 1 to 600, default 60, for `tools/call` and `resources/read` |
+| Field | Set by | Rule |
+|---|---|---|
+| `name` | registry | `^[a-z0-9][a-z0-9-]{0,31}$`, unique, not `shell`, `network` or `secrets`; it prefixes the tool names |
+| `url` | registry | https, a hostname, no userinfo, query or fragment |
+| `tools`, `resources` | policy | at least one of them; tool names are exact, resources are URI prefixes |
+| `credential` | registry | the name of a secret, or `null` |
+| `timeout_seconds` | registry | 1 to 45, default 30 |
+| `max_calls_per_minute` | registry | 1 to 600, default 60, for `tools/call` and `resources/read` |
+
+A policy names only registered servers, and a Run is refused while one of
+them is unknown or disabled. Disabling a server takes it out of the document
+of every Run that has not started, so the broker of such a Run does not know
+the name and denies the call before anything leaves the host.
 
 A resource prefix of one server must not be a prefix of another server's, so
 a URI routes to at most one server.
@@ -163,6 +181,8 @@ list. A call checks the tool and the budget before anything leaves the host.
 
 The agent never holds a provider credential:
 
+- a credential belongs to the registry entry and never to a policy: it is
+  naos's access to that server, and no tool lists or returns it;
 - the API issues credentials to the runner in the desired state, never in the
   policy document, its digest or a log ([03](03-api-design.md));
 - each reconcile replaces the credentials of the Run's MCP gate, and one past
@@ -232,13 +252,16 @@ The broker tests in `packages/runner/src/libs/mcp/tests.rs` verify that:
 - a server error, an unreachable server, a slow server, a spent budget and an
   expired session are handled.
 
-The API tests in `packages/api/tests/test_mcp.py`, `test_routes.py` and
-`test_runner_lifecycle.py` cover the policy, secrets and credential issuance.
+The API tests in `packages/api/tests/test_mcp.py`, `test_mcp_servers.py`,
+`test_routes.py` and `test_runner_lifecycle.py` cover the policy, the
+registry, secrets and credential issuance: a Run keeps the entry it was
+created with, an unknown or disabled server starts no Run, and a disable
+reaches PENDING Runs only.
 
 The smoke test is the end-to-end pass: the guest runs `naos-mcp` over the gate
 port and sends `tools/list`, an allowed and a refused call of each built-in
-gate, a call of the external server's tool and a request reusing an id. It
-fails unless the built-in tools are listed, the workspace file comes back, the
+gate, a call of the registered external server's tool and a request reusing
+an id. It fails unless the built-in tools are listed, the workspace file comes back, the
 reused id is refused, and the runner logged an `mcp_call` for every one of
 those decisions, the external server included. Nothing answers as that server,
 so its call proves the routing and the failure path, not a working upstream.
