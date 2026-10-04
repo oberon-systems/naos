@@ -739,7 +739,7 @@ temp, run, *secrets = sys.argv[1:]
 wanted = {
     "list": ["beta-token", "alpha-token", "tile__number"],
     "events": ["secret_created", "secret_rotated"],
-    "used": ["Open policy", run],
+    "used": ["mcp registry", "server alpha", run],
     "refused": ["alpha-token cannot be deleted", "the api answered 409"],
     "audit": ["secret_created", "secret_rotated"],
 }
@@ -963,11 +963,18 @@ secret="$(token)"
 curl -fsS "${auth[@]}" "$api/api/v1/secrets" -o /dev/null -d @- <<EOF
 {"name": "alpha-token", "value": "$secret"}
 EOF
+curl -fsS "${auth[@]}" "$api/api/v1/mcp-servers" -o /dev/null -d @- <<EOF
+{"name": "alpha", "url": "https://example.com/mcp", "credential": "alpha-token"}
+EOF
 mcp_policy="$(
     curl -fsS "${auth[@]}" "$api/api/v1/policies" -d @- <<EOF | field id
-{"kind": "mcp", "document": {"servers": [{"name": "alpha", "url": "https://example.com/mcp", "tools": ["search"], "resources": [], "credential": "alpha-token"}]}}
+{"kind": "mcp", "document": {"servers": [{"name": "alpha", "tools": ["search"], "resources": []}]}}
 EOF
 )"
+# A policy names registered servers only.
+[ "$(curl -s -o /dev/null -w '%{http_code}' "${auth[@]}" "$api/api/v1/policies" \
+    -d '{"kind": "mcp", "document": {"servers": [{"name": "beta", "tools": ["search"]}]}}')" = 422 ] ||
+    fail "a policy named an mcp server the registry does not hold"
 for name in openai anthropic; do
     key_var="${name}_key"
     curl -fsS "${auth[@]}" "$api/api/v1/secrets" -o /dev/null -d @- <<EOF
