@@ -18,6 +18,7 @@ from naos_api.errors import (
     ProfileConflictError,
     SecretBusyError,
     SecretConflictError,
+    ServerConflictError,
 )
 from naos_api.settings import get_settings
 
@@ -58,6 +59,7 @@ _ERROR_STATUS: dict[type[Exception], int] = {
     ImageConflictError: 409,
     SecretConflictError: 409,
     SecretBusyError: 409,
+    ServerConflictError: 409,
     ProfileConflictError: 409,
     ProfileBusyError: 409,
     PolicyError: 422,

@@ -3,8 +3,10 @@ from typing import Any
 import pytest
 from sqlmodel import Session
 
+from naos_api import mcp_servers
 from naos_api.errors import PolicyError
 from naos_api.mcp import McpPolicyIn, resolve_mcp_policy
+from naos_api.mcp_servers import ServerCreate
 from naos_api.policies import create_mcp_policy
 from naos_api.secrets import create_secret, issue_credentials
 from naos_api.spec import PolicyKind
@@ -15,28 +17,26 @@ def _policy(document: dict[str, Any]) -> McpPolicyIn:
 
 
 def _server(**values: Any) -> dict[str, Any]:
-    return {"name": "alpha", "url": "https://mcp.example.com/mcp", "tools": ["search"]} | values
+    return {"name": "alpha", "tools": ["search"]} | values
+
+
+def _register(session: Session, *names: str) -> None:
+    for name in names:
+        body = ServerCreate(name=name, url=f"https://{name}.example.com/mcp")
+        mcp_servers.register_server(session, body)
 
 
 def test_servers_are_canonical() -> None:
     resolved = resolve_mcp_policy(
-        _policy(
-            {
-                "servers": [
-                    _server(name="beta", url="https://MCP.example.com:443", tools=["b", "a"]),
-                    _server(url="https://mcp.example.com:8443/mcp"),
-                ]
-            }
-        )
+        _policy({"servers": [_server(name="beta", tools=["b", "a"]), _server()]})
     )
 
     assert [server.name for server in resolved.servers] == ["alpha", "beta"]
-    assert resolved.servers[0].url == "https://mcp.example.com:8443/mcp"
-    assert resolved.servers[1].url == "https://mcp.example.com/"
     assert resolved.servers[1].tools == ["a", "b"]
 
 
 def test_equivalent_documents_share_one_digest(session: Session) -> None:
+    _register(session, "alpha")
     first, created = create_mcp_policy(session, _policy({"servers": [_server(tools=["a", "b"])]}))
     again, created_again = create_mcp_policy(
         session, _policy({"servers": [_server(tools=["b", "a"])]})
@@ -48,6 +48,13 @@ def test_equivalent_documents_share_one_digest(session: Session) -> None:
     assert first.kind is PolicyKind.MCP
 
 
+def test_a_policy_names_registered_servers_only(session: Session) -> None:
+    _register(session, "alpha")
+
+    with pytest.raises(PolicyError, match="beta is not registered"):
+        create_mcp_policy(session, _policy({"servers": [_server(), _server(name="beta")]}))
+
+
 @pytest.mark.parametrize(
     "document",
     [
@@ -56,16 +63,9 @@ def test_equivalent_documents_share_one_digest(session: Session) -> None:
         {"servers": [_server(), _server()]},
         {"servers": [_server(tools=[])]},
         {"servers": [_server(tools=["a", "a"])]},
-        {"servers": [_server(url="http://mcp.example.com/mcp")]},
-        {"servers": [_server(url="https://user:pass@mcp.example.com/mcp")]},
-        {"servers": [_server(url="https://mcp.example.com/mcp?token=alpha")]},
-        {"servers": [_server(url="https://mcp.example.com/mcp#alpha")]},
-        {"servers": [_server(url="https://192.0.2.10/mcp")]},
-        {"servers": [_server(url="https://[2001:db8::1]/mcp")]},
-        {"servers": [_server(url="https://localhost/mcp")]},
-        {"servers": [_server(url="https://mcp.example.com:0/mcp")]},
-        {"servers": [_server(url="https://mcp.example.com:65536/mcp")]},
-        {"servers": [_server(url="https://mcp.example.com/a b")]},
+        {"servers": [_server(name="shell")]},
+        {"servers": [_server(name="network")]},
+        {"servers": [_server(name="secrets")]},
         {
             "servers": [
                 _server(resources=["docs://alpha/"]),
@@ -86,11 +86,10 @@ def test_unusable_policies_are_refused(document: dict[str, Any]) -> None:
         _server(name="Alpha"),
         _server(tools=["bad tool"]),
         _server(resources=["no-scheme"]),
-        _server(credential="Bad Name"),
-        _server(timeout_seconds=0),
-        _server(timeout_seconds=46),
-        _server(max_calls_per_minute=601),
-        _server(extra=1),
+        _server(url="https://mcp.example.com/mcp"),
+        _server(credential="alpha-token"),
+        _server(timeout_seconds=30),
+        _server(max_calls_per_minute=60),
     ],
 )
 def test_malformed_policies_are_refused_by_the_model(server: dict[str, Any]) -> None:

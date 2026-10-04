@@ -11,7 +11,7 @@ from sqlmodel import Session, col, func, select
 from naos_api import audit
 from naos_api.errors import NotFoundError, SecretBusyError, SecretConflictError
 from naos_api.lifecycle import CREDENTIAL_BOUND, RunStatus
-from naos_api.models import AuditEvent, Policy, Run, Secret, SecretMeta
+from naos_api.models import AuditEvent, McpServer, Policy, Run, Secret, SecretMeta
 from naos_api.spec import PolicyKind
 
 SecretName = Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9._-]{0,63}$")]
@@ -35,7 +35,7 @@ class IssuedCredential:
 
 
 class Usage(BaseModel):
-    kind: Literal["cred", "model"]
+    kind: Literal["reg", "model"]
     id: str
     server: str | None
 
@@ -104,18 +104,15 @@ def state_of(secret: Secret, now: int) -> SecretState:
 # Policy documents are JSON, so the secrets they name are read in Python, not queried.
 def _naming(session: Session) -> dict[str, list[Usage]]:
     naming: dict[str, list[Usage]] = {}
-    kinds = (PolicyKind.MCP, PolicyKind.MODEL)
-    statement = select(Policy).where(col(Policy.kind).in_(kinds)).order_by(col(Policy.id))
+    servers = select(McpServer).where(col(McpServer.credential).is_not(None))
+    for server in session.exec(servers.order_by(col(McpServer.name))).all():
+        usage = Usage(kind="reg", id=server.id, server=server.name)
+        naming.setdefault(str(server.credential), []).append(usage)
+    statement = select(Policy).where(col(Policy.kind) == PolicyKind.MODEL).order_by(col(Policy.id))
     for policy in session.exec(statement).all():
-        if policy.kind == PolicyKind.MODEL:
-            for provider in policy.document["providers"]:
-                usage = Usage(kind="model", id=policy.id, server=provider["name"])
-                naming.setdefault(provider["credential"], []).append(usage)
-            continue
-        for server in policy.document["servers"]:
-            if server["credential"]:
-                usage = Usage(kind="cred", id=policy.id, server=server["name"])
-                naming.setdefault(server["credential"], []).append(usage)
+        for provider in policy.document["providers"]:
+            usage = Usage(kind="model", id=policy.id, server=provider["name"])
+            naming.setdefault(provider["credential"], []).append(usage)
     return naming
 
 
@@ -240,7 +237,7 @@ def set_expiry(session: Session, name: str, expires_at: int | None) -> Secret:
 
 
 def _busy_detail(view: SecretView) -> str:
-    role = {"cred": "server", "model": "provider"}
+    role = {"reg": "server", "model": "provider"}
     named = [f"{usage.id} ({role[usage.kind]} {usage.server})" for usage in view.named_by]
     held = [f"#{holder.seq} {holder.status}" for holder in view.held_by]
     parts = []

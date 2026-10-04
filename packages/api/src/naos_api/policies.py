@@ -6,7 +6,7 @@ from uuid import uuid4
 from sqlalchemy import ColumnElement
 from sqlmodel import Session, case, col, func, or_, select
 
-from naos_api import audit
+from naos_api import audit, mcp_servers
 from naos_api.errors import NotFoundError, PolicyError
 from naos_api.lifecycle import TERMINAL
 from naos_api.mcp import McpPolicyIn, resolve_mcp_policy
@@ -72,6 +72,7 @@ def create_shell_policy(session: Session, policy: ShellPolicyIn) -> tuple[Policy
 
 def create_mcp_policy(session: Session, policy: McpPolicyIn) -> tuple[Policy, bool]:
     resolved = resolve_mcp_policy(policy)
+    mcp_servers.check_names(session, [server.name for server in resolved.servers])
     return _store(session, PolicyKind.MCP, resolved.model_dump(mode="json"))
 
 

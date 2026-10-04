@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from sqlmodel import Session, col, func, or_, select, update
 
-from naos_api import audit
+from naos_api import audit, mcp_servers
 from naos_api.audit import Actor
 from naos_api.clock import now_ts
 from naos_api.errors import (
@@ -119,6 +119,8 @@ def create_run(
     check_image(session, spec.image)
     _check_runner(session, spec.runner)
     refs = spec.policy_refs()
+    mcp = session.get(Policy, refs[PolicyKind.MCP]) if refs[PolicyKind.MCP] else None
+    mcp_document = mcp_servers.snapshot(session, mcp.document) if mcp else None
     profile = session.get(Profile, profile_id) if profile_id else None
     created = {
         "workspace": _workspace(session, refs[PolicyKind.MOUNT]),
@@ -133,6 +135,7 @@ def create_run(
             network_policy_id=refs[PolicyKind.NETWORK],
             shell_policy_id=refs[PolicyKind.SHELL],
             mcp_policy_id=refs[PolicyKind.MCP],
+            mcp_document=mcp_document,
             model_policy_id=refs[PolicyKind.MODEL],
             profile_id=profile_id,
             runner_id=spec.runner,

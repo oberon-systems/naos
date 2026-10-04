@@ -119,6 +119,20 @@ def upgrade() -> None:
     )
     op.create_index("ix_leases_runner_id", "leases", ["runner_id"])
     op.create_table(
+        "mcp_servers",
+        sa.Column("id", sa.String(), nullable=False),
+        sa.Column("name", sa.String(), nullable=False),
+        sa.Column("url", sa.String(), nullable=False),
+        sa.Column("credential", sa.String(), nullable=True),
+        sa.Column("timeout_seconds", sa.Integer(), nullable=False),
+        sa.Column("max_calls_per_minute", sa.Integer(), nullable=False),
+        sa.Column("disabled_at", sa.Integer(), nullable=True),
+        sa.Column("created_at", sa.Integer(), nullable=False),
+        sa.Column("updated_at", sa.Integer(), nullable=False),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("name"),
+    )
+    op.create_table(
         "merges",
         sa.Column("run_id", sa.String(), nullable=False),
         sa.Column("entries", sa.JSON(), nullable=False),
@@ -161,6 +175,7 @@ def upgrade() -> None:
         sa.Column("network_policy_id", sa.String(), nullable=True),
         sa.Column("shell_policy_id", sa.String(), nullable=True),
         sa.Column("mcp_policy_id", sa.String(), nullable=True),
+        sa.Column("mcp_document", sa.JSON(), nullable=True),
         sa.Column("model_policy_id", sa.String(), nullable=True),
         sa.Column("profile_id", sa.String(), nullable=True),
         sa.Column("runner_id", sa.String(), nullable=True),
@@ -199,6 +214,7 @@ def downgrade() -> None:
         "profiles",
         "policies",
         "merges",
+        "mcp_servers",
         "leases",
         "images",
         "console_sizes",

@@ -34,6 +34,10 @@ class SecretBusyError(DomainError):
     """The secret cannot be deleted while something names or holds it."""
 
 
+class ServerConflictError(DomainError):
+    """The MCP server name is taken, or the server is built-in and cannot change."""
+
+
 class MergeError(DomainError):
     """The merge selection does not fit the collected diff."""
 

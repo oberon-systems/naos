@@ -1,17 +1,17 @@
 import re
 from typing import Annotated
 
-from pydantic import Field, StrictInt
+from pydantic import Field
 
 from naos_api.errors import PolicyError
 from naos_api.network import resolve_host
-from naos_api.secrets import SecretName
 from naos_api.spec import StrictModel
 
 MAX_SERVERS = 16
 MAX_TOOLS = 128
 MAX_RESOURCES = 64
 MAX_URL = 2048
+BUILT_IN = ("shell", "network", "secrets")
 
 ServerName = Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9-]{0,31}$")]
 ToolName = Annotated[str, Field(pattern=r"^[A-Za-z0-9_.-]{1,128}$")]
@@ -21,32 +21,24 @@ RawUrl = Annotated[str, Field(min_length=1, max_length=MAX_URL)]
 _URL = re.compile(r"https://([^/:?#@\[\]]+)(?::([0-9]{1,5}))?(/[\x21-\x7e]*)?")
 
 
-class McpServerIn(StrictModel):
+class ServerGrantIn(StrictModel):
     name: ServerName
-    url: RawUrl
     tools: Annotated[list[ToolName], Field(max_length=MAX_TOOLS)] = []
     resources: Annotated[list[ResourcePrefix], Field(max_length=MAX_RESOURCES)] = []
-    credential: SecretName | None = None
-    timeout_seconds: Annotated[StrictInt, Field(ge=1, le=45)] = 30
-    max_calls_per_minute: Annotated[StrictInt, Field(ge=1, le=600)] = 60
 
 
 class McpPolicyIn(StrictModel):
-    servers: Annotated[list[McpServerIn], Field(max_length=MAX_SERVERS)] = []
+    servers: Annotated[list[ServerGrantIn], Field(max_length=MAX_SERVERS)] = []
 
 
-class McpServer(StrictModel):
+class ServerGrant(StrictModel):
     name: str
-    url: str
     tools: list[str]
     resources: list[str]
-    credential: str | None
-    timeout_seconds: int
-    max_calls_per_minute: int
 
 
 class McpPolicy(StrictModel):
-    servers: list[McpServer]
+    servers: list[ServerGrant]
 
 
 def https_url(raw: str, what: str = "server") -> str:
@@ -66,17 +58,15 @@ def _unique(values: list[str], what: str, server: str) -> list[str]:
     return sorted(values)
 
 
-def _server(server: McpServerIn) -> McpServer:
+def _server(server: ServerGrantIn) -> ServerGrant:
+    if server.name in BUILT_IN:
+        raise PolicyError(f"server {server.name} is built-in and is not granted by name")
     if not server.tools and not server.resources:
         raise PolicyError(f"server {server.name} must allow at least one tool or resource")
-    return McpServer(
+    return ServerGrant(
         name=server.name,
-        url=https_url(server.url),
         tools=_unique(server.tools, "tool", server.name),
         resources=_unique(server.resources, "resource", server.name),
-        credential=server.credential,
-        timeout_seconds=server.timeout_seconds,
-        max_calls_per_minute=server.max_calls_per_minute,
     )
 
 

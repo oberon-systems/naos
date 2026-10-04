@@ -5,6 +5,7 @@ from naos_api.routes.console import router as console_router
 from naos_api.routes.console import runner_router as runner_console_router
 from naos_api.routes.deps import domain_error_handler
 from naos_api.routes.images import router as _images_router
+from naos_api.routes.mcp_servers import router as _mcp_servers_router
 from naos_api.routes.policies import router as _policies_router
 from naos_api.routes.profiles import router as _profiles_router
 from naos_api.routes.runner import router as runner_router
@@ -19,6 +20,7 @@ api_router.include_router(_policies_router)
 api_router.include_router(_profiles_router)
 api_router.include_router(_images_router)
 api_router.include_router(_secrets_router)
+api_router.include_router(_mcp_servers_router)
 api_router.include_router(_audit_router)
 
 __all__ = [

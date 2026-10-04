@@ -15,7 +15,7 @@ from naos_api.app import create_app
 from naos_api.auth import require_principal
 from naos_api.clock import get_now
 from naos_api.db import Database
-from naos_api.models import Image
+from naos_api.models import Image, McpServer
 from naos_api.settings import Settings, get_settings
 
 MOUNT_ROOTS = ["/srv/projects", "/srv/agent-home"]
@@ -185,17 +185,20 @@ def shell_body() -> dict[str, Any]:
 
 
 @pytest.fixture
-def mcp_body() -> dict[str, Any]:
+def mcp_body(session: Session) -> dict[str, Any]:
+    session.add(
+        McpServer(
+            id="mcpsrv_" + "a" * 32,
+            name="alpha",
+            url="https://mcp.example.com/mcp",
+            credential="alpha-token",
+            timeout_seconds=30,
+            max_calls_per_minute=60,
+        )
+    )
+    session.commit()
     return {
-        "servers": [
-            {
-                "name": "alpha",
-                "url": "https://mcp.example.com/mcp",
-                "tools": ["search", "fetch"],
-                "resources": ["docs://alpha/"],
-                "credential": "alpha-token",
-            }
-        ]
+        "servers": [{"name": "alpha", "tools": ["search", "fetch"], "resources": ["docs://alpha/"]}]
     }
 
 

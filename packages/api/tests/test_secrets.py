@@ -68,18 +68,18 @@ def test_list_filters_by_state_and_query(client: TestClient, clock: Callable[[],
     assert client.get("/api/v1/secrets", params={"state": "stale"}).status_code == 422
 
 
-def test_usage_names_the_policy_and_server(client: TestClient, mcp_body: dict[str, Any]) -> None:
+def test_usage_names_the_registry_server(client: TestClient, mcp_body: dict[str, Any]) -> None:
     _secret(client, "alpha-token")
     _secret(client, "beta-token")
-    policy_id = _mcp_policy(client, mcp_body)
+    server_id = client.get("/api/v1/mcp-servers/alpha").json()["id"]
 
     [row] = client.get("/api/v1/secrets", params={"used": True}).json()
 
     assert row["name"] == "alpha-token"
-    assert row["named_by"] == [{"kind": "cred", "id": policy_id, "server": "alpha"}]
+    assert row["named_by"] == [{"kind": "reg", "id": server_id, "server": "alpha"}]
     assert row["held_by"] == []
     assert _names(client, used=False) == ["beta-token"]
-    assert _names(client, q=policy_id) == ["alpha-token"]
+    assert _names(client, q=server_id) == ["alpha-token"]
 
 
 def test_a_run_holds_what_was_issued_until_it_stops(
@@ -148,12 +148,12 @@ def test_patch_changes_the_expiry_only(client: TestClient, clock: Callable[[], i
 
 def test_delete_is_refused_while_named(client: TestClient, mcp_body: dict[str, Any]) -> None:
     _secret(client, "alpha-token")
-    policy_id = _mcp_policy(client, mcp_body)
+    server_id = client.get("/api/v1/mcp-servers/alpha").json()["id"]
 
     refused = client.delete("/api/v1/secrets/alpha-token")
 
     assert refused.status_code == 409
-    assert policy_id in refused.json()["detail"]
+    assert f"{server_id} (server alpha)" in refused.json()["detail"]
     assert client.get("/api/v1/secrets/alpha-token").status_code == 200
     [event] = client.get("/api/v1/audit", params={"event": "secret_delete_refused"}).json()
     assert event["data"] == {"name": "alpha-token", "named_by": 1, "held_by": []}

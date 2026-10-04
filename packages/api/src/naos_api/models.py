@@ -69,6 +69,10 @@ class Run(SQLModel, table=True):
     network_policy_id: str | None = None
     shell_policy_id: str | None = None
     mcp_policy_id: str | None = None
+    # The registry entries the mcp policy named, copied when the Run was created.
+    mcp_document: dict[str, Any] | None = Field(
+        default=None, sa_column=Column(JSON(none_as_null=True))
+    )
     model_policy_id: str | None = None
     profile_id: str | None = Field(default=None, index=True)
     runner_id: str | None = Field(default=None, index=True)
@@ -119,6 +123,20 @@ class Secret(SecretMeta, table=True):
     __tablename__ = "secrets"
 
     value: str
+
+
+class McpServer(SQLModel, table=True):
+    __tablename__ = "mcp_servers"
+
+    id: str = Field(primary_key=True)
+    name: str = Field(unique=True)
+    url: str
+    credential: str | None = None
+    timeout_seconds: int
+    max_calls_per_minute: int
+    disabled_at: int | None = None
+    created_at: int = Field(default_factory=now_ts)
+    updated_at: int = Field(default_factory=now_ts)
 
 
 class AuditEvent(SQLModel, table=True):

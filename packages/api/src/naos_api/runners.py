@@ -506,10 +506,9 @@ def _policies(session: Session, run: Run) -> dict[PolicyKind, dict[str, Any] | N
         PolicyKind.MOUNT: run.mount_policy_id,
         PolicyKind.NETWORK: run.network_policy_id,
         PolicyKind.SHELL: run.shell_policy_id,
-        PolicyKind.MCP: run.mcp_policy_id,
         PolicyKind.MODEL: run.model_policy_id,
     }
-    policies: dict[PolicyKind, dict[str, Any] | None] = {}
+    policies: dict[PolicyKind, dict[str, Any] | None] = {PolicyKind.MCP: run.mcp_document}
     for kind, policy_id in refs.items():
         policy = session.get(Policy, policy_id) if policy_id else None
         policies[kind] = policy.document if policy else None
