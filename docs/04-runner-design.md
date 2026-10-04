@@ -114,8 +114,10 @@ this table. While the runtime cannot list VMs, the heartbeat offers capacity
 | not desired | present | destroy as orphan, archiving an upper disk |
 
 Creating a VM is idempotent by `run_id`, and a second VM for the same Run is
-destroyed. A claim rejected by the API creates nothing. When the desired
-state cannot be fetched, no VM is touched. A start that fails reports FAILED
+destroyed. A claim rejected by the API creates nothing. After a claim the
+runner reads the desired state again and creates the VM from that answer,
+because a PENDING Run can still change and a claimed one cannot. When the
+desired state cannot be fetched, no VM is touched. A start that fails reports FAILED
 `vm start failed` and removes whatever it created.
 
 A VM is running while a process of the agent's own user carries

@@ -163,6 +163,7 @@ beside the Run itself, resolved by the API rather than by the caller:
 | `workspace` | The workspace the mount policy names, or null |
 | `runner` | `id` and `name` of the runner holding the lease, or null |
 | `lease_id` | The lease that fences the Run, or null while it queues |
+| `mcp_document` | The registry entries the Run holds, as the runner reads them, or null without an `mcp` policy |
 | `profile_id` | The profile the spec was copied from, or null |
 | `merge` | `changed` and `conflicts` of the collected diff, or null |
 | `started_at` | When the Run reached STARTING, or null while it queues |
@@ -389,8 +390,9 @@ server into the Run, so a later `PATCH` never reaches a Run that exists. A
 name that is unknown or disabled at that moment gets 422.
 
 A disable reaches only Runs that are still PENDING: from STARTING on a Run
-keeps the entry it has. A runner that already read the desired state of a
-PENDING Run may start it with the entry it read.
+keeps the entry it has. The runner reads the desired state again after its
+claim and starts the Run from that answer, so a disable that lands before the
+claim is always in effect.
 
 `credential` is a secret name and never a value. It is naos's own access to
 that server: the runner gets the value with the Run's credentials, and the
