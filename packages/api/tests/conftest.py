@@ -198,7 +198,11 @@ def mcp_body(session: Session) -> dict[str, Any]:
     )
     session.commit()
     return {
-        "servers": [{"name": "alpha", "tools": ["search", "fetch"], "resources": ["docs://alpha/"]}]
+        "rules": [
+            {"server": "alpha", "tool": "search", "effect": "allow"},
+            {"server": "alpha", "tool": "fetch", "effect": "allow"},
+            {"server": "alpha", "resource": "docs://alpha/", "effect": "allow"},
+        ]
     }
 
 

@@ -8,7 +8,7 @@ from sqlmodel import Session, col, select, update
 from naos_api import audit
 from naos_api.errors import NotFoundError, PolicyError, ServerConflictError
 from naos_api.lifecycle import RunStatus
-from naos_api.mcp import BUILT_IN, RawUrl, ServerName, https_url
+from naos_api.mcp import BUILT_IN, RawUrl, ServerName, external_servers, https_url
 from naos_api.models import McpServer, Policy, Run
 from naos_api.secrets import SecretName
 from naos_api.spec import PolicyKind, StrictModel
@@ -64,8 +64,8 @@ def _naming(session: Session) -> dict[str, list[str]]:
     naming: dict[str, list[str]] = {}
     statement = select(Policy).where(col(Policy.kind) == PolicyKind.MCP).order_by(col(Policy.id))
     for policy in session.exec(statement).all():
-        for server in policy.document["servers"]:
-            naming.setdefault(server["name"], []).append(policy.id)
+        for name in sorted({rule["server"] for rule in policy.document["rules"]}):
+            naming.setdefault(name, []).append(policy.id)
     return naming
 
 
@@ -82,12 +82,15 @@ def list_servers(session: Session) -> list[ServerView]:
         col(McpServer.created_at).desc(), col(McpServer.name).desc()
     )
     external = view_servers(session, session.exec(statement).all())
-    return external + [ServerView(name=name, kind="built-in") for name in BUILT_IN]
+    naming = _naming(session)
+    return external + [
+        ServerView(name=name, kind="built-in", policies=naming.get(name, [])) for name in BUILT_IN
+    ]
 
 
 def get_server(session: Session, name: str) -> ServerView:
     if name in BUILT_IN:
-        return ServerView(name=name, kind="built-in")
+        return ServerView(name=name, kind="built-in", policies=_naming(session).get(name, []))
     server = _find(session, name)
     if server is None:
         raise NotFoundError(f"mcp server {name} does not exist")
@@ -137,20 +140,21 @@ def patch_server(session: Session, name: str, body: ServerPatch, now: int) -> Mc
 
 
 # Only a Run still PENDING loses the server; the status in the WHERE keeps a started one whole.
+# The rules stay, so a rule index means the same in the Run as in its policy.
 def _strip(session: Session, name: str) -> int:
     statement = select(Run).where(
         col(Run.status) == RunStatus.PENDING, col(Run.mcp_document).is_not(None)
     )
     stripped = 0
     for run in session.exec(statement).all():
-        servers = (run.mcp_document or {})["servers"]
-        kept = [server for server in servers if server["name"] != name]
-        if len(kept) == len(servers):
+        document = run.mcp_document or {}
+        kept = [server for server in document["servers"] if server["name"] != name]
+        if len(kept) == len(document["servers"]):
             continue
         result = session.exec(
             update(Run)
             .where(col(Run.id) == run.id, col(Run.status) == RunStatus.PENDING)
-            .values(mcp_document={"servers": kept})
+            .values(mcp_document=document | {"servers": kept})
         )
         stripped += result.rowcount
     return stripped
@@ -191,24 +195,20 @@ def check_names(session: Session, names: Collection[str]) -> None:
 
 
 def snapshot(session: Session, document: dict[str, Any]) -> dict[str, Any]:
-    names = [grant["name"] for grant in document["servers"]]
-    check_names(session, names)
+    check_names(session, external_servers(document))
+    names = external_servers(document, "allow")
     found = session.exec(select(McpServer).where(col(McpServer.name).in_(names))).all()
-    registered = {server.name: server for server in found}
     servers = []
-    for grant in document["servers"]:
-        server = registered[grant["name"]]
+    for server in sorted(found, key=lambda server: server.name):
         if server.disabled_at is not None:
             raise PolicyError(f"mcp server {server.name} is disabled")
         servers.append(
             {
                 "name": server.name,
                 "url": server.url,
-                "tools": grant["tools"],
-                "resources": grant["resources"],
                 "credential": server.credential,
                 "timeout_seconds": server.timeout_seconds,
                 "max_calls_per_minute": server.max_calls_per_minute,
             }
         )
-    return {"servers": servers}
+    return {"servers": servers, "rules": document["rules"]}

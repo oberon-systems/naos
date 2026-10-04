@@ -177,8 +177,12 @@ def test_mcp_policy_flow(
     assert replayed.status_code == 200
     assert replayed.json()["id"] == policy_id
     assert policy_id.startswith("mcppol_")
-    [server] = created.json()["document"]["servers"]
-    assert server == {"name": "alpha", "tools": ["fetch", "search"], "resources": ["docs://alpha/"]}
+    rules = created.json()["document"]["rules"]
+    assert [rule.get("tool") or rule["resource"] for rule in rules] == [
+        "fetch",
+        "search",
+        "docs://alpha/",
+    ]
 
     spec_body["mcp"] = {"policy": policy_id}
     run = _create(client, spec_body).json()
@@ -216,8 +220,12 @@ def test_bad_secret_is_unprocessable(client: TestClient, body: dict[str, Any]) -
     "body",
     [
         {"kind": "mcp", "document": {}},
-        {"kind": "mcp", "document": {"servers": [{"name": "alpha"}]}},
+        {"kind": "mcp", "document": {"rules": []}},
         {"kind": "mcp", "document": {"servers": [{"name": "alpha", "tools": ["search"]}]}},
+        {
+            "kind": "mcp",
+            "document": {"rules": [{"server": "alpha", "tool": "search", "effect": "allow"}]},
+        },
         {"kind": "network", "document": {}},
         {"kind": "network", "document": {"allow": [{}]}},
         {"kind": "network", "document": {"allow": [{"host": "bad_host"}]}},

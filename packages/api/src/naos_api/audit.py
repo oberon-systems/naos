@@ -97,6 +97,7 @@ RUNNER_EVENTS: dict[str, dict[str, Any]] = {
         "decision": Literal["allow", "deny"],
         "duration_ms": Count,
         "category": Name,
+        "rule": Name,
     },
     "model_policy_configured": _RUN,
     "model_attached": _RUN,

@@ -20,10 +20,11 @@ def _server(client: TestClient, name: str = "alpha", **fields: Any) -> dict[str,
 
 
 def _policy(client: TestClient, *names: str) -> str:
-    servers = [{"name": name, "tools": ["search"]} for name in names]
-    response = client.post(
-        "/api/v1/policies", json={"kind": "mcp", "document": {"servers": servers}}
-    )
+    tools = {"shell": "read_file"}
+    rules = [
+        {"server": name, "tool": tools.get(name, "search"), "effect": "allow"} for name in names
+    ]
+    response = client.post("/api/v1/policies", json={"kind": "mcp", "document": {"rules": rules}})
     assert response.status_code in (200, 201), response.text
     policy_id: str = response.json()["id"]
     return policy_id
@@ -71,12 +72,13 @@ def test_the_list_is_newest_first_with_the_built_in_servers(
     _server(client, "beta")
     session.exec(update(McpServer).where(col(McpServer.name) == "alpha").values(created_at=1))
     session.commit()
-    policy_id = _policy(client, "alpha")
+    policy_id = _policy(client, "alpha", "shell")
 
     rows = client.get("/api/v1/mcp-servers").json()
 
     assert [row["name"] for row in rows] == ["beta", "alpha", "shell", "network", "secrets"]
     assert rows[1]["policies"] == [policy_id]
+    assert rows[2]["policies"] == [policy_id]
     assert all(row["kind"] == "built-in" and row["url"] is None for row in rows[2:])
 
 
@@ -156,8 +158,6 @@ def test_a_run_keeps_the_entry_it_was_created_with(
         {
             "name": "alpha",
             "url": URL,
-            "tools": ["search"],
-            "resources": [],
             "credential": "alpha-token",
             "timeout_seconds": 30,
             "max_calls_per_minute": 60,
@@ -176,7 +176,8 @@ def test_an_unknown_or_disabled_server_never_starts_a_run(
 ) -> None:
     _server(client)
     policy_id = _policy(client, "alpha")
-    unknown = {"kind": "mcp", "document": {"servers": [{"name": "beta", "tools": ["search"]}]}}
+    rule = {"server": "beta", "tool": "search", "effect": "allow"}
+    unknown = {"kind": "mcp", "document": {"rules": [rule]}}
 
     assert client.post("/api/v1/policies", json=unknown).status_code == 422
     assert client.post("/api/v1/mcp-servers/alpha/disable").json()["disabled_at"] is not None
@@ -214,6 +215,7 @@ def test_disable_takes_the_server_out_of_runs_that_have_not_started(
     assert [server["name"] for server in _servers_of(first)] == ["alpha", "beta"]
     assert set(first["credentials"]) == {"alpha-token"}
     assert [server["name"] for server in _servers_of(second)] == ["beta"]
+    assert second["policies"]["mcp"]["rules"] == first["policies"]["mcp"]["rules"]
     assert second["credentials"] == {}
     [event] = client.get("/api/v1/audit", params={"event": "mcp_server_disabled"}).json()
     assert event["data"] == {"name": "alpha", "runs": 1}

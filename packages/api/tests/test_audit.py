@@ -359,6 +359,7 @@ def test_the_summary_counts_the_last_day(
         "resource": "",
         "duration_ms": 3,
         "category": "read",
+        "rule": "0",
     }
     old = _event("network_denied", **net, reason="no rule") | {"at": now_ts() - 2 * 86_400}
     _post_events(

@@ -9,7 +9,7 @@ from sqlmodel import Session, case, col, func, or_, select
 from naos_api import audit, mcp_servers
 from naos_api.errors import NotFoundError, PolicyError
 from naos_api.lifecycle import TERMINAL
-from naos_api.mcp import McpPolicyIn, resolve_mcp_policy
+from naos_api.mcp import McpPolicyIn, external_servers, resolve_mcp_policy
 from naos_api.model import ModelPolicyIn, resolve_model_policy
 from naos_api.models import Policy, Profile, Run
 from naos_api.mounts import MountPolicyIn, resolve_mount_policy
@@ -71,9 +71,9 @@ def create_shell_policy(session: Session, policy: ShellPolicyIn) -> tuple[Policy
 
 
 def create_mcp_policy(session: Session, policy: McpPolicyIn) -> tuple[Policy, bool]:
-    resolved = resolve_mcp_policy(policy)
-    mcp_servers.check_names(session, [server.name for server in resolved.servers])
-    return _store(session, PolicyKind.MCP, resolved.model_dump(mode="json"))
+    document = resolve_mcp_policy(policy).model_dump(mode="json")
+    mcp_servers.check_names(session, external_servers(document))
+    return _store(session, PolicyKind.MCP, document)
 
 
 def create_model_policy(session: Session, policy: ModelPolicyIn) -> tuple[Policy, bool]:
