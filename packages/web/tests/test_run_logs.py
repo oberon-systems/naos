@@ -110,6 +110,7 @@ def test_a_failed_transition_and_a_denied_call_are_errors() -> None:
                 "decision": "deny",
                 "duration_ms": 3,
                 "category": "files",
+                "rule": "2",
             },
             source="runner",
         ),
@@ -117,7 +118,7 @@ def test_a_failed_transition_and_a_denied_call_are_errors() -> None:
     )
 
     assert (failed.error, failed.detail) == (True, "STARTED \u2192 FAILED · timeout")
-    assert (denied.error, denied.detail) == (True, "alpha/read · deny · 3ms")
+    assert (denied.error, denied.detail) == (True, "alpha/read · deny by rule 2 · 3ms")
 
 
 def test_a_model_call_renders_and_a_denied_one_is_an_error() -> None:

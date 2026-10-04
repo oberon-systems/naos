@@ -88,8 +88,9 @@ def test_the_mount_and_shell_documents(client: TestClient) -> None:
 def test_the_mcp_document_reads_secret_expiry_only(client: TestClient) -> None:
     body = client.get(f"/policies/{MCPPOL}", headers=HX).text
 
-    assert "SERVERS \u00b7 2" in body and "SECRETS \u00b7 1" in body
-    assert "beta__fetch" in body
+    assert "SERVERS \u00b7 3" in body and "SECRETS \u00b7 1" in body
+    assert "1 \u00b7 allow tool fetch" in body and "10/min \u00b7 100/run" in body
+    assert "0 \u00b7 deny tool *" in body and "built-in" in body
     assert "expires in 12d" in body
     assert "sec_alpha" not in body
 

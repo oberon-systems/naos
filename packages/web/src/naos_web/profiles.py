@@ -38,7 +38,7 @@ CLOSED = {
     "mcp": "none \u2014 no servers, no secrets",
     "model": "none \u2014 no providers, no keys",
 }
-HOLDERS = {"mcp": "servers", "model": "providers"}
+HOLDERS = {"model": "providers"}
 KIND_NAMES = {
     "mount": "mount",
     "network": "net",
@@ -149,11 +149,16 @@ def pick_profiles(profiles: list[Row], state: str, query: str) -> list[Row]:
 
 # Secrets are counted by the names MCP and model policies bind; their values never reach the web.
 def holders(policy: Row) -> list[Row]:
-    held: list[Row] = policy["document"].get(HOLDERS.get(policy["kind"], ""), [])
     if policy["kind"] != "mcp":
+        held: list[Row] = policy["document"].get(HOLDERS.get(policy["kind"], ""), [])
         return held
     registry = policy.get("registry", {})
-    return [registry.get(server["name"], {}) | server for server in held]
+    servers: dict[str, Row] = {}
+    for index, rule in enumerate(policy["document"]["rules"]):
+        name = rule["server"]
+        server = servers.setdefault(name, registry.get(name, {}) | {"name": name, "rules": []})
+        server["rules"].append(rule | {"index": index})
+    return list(servers.values())
 
 
 def _secret_names(policies: list[Row]) -> set[str]:
@@ -210,7 +215,8 @@ def _bound(holders: list[Row]) -> str:
 
 def _mcp(policy: Row) -> str:
     servers = holders(policy)
-    return f"{_plural(len(servers), 'server')} \u00b7 {_bound(servers)}"
+    rules = _plural(len(policy["document"]["rules"]), "rule")
+    return f"{rules} \u00b7 {_plural(len(servers), 'server')} \u00b7 {_bound(servers)}"
 
 
 def summary_of(policy: Row) -> str:

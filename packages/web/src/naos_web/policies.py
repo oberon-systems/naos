@@ -31,7 +31,8 @@ TAGS: dict[Kind, str] = {
 GUEST_HOME = "/home/naos/"
 MAX_RULES = 64
 MAX_HOME = 32
-MAX_SERVERS = 16
+MAX_MCP_RULES = 256
+EFFECTS = ("allow", "deny")
 MAX_PROVIDERS = 16
 CAPABILITIES: dict[str, str] = {
     "read_file": "read a file under a mount",
@@ -115,15 +116,10 @@ def _document_note(policy: Row) -> str:
             f"{format.grouped(document['max_input_tokens'])} input \u00b7 "
             f"{format.grouped(document['max_output_tokens'])} output tokens per run"
         )
-    return " \u00b7 ".join(
-        f"{server['name']} "
-        + (
-            _plural(len(server["tools"]), "tool")
-            if server["tools"]
-            else _plural(len(server["resources"]), "resource prefix", "resource prefixes")
-        )
-        for server in document["servers"]
-    )
+    counts: dict[str, int] = {}
+    for rule in document["rules"]:
+        counts[rule["server"]] = counts.get(rule["server"], 0) + 1
+    return " \u00b7 ".join(f"{name} {_plural(count, 'rule')}" for name, count in counts.items())
 
 
 def _usage(policy: Row) -> tuple[str, str]:
@@ -196,12 +192,19 @@ class Capability:
 
 
 @dataclass(frozen=True)
+class ServerRule:
+    index: int
+    effect: str
+    target: str
+    constraints: str
+    budget: str
+
+
+@dataclass(frozen=True)
 class Server:
     name: str
     url: str
-    tools: str
-    exposed: str
-    resources: str
+    rules: list[ServerRule]
     credential: str
     limits: str
 
@@ -294,22 +297,38 @@ def _mount_tables(document: Row) -> list[Table]:
     ]
 
 
+def _server_rule(rule: Row) -> ServerRule:
+    limits = [
+        f"{rule[key]}{unit}"
+        for key, unit in (("max_calls_per_minute", "/min"), ("max_calls", "/run"))
+        if rule.get(key)
+    ]
+    return ServerRule(
+        index=rule["index"],
+        effect=rule["effect"],
+        target=f"tool {rule['tool']}" if "tool" in rule else f"resource {rule['resource']}",
+        constraints=json.dumps(rule["arguments"]) if rule.get("arguments") else "",
+        budget=" \u00b7 ".join(limits),
+    )
+
+
+def _limits(server: Row) -> str:
+    if server.get("kind") == "built-in":
+        return "built-in"
+    if server.get("timeout_seconds") is None:
+        return "not in the registry"
+    return f"{server['timeout_seconds']}s timeout \u00b7 {server['max_calls_per_minute']} calls/min"
+
+
 # The url, the credential and the limits are the registry's, as it holds them now.
 def _servers(policy: Row) -> list[Server]:
     return [
         Server(
             name=server["name"],
-            url=server.get("url", format.DASH),
-            tools=" \u00b7 ".join(server["tools"]) or format.DASH,
-            exposed=", ".join(f"{server['name']}__{tool}" for tool in server["tools"]),
-            resources=", ".join(server["resources"]) or format.DASH,
+            url=server.get("url") or format.DASH,
+            rules=[_server_rule(rule) for rule in server["rules"]],
             credential=server.get("credential") or "",
-            limits=(
-                f"{server['timeout_seconds']}s timeout \u00b7 "
-                f"{server['max_calls_per_minute']} calls/min"
-                if "timeout_seconds" in server
-                else "not in the registry"
-            ),
+            limits=_limits(server),
         )
         for server in holders(policy)
     ]
@@ -485,7 +504,7 @@ LISTS: dict[Kind, dict[str, tuple[str, ...]]] = {
     },
     "shell": {},
     "mcp": {
-        "servers": ("name", "tools", "resources"),
+        "rules": ("server", "tool", "resource", "effect", "arguments", "per_minute", "per_run"),
     },
     "model": {
         "providers": ("name", "api", "url", "models", "credential", "timeout", "requests"),
@@ -495,14 +514,22 @@ LIMITS = {
     "home": MAX_HOME,
     "allow": MAX_RULES,
     "deny": MAX_RULES,
-    "servers": MAX_SERVERS,
+    "rules": MAX_MCP_RULES,
     "providers": MAX_PROVIDERS,
 }
 BLANK: dict[str, dict[str, str]] = {
     "home": {"host_path": "", "guest_path": "", "mode": "ro"},
     "allow": {"protocol": "any", "host": "", "ip": ""},
     "deny": {"protocol": "any", "host": "", "ip": ""},
-    "servers": {"name": "", "tools": "", "resources": ""},
+    "rules": {
+        "server": "",
+        "tool": "",
+        "resource": "",
+        "effect": "allow",
+        "arguments": "",
+        "per_minute": "",
+        "per_run": "",
+    },
     "providers": {
         "name": "",
         "api": "openai",
@@ -572,8 +599,8 @@ class PolicyForm:
                 "max_input_tokens": _whole(self.max_input, "max input tokens"),
                 "max_output_tokens": _whole(self.max_output, "max output tokens"),
             }
-        servers = [item for item in self.items("servers") if item["name"] or item["tools"]]
-        return {"servers": [_server(item) for item in servers]}
+        rules = [item for item in self.items("rules") if item["server"] or item["tool"]]
+        return {"rules": [_mcp_rule(item) for item in rules]}
 
 
 # A row left at any protocol with no host and no ip is an empty row, not a rule.
@@ -596,12 +623,21 @@ def _whole(value: str, label: str) -> int:
     return int(value)
 
 
-def _server(item: dict[str, str]) -> Row:
-    return {
-        "name": item["name"],
-        "tools": _split(item["tools"]),
-        "resources": _split(item["resources"]),
-    }
+# A row names a tool or a resource; the API refuses one that names both or neither.
+def _mcp_rule(item: dict[str, str]) -> Row:
+    rule: Row = {"server": item["server"], "effect": item["effect"]}
+    for key in ("tool", "resource"):
+        if item[key]:
+            rule[key] = item[key]
+    if item["arguments"]:
+        try:
+            rule["arguments"] = json.loads(item["arguments"])
+        except ValueError:
+            raise FormError("argument constraints must be a JSON object") from None
+    for key, name in (("per_minute", "max_calls_per_minute"), ("per_run", "max_calls")):
+        if item[key]:
+            rule[name] = _whole(item[key], "a call budget")
+    return rule
 
 
 def _provider(item: dict[str, str]) -> Row:
@@ -618,7 +654,7 @@ def _provider(item: dict[str, str]) -> Row:
 
 def new_form(kind: str) -> PolicyForm:
     chosen = KIND_OF.get(kind, "mount")
-    starts = {"network": ["allow"], "mcp": ["servers"], "model": ["providers"]}.get(chosen, [])
+    starts = {"network": ["allow"], "mcp": ["rules"], "model": ["providers"]}.get(chosen, [])
     return PolicyForm(chosen, {name: [dict(BLANK[name])] for name in starts})
 
 
@@ -701,13 +737,17 @@ def from_document(policy: Row) -> PolicyForm:
     return PolicyForm(
         "mcp",
         {
-            "servers": [
+            "rules": [
                 {
-                    "name": server["name"],
-                    "tools": ", ".join(server["tools"]),
-                    "resources": ", ".join(server["resources"]),
+                    "server": rule["server"],
+                    "tool": rule.get("tool", ""),
+                    "resource": rule.get("resource", ""),
+                    "effect": rule["effect"],
+                    "arguments": json.dumps(rule["arguments"]) if rule.get("arguments") else "",
+                    "per_minute": str(rule.get("max_calls_per_minute") or ""),
+                    "per_run": str(rule.get("max_calls") or ""),
                 }
-                for server in document["servers"]
+                for rule in document["rules"]
             ]
         },
     )

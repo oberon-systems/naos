@@ -1325,6 +1325,7 @@ async def _policy_form(
         protocols=documents.PROTOCOLS,
         modes=documents.MODES,
         dialects=documents.DIALECTS,
+        effects=documents.EFFECTS,
         limits=documents.LIMITS,
         form_note=POLICY_FORM_NOTE,
         form_hint=POLICY_FORM_HINTS[form.kind],

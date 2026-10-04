@@ -311,8 +311,8 @@ POLICY_FORM_HINTS = {
     "a trailing dot; an address goes in ip, never in host; localhost is refused.",
     "shell": "At least one capability. The gate serves only the paths the Run's mount policy "
     "names, whatever this list grants.",
-    "mcp": "Each server needs tools or resource prefixes. Credential is the name of a secret, "
-    "never its value; the runner receives it per Run.",
+    "mcp": "A rule names a tool, or * for every tool of the server, or a resource prefix. "
+    "A call no rule allows is denied and a matching deny wins; shell and network are servers too.",
     "model": "Credential is the name of a secret, never its value. A model belongs to one "
     "provider. The budget is for one whole Run.",
 }

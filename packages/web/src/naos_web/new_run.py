@@ -174,8 +174,8 @@ def policy_label(policy: Row) -> str:
         return f"{len(document['allow'])} capabilities"
     if kind == "model":
         return model_line(document)
-    names = ", ".join(server["name"] for server in document["servers"])
-    return f"{len(document['servers'])} servers · {names}"
+    names = sorted({rule["server"] for rule in document["rules"]})
+    return f"{len(names)} servers · {', '.join(names)}"
 
 
 def image_label(image: Row) -> str:

@@ -97,13 +97,12 @@ RUNS: list[Row] = [
                     {
                         "name": "alpha",
                         "url": "https://alpha.example.com/mcp",
-                        "tools": ["search"],
-                        "resources": [],
                         "credential": "alpha-token",
                         "timeout_seconds": 30,
                         "max_calls_per_minute": 60,
                     }
-                ]
+                ],
+                "rules": [{"server": "alpha", "tool": "search", "effect": "allow"}],
             },
         },
     ),
@@ -703,9 +702,32 @@ POLICIES: list[Row] = [
         "kind": "mcp",
         "digest": "2" * 64,
         "document": {
-            "servers": [
-                {"name": "alpha", "tools": [], "resources": []},
-                {"name": "beta", "tools": ["fetch"], "resources": ["docs://beta/"]},
+            "rules": [
+                {
+                    "server": "alpha",
+                    "tool": "*",
+                    "effect": "deny",
+                    "arguments": {"scope": {"equals": "admin"}},
+                    "max_calls_per_minute": None,
+                    "max_calls": None,
+                },
+                {
+                    "server": "beta",
+                    "tool": "fetch",
+                    "effect": "allow",
+                    "arguments": {},
+                    "max_calls_per_minute": 10,
+                    "max_calls": 100,
+                },
+                {"server": "beta", "resource": "docs://beta/", "effect": "allow"},
+                {
+                    "server": "shell",
+                    "tool": "read_file",
+                    "effect": "allow",
+                    "arguments": {"path": {"prefix": "/workspace/"}},
+                    "max_calls_per_minute": None,
+                    "max_calls": None,
+                },
             ]
         },
         "created_at": NOW - 9000,
@@ -998,7 +1020,8 @@ def _server(name: str, credential: str | None, timeout: int, calls: int) -> Row:
 
 @stub.get("/api/v1/mcp-servers")
 def list_mcp_servers() -> list[Row]:
-    return [_server("alpha", "alpha-token", 30, 60), _server("beta", None, 15, 120)]
+    built_in = [{"name": name, "kind": "built-in", "url": None} for name in ("shell", "network")]
+    return [_server("alpha", "alpha-token", 30, 60), _server("beta", None, 15, 120), *built_in]
 
 
 @stub.get("/api/v1/policies")

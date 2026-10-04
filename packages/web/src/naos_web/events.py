@@ -129,9 +129,10 @@ def _shell(data: Row) -> str:
 
 
 def _mcp_call(data: Row) -> str:
+    decision, rule = data["decision"], data["rule"]
     return _joined(
         f"{data['server']}/{data['tool']} {data['resource']}".rstrip(),
-        data["decision"],
+        decision if rule == "none" else f"{decision} by rule {rule}",
         f"{data['duration_ms']}ms",
     )
 
@@ -308,6 +309,7 @@ RUNNER: dict[str, Schema] = {
             "decision": _one_of("allow", "deny"),
             "duration_ms": _count,
             "category": _text,
+            "rule": _text,
         },
         _data(_mcp_call),
         lambda d: d["decision"] == "deny",

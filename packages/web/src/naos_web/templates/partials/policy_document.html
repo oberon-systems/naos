@@ -85,11 +85,13 @@
                                 <strong class="run__mono">{{ server.name }}</strong>
                                 <span class="run__mono table__secondary">{{ server.url }}</span>
                             </div>
-                            <div>
-                                tools {{ server.tools }}
-                                {% if server.exposed %}→ {{ server.exposed }}{% endif %}
-                            </div>
-                            <div>resources {{ server.resources }}</div>
+                            {% for rule in server.rules %}
+                                <div class="run__mono">
+                                    {{ rule.index }} · {{ rule.effect }} {{ rule.target }}
+                                    {% if rule.constraints %}{{ rule.constraints }}{% endif %}
+                                    {% if rule.budget %}· {{ rule.budget }}{% endif %}
+                                </div>
+                            {% endfor %}
                             <div class="table__secondary">
                                 credential
                                 {% if server.credential %}
@@ -103,7 +105,7 @@
                     {% endfor %}
                 </ul>
                 <p class="image__hint table__secondary">
-                    The url, the credential and the limits are the registry's. A secret appears by name only; its value never leaves the API. A resource prefix routes to one server.
+                    A call no rule allows is denied, and a matching deny wins. The number is the rule's place in the document, as the audit names it. The url, the credential and the limits are the registry's; a secret appears by name only.
                 </p>
             </section>
         {% elif policy.kind == "model" %}

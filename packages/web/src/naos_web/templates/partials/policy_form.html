@@ -154,23 +154,31 @@
                     {% endfor %}
                     {% if not form.full("providers") %}{{ step('add:providers', '+ Add provider') }}{% endif %}
                 {% else %}
-                    {% set items = form.items("servers") %}
-                    <h3 class="run__card-title profile__section">SERVERS · {{ items | length }}</h3>
+                    {% set items = form.items("rules") %}
+                    <h3 class="run__card-title profile__section">RULES · {{ items | length }}</h3>
                     {% for item in items %}
-                        {% set at = "servers." ~ loop.index0 ~ "." %}
+                        {% set at = "rules." ~ loop.index0 ~ "." %}
                         <div class="policy__server-form">
                             <div class="policy__server-head">
-                                <strong>Server {{ item.name or loop.index }}</strong>
-                                {{ step("drop:servers:" ~ loop.index0, "Remove", "policy__remove") }}
+                                <strong>Rule {{ loop.index }}</strong>
+                                {{ step("drop:rules:" ~ loop.index0, "Remove", "policy__remove") }}
                             </div>
-                            {{ input(at ~ "name", item.name, "Registered server", "alpha", mono=true) }}
                             <div class="dialog__grid">
-                                {{ input(at ~ "tools", item.tools, "Tools", "fetch, search", mono=true) }}
-                                {{ input(at ~ "resources", item.resources, "Resource prefixes", "docs://alpha/", mono=true) }}
+                                {{ input(at ~ "server", item.server, "Server", "alpha, shell, network", mono=true) }}
+                                {{ choose(at ~ "effect", item.effect, effects, "Effect") }}
+                            </div>
+                            <div class="dialog__grid">
+                                {{ input(at ~ "tool", item.tool, "Tool, or * for all", "search", mono=true) }}
+                                {{ input(at ~ "resource", item.resource, "or resource prefix", "docs://alpha/", mono=true) }}
+                            </div>
+                            {{ input(at ~ "arguments", item.arguments, "Argument constraints, JSON", '{"path": {"prefix": "/workspace/" }}', mono=true) }}
+                            <div class="dialog__grid">
+                                {{ input(at ~ "per_minute", item.per_minute, "Calls / min") }}
+                                {{ input(at ~ "per_run", item.per_run, "Calls / run") }}
                             </div>
                         </div>
                     {% endfor %}
-                    {% if not form.full("servers") %}{{ step('add:servers', '+ Add server') }}{% endif %}
+                    {% if not form.full("rules") %}{{ step('add:rules', '+ Add rule') }}{% endif %}
                 {% endif %}
                 <span class="field__hint">{{ form_hint }}</span>
             </div>
