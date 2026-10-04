@@ -48,6 +48,7 @@ def run(
         | (policies or {}),
         "profile_id": None,
         "lease_id": None,
+        "mcp_document": None,
         "workspace": workspace,
         "runner": runner,
         "merge": merge,
@@ -88,7 +89,23 @@ RUNS: list[Row] = [
             "mcp": {"policy": MCPPOL},
             "model": {"policy": MODELPOL},
         },
-        extra={"profile_id": "prof_7a1c30", "lease_id": "lease_5d2a91"},
+        extra={
+            "profile_id": "prof_7a1c30",
+            "lease_id": "lease_5d2a91",
+            "mcp_document": {
+                "servers": [
+                    {
+                        "name": "alpha",
+                        "url": "https://alpha.example.com/mcp",
+                        "tools": ["search"],
+                        "resources": [],
+                        "credential": "alpha-token",
+                        "timeout_seconds": 30,
+                        "max_calls_per_minute": 60,
+                    }
+                ]
+            },
+        },
     ),
     run(127, "run_7c08ab", "COLLECTING", runner=BETA, started=NOW - 348, created=NOW - 360),
     run(

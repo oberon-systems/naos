@@ -465,11 +465,9 @@ def _egress(policy: Row | None) -> str:
 
 
 # Only the credential names are counted; a value never reaches the web.
-def _secrets(policy: Row | None) -> str:
-    servers = policy["document"].get("servers", []) if policy else []
-    registry = policy.get("registry", {}) if policy else {}
-    named = {registry.get(server["name"], {}).get("credential") for server in servers}
-    bound = len(named - {None})
+def _secrets(run: Row) -> str:
+    servers = (run.get("mcp_document") or {}).get("servers", [])
+    bound = len({server["credential"] for server in servers} - {None})
     return f"{bound} bound \u00b7 never logged" if bound else "none bound"
 
 
@@ -628,7 +626,7 @@ def run_detail(
             Fact("Approvals", format.DASH),
             Fact("Timeouts", f"run {format.coarse(spec['timeout'])} \u00b7 idle {format.DASH}"),
             Fact("Network egress", _egress(policies.get("network"))),
-            Fact("Secrets", _secrets(policies.get("mcp"))),
+            Fact("Secrets", _secrets(run)),
             Fact("Model", model_line(model["document"]) if model else "no policy"),
             Fact("Artifacts", format.DASH),
             Fact("Lease fencing", _fencing(run, runner)),
