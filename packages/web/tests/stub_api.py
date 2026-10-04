@@ -60,6 +60,7 @@ def run(
 
 NETPOL = "netpol_9a07" + "0" * 28
 MCPPOL = "mcppol_5b2d" + "0" * 28
+MCPSRV = "mcpsrv_7c1e" + "0" * 28
 MODELPOL = "modelpol_7c1e" + "0" * 28
 MNTPOL = "mntpol_4c1e" + "0" * 28
 SHELLPOL = "shellpol_c42f" + "0" * 26
@@ -686,24 +687,8 @@ POLICIES: list[Row] = [
         "digest": "2" * 64,
         "document": {
             "servers": [
-                {
-                    "name": "alpha",
-                    "url": "https://mcp.example.com/mcp",
-                    "tools": [],
-                    "resources": [],
-                    "credential": "alpha-token",
-                    "timeout_seconds": 30,
-                    "max_calls_per_minute": 60,
-                },
-                {
-                    "name": "beta",
-                    "url": "https://beta.example.com/mcp",
-                    "tools": ["fetch"],
-                    "resources": ["docs://beta/"],
-                    "credential": None,
-                    "timeout_seconds": 15,
-                    "max_calls_per_minute": 120,
-                },
+                {"name": "alpha", "tools": [], "resources": []},
+                {"name": "beta", "tools": ["fetch"], "resources": ["docs://beta/"]},
             ]
         },
         "created_at": NOW - 9000,
@@ -772,7 +757,7 @@ SECRETS: dict[str, Row] = {
         "valid",
         NOW + 12 * DAY,
         rotated_at=NOW - 3 * DAY,
-        named_by=[{"kind": "cred", "id": MCPPOL, "server": "alpha"}],
+        named_by=[{"kind": "reg", "id": MCPSRV, "server": "alpha"}],
         held_by=[HOLDER],
         runs=[
             HOLDER | {"issued": 2, "last_at": NOW - 133},
@@ -784,7 +769,7 @@ SECRETS: dict[str, Row] = {
         "sec_2b9c7e" + "0" * 26,
         "expired",
         NOW - 2 * DAY,
-        named_by=[{"kind": "cred", "id": MCPPOL, "server": "beta"}],
+        named_by=[{"kind": "reg", "id": MCPSRV, "server": "beta"}],
     ),
     "gamma-key": secret("gamma-key", "sec_0f3a55" + "0" * 26, "valid", None),
 }
@@ -978,6 +963,27 @@ def run_from_profile(pid: str, body: Row, idempotency_key: str = Header()) -> Ro
     return RUNS[0]
 
 
+def _server(name: str, credential: str | None, timeout: int, calls: int) -> Row:
+    return {
+        "name": name,
+        "kind": "external",
+        "id": MCPSRV,
+        "url": f"https://{name}.example.com/mcp",
+        "credential": credential,
+        "timeout_seconds": timeout,
+        "max_calls_per_minute": calls,
+        "disabled_at": None,
+        "created_at": NOW - 9000,
+        "updated_at": NOW - 9000,
+        "policies": [MCPPOL],
+    }
+
+
+@stub.get("/api/v1/mcp-servers")
+def list_mcp_servers() -> list[Row]:
+    return [_server("alpha", "alpha-token", 30, 60), _server("beta", None, 15, 120)]
+
+
 @stub.get("/api/v1/policies")
 def list_policies(kind: str | None = None, q: str | None = None) -> list[Row]:
     needle = (q or "").lower()
@@ -1075,7 +1081,7 @@ def delete_secret(name: str) -> Response:
     if found is None:
         return _missing(f"secret {name}")
     if _in_use(found):
-        return _refused(f"secret {name} is in use: named by {MCPPOL} (server alpha)", 409)
+        return _refused(f"secret {name} is in use: named by {MCPSRV} (server alpha)", 409)
     return Response(status_code=204)
 
 

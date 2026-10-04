@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from stub_api import MCPPOL, MODELPOL, NOW, WRITES
+from stub_api import MCPSRV, MODELPOL, NOW, WRITES
 
 HX = {"HX-Request": "true"}
 ROW = '<tr class="runs-table__row"'
@@ -48,9 +48,9 @@ def test_a_row_shows_state_usage_rotation_and_holders(client: TestClient) -> Non
     assert body.count(ROW) == 4
     assert ">VALID</span>" in body and ">EXPIRING</span>" in body and ">EXPIRED</span>" in body
     assert "12d left" in body and "since 2d" in body and "no expiry" in body
-    assert '<span class="profile__tag">cred</span>' in body
+    assert '<span class="profile__tag">reg</span>' in body
     assert '<span class="profile__tag profile__tag--off">grant</span>' in body
-    assert "1 policy \u00b7 issue refused" in body and "1 model policy" in body
+    assert "1 server \u00b7 issue refused" in body and "1 model policy" in body
     assert "unused \u00b7 can be deleted" in body
     assert "by operator" in body and "never rotated" in body
     assert "#128" in body and "none open" in body
@@ -72,8 +72,9 @@ def test_the_overview_reads_metadata_and_who_names_and_holds_it(client: TestClie
     assert "rotated 3d ago" in body and "expires in 12d" in body
     assert "named by 1 \u00b7 held by 1 run" in body
     assert "3d ago \u00b7 by operator \u00b7 2 issues since" in body
-    assert "NAMED BY \u00b7 1" in body and f'hx-get="/policies/{MCPPOL}"' in body
-    assert "mcp policy \u00b7 credential of server alpha" in body
+    assert "NAMED BY \u00b7 1" in body and MCPSRV in body
+    assert f'hx-get="/policies/{MCPSRV}"' not in body
+    assert "mcp registry \u00b7 credential of server alpha" in body
     assert "HELD BY \u00b7 1 RUN" in body and 'hx-get="/runs/run_9f21c4"' in body
     for act in ("rotate", "expiry", "delete"):
         assert f'hx-get="/secrets/alpha-token/{act}"' in body
@@ -92,7 +93,7 @@ def test_used_by_lists_what_names_it_and_the_runs_it_reached(client: TestClient)
     body = flat(client.get("/secrets/alpha-token/used", headers=HX).text)
 
     assert "NAMED BY \u00b7 1" in body and ">CREDENTIAL</span>" in body
-    assert ">Open policy</a>" in body and "server alpha" in body
+    assert "mcp registry" in body and "server alpha" in body
     assert "RUNS \u00b7 2" in body and "1 hold it now" in body
     assert "issued 2\u00d7" in body and "holds it now" in body
     assert "build-small" in body and 'hx-get="/runs/run_0d4492"' in body
@@ -242,7 +243,7 @@ def test_a_secret_in_use_is_refused_by_the_api(client: TestClient, writes: list[
 
     assert "alpha-token cannot be deleted" in body and ">Yes</button>" not in body
     assert "the api answered 409 for /secrets/alpha-token" in body
-    assert f"named by {MCPPOL} (server alpha). Drop it from them" in body
+    assert f"named by {MCPSRV} (server alpha). Drop it from them" in body
     assert writes == [("DELETE", "/secrets/alpha-token", {}, None)]
 
 

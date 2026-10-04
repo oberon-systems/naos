@@ -249,9 +249,22 @@ class ApiClient:
         except (HTTPXWSException, httpx.HTTPError) as err:
             raise ApiError(f"the api refused {path}") from err
 
+    async def mcp_servers(self) -> list[Row]:
+        rows: list[Row] = await self._call("GET", "/mcp-servers")
+        return rows
+
+    # An mcp policy names its servers only; what the registry holds for them rides beside it.
+    async def _registered(self, policies: list[Row]) -> list[Row]:
+        named = [policy for policy in policies if policy["kind"] == "mcp"]
+        if named:
+            registry = {row["name"]: row for row in await self.mcp_servers()}
+            for policy in named:
+                policy["registry"] = registry
+        return policies
+
     async def policy(self, policy_id: str) -> Row:
         row: Row = await self._call("GET", f"/policies/{policy_id}")
-        return row
+        return (await self._registered([row]))[0]
 
     async def create_run(self, spec: Row, idempotency_key: str) -> Row:
         row: Row = await self._call(
@@ -307,7 +320,7 @@ class ApiClient:
         if query:
             params["q"] = query
         rows: list[Row] = await self._call("GET", "/policies", params=params)
-        return rows
+        return await self._registered(rows)
 
     # The api answers 201 for a new policy and 200 for the one an equivalent document holds.
     async def create_policy(self, kind: str, document: Row) -> tuple[Row, bool]:

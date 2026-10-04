@@ -163,18 +163,10 @@
                                 <strong>Server {{ item.name or loop.index }}</strong>
                                 {{ step("drop:servers:" ~ loop.index0, "Remove", "policy__remove") }}
                             </div>
-                            <div class="policy__server-row policy__server-row--name">
-                                {{ input(at ~ "name", item.name, "Name", "alpha", mono=true) }}
-                                {{ input(at ~ "url", item.url, "URL", "https://mcp.example.com/mcp", mono=true) }}
-                            </div>
+                            {{ input(at ~ "name", item.name, "Registered server", "alpha", mono=true) }}
                             <div class="dialog__grid">
                                 {{ input(at ~ "tools", item.tools, "Tools", "fetch, search", mono=true) }}
                                 {{ input(at ~ "resources", item.resources, "Resource prefixes", "docs://alpha/", mono=true) }}
-                            </div>
-                            <div class="policy__server-row policy__server-row--limits">
-                                {{ input(at ~ "credential", item.credential, "Credential", "alpha-token", mono=true) }}
-                                {{ input(at ~ "timeout", item.timeout, "Timeout, s") }}
-                                {{ input(at ~ "calls", item.calls, "Calls / min") }}
                             </div>
                         </div>
                     {% endfor %}

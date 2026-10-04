@@ -8,7 +8,7 @@ from naos_web import format
 from naos_web.client import Row
 from naos_web.new_run import FormError, short
 from naos_web.pages import Summary, TileValue, Tone
-from naos_web.profiles import HOLDERS, ProfileRow, profile_rows, summary_of
+from naos_web.profiles import ProfileRow, holders, profile_rows, summary_of
 from naos_web.rows import Fact, RunRow, run_rows
 
 Kind = Literal["mount", "network", "shell", "mcp", "model"]
@@ -66,8 +66,8 @@ def _secret_names(policies: list[Row]) -> list[str]:
         {
             holder["credential"]
             for policy in policies
-            for holder in policy["document"].get(HOLDERS.get(policy["kind"], ""), [])
-            if holder["credential"]
+            for holder in holders(policy)
+            if holder.get("credential")
         }
     )
 
@@ -294,21 +294,24 @@ def _mount_tables(document: Row) -> list[Table]:
     ]
 
 
-def _servers(document: Row) -> list[Server]:
+# The url, the credential and the limits are the registry's, as it holds them now.
+def _servers(policy: Row) -> list[Server]:
     return [
         Server(
             name=server["name"],
-            url=server["url"],
+            url=server.get("url", format.DASH),
             tools=" \u00b7 ".join(server["tools"]) or format.DASH,
             exposed=", ".join(f"{server['name']}__{tool}" for tool in server["tools"]),
             resources=", ".join(server["resources"]) or format.DASH,
-            credential=server["credential"] or "",
+            credential=server.get("credential") or "",
             limits=(
                 f"{server['timeout_seconds']}s timeout \u00b7 "
                 f"{server['max_calls_per_minute']} calls/min"
+                if "timeout_seconds" in server
+                else "not in the registry"
             ),
         )
-        for server in document["servers"]
+        for server in holders(policy)
     ]
 
 
@@ -434,7 +437,7 @@ def policy_detail(policy: Row, secrets: dict[str, Row | None], now: int) -> Poli
         ]
         if kind == "shell"
         else [],
-        servers=_servers(document) if kind == "mcp" else [],
+        servers=_servers(policy) if kind == "mcp" else [],
         providers=_providers(document) if kind == "model" else [],
         budget=_budget(document) if kind == "model" else [],
         canonical=json.dumps(document, indent=2),
@@ -482,7 +485,7 @@ LISTS: dict[Kind, dict[str, tuple[str, ...]]] = {
     },
     "shell": {},
     "mcp": {
-        "servers": ("name", "url", "tools", "resources", "credential", "timeout", "calls"),
+        "servers": ("name", "tools", "resources"),
     },
     "model": {
         "providers": ("name", "api", "url", "models", "credential", "timeout", "requests"),
@@ -499,15 +502,7 @@ BLANK: dict[str, dict[str, str]] = {
     "home": {"host_path": "", "guest_path": "", "mode": "ro"},
     "allow": {"protocol": "any", "host": "", "ip": ""},
     "deny": {"protocol": "any", "host": "", "ip": ""},
-    "servers": {
-        "name": "",
-        "url": "",
-        "tools": "",
-        "resources": "",
-        "credential": "",
-        "timeout": "30",
-        "calls": "60",
-    },
+    "servers": {"name": "", "tools": "", "resources": ""},
     "providers": {
         "name": "",
         "api": "openai",
@@ -577,7 +572,7 @@ class PolicyForm:
                 "max_input_tokens": _whole(self.max_input, "max input tokens"),
                 "max_output_tokens": _whole(self.max_output, "max output tokens"),
             }
-        servers = [item for item in self.items("servers") if item["name"] or item["url"]]
+        servers = [item for item in self.items("servers") if item["name"] or item["tools"]]
         return {"servers": [_server(item) for item in servers]}
 
 
@@ -604,12 +599,8 @@ def _whole(value: str, label: str) -> int:
 def _server(item: dict[str, str]) -> Row:
     return {
         "name": item["name"],
-        "url": item["url"],
         "tools": _split(item["tools"]),
         "resources": _split(item["resources"]),
-        "credential": item["credential"] or None,
-        "timeout_seconds": _whole(item["timeout"], "timeout"),
-        "max_calls_per_minute": _whole(item["calls"], "calls per minute"),
     }
 
 
@@ -713,12 +704,8 @@ def from_document(policy: Row) -> PolicyForm:
             "servers": [
                 {
                     "name": server["name"],
-                    "url": server["url"],
                     "tools": ", ".join(server["tools"]),
                     "resources": ", ".join(server["resources"]),
-                    "credential": server["credential"] or "",
-                    "timeout": str(server["timeout_seconds"]),
-                    "calls": str(server["max_calls_per_minute"]),
                 }
                 for server in document["servers"]
             ]

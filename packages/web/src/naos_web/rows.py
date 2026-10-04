@@ -467,7 +467,9 @@ def _egress(policy: Row | None) -> str:
 # Only the credential names are counted; a value never reaches the web.
 def _secrets(policy: Row | None) -> str:
     servers = policy["document"].get("servers", []) if policy else []
-    bound = len({server["credential"] for server in servers if server.get("credential")})
+    registry = policy.get("registry", {}) if policy else {}
+    named = {registry.get(server["name"], {}).get("credential") for server in servers}
+    bound = len(named - {None})
     return f"{bound} bound \u00b7 never logged" if bound else "none bound"
 
 

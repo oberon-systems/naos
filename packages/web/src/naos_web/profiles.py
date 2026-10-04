@@ -148,11 +148,19 @@ def pick_profiles(profiles: list[Row], state: str, query: str) -> list[Row]:
 
 
 # Secrets are counted by the names MCP and model policies bind; their values never reach the web.
+def holders(policy: Row) -> list[Row]:
+    held: list[Row] = policy["document"].get(HOLDERS.get(policy["kind"], ""), [])
+    if policy["kind"] != "mcp":
+        return held
+    registry = policy.get("registry", {})
+    return [registry.get(server["name"], {}) | server for server in held]
+
+
 def _secret_names(policies: list[Row]) -> set[str]:
     return {
         holder["credential"]
         for policy in policies
-        for holder in policy["document"].get(HOLDERS.get(policy["kind"], ""), [])
+        for holder in holders(policy)
         if holder.get("credential")
     }
 
@@ -200,8 +208,8 @@ def _bound(holders: list[Row]) -> str:
     return f"secrets {', '.join(names)} \u2014 values never shown" if names else "no secrets"
 
 
-def _mcp(document: Row) -> str:
-    servers = document["servers"]
+def _mcp(policy: Row) -> str:
+    servers = holders(policy)
     return f"{_plural(len(servers), 'server')} \u00b7 {_bound(servers)}"
 
 
@@ -215,7 +223,7 @@ def summary_of(policy: Row) -> str:
         return " \u00b7 ".join(document["allow"])
     if kind == "model":
         return f"{model_line(document)} \u00b7 {_bound(document['providers'])}"
-    return _mcp(document)
+    return _mcp(policy)
 
 
 @dataclass(frozen=True)

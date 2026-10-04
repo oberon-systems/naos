@@ -13,8 +13,7 @@ State = Literal["all", "valid", "expiring", "expired", "used", "unused"]
 STATE_TONE: dict[str, Tone] = {"valid": "green", "expiring": "amber", "expired": "red"}
 # The board draws four ways to name a secret; the api reports these two so far.
 TAGS = ("reg", "model", "cred", "grant")
-POLICY_KIND = {"cred": "mcp", "model": "model"}
-ROLE = {"cred": "server", "model": "provider"}
+ROLE = {"reg": "server", "model": "provider"}
 TERMS: dict[str, int | None] = {
     "never": None,
     "1h": format.HOUR,
@@ -94,8 +93,8 @@ def _policies(secret: Row, kind: str) -> int:
 
 def _used(secret: Row) -> str:
     parts = []
-    if _policies(secret, "cred"):
-        parts.append(_plural(_policies(secret, "cred"), "policy", "policies"))
+    if _policies(secret, "reg"):
+        parts.append(_plural(_policies(secret, "reg"), "server"))
     if _policies(secret, "model"):
         parts.append(_plural(_policies(secret, "model"), "model policy", "model policies"))
     if not parts:
@@ -213,19 +212,22 @@ class SecretDetail:
 
 
 def _named(usage: Row, policies: dict[str, Row]) -> NamedBy:
-    kind = POLICY_KIND[usage["kind"]]
     role = f"{ROLE[usage['kind']]} {usage['server']}"
     policy = policies.get(usage["id"])
+    # A registry server has no screen of its own yet, so it is named without a link.
+    kind, href = "mcp registry", ""
+    if usage["kind"] == "model":
+        kind, href = "model policy", f"/policies/{usage['id']}"
     return NamedBy(
         tag=usage["kind"],
         id=usage["id"],
         short_id=short(usage["id"]),
-        kind=f"{kind} policy",
+        kind=kind,
         role=role,
-        line=f"{kind} policy \u00b7 credential of {role}",
+        line=f"{kind} \u00b7 credential of {role}",
         scope=_plural(len(policy["profiles"]), "profile") if policy else format.DASH,
         scope_note=_plural(policy["runs_total"], "run") if policy else "",
-        href=f"/policies/{usage['id']}",
+        href=href,
     )
 
 
