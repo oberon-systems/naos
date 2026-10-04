@@ -23,6 +23,18 @@ fn no_mcp() -> McpGate {
     McpGate::from_snapshot("run_a", None).expect("policy")
 }
 
+fn ruled_mcp(rules: Value) -> McpGate {
+    McpGate::from_snapshot("run_a", Some(&json!({ "servers": [], "rules": rules })))
+        .expect("policy")
+}
+
+fn open_mcp() -> McpGate {
+    ruled_mcp(json!([
+        {"server": "shell", "tool": "*", "effect": "allow"},
+        {"server": "network", "tool": "*", "effect": "allow"},
+    ]))
+}
+
 fn no_model() -> ModelGate {
     ModelGate::from_snapshot("run_a", None).expect("policy")
 }
@@ -54,7 +66,7 @@ fn shell_gates(dir: &TempDir, allow: &[&str]) -> RunGates {
             Path::new("/usr/bin/git"),
         )
         .expect("policy"),
-        mcp: no_mcp(),
+        mcp: open_mcp(),
         model: no_model(),
     }
 }
@@ -67,7 +79,7 @@ fn http_gates(address: SocketAddr) -> RunGates {
         )
         .expect("policy"),
         shell: no_shell(),
-        mcp: no_mcp(),
+        mcp: open_mcp(),
         model: no_model(),
     }
 }
@@ -495,11 +507,17 @@ fn answers(method: &str, params: &Value) -> Value {
 }
 
 fn upstream_gates(address: SocketAddr, server: Value) -> RunGates {
+    let rules = json!([
+        {"server": "alpha", "tool": "search", "effect": "allow"},
+        {"server": "alpha", "resource": "docs://alpha/", "effect": "allow"},
+    ]);
+    ruled_gates(address, server, rules)
+}
+
+fn ruled_gates(address: SocketAddr, server: Value, rules: Value) -> RunGates {
     let mut document = json!({
         "name": "alpha",
         "url": format!("http://example.com:{}/mcp", address.port()),
-        "tools": ["search"],
-        "resources": ["docs://alpha/"],
         "credential": "alpha-token",
         "timeout_seconds": 30,
         "max_calls_per_minute": 60,
@@ -510,7 +528,11 @@ fn upstream_gates(address: SocketAddr, server: Value) -> RunGates {
     let gates = RunGates {
         network: NetworkGate::from_snapshot("run_a", None).expect("policy"),
         shell: no_shell(),
-        mcp: McpGate::local(&json!({ "servers": [document] }), vec![address.ip()]).expect("policy"),
+        mcp: McpGate::local(
+            &json!({ "servers": [document], "rules": rules }),
+            vec![address.ip()],
+        )
+        .expect("policy"),
         model: no_model(),
     };
     grant(&gates, u64::MAX);
@@ -613,7 +635,7 @@ async fn a_tool_or_server_outside_the_policy_never_reaches_upstream() {
     assert!(outcome.is_ok());
     assert_eq!(
         tool_text(&replies[0]),
-        (true, "tool not allowed".to_owned())
+        (true, "no rule allows this call".to_owned())
     );
     assert_eq!(error_code(&replies[1]), -32602);
     assert_eq!(error_code(&replies[2]), -32602);
@@ -834,4 +856,199 @@ async fn an_expired_session_is_opened_again() {
             "tools/call"
         ]
     );
+}
+
+#[tokio::test]
+async fn a_run_without_rules_lists_and_calls_nothing() {
+    let dir = TempDir::new().expect("tempdir");
+    fs::write(dir.path().join("a.txt"), "alpha").expect("write");
+    let mut gates = shell_gates(&dir, &["read_file"]);
+    gates.mcp = no_mcp();
+    let input = [
+        request(1, "tools/list", json!({})),
+        call(2, "read_file", json!({"path": format!("{GUEST}/a.txt")})),
+    ]
+    .concat();
+
+    let (_, replies) = exchange(&gates, input.as_bytes()).await;
+
+    assert_eq!(replies[0]["result"]["tools"], json!([]));
+    assert_eq!(
+        tool_text(&replies[1]),
+        (true, "no rule allows this call".to_owned())
+    );
+}
+
+#[tokio::test]
+async fn rules_hold_for_a_built_in_tool() {
+    let dir = TempDir::new().expect("tempdir");
+    fs::create_dir(dir.path().join("src")).expect("mkdir");
+    fs::write(dir.path().join("src/a.txt"), "alpha").expect("write");
+    fs::write(dir.path().join("b.txt"), "beta").expect("write");
+    let mut gates = shell_gates(&dir, &["read_file", "list_dir", "grep"]);
+    gates.mcp = ruled_mcp(json!([
+        {"server": "shell", "tool": "*", "effect": "allow",
+         "arguments": {"path": {"prefix": format!("{GUEST}/src")}}},
+        {"server": "shell", "tool": "grep", "effect": "deny"},
+        {"server": "shell", "tool": "read_file", "effect": "deny",
+         "arguments": {"path": {"regex": ".*\\.key"}}},
+    ]));
+    let input = [
+        request(1, "tools/list", json!({})),
+        call(
+            2,
+            "read_file",
+            json!({"path": format!("{GUEST}/src/a.txt")}),
+        ),
+        call(3, "read_file", json!({"path": format!("{GUEST}/b.txt")})),
+        call(
+            4,
+            "read_file",
+            json!({"path": format!("{GUEST}/src/a.key")}),
+        ),
+        call(
+            5,
+            "grep",
+            json!({"path": format!("{GUEST}/src"), "pattern": "alpha"}),
+        ),
+        call(6, "list_dir", json!({"path": format!("{GUEST}/src")})),
+    ]
+    .concat();
+
+    let (_, replies) = exchange(&gates, input.as_bytes()).await;
+
+    let listed: Vec<&str> = replies[0]["result"]["tools"]
+        .as_array()
+        .expect("tools")
+        .iter()
+        .map(|tool| tool["name"].as_str().expect("name"))
+        .collect();
+    assert_eq!(listed, ["read_file", "list_dir"]);
+    assert_eq!(tool_text(&replies[1]), (false, "alpha".to_owned()));
+    assert_eq!(
+        tool_text(&replies[2]),
+        (true, "no rule allows this call".to_owned())
+    );
+    assert_eq!(
+        tool_text(&replies[3]),
+        (true, "denied by rule 2".to_owned())
+    );
+    assert_eq!(
+        tool_text(&replies[4]),
+        (true, "denied by rule 1".to_owned())
+    );
+    assert!(!tool_text(&replies[5]).0);
+}
+
+#[tokio::test]
+async fn a_rule_never_lifts_what_the_gate_refuses() {
+    let dir = TempDir::new().expect("tempdir");
+    let gates = shell_gates(&dir, &["read_file"]);
+    let input = call(1, "grep", json!({"path": GUEST, "pattern": "alpha"}));
+
+    let (_, replies) = exchange(&gates, input.as_bytes()).await;
+
+    assert!(tool_text(&replies[0]).0);
+}
+
+#[tokio::test]
+async fn rules_hold_for_an_upstream_tool() {
+    let server = upstream(answers, false).await;
+    let rules = json!([
+        {"server": "alpha", "tool": "*", "effect": "allow"},
+        {"server": "alpha", "tool": "delete", "effect": "deny"},
+        {"server": "alpha", "tool": "search", "effect": "deny",
+         "arguments": {"scope": {"equals": "admin"}}},
+        {"server": "alpha", "tool": "search", "effect": "deny",
+         "arguments": {"limit": {"schema": {"type": "integer", "maximum": 0}}}},
+    ]);
+    let input = [
+        call(1, "alpha__search", json!({"query": "naos"})),
+        call(2, "alpha__delete", json!({})),
+        call(3, "alpha__search", json!({"scope": "admin"})),
+        call(4, "alpha__search", json!({"limit": 0})),
+        call(5, "alpha__search", json!({"limit": 5, "scope": "user"})),
+    ]
+    .concat();
+
+    let (_, replies) = exchange(
+        &ruled_gates(*server.address(), json!({}), rules),
+        input.as_bytes(),
+    )
+    .await;
+
+    assert!(!tool_text(&replies[0]).0);
+    assert_eq!(
+        tool_text(&replies[1]),
+        (true, "denied by rule 1".to_owned())
+    );
+    assert_eq!(
+        tool_text(&replies[2]),
+        (true, "denied by rule 2".to_owned())
+    );
+    assert_eq!(
+        tool_text(&replies[3]),
+        (true, "denied by rule 3".to_owned())
+    );
+    assert!(!tool_text(&replies[4]).0);
+    let calls = methods(&server).await;
+    assert_eq!(calls.iter().filter(|name| *name == "tools/call").count(), 2);
+}
+
+#[tokio::test]
+async fn a_rule_budget_is_spent_for_the_run() {
+    let server = upstream(answers, false).await;
+    let rules = json!([
+        {"server": "alpha", "tool": "search", "effect": "allow", "max_calls": 1,
+         "arguments": {"query": {"equals": "naos"}}},
+        {"server": "alpha", "tool": "search", "effect": "allow", "max_calls_per_minute": 1},
+    ]);
+    let gates = ruled_gates(*server.address(), json!({}), rules);
+    let first = [
+        call(1, "alpha__search", json!({"query": "naos"})),
+        call(2, "alpha__search", json!({"query": "naos"})),
+    ]
+    .concat();
+
+    let (_, replies) = exchange(&gates, first.as_bytes()).await;
+    let (_, later) = exchange(
+        &gates,
+        call(1, "alpha__search", json!({"query": "naos"})).as_bytes(),
+    )
+    .await;
+
+    assert!(!tool_text(&replies[0]).0);
+    assert!(!tool_text(&replies[1]).0);
+    assert_eq!(
+        tool_text(&later[0]),
+        (true, "budget of rule 0 is spent".to_owned())
+    );
+}
+
+#[tokio::test]
+async fn a_denied_resource_prefix_is_not_listed_or_read() {
+    let server = upstream(answers, false).await;
+    let rules = json!([
+        {"server": "alpha", "resource": "docs://", "effect": "allow"},
+        {"server": "alpha", "resource": "docs://beta/", "effect": "deny"},
+    ]);
+    let input = [
+        request(1, "resources/list", json!({})),
+        request(2, "resources/read", json!({"uri": "docs://beta/private"})),
+        request(3, "resources/read", json!({"uri": "docs://alpha/guide"})),
+    ]
+    .concat();
+
+    let (_, replies) = exchange(
+        &ruled_gates(*server.address(), json!({}), rules),
+        input.as_bytes(),
+    )
+    .await;
+
+    assert_eq!(
+        replies[0]["result"]["resources"],
+        json!([{"uri": "docs://alpha/guide", "name": "guide"}])
+    );
+    assert_eq!(error_code(&replies[1]), -32002);
+    assert_eq!(replies[2]["result"]["contents"][0]["text"], "guide");
 }

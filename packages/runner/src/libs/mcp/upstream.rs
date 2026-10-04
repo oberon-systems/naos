@@ -1,5 +1,5 @@
 //! External MCP servers named by the Run's mcp policy, reached over Streamable HTTP through a gate of their own.
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -9,6 +9,7 @@ use reqwest::{Method, StatusCode, Url};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+use super::rules::Rules;
 use super::PROTOCOL_VERSIONS;
 use crate::libs::api::RunCredential;
 use crate::libs::audit;
@@ -26,6 +27,7 @@ const MAX_REASON: usize = 200;
 #[serde(deny_unknown_fields)]
 struct PolicyDoc {
     servers: Vec<ServerDoc>,
+    rules: Vec<Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -33,8 +35,6 @@ struct PolicyDoc {
 struct ServerDoc {
     name: String,
     url: String,
-    tools: Vec<String>,
-    resources: Vec<String>,
     credential: Option<String>,
     timeout_seconds: u64,
     max_calls_per_minute: u32,
@@ -81,8 +81,6 @@ pub struct Upstream {
     pub name: String,
     pub timeout: Duration,
     url: String,
-    tools: BTreeSet<String>,
-    resources: Vec<String>,
     credential: Option<String>,
     max_calls: u32,
     window: Mutex<(Instant, u32)>,
@@ -116,8 +114,6 @@ impl Upstream {
             name: doc.name,
             timeout: Duration::from_secs(doc.timeout_seconds),
             url: doc.url,
-            tools: doc.tools.into_iter().collect(),
-            resources: doc.resources,
             credential: doc.credential,
             max_calls: doc.max_calls_per_minute,
             window: Mutex::new((Instant::now(), 0)),
@@ -125,25 +121,6 @@ impl Upstream {
             handshake: Mutex::new(None),
             next_id: AtomicU64::new(1),
         })
-    }
-
-    pub fn allows_tool(&self, tool: &str) -> bool {
-        self.tools.contains(tool)
-    }
-
-    pub fn lists_tools(&self) -> bool {
-        !self.tools.is_empty()
-    }
-
-    pub fn lists_resources(&self) -> bool {
-        !self.resources.is_empty()
-    }
-
-    fn prefix_of(&self, uri: &str) -> Option<&str> {
-        self.resources
-            .iter()
-            .find(|prefix| uri.starts_with(prefix.as_str()))
-            .map(String::as_str)
     }
 
     fn spend(&self) -> Result<(), Failure> {
@@ -165,6 +142,7 @@ impl Upstream {
 pub struct McpGate {
     run_id: String,
     servers: Vec<Upstream>,
+    rules: Rules,
     credentials: Mutex<BTreeMap<String, RunCredential>>,
 }
 
@@ -181,20 +159,23 @@ impl McpGate {
         scheme: &str,
         gate: &dyn Fn(&str, &Value) -> Result<NetworkGate, AgentError>,
     ) -> Result<Self, AgentError> {
-        let servers = match document {
+        let (servers, rules) = match document {
             Some(value) => {
                 let doc: PolicyDoc = serde_json::from_value(value.clone())
                     .map_err(|err| invalid(&err.to_string()))?;
-                doc.servers
+                let servers = doc
+                    .servers
                     .into_iter()
                     .map(|server| Upstream::parse(run_id, server, scheme, gate))
-                    .collect::<Result<_, _>>()?
+                    .collect::<Result<_, _>>()?;
+                (servers, Rules::parse(&doc.rules)?)
             }
-            None => vec![],
+            None => (vec![], Rules::default()),
         };
         Ok(Self {
             run_id: run_id.to_owned(),
             servers,
+            rules,
             credentials: Mutex::new(BTreeMap::new()),
         })
     }
@@ -216,15 +197,27 @@ impl McpGate {
         self.servers.iter().find(|server| server.name == name)
     }
 
-    pub fn has_resources(&self) -> bool {
-        self.servers.iter().any(Upstream::lists_resources)
+    pub fn rules(&self) -> &Rules {
+        &self.rules
     }
 
-    /// The API refuses overlapping prefixes, so at most one server can match.
-    pub fn resource(&self, uri: &str) -> Option<(&Upstream, &str)> {
+    pub fn has_resources(&self) -> bool {
         self.servers
             .iter()
-            .find_map(|server| server.prefix_of(uri).map(|prefix| (server, prefix)))
+            .any(|server| self.rules.lists_resources(&server.name))
+    }
+
+    /// The server a URI routes to with the prefix and rule that allow it, or the rule that denies it.
+    /// The API refuses overlapping allow prefixes, so at most one server can match.
+    pub fn resource(&self, uri: &str) -> Result<(&Upstream, &str, usize), Option<usize>> {
+        let mut denied = None;
+        for server in &self.servers {
+            match self.rules.resource(&server.name, uri) {
+                Ok((prefix, rule)) => return Ok((server, prefix, rule)),
+                Err(rule) => denied = denied.or(rule),
+            }
+        }
+        Err(denied)
     }
 
     pub async fn list_tools(&self, upstream: &Upstream) -> Result<Vec<Value>, Failure> {
@@ -233,7 +226,7 @@ impl McpGate {
             .into_iter()
             .filter_map(|mut tool| {
                 let name = tool.get("name")?.as_str()?.to_owned();
-                upstream.allows_tool(&name).then(|| {
+                self.rules.could_allow(&upstream.name, &name).then(|| {
                     tool["name"] = json!(format!("{}__{name}", upstream.name));
                     tool
                 })
@@ -247,9 +240,6 @@ impl McpGate {
         tool: &str,
         arguments: Value,
     ) -> Result<Value, Failure> {
-        if !upstream.allows_tool(tool) {
-            return Err(Failure::denied("tool not allowed"));
-        }
         upstream.spend()?;
         let result = self
             .rpc(
@@ -274,16 +264,12 @@ impl McpGate {
                 resource
                     .get("uri")
                     .and_then(Value::as_str)
-                    .and_then(|uri| upstream.prefix_of(uri))
-                    .is_some()
+                    .is_some_and(|uri| self.rules.resource(&upstream.name, uri).is_ok())
             })
             .collect())
     }
 
     pub async fn read_resource(&self, upstream: &Upstream, uri: &str) -> Result<Value, Failure> {
-        if upstream.prefix_of(uri).is_none() {
-            return Err(Failure::denied("resource not allowed"));
-        }
         upstream.spend()?;
         self.rpc(upstream, "resources/read", json!({ "uri": uri }))
             .await

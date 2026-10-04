@@ -228,6 +228,7 @@ pub fn mcp_credentials_updated(run_id: &str, names: &str) {
 }
 
 // Arguments are not logged: a header or body may carry a secret. The resource is the policy prefix that matched.
+#[allow(clippy::too_many_arguments)]
 pub fn mcp_call(
     run_id: &str,
     server: &str,
@@ -236,6 +237,7 @@ pub fn mcp_call(
     decision: &str,
     duration_ms: u64,
     category: &str,
+    rule: &str,
 ) {
     audit!(
         info,
@@ -246,7 +248,8 @@ pub fn mcp_call(
         resource = resource,
         decision = decision,
         duration_ms = duration_ms,
-        category = category
+        category = category,
+        rule = rule
     );
 }
 

@@ -16,7 +16,9 @@ use crate::libs::network::{GateRequest, GateResponse};
 use crate::libs::runtime::RunGates;
 use crate::libs::shell::{ShellRequest, ShellResponse};
 
+mod rules;
 mod upstream;
+use rules::Verdict;
 pub use upstream::McpGate;
 use upstream::{Failure, Upstream};
 
@@ -36,6 +38,7 @@ const PARSE_ERROR: i64 = -32700;
 const RESOURCE_NOT_FOUND: i64 = -32002;
 const SERVER: &str = "naos";
 const NO_RESOURCE: &str = "none";
+const UNKNOWN: &str = "unknown";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -211,12 +214,20 @@ impl<'a> Session<'a> {
         if let Some((server, tool)) = name.split_once("__") {
             return self.call_upstream(server, tool, arguments, started).await;
         }
-        let tool = if is_tool(name) { name } else { "unknown" };
-        let call = match parse_call(name, arguments) {
+        let server = server_of(name);
+        let tool = if server == UNKNOWN { UNKNOWN } else { name };
+        let call = match parse_call(name, arguments.clone()) {
             Ok(call) => call,
             Err(reason) => {
-                self.audit(SERVER, tool, NO_RESOURCE, started, "invalid");
+                self.audit(server, tool, NO_RESOURCE, started, "invalid", None);
                 return Err(reason);
+            }
+        };
+        let rule = match self.gates.mcp.rules().check(server, name, &arguments) {
+            Verdict::Allow(rule) => Some(rule),
+            Verdict::Deny { rule, reason } => {
+                self.audit(server, tool, NO_RESOURCE, started, "denied", rule);
+                return Ok(tool_result(reason, true));
             }
         };
         let outcome = tokio::time::timeout(self.timeout, self.dispatch(call)).await;
@@ -225,7 +236,7 @@ impl<'a> Session<'a> {
             Ok(Err(reason)) => (Err(reason), "denied"),
             Err(_) => (Err("call timed out".to_owned()), "timeout"),
         };
-        self.audit(SERVER, tool, NO_RESOURCE, started, category);
+        self.audit(server, tool, NO_RESOURCE, started, category, rule);
         Ok(match text {
             Ok(text) => tool_result(text, false),
             Err(reason) => tool_result(reason, true),
@@ -240,31 +251,48 @@ impl<'a> Session<'a> {
         started: Instant,
     ) -> Result<Value, String> {
         let Some(upstream) = self.gates.mcp.server(server) else {
-            self.audit("unknown", "unknown", NO_RESOURCE, started, "invalid");
+            self.audit(UNKNOWN, UNKNOWN, NO_RESOURCE, started, "invalid", None);
             return Err("unknown tool".into());
         };
-        let logged = if upstream.allows_tool(tool) {
+        let rules = self.gates.mcp.rules();
+        let logged = if rules.could_allow(&upstream.name, tool) {
             tool
         } else {
-            "unknown"
+            UNKNOWN
         };
         if !arguments.is_object() {
-            self.audit(&upstream.name, logged, NO_RESOURCE, started, "invalid");
+            self.audit(
+                &upstream.name,
+                logged,
+                NO_RESOURCE,
+                started,
+                "invalid",
+                None,
+            );
             return Err("invalid arguments: expected an object".into());
         }
+        let rule = match rules.check(&upstream.name, tool, &arguments) {
+            Verdict::Allow(rule) => rule,
+            Verdict::Deny { rule, reason } => {
+                self.audit(&upstream.name, logged, NO_RESOURCE, started, "denied", rule);
+                return Ok(tool_result(reason, true));
+            }
+        };
         let work = self.gates.mcp.call_tool(upstream, tool, arguments);
         Ok(self
-            .guarded(upstream, logged, NO_RESOURCE, work)
+            .guarded(upstream, logged, NO_RESOURCE, Some(rule), work)
             .await
             .unwrap_or_else(|reason| tool_result(reason, true)))
     }
 
     async fn tools(&self) -> Vec<Value> {
+        let rules = self.gates.mcp.rules();
         let mut tools = builtin_tools(self.gates);
-        for upstream in self.gates.mcp.servers().iter().filter(|u| u.lists_tools()) {
+        let servers = self.gates.mcp.servers().iter();
+        for upstream in servers.filter(|server| rules.lists_tools(&server.name)) {
             let work = self.gates.mcp.list_tools(upstream);
             if let Ok(listed) = self
-                .guarded(upstream, "tools/list", NO_RESOURCE, work)
+                .guarded(upstream, "tools/list", NO_RESOURCE, None, work)
                 .await
             {
                 tools.extend(listed);
@@ -274,17 +302,13 @@ impl<'a> Session<'a> {
     }
 
     async fn resources(&self) -> Vec<Value> {
+        let rules = self.gates.mcp.rules();
         let mut resources = Vec::new();
-        for upstream in self
-            .gates
-            .mcp
-            .servers()
-            .iter()
-            .filter(|u| u.lists_resources())
-        {
+        let servers = self.gates.mcp.servers().iter();
+        for upstream in servers.filter(|server| rules.lists_resources(&server.name)) {
             let work = self.gates.mcp.list_resources(upstream);
             if let Ok(listed) = self
-                .guarded(upstream, "resources/list", NO_RESOURCE, work)
+                .guarded(upstream, "resources/list", NO_RESOURCE, None, work)
                 .await
             {
                 resources.extend(listed);
@@ -299,15 +323,36 @@ impl<'a> Session<'a> {
             .and_then(|params| params.get("uri"))
             .and_then(Value::as_str)
         else {
-            self.audit("unknown", "resources/read", NO_RESOURCE, started, "invalid");
+            self.audit(
+                UNKNOWN,
+                "resources/read",
+                NO_RESOURCE,
+                started,
+                "invalid",
+                None,
+            );
             return Err((INVALID_PARAMS, "invalid arguments: uri is required".into()));
         };
-        let Some((upstream, prefix)) = self.gates.mcp.resource(uri) else {
-            self.audit("unknown", "resources/read", NO_RESOURCE, started, "denied");
-            return Err((RESOURCE_NOT_FOUND, "resource not allowed".into()));
+        let (upstream, prefix, rule) = match self.gates.mcp.resource(uri) {
+            Ok(found) => found,
+            Err(rule) => {
+                self.audit(
+                    UNKNOWN,
+                    "resources/read",
+                    NO_RESOURCE,
+                    started,
+                    "denied",
+                    rule,
+                );
+                let reason = rule.map_or_else(
+                    || "resource not allowed".to_owned(),
+                    |index| format!("resource denied by rule {index}"),
+                );
+                return Err((RESOURCE_NOT_FOUND, reason));
+            }
         };
         let work = self.gates.mcp.read_resource(upstream, uri);
-        self.guarded(upstream, "resources/read", prefix, work)
+        self.guarded(upstream, "resources/read", prefix, Some(rule), work)
             .await
             .map_err(|reason| (INTERNAL_ERROR, reason))
     }
@@ -318,6 +363,7 @@ impl<'a> Session<'a> {
         upstream: &Upstream,
         tool: &str,
         resource: &str,
+        rule: Option<usize>,
         work: impl Future<Output = Result<T, Failure>>,
     ) -> Result<T, String> {
         let started = Instant::now();
@@ -327,12 +373,21 @@ impl<'a> Session<'a> {
             Ok(Err(failure)) => (Err(failure.reason), failure.category),
             Err(_) => (Err("call timed out".to_owned()), "timeout"),
         };
-        self.audit(&upstream.name, tool, resource, started, category);
+        self.audit(&upstream.name, tool, resource, started, category, rule);
         result
     }
 
-    fn audit(&self, server: &str, tool: &str, resource: &str, started: Instant, category: &str) {
+    fn audit(
+        &self,
+        server: &str,
+        tool: &str,
+        resource: &str,
+        started: Instant,
+        category: &str,
+        rule: Option<usize>,
+    ) {
         let decision = if category == "none" { "allow" } else { "deny" };
+        let rule = rule.map_or_else(|| "none".to_owned(), |index| index.to_string());
         audit::mcp_call(
             self.run_id,
             server,
@@ -341,6 +396,7 @@ impl<'a> Session<'a> {
             decision,
             elapsed_ms(started),
             category,
+            &rule,
         );
     }
 
@@ -356,17 +412,25 @@ impl<'a> Session<'a> {
     }
 }
 
-fn is_tool(name: &str) -> bool {
-    matches!(
-        name,
-        "read_file" | "list_dir" | "grep" | "git_status" | "git_diff" | "http_request"
-    )
+/// The built-in server a rule names for this tool.
+fn server_of(name: &str) -> &'static str {
+    match name {
+        "read_file" | "list_dir" | "grep" | "git_status" | "git_diff" => "shell",
+        "http_request" => "network",
+        _ => UNKNOWN,
+    }
 }
 
-/// Only what the Run was granted is listed; a call to anything else still meets the gate.
+/// Only what the gate granted and some rule could allow is listed; a call still meets both.
 fn builtin_tools(gates: &RunGates) -> Vec<Value> {
-    let mut tools: Vec<Value> = gates.shell.granted().map(shell_tool).collect();
-    if gates.network.allows_any() {
+    let rules = gates.mcp.rules();
+    let mut tools: Vec<Value> = gates
+        .shell
+        .granted()
+        .filter(|name| rules.could_allow("shell", name))
+        .map(shell_tool)
+        .collect();
+    if gates.network.allows_any() && rules.could_allow("network", "http_request") {
         tools.push(json!({
             "name": "http_request",
             "description": "Send one HTTP(S) request the Run's network policy allows. Redirects are not followed.",

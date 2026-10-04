@@ -195,11 +195,13 @@ async fn sync_refreshes_credentials_on_the_kept_gate_and_never_launches() {
     let mut run = desired_run("run_a", RunStatus::Started);
     run.policies.insert(
         "mcp".into(),
-        Some(json!({ "servers": [{
-            "name": "alpha", "url": "https://example.com/mcp", "tools": ["search"],
-            "resources": [], "credential": "alpha-token",
-            "timeout_seconds": 30, "max_calls_per_minute": 60,
-        }] })),
+        Some(json!({
+            "servers": [{
+                "name": "alpha", "url": "https://example.com/mcp", "credential": "alpha-token",
+                "timeout_seconds": 30, "max_calls_per_minute": 60,
+            }],
+            "rules": [{"server": "alpha", "tool": "search", "effect": "allow"}],
+        })),
     );
     let vm = LocalVm {
         vm_id: "vm_0123456789abcdef0123456789abcdef".into(),
