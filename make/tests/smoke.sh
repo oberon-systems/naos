@@ -354,11 +354,21 @@ check_gates() {
         fail "the shell gate did not read the host workspace"
     grep -q 'duplicate request id' "$TEMP_DIR/console.log" ||
         fail "a reused request id was accepted"
-    for call in "naos read_file allow" "naos http_request allow" "naos read_file deny" \
-        "naos git_status deny" "naos http_request deny" "alpha search deny"; do
+    for call in "shell read_file allow" "network http_request allow" "shell read_file deny" \
+        "shell git_status deny" "network http_request deny" "alpha search deny" \
+        "shell list_dir allow" "shell list_dir deny" "shell grep allow" "shell grep deny"; do
         # shellcheck disable=SC2086  # the three fields are one argument each
         [ "$(mcp_calls $call)" -ge 1 ] || fail "no mcp_call for: $call"
     done
+    # One denied call per rule kind: a whole server by prefix, equality, a regex, a schema, a budget.
+    [ "$(grep -o 'denied by rule [0-9]*' "$TEMP_DIR/console.log" | sort -u | wc -l)" -eq 3 ] ||
+        fail "the deny rules did not each refuse their call"
+    [ "$(grep -o 'no rule allows this call' "$TEMP_DIR/console.log" | wc -l)" -ge 3 ] ||
+        fail "a call no rule allows was not refused"
+    grep -q 'budget of rule [0-9]* is spent' "$TEMP_DIR/console.log" ||
+        fail "a spent rule budget was not refused"
+    grep '"event":"mcp_call"' "$TEMP_DIR/agent.log" | grep -q '"decision":"allow".*"rule":"[0-9]' ||
+        fail "an allowed mcp_call does not name its rule"
     for event in shell_allowed shell_denied network_allowed network_denied; do
         [ "$(events "$event")" -ge 1 ] || fail "$event is missing from the agent log"
     done
@@ -968,13 +978,29 @@ curl -fsS "${auth[@]}" "$api/api/v1/mcp-servers" -o /dev/null -d @- <<EOF
 EOF
 mcp_policy="$(
     curl -fsS "${auth[@]}" "$api/api/v1/policies" -d @- <<EOF | field id
-{"kind": "mcp", "document": {"servers": [{"name": "alpha", "tools": ["search"], "resources": []}]}}
+{"kind": "mcp", "document": {"rules": [
+  {"server": "shell", "tool": "*", "effect": "allow"},
+  {"server": "shell", "tool": "*", "effect": "deny",
+   "arguments": {"path": {"prefix": "/naos/alpha/dir"}}},
+  {"server": "shell", "tool": "grep", "effect": "deny",
+   "arguments": {"pattern": {"equals": "gamma"}}},
+  {"server": "shell", "tool": "read_file", "effect": "deny",
+   "arguments": {"path": {"regex": ".*/added[.]txt"}}},
+  {"server": "network", "tool": "http_request", "effect": "allow",
+   "arguments": {"url": {"prefix": "https://www."}, "method": {"schema": {"enum": ["GET"]}}}},
+  {"server": "alpha", "tool": "search", "effect": "allow", "max_calls": 1}
+]}}
 EOF
 )"
-# A policy names registered servers only.
-[ "$(curl -s -o /dev/null -w '%{http_code}' "${auth[@]}" "$api/api/v1/policies" \
-    -d '{"kind": "mcp", "document": {"servers": [{"name": "beta", "tools": ["search"]}]}}')" = 422 ] ||
-    fail "a policy named an mcp server the registry does not hold"
+# A policy names registered servers only, and a rule that can never match is refused.
+for rule in '{"server": "beta", "tool": "search", "effect": "allow"}' \
+    '{"server": "shell", "tool": "rm", "effect": "allow"}' \
+    '{"server": "shell", "tool": "read_file", "effect": "allow", "arguments": {"url": {"prefix": "a"}}}' \
+    '{"server": "alpha", "tool": "search", "effect": "allow", "arguments": {"q": {"regex": "(?=a)b"}}}'; do
+    [ "$(curl -s -o /dev/null -w '%{http_code}' "${auth[@]}" "$api/api/v1/policies" \
+        -d "{\"kind\": \"mcp\", \"document\": {\"rules\": [$rule]}}")" = 422 ] ||
+        fail "an mcp rule that cannot hold was accepted: $rule"
+done
 for name in openai anthropic; do
     key_var="${name}_key"
     curl -fsS "${auth[@]}" "$api/api/v1/secrets" -o /dev/null -d @- <<EOF
@@ -1087,6 +1113,15 @@ guest \
     '{"jsonrpc":"2.0","id":15,"method":"tools/call","params":{"name":"http_request","arguments":{"method":"GET","url":"https://www.google.com/robots.txt"}}}' \
     '{"jsonrpc":"2.0","id":16,"method":"tools/call","params":{"name":"http_request","arguments":{"method":"GET","url":"https://www.wikipedia.org/"}}}' \
     '{"jsonrpc":"2.0","id":17,"method":"tools/call","params":{"name":"alpha__search","arguments":{"query":"naos"}}}' \
+    '{"jsonrpc":"2.0","id":18,"method":"tools/call","params":{"name":"alpha__search","arguments":{"query":"naos"}}}' \
+    '{"jsonrpc":"2.0","id":19,"method":"tools/call","params":{"name":"alpha__delete","arguments":{}}}' \
+    '{"jsonrpc":"2.0","id":20,"method":"tools/call","params":{"name":"list_dir","arguments":{"path":"/naos/alpha/dir"}}}' \
+    '{"jsonrpc":"2.0","id":21,"method":"tools/call","params":{"name":"list_dir","arguments":{"path":"/naos/alpha"}}}' \
+    '{"jsonrpc":"2.0","id":22,"method":"tools/call","params":{"name":"grep","arguments":{"path":"/naos/alpha","pattern":"gamma"}}}' \
+    '{"jsonrpc":"2.0","id":23,"method":"tools/call","params":{"name":"grep","arguments":{"path":"/naos/alpha","pattern":"alpha"}}}' \
+    '{"jsonrpc":"2.0","id":24,"method":"tools/call","params":{"name":"read_file","arguments":{"path":"/naos/alpha/added.txt"}}}' \
+    '{"jsonrpc":"2.0","id":25,"method":"tools/call","params":{"name":"http_request","arguments":{"method":"HEAD","url":"https://www.google.com/robots.txt"}}}' \
+    '{"jsonrpc":"2.0","id":26,"method":"tools/call","params":{"name":"http_request","arguments":{"method":"GET","url":"https://example.com/"}}}' \
     '{"jsonrpc":"2.0","id":11,"method":"ping"}' \
     "JSON" \
     "{ cat /tmp/rpc; sleep 20; } | naos-mcp" \
