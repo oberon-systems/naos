@@ -363,8 +363,20 @@ check_gates() {
     # One denied call per rule kind: a whole server by prefix, equality, a regex, a schema, a budget.
     [ "$(grep -o 'denied by rule [0-9]*' "$TEMP_DIR/console.log" | sort -u | wc -l)" -eq 3 ] ||
         fail "the deny rules did not each refuse their call"
-    [ "$(grep -o 'no rule allows this call' "$TEMP_DIR/console.log" | wc -l)" -ge 3 ] ||
+    [ "$(grep -o 'no rule allows this call' "$TEMP_DIR/console.log" | wc -l)" -ge 4 ] ||
         fail "a call no rule allows was not refused"
+    # The granted secret reaches the guest and nothing else of naos; the server credential never does.
+    grep -qF -- "$agent_secret" "$TEMP_DIR/console.log" || fail "the granted secret did not come back"
+    grep -qF -- "$secret" "$TEMP_DIR/console.log" && fail "a server credential reached the guest"
+    grep -q 'agent-key' "$TEMP_DIR/console.log" || fail "secrets__list did not name the granted secret"
+    grep -qF -- "$agent_secret" "$TEMP_DIR/agent.log" && fail "a secret value reached the runner log"
+    # The guest printed the value on its own console, so only that log may hold it.
+    grep -rqF --exclude=console.log -- "$agent_secret" "$TEMP_DIR/state" "$TEMP_DIR/runs" &&
+        fail "a secret value reached the runner's state"
+    for read in '"name":"agent-key","decision":"allow"' '"name":"alpha-token","decision":"deny"'; do
+        grep '"event":"secret_read"' "$TEMP_DIR/agent.log" | grep -qF -- "$read" ||
+            fail "no secret_read for: $read"
+    done
     grep -q 'budget of rule [0-9]* is spent' "$TEMP_DIR/console.log" ||
         fail "a spent rule budget was not refused"
     grep '"event":"mcp_call"' "$TEMP_DIR/agent.log" | grep -q '"decision":"allow".*"rule":"[0-9]' ||
@@ -490,7 +502,8 @@ check_secrets() {
         after="$(printf '%s' "$page" | "$VENV/bin/python" -c 'import json, sys; print(json.load(sys.stdin)[-1]["seq"])')"
     done
     [ "$(stat -c %a "$spool")" = 600 ] || fail "$spool is not 0600"
-    for value in "$operator" "$(cat "$TEMP_DIR/enrollment")" "$secret" "$openai_key" "$anthropic_key" \
+    for value in "$operator" "$(cat "$TEMP_DIR/enrollment")" "$secret" "$agent_secret" "$openai_key" \
+        "$anthropic_key" \
         "$(field token <"$TEMP_DIR/state/credentials.json")"; do
         if grep -qF -- "$value" "$TEMP_DIR/audit.json" "$spool"; then
             fail "a credential reached the audit trail"
@@ -973,6 +986,10 @@ secret="$(token)"
 curl -fsS "${auth[@]}" "$api/api/v1/secrets" -o /dev/null -d @- <<EOF
 {"name": "alpha-token", "value": "$secret"}
 EOF
+agent_secret="$(token)"
+curl -fsS "${auth[@]}" "$api/api/v1/secrets" -o /dev/null -d @- <<EOF
+{"name": "agent-key", "value": "$agent_secret"}
+EOF
 curl -fsS "${auth[@]}" "$api/api/v1/mcp-servers" -o /dev/null -d @- <<EOF
 {"name": "alpha", "url": "https://example.com/mcp", "credential": "alpha-token"}
 EOF
@@ -988,7 +1005,10 @@ mcp_policy="$(
    "arguments": {"path": {"regex": ".*/added[.]txt"}}},
   {"server": "network", "tool": "http_request", "effect": "allow",
    "arguments": {"url": {"prefix": "https://www."}, "method": {"schema": {"enum": ["GET"]}}}},
-  {"server": "alpha", "tool": "search", "effect": "allow", "max_calls": 1}
+  {"server": "alpha", "tool": "search", "effect": "allow", "max_calls": 1},
+  {"server": "secrets", "tool": "list", "effect": "allow"},
+  {"server": "secrets", "tool": "get", "effect": "allow",
+   "arguments": {"name": {"equals": "agent-key"}}}
 ]}}
 EOF
 )"
@@ -996,7 +1016,9 @@ EOF
 for rule in '{"server": "beta", "tool": "search", "effect": "allow"}' \
     '{"server": "shell", "tool": "rm", "effect": "allow"}' \
     '{"server": "shell", "tool": "read_file", "effect": "allow", "arguments": {"url": {"prefix": "a"}}}' \
-    '{"server": "alpha", "tool": "search", "effect": "allow", "arguments": {"q": {"regex": "(?=a)b"}}}'; do
+    '{"server": "alpha", "tool": "search", "effect": "allow", "arguments": {"q": {"regex": "(?=a)b"}}}' \
+    '{"server": "secrets", "tool": "*", "effect": "allow"}' \
+    '{"server": "secrets", "tool": "get", "effect": "allow", "arguments": {"name": {"prefix": "a"}}}'; do
     [ "$(curl -s -o /dev/null -w '%{http_code}' "${auth[@]}" "$api/api/v1/policies" \
         -d "{\"kind\": \"mcp\", \"document\": {\"rules\": [$rule]}}")" = 422 ] ||
         fail "an mcp rule that cannot hold was accepted: $rule"
@@ -1122,6 +1144,9 @@ guest \
     '{"jsonrpc":"2.0","id":24,"method":"tools/call","params":{"name":"read_file","arguments":{"path":"/naos/alpha/added.txt"}}}' \
     '{"jsonrpc":"2.0","id":25,"method":"tools/call","params":{"name":"http_request","arguments":{"method":"HEAD","url":"https://www.google.com/robots.txt"}}}' \
     '{"jsonrpc":"2.0","id":26,"method":"tools/call","params":{"name":"http_request","arguments":{"method":"GET","url":"https://example.com/"}}}' \
+    '{"jsonrpc":"2.0","id":27,"method":"tools/call","params":{"name":"secrets__list","arguments":{}}}' \
+    '{"jsonrpc":"2.0","id":28,"method":"tools/call","params":{"name":"secrets__get","arguments":{"name":"agent-key"}}}' \
+    '{"jsonrpc":"2.0","id":29,"method":"tools/call","params":{"name":"secrets__get","arguments":{"name":"alpha-token"}}}' \
     '{"jsonrpc":"2.0","id":11,"method":"ping"}' \
     "JSON" \
     "{ cat /tmp/rpc; sleep 20; } | naos-mcp" \
