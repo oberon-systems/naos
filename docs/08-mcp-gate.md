@@ -69,6 +69,7 @@ else. Every tool belongs to a server, the name a [rule](#rules) uses:
 |---|---|---|---|
 | `read_file`, `list_dir`, `grep`, `git_status`, `git_diff` | `shell` | the shell policy grants that capability | [07](07-shell-gate.md) |
 | `http_request` | `network` | the network policy has an allow rule | [06](06-network-gate.md) |
+| `secrets__list`, `secrets__get` | `secrets` | a rule allows `list` or `get` | [Secrets](#secrets) |
 | `<server>__<tool>` | `<server>` | the server lists it | [External servers](#external-servers) |
 
 A tool is listed only when some rule could allow a call of it as well. A Run
@@ -101,7 +102,7 @@ them before it reaches a gate or leaves the host:
 
 | Field | Rule |
 |---|---|
-| `server` | a registered external server, or `shell`, `network` or `secrets` |
+| `server` | a registered external server, or `shell`, `network` or `secrets` (tools `list` and `get`) |
 | `tool` | an exact tool name, or `*` for every tool of the server |
 | `resource` | a URI prefix instead of `tool`; external servers only |
 | `effect` | `allow` or `deny` |
@@ -150,7 +151,8 @@ named by its index in that stored list, in the tool error and in the audit.
 - an unknown tool or argument of a built-in server, a resource rule on one,
   or a constraint its argument can never satisfy, such as a prefix on an
   object;
-- any rule on `secrets`, which has no tools yet;
+- an allow rule on `secrets` that is not `list` or a grant by exact name
+  ([Secrets](#secrets));
 - an invalid pattern or a schema keyword outside the subset;
 - a budget on a `deny` rule or on a resource rule;
 - an `allow` rule that an unconstrained `deny` of the same server always
@@ -170,6 +172,8 @@ one.
 | `grep` | `path`, `pattern` | a JSON array of `path`, `line`, `text` |
 | `git_status`, `git_diff` | `path` | the git output |
 | `http_request` | `method`, `url`, optional `headers` and `body` | a JSON object of `status`, `headers`, `body`; the body must be UTF-8 |
+| `secrets__list` | none | a JSON array of the granted names |
+| `secrets__get` | `name` | the value of that secret |
 
 `http_request` accepts `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE` and
 `OPTIONS`. It refuses the `Host`, `Connection`, `Transfer-Encoding`,
@@ -270,6 +274,47 @@ The agent never holds a provider credential:
 - every string an upstream answer or error carries back has the credential
   value replaced by `<redacted>`.
 
+## Secrets
+
+An agent that needs a secret asks the broker for it, and the policy decides.
+Nothing puts a secret in place for the agent. A grant is an allow rule on the
+`secrets` server:
+
+```json
+{
+  "rules": [
+    {"server": "secrets", "tool": "list", "effect": "allow"},
+    {"server": "secrets", "tool": "get", "effect": "allow", "max_calls": 5,
+     "arguments": {"name": {"equals": "agent-key"}}}
+  ]
+}
+```
+
+- A secret is granted by its exact name: an allow rule of `get` carries
+  `name` with `equals` and a valid secret name. A prefix, a pattern, a
+  schema, no constraint or tool `*` is 422. Deny rules and budgets follow
+  [Rules](#rules).
+- The API does not check that a granted secret exists. The Run's document
+  lists the granted names under `secrets`, and the API issues their values to
+  the runner beside the credentials, with the same TTL and only while the Run
+  is PENDING, STARTING or STARTED ([03](03-api-design.md)).
+- `secrets__list` answers the granted names and never a value.
+- `secrets__get` answers the value of a granted secret. A name that is not
+  granted is denied by the rules; a secret that is missing, expired or not
+  issued is a tool error, `secret is not available`.
+- The runner keeps the values in memory with the Run's gate and drops them
+  with it. They never reach its state directory, its log or the audit.
+
+A value `secrets__get` returns belongs to the agent from then on. It may
+reach the model provider, the agent's own files and so the upper disk, and
+whatever the agent prints lands in the console log. naos itself writes no
+value anywhere.
+
+Two kinds of secret naos puts in place itself, and neither is ever listed or
+returned: the `credential` of a registry server and the provider keys of the
+model gateway ([13](13-model-gateway.md)). They are not in the granted set,
+so a `get` of one is denied like any name without a grant.
+
 ## Resources
 
 `resources/list` asks every server with an allow prefix and keeps the
@@ -294,15 +339,20 @@ The broker writes to the `audit` target ([11](11-observability.md)):
 | `mcp_credentials_updated` | `run_id`, `names` |
 | `mcp_rejected` | `run_id`, `reason` |
 | `mcp_call` | `run_id`, `server`, `tool`, `resource`, `decision`, `duration_ms`, `category`, `rule` |
+| `secret_read` | `run_id`, `name`, `decision` |
 
 `mcp_credentials_updated` fires when the set of credential names the gate
 holds changes, and `names` lists them comma-separated; values are never
 logged.
 
-`server` is `shell` or `network` for the built-in tools and the registry name
-of an external server, or `unknown`. `tool` is the tool name, `tools/list`,
-`resources/list` or `resources/read`, and `unknown` for a name no rule could
-allow. `resource` is the policy prefix a read matched, or `none`. `decision`
+Every `secrets__get` with a well-formed call writes `secret_read` beside its
+`mcp_call`: the secret name, or `invalid` for a string that is not shaped like
+one, and `allow` or `deny`. The value is never logged.
+
+`server` is `shell`, `network` or `secrets` for the built-in tools and the
+registry name of an external server, or `unknown`. `tool` is the tool name
+(`list` or `get` on `secrets`), `tools/list`, `resources/list` or
+`resources/read`, and `unknown` for a name no rule could allow. `resource` is the policy prefix a read matched, or `none`. `decision`
 is `allow` or `deny`, and `category` is `none`, `invalid`, `denied`,
 `timeout`, `credential` or `provider`. `rule` is the index of the rule that
 decided: the allow rule that was charged, the deny rule that matched or the
@@ -335,6 +385,9 @@ The broker tests in `packages/runner/src/libs/mcp/tests.rs` verify that:
 - a credential the server echoes is redacted;
 - resources are filtered and read by allow prefix, and a deny prefix is
   neither listed nor read;
+- a granted secret is listed by name and read by value, and a name without a
+  grant, a server credential, an expired secret and one the API did not issue
+  are never returned;
 - a server error, an unreachable server, a slow server, a spent budget and an
   expired session are handled.
 
@@ -352,8 +405,10 @@ The smoke test is the end-to-end pass: the guest runs `naos-mcp` over the gate
 port and sends `tools/list`, an allowed and a refused call of each built-in
 gate, a call of the registered external server's tool, one allowed and one
 denied call per rule kind (a whole server, an exact tool, equality, a prefix,
-a regular expression, a schema fragment and a budget) and a request reusing
-an id. It fails unless the built-in tools are listed, the workspace file comes back, the
+a regular expression, a schema fragment and a budget), a read of a granted
+secret, a refused read of the server's credential and a request reusing an
+id. It also fails when the secret's value shows up in the runner log, its
+state directory or the audit. It fails unless the built-in tools are listed, the workspace file comes back, the
 reused id is refused, and the runner logged an `mcp_call` for every one of
 those decisions, the external server included. Nothing answers as that server,
 so its call proves the routing and the failure path, not a working upstream.

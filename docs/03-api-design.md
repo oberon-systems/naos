@@ -163,7 +163,7 @@ beside the Run itself, resolved by the API rather than by the caller:
 | `workspace` | The workspace the mount policy names, or null |
 | `runner` | `id` and `name` of the runner holding the lease, or null |
 | `lease_id` | The lease that fences the Run, or null while it queues |
-| `mcp_document` | The registry entries and the rules the Run holds, as the runner reads them, or null without an `mcp` policy |
+| `mcp_document` | The registry entries, the rules and the names of the granted secrets the Run holds, as the runner reads them, or null without an `mcp` policy |
 | `profile_id` | The profile the spec was copied from, or null |
 | `merge` | `changed` and `conflicts` of the collected diff, or null |
 | `started_at` | When the Run reached STARTING, or null while it queues |
@@ -405,8 +405,9 @@ agent never lists or receives it.
 
 ## Secrets
 
-A secret is a provider credential a registry server or a model policy names
-by `name`. The API stores it as given, without encryption for now, and never
+A secret is a value a registry server or a model policy names as its
+credential, or an `mcp` policy grants to the agent
+([08](08-mcp-gate.md#secrets)), always by `name`. The API stores it as given, without encryption for now, and never
 returns its value: no response, error or audit event carries it.
 
 - `POST /api/v1/secrets` takes `name`, `value` and an optional `expires_at`
@@ -433,12 +434,13 @@ Each secret carries these fields beside `id`, `name`, `expires_at`,
 | Field | Meaning |
 | --- | --- |
 | `state` | `valid`, `expiring` within 7 days, or `expired` |
-| `named_by` | `kind` `reg` with the registry server `id` and its name in `server`, or `kind` `model` with the model policy `id` and the provider in `server` |
+| `named_by` | `kind` `reg` with the registry server `id` and its name in `server`, `kind` `model` with the model policy `id` and the provider in `server`, or `kind` `grant` with the `mcp` policy `id` and `server` null |
 | `held_by` | The PENDING, STARTING and STARTED Runs it was issued to: `run_id`, `seq`, `status`, `profile_id` |
 | `runs` | `GET` of one secret only: every Run it was ever issued to, with `issued` count and `last_at` |
 
-`GET /api/v1/audit?secret=<name>` returns the secret's own events and the
-`credentials_issued` events that name it.
+`GET /api/v1/audit?secret=<name>` returns the secret's own events, the
+`secret_read` events of the runners and the `credentials_issued` events that
+name it.
 
 ## Images
 
@@ -532,7 +534,9 @@ POST /api/v1/runners/{runner_id}/events                      runner token
   WAITING_MERGE Run or null.
 - `credentials` maps each secret the Run's MCP snapshot and model policy name to `value` and
   `expires_at`, only for PENDING, STARTING and STARTED Runs, so the start that
-  follows a claim already has them. A missing or expired secret is left out,
+  follows a claim already has them. `secrets` does the same for the secrets
+  the Run's `mcp` policy grants to the agent, and one `credentials_issued`
+  event names both. A missing or expired secret is left out,
   and `expires_at` is at most `NAOS_RUN_CREDENTIAL_TTL_SECONDS` away, so a
   runner that loses its lease loses its credentials with it.
 
