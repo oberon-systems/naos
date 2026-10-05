@@ -14,6 +14,7 @@ STATE_TONE: dict[str, Tone] = {"valid": "green", "expiring": "amber", "expired":
 # The board draws four ways to name a secret; the api reports these two so far.
 TAGS = ("reg", "model", "cred", "grant")
 ROLE = {"reg": "server", "model": "provider"}
+KIND = {"model": "model", "grant": "mcp"}
 TERMS: dict[str, int | None] = {
     "never": None,
     "1h": format.HOUR,
@@ -97,6 +98,8 @@ def _used(secret: Row) -> str:
         parts.append(_plural(_policies(secret, "reg"), "server"))
     if _policies(secret, "model"):
         parts.append(_plural(_policies(secret, "model"), "model policy", "model policies"))
+    if _policies(secret, "grant"):
+        parts.append(f"granted by {_plural(_policies(secret, 'grant'), 'policy', 'policies')}")
     if not parts:
         return "held by an open run" if secret["held_by"] else "unused \u00b7 can be deleted"
     if secret["state"] == "expired":
@@ -212,19 +215,23 @@ class SecretDetail:
 
 
 def _named(usage: Row, policies: dict[str, Row]) -> NamedBy:
-    role = f"{ROLE[usage['kind']]} {usage['server']}"
     policy = policies.get(usage["id"])
     # A registry server has no screen of its own yet, so it is named without a link.
     kind, href = "mcp registry", ""
-    if usage["kind"] == "model":
-        kind, href = "model policy", f"/policies/{usage['id']}"
+    if usage["kind"] != "reg":
+        kind, href = f"{KIND[usage['kind']]} policy", f"/policies/{usage['id']}"
+    if usage["kind"] == "grant":
+        role, line = "the agent", f"{kind} \u00b7 granted to the agent"
+    else:
+        role = f"{ROLE[usage['kind']]} {usage['server']}"
+        line = f"{kind} \u00b7 credential of {role}"
     return NamedBy(
         tag=usage["kind"],
         id=usage["id"],
         short_id=short(usage["id"]),
         kind=kind,
         role=role,
-        line=f"{kind} \u00b7 credential of {role}",
+        line=line,
         scope=_plural(len(policy["profiles"]), "profile") if policy else format.DASH,
         scope_note=_plural(policy["runs_total"], "run") if policy else "",
         href=href,

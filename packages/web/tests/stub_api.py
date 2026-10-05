@@ -721,6 +721,14 @@ POLICIES: list[Row] = [
                 },
                 {"server": "beta", "resource": "docs://beta/", "effect": "allow"},
                 {
+                    "server": "secrets",
+                    "tool": "get",
+                    "effect": "allow",
+                    "arguments": {"name": {"equals": "agent-key"}},
+                    "max_calls_per_minute": None,
+                    "max_calls": 5,
+                },
+                {
                     "server": "shell",
                     "tool": "read_file",
                     "effect": "allow",
@@ -1020,7 +1028,8 @@ def _server(name: str, credential: str | None, timeout: int, calls: int) -> Row:
 
 @stub.get("/api/v1/mcp-servers")
 def list_mcp_servers() -> list[Row]:
-    built_in = [{"name": name, "kind": "built-in", "url": None} for name in ("shell", "network")]
+    names = ("shell", "network", "secrets")
+    built_in = [{"name": name, "kind": "built-in", "url": None} for name in names]
     return [_server("alpha", "alpha-token", 30, 60), _server("beta", None, 15, 120), *built_in]
 
 

@@ -232,6 +232,7 @@ class PolicyDetail:
     workdir: str
     capabilities: list[Capability]
     servers: list[Server]
+    granted: list[str]
     providers: list[Provider]
     budget: list[Fact]
     canonical: str
@@ -318,6 +319,15 @@ def _limits(server: Row) -> str:
     if server.get("timeout_seconds") is None:
         return "not in the registry"
     return f"{server['timeout_seconds']}s timeout \u00b7 {server['max_calls_per_minute']} calls/min"
+
+
+def _granted(document: Row) -> list[str]:
+    grants = [
+        rule
+        for rule in document["rules"]
+        if rule["server"] == "secrets" and rule["effect"] == "allow" and rule.get("tool") == "get"
+    ]
+    return sorted({rule["arguments"]["name"]["equals"] for rule in grants})
 
 
 # The url, the credential and the limits are the registry's, as it holds them now.
@@ -457,6 +467,7 @@ def policy_detail(policy: Row, secrets: dict[str, Row | None], now: int) -> Poli
         if kind == "shell"
         else [],
         servers=_servers(policy) if kind == "mcp" else [],
+        granted=_granted(document) if kind == "mcp" else [],
         providers=_providers(document) if kind == "model" else [],
         budget=_budget(document) if kind == "model" else [],
         canonical=json.dumps(document, indent=2),

@@ -298,6 +298,11 @@ RUNNER: dict[str, Schema] = {
     "shell_allowed": Schema(SHELL, _data(_shell)),
     "shell_denied": Schema(SHELL | {"reason": _text}, _data(_shell), lambda d: True),
     "mcp_attached": Schema({}, _none),
+    "secret_read": Schema(
+        {"name": _text, "decision": _one_of("allow", "deny")},
+        _data(lambda d: f"{d['name']} \u00b7 {d['decision']}"),
+        lambda d: d["decision"] == "deny",
+    ),
     "mcp_rejected": Schema({"reason": _text}, _data(_reason), lambda d: True),
     "mcp_policy_configured": Schema({}, _none),
     "mcp_credentials_updated": Schema({"names": _text}, _data(lambda d: str(d["names"]))),

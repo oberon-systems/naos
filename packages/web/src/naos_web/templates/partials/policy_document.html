@@ -104,6 +104,15 @@
                         </li>
                     {% endfor %}
                 </ul>
+                {% if policy.granted %}
+                    <p class="image__hint">
+                        Grants to the agent:
+                        {% for name in policy.granted %}<code class="profile__tag">{{ name }}</code>{% endfor %}
+                    </p>
+                    <p class="image__hint table__secondary">
+                        A value the agent reads is the agent's from then on: it may reach the model provider, the agent's files and the upper disk.
+                    </p>
+                {% endif %}
                 <p class="image__hint table__secondary">
                     A call no rule allows is denied, and a matching deny wins. The number is the rule's place in the document, as the audit names it. The url, the credential and the limits are the registry's; a secret appears by name only.
                 </p>

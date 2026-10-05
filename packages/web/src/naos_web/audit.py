@@ -57,6 +57,7 @@ KINDS: dict[str, Kind] = {
     "shell_allowed": DECISION,
     "shell_denied": DECISION,
     "mcp_call": DECISION,
+    "secret_read": DECISION,
     "model_call": DECISION,
     "network_policy_configured": GATE,
     "shell_policy_configured": GATE,
