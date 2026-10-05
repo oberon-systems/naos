@@ -19,6 +19,7 @@ from naos_api.routes.deps import (
 from naos_api.routes.runs import RunRead
 from naos_api.runners import IssuedToken, RunnerPrincipal
 from naos_api.runs import MAX_REASON_LENGTH
+from naos_api.secrets import IssuedCredential
 from naos_api.spec import PolicyKind, RunSpec, StrictModel
 
 PrincipalDep = Annotated[RunnerPrincipal, Depends(require_runner)]
@@ -186,12 +187,20 @@ class DesiredRunOut(BaseModel):
     image_url: str
     policies: dict[PolicyKind, dict[str, Any] | None]
     credentials: dict[str, CredentialOut]
+    secrets: dict[str, CredentialOut]
     merge: dict[str, Any] | None
 
 
 class DesiredStateOut(BaseModel):
     lease_id: str
     runs: list[DesiredRunOut]
+
+
+def _issued(issued: dict[str, IssuedCredential]) -> dict[str, CredentialOut]:
+    return {
+        name: CredentialOut(value=item.value, expires_at=item.expires_at)
+        for name, item in issued.items()
+    }
 
 
 router = APIRouter(prefix="/runners")
@@ -254,10 +263,8 @@ def desired_runs(
                 spec=RunSpec.model_validate(item.run.spec),
                 image_url=item.image_url,
                 policies=item.policies,
-                credentials={
-                    name: CredentialOut(value=issued.value, expires_at=issued.expires_at)
-                    for name, issued in item.credentials.items()
-                },
+                credentials=_issued(item.credentials),
+                secrets=_issued(item.secrets),
                 merge=item.merge,
             )
             for item in desired

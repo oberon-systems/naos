@@ -27,7 +27,7 @@ PerRun = Annotated[StrictInt, Field(ge=1, le=1_000_000)]
 
 ANY_TOOL = "*"
 _PATH = {"path": "string"}
-# What a rule may name on a built-in server; secrets gets its tools with the secrets server.
+# What a rule may name on a built-in server.
 TOOLS: dict[str, dict[str, dict[str, str]]] = {
     "shell": {
         "read_file": _PATH,
@@ -39,8 +39,9 @@ TOOLS: dict[str, dict[str, dict[str, str]]] = {
     "network": {
         "http_request": {"method": "string", "url": "string", "headers": "object", "body": "string"}
     },
-    "secrets": {},
+    "secrets": {"list": {}, "get": {"name": "string"}},
 }
+SECRET_NAME = re.compile(r"[a-z0-9][a-z0-9._-]{0,63}")
 _JSON_TYPES = ("string", "number", "integer", "boolean", "object", "array", "null")
 _COUNTS = ("minLength", "maxLength")
 _BOUNDS = ("minimum", "maximum")
@@ -200,6 +201,25 @@ def _built_in(rule: RuleIn, arguments: dict[str, dict[str, Any]], what: str) -> 
             raise PolicyError(f"{what} can never match: {name} is of type {sorted(kinds)[0]}")
 
 
+# A secret is granted by its exact name, so the agent can never widen what it reads.
+def _grant(rule: RuleIn, arguments: dict[str, dict[str, Any]], what: str) -> None:
+    if rule.effect != "allow" or rule.tool == "list":
+        return
+    name = arguments.get("name", {}).get("equals")
+    if rule.tool == ANY_TOOL or not isinstance(name, str) or not SECRET_NAME.fullmatch(name):
+        raise PolicyError(f"{what} must grant secrets get by name equals one exact secret name")
+
+
+def granted_secrets(document: dict[str, Any]) -> list[str]:
+    return sorted(
+        {
+            rule["arguments"]["name"]["equals"]
+            for rule in document["rules"]
+            if rule["server"] == "secrets" and rule["effect"] == "allow" and rule["tool"] == "get"
+        }
+    )
+
+
 def _rule(rule: RuleIn, index: int) -> dict[str, Any]:
     what = f"rule {index}"
     if (rule.tool is None) == (rule.resource is None):
@@ -213,6 +233,8 @@ def _rule(rule: RuleIn, index: int) -> dict[str, Any]:
     }
     if rule.server in BUILT_IN:
         _built_in(rule, arguments, what)
+    if rule.server == "secrets":
+        _grant(rule, arguments, what)
     if rule.resource is not None:
         if arguments:
             raise PolicyError(f"{what} names a resource and cannot constrain arguments")

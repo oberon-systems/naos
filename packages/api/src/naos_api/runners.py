@@ -92,6 +92,7 @@ class DesiredRun:
     image_url: str
     policies: dict[PolicyKind, dict[str, Any] | None]
     credentials: dict[str, IssuedCredential]
+    secrets: dict[str, IssuedCredential]
     merge: dict[str, Any] | None
 
 
@@ -522,6 +523,7 @@ def _credential_names(policies: dict[PolicyKind, dict[str, Any] | None]) -> set[
     return names | {provider["credential"] for provider in model["providers"]}
 
 
+# What naos uses itself and what the policy grants to the agent leave in two maps of one issue.
 def _credentials(
     session: Session,
     runner_id: str,
@@ -529,11 +531,12 @@ def _credentials(
     policies: dict[PolicyKind, dict[str, Any] | None],
     now: int,
     ttl: int,
-) -> dict[str, IssuedCredential]:
+) -> tuple[dict[str, IssuedCredential], dict[str, IssuedCredential]]:
     if run.status not in CREDENTIAL_BOUND:
-        return {}
+        return {}, {}
     names = _credential_names(policies)
-    issued = issue_credentials(session, names, now, ttl)
+    granted = set((policies[PolicyKind.MCP] or {}).get("secrets", []))
+    issued = issue_credentials(session, names | granted, now, ttl)
     if issued:
         audit.record(
             session,
@@ -544,7 +547,8 @@ def _credentials(
             names=sorted(issued),
             ttl=ttl,
         )
-    return issued
+    own = {name: value for name, value in issued.items() if name in names}
+    return own, {name: value for name, value in issued.items() if name in granted}
 
 
 def _decision(session: Session, run: Run) -> dict[str, Any] | None:
@@ -570,12 +574,14 @@ def desired_state(
     desired: list[DesiredRun] = []
     for run in assigned:
         policies = _policies(session, run)
+        credentials, secrets = _credentials(session, runner_id, run, policies, now, credential_ttl)
         desired.append(
             DesiredRun(
                 run=run,
                 image_url=check_image(session, RunSpec.model_validate(run.spec).image).url,
                 policies=policies,
-                credentials=_credentials(session, runner_id, run, policies, now, credential_ttl),
+                credentials=credentials,
+                secrets=secrets,
                 merge=_decision(session, run),
             )
         )

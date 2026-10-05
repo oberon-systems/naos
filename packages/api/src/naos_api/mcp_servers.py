@@ -8,7 +8,14 @@ from sqlmodel import Session, col, select, update
 from naos_api import audit
 from naos_api.errors import NotFoundError, PolicyError, ServerConflictError
 from naos_api.lifecycle import RunStatus
-from naos_api.mcp import BUILT_IN, RawUrl, ServerName, external_servers, https_url
+from naos_api.mcp import (
+    BUILT_IN,
+    RawUrl,
+    ServerName,
+    external_servers,
+    granted_secrets,
+    https_url,
+)
 from naos_api.models import McpServer, Policy, Run
 from naos_api.secrets import SecretName
 from naos_api.spec import PolicyKind, StrictModel
@@ -211,4 +218,5 @@ def snapshot(session: Session, document: dict[str, Any]) -> dict[str, Any]:
                 "max_calls_per_minute": server.max_calls_per_minute,
             }
         )
-    return {"servers": servers, "rules": document["rules"]}
+    secrets = granted_secrets(document)
+    return {"servers": servers, "rules": document["rules"], "secrets": secrets}

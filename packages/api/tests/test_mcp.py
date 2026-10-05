@@ -5,7 +5,7 @@ from sqlmodel import Session
 
 from naos_api import mcp_servers
 from naos_api.errors import PolicyError
-from naos_api.mcp import McpPolicyIn, resolve_mcp_policy
+from naos_api.mcp import McpPolicyIn, granted_secrets, resolve_mcp_policy
 from naos_api.mcp_servers import ServerCreate
 from naos_api.policies import create_mcp_policy
 from naos_api.secrets import create_secret, issue_credentials
@@ -204,6 +204,48 @@ def test_a_deny_with_constraints_leaves_the_allow_usable() -> None:
 def test_malformed_rules_are_refused_by_the_model(rule: dict[str, Any]) -> None:
     with pytest.raises(ValueError):
         _rules(rule)
+
+
+def _secret(**values: Any) -> dict[str, Any]:
+    grant = {"server": "secrets", "tool": "get", "arguments": {"name": {"equals": "alpha-key"}}}
+    return _rule(**grant) | values
+
+
+def test_a_secret_is_granted_by_its_exact_name() -> None:
+    document = resolve_mcp_policy(
+        _rules(
+            _secret(max_calls=5),
+            _secret(arguments={"name": {"equals": "beta-key"}}),
+            _secret(effect="deny", arguments={"name": {"equals": "beta-key"}}, tool="*"),
+            _secret(effect="deny", arguments={"name": {"prefix": "gamma"}}),
+            _rule(server="secrets", tool="list"),
+        )
+    ).model_dump()
+
+    assert granted_secrets(document) == ["alpha-key", "beta-key"]
+
+
+@pytest.mark.parametrize(
+    "rule",
+    [
+        _secret(arguments={}),
+        _secret(tool="*"),
+        _secret(tool="*", arguments={}),
+        _secret(arguments={"name": {"prefix": "alpha"}}),
+        _secret(arguments={"name": {"regex": "alpha-.*"}}),
+        _secret(arguments={"name": {"schema": {"enum": ["alpha-key"]}}}),
+        _secret(arguments={"name": {"equals": "*"}}),
+        _secret(arguments={"name": {"equals": "Alpha Key"}}),
+        _secret(arguments={"name": {"equals": 1}}),
+        _secret(arguments={"value": {"equals": "alpha-key"}}),
+        _secret(tool="set"),
+        _secret(tool="list"),
+        _secret(tool=None, resource="secret://alpha-key", arguments={}),
+    ],
+)
+def test_a_secret_grant_by_pattern_or_wildcard_is_refused(rule: dict[str, Any]) -> None:
+    with pytest.raises(PolicyError):
+        resolve_mcp_policy(_rules(rule))
 
 
 def test_a_built_in_tool_takes_rules_on_its_own_arguments() -> None:

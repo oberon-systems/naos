@@ -238,3 +238,68 @@ def test_no_response_or_audit_row_carries_a_value(
     for text in texts + [str(row.data) for row in rows]:
         assert VALUE not in text
         assert ROTATED not in text
+
+
+GRANT = {
+    "rules": [
+        {"server": "secrets", "tool": "list", "effect": "allow"},
+        {
+            "server": "secrets",
+            "tool": "get",
+            "effect": "allow",
+            "arguments": {"name": {"equals": "agent-key"}},
+        },
+        {
+            "server": "secrets",
+            "tool": "get",
+            "effect": "allow",
+            "arguments": {"name": {"equals": "gone-key"}},
+        },
+        {"server": "alpha", "tool": "search", "effect": "allow"},
+    ]
+}
+
+
+def test_a_granted_secret_is_issued_apart_from_the_credentials(
+    client: TestClient,
+    register: Register,
+    spec_body: dict[str, Any],
+    mcp_body: dict[str, Any],
+    clock: Callable[[], int],
+) -> None:
+    _secret(client, "alpha-token")
+    _secret(client, "agent-key", "secret-agent-value")
+    _secret(client, "gone-key", expires_at=clock())
+    _secret(client, "other-key")
+    policy_id = _mcp_policy(client, GRANT)
+    spec_body["mcp"] = {"policy": policy_id}
+    run = client.post("/api/v1/runs", json=spec_body, headers={"Idempotency-Key": "key-1"}).json()
+    runner = register()
+    bearer = {"Authorization": f"Bearer {runner['token']}"}
+    path = f"/api/v1/runners/{runner['runner_id']}"
+    client.post(f"{path}/heartbeat", json={"capacity": 1}, headers=bearer)
+
+    [desired] = client.get(f"{path}/runs", headers=bearer).json()["runs"]
+
+    assert desired["policies"]["mcp"]["secrets"] == ["agent-key", "gone-key"]
+    assert set(desired["credentials"]) == {"alpha-token"}
+    assert set(desired["secrets"]) == {"agent-key"}
+    assert desired["secrets"]["agent-key"]["value"] == "secret-agent-value"
+    assert run["mcp_document"]["secrets"] == ["agent-key", "gone-key"]
+    assert "secret-agent-value" not in str(run)
+    [event] = client.get("/api/v1/audit", params={"event": "credentials_issued"}).json()
+    assert event["data"]["names"] == ["agent-key", "alpha-token"]
+    held = client.get("/api/v1/secrets/agent-key").json()
+    assert [holder["run_id"] for holder in held["held_by"]] == [run["id"]]
+    assert held["named_by"] == [{"kind": "grant", "id": policy_id, "server": None}]
+
+
+def test_a_granted_secret_cannot_be_deleted(client: TestClient, mcp_body: dict[str, Any]) -> None:
+    _secret(client, "agent-key")
+    policy_id = _mcp_policy(client, GRANT)
+
+    refused = client.delete("/api/v1/secrets/agent-key")
+
+    assert refused.status_code == 409
+    assert f"{policy_id} (granted to agents)" in refused.json()["detail"]
+    assert _names(client, q=policy_id) == ["agent-key"]

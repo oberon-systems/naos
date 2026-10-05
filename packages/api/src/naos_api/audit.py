@@ -89,6 +89,7 @@ RUNNER_EVENTS: dict[str, dict[str, Any]] = {
     "mcp_rejected": _RUN | {"reason": Text},
     "mcp_policy_configured": _RUN,
     "mcp_credentials_updated": _RUN | {"names": Text},
+    "secret_read": _RUN | {"name": Name, "decision": Literal["allow", "deny"]},
     "mcp_call": _RUN
     | {
         "server": Name,

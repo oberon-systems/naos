@@ -11,6 +11,7 @@ from sqlmodel import Session, col, func, select
 from naos_api import audit
 from naos_api.errors import NotFoundError, SecretBusyError, SecretConflictError
 from naos_api.lifecycle import CREDENTIAL_BOUND, RunStatus
+from naos_api.mcp import granted_secrets
 from naos_api.models import AuditEvent, McpServer, Policy, Run, Secret, SecretMeta
 from naos_api.spec import PolicyKind
 
@@ -35,7 +36,7 @@ class IssuedCredential:
 
 
 class Usage(BaseModel):
-    kind: Literal["reg", "model"]
+    kind: Literal["reg", "model", "grant"]
     id: str
     server: str | None
 
@@ -113,6 +114,10 @@ def _naming(session: Session) -> dict[str, list[Usage]]:
         for provider in policy.document["providers"]:
             usage = Usage(kind="model", id=policy.id, server=provider["name"])
             naming.setdefault(provider["credential"], []).append(usage)
+    statement = select(Policy).where(col(Policy.kind) == PolicyKind.MCP).order_by(col(Policy.id))
+    for policy in session.exec(statement).all():
+        for name in granted_secrets(policy.document):
+            naming.setdefault(name, []).append(Usage(kind="grant", id=policy.id, server=None))
     return naming
 
 
@@ -238,7 +243,12 @@ def set_expiry(session: Session, name: str, expires_at: int | None) -> Secret:
 
 def _busy_detail(view: SecretView) -> str:
     role = {"reg": "server", "model": "provider"}
-    named = [f"{usage.id} ({role[usage.kind]} {usage.server})" for usage in view.named_by]
+    named = [
+        f"{usage.id} (granted to agents)"
+        if usage.kind == "grant"
+        else f"{usage.id} ({role[usage.kind]} {usage.server})"
+        for usage in view.named_by
+    ]
     held = [f"#{holder.seq} {holder.status}" for holder in view.held_by]
     parts = []
     if named:
