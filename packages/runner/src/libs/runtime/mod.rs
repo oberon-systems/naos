@@ -204,7 +204,7 @@ impl QemuRuntime {
             .entry(run.id.clone())
             .or_insert_with(|| Arc::new(gates))
             .clone();
-        kept.mcp.refresh(&run.credentials);
+        kept.mcp.refresh(&run.credentials, &run.secrets);
         kept.model.refresh(&run.credentials);
         Ok(())
     }

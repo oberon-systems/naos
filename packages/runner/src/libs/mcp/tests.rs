@@ -539,14 +539,20 @@ fn ruled_gates(address: SocketAddr, server: Value, rules: Value) -> RunGates {
     gates
 }
 
-fn grant(gates: &RunGates, expires_at: u64) {
-    gates.mcp.refresh(&BTreeMap::from([(
-        "alpha-token".to_owned(),
+fn issued(name: &str, value: &str, expires_at: u64) -> BTreeMap<String, RunCredential> {
+    BTreeMap::from([(
+        name.to_owned(),
         RunCredential {
-            value: SECRET.into(),
+            value: value.into(),
             expires_at,
         },
-    )]));
+    )])
+}
+
+fn grant(gates: &RunGates, expires_at: u64) {
+    gates
+        .mcp
+        .refresh(&issued("alpha-token", SECRET, expires_at), &BTreeMap::new());
 }
 
 fn request(id: u64, method: &str, params: Value) -> String {
@@ -646,7 +652,7 @@ async fn a_tool_or_server_outside_the_policy_never_reaches_upstream() {
 async fn a_missing_or_expired_credential_denies_without_a_request() {
     let server = upstream(answers, false).await;
     let gates = upstream_gates(*server.address(), json!({}));
-    gates.mcp.refresh(&BTreeMap::new());
+    gates.mcp.refresh(&BTreeMap::new(), &BTreeMap::new());
 
     let (_, missing) = exchange(&gates, call(1, "alpha__search", json!({})).as_bytes()).await;
     grant(&gates, 1);
@@ -1051,4 +1057,117 @@ async fn a_denied_resource_prefix_is_not_listed_or_read() {
     );
     assert_eq!(error_code(&replies[1]), -32002);
     assert_eq!(replies[2]["result"]["contents"][0]["text"], "guide");
+}
+
+fn secret_gates(expires_at: u64) -> RunGates {
+    let document = json!({
+        "servers": [],
+        "secrets": ["agent-key", "late-key"],
+        "rules": [
+            {"server": "secrets", "tool": "list", "effect": "allow"},
+            {"server": "secrets", "tool": "get", "effect": "allow", "max_calls": 2,
+             "arguments": {"name": {"equals": "agent-key"}}},
+            {"server": "secrets", "tool": "get", "effect": "allow",
+             "arguments": {"name": {"equals": "late-key"}}},
+        ],
+    });
+    let mut gates = no_gates();
+    gates.mcp = McpGate::from_snapshot("run_a", Some(&document)).expect("policy");
+    let mut secrets = issued("agent-key", "agent-value", u64::MAX);
+    secrets.extend(issued("late-key", "late-value", expires_at));
+    secrets.extend(issued("alpha-token", SECRET, u64::MAX));
+    gates
+        .mcp
+        .refresh(&issued("alpha-token", SECRET, u64::MAX), &secrets);
+    gates
+}
+
+#[tokio::test]
+async fn a_granted_secret_is_listed_by_name_and_read_by_value() {
+    let gates = secret_gates(u64::MAX);
+    let input = [
+        request(1, "tools/list", json!({})),
+        call(2, "secrets__list", json!({})),
+        call(3, "secrets__get", json!({"name": "agent-key"})),
+        call(4, "secrets__get", json!({"name": "late-key"})),
+    ]
+    .concat();
+
+    let (_, replies) = exchange(&gates, input.as_bytes()).await;
+
+    let listed: Vec<&str> = replies[0]["result"]["tools"]
+        .as_array()
+        .expect("tools")
+        .iter()
+        .map(|tool| tool["name"].as_str().expect("name"))
+        .collect();
+    assert_eq!(listed, ["secrets__list", "secrets__get"]);
+    let names = tool_text(&replies[1]);
+    assert_eq!(names, (false, r#"["agent-key","late-key"]"#.to_owned()));
+    assert_eq!(tool_text(&replies[2]), (false, "agent-value".to_owned()));
+    assert_eq!(tool_text(&replies[3]), (false, "late-value".to_owned()));
+}
+
+#[tokio::test]
+async fn a_secret_outside_the_grant_is_never_returned() {
+    let gates = secret_gates(0);
+    let input = [
+        call(1, "secrets__get", json!({"name": "alpha-token"})),
+        call(2, "secrets__get", json!({"name": "other-key"})),
+        call(3, "secrets__get", json!({"name": "late-key"})),
+        call(4, "secrets__get", json!({})),
+        call(5, "secrets__get", json!({"name": "agent-key", "raw": true})),
+        call(6, "secrets__list", json!({"all": true})),
+        call(7, "secrets__set", json!({"name": "agent-key"})),
+        call(8, "secrets__get", json!({"name": "agent-key"})),
+        call(9, "secrets__get", json!({"name": "agent-key"})),
+        call(10, "secrets__get", json!({"name": "agent-key"})),
+    ]
+    .concat();
+
+    let (_, replies) = exchange(&gates, input.as_bytes()).await;
+
+    let refused = (true, "no rule allows this call".to_owned());
+    assert_eq!(tool_text(&replies[0]), refused);
+    assert_eq!(tool_text(&replies[1]), refused);
+    assert_eq!(
+        tool_text(&replies[2]),
+        (true, "secret is not available".to_owned())
+    );
+    for reply in &replies[3..7] {
+        assert_eq!(error_code(reply), -32602);
+    }
+    assert!(!tool_text(&replies[7]).0 && !tool_text(&replies[8]).0);
+    assert_eq!(
+        tool_text(&replies[9]),
+        (true, "budget of rule 1 is spent".to_owned())
+    );
+    for reply in &replies {
+        assert!(!reply.to_string().contains(SECRET), "{reply}");
+    }
+}
+
+#[tokio::test]
+async fn a_secret_the_api_did_not_issue_is_not_available() {
+    let gates = secret_gates(u64::MAX);
+    gates.mcp.refresh(&BTreeMap::new(), &BTreeMap::new());
+
+    let (_, replies) = exchange(
+        &gates,
+        call(1, "secrets__get", json!({"name": "agent-key"})).as_bytes(),
+    )
+    .await;
+
+    assert_eq!(
+        tool_text(&replies[0]),
+        (true, "secret is not available".to_owned())
+    );
+}
+
+#[test]
+fn a_guest_string_is_logged_only_when_it_is_a_secret_name() {
+    assert_eq!(logged_name("agent-key.v2_a"), "agent-key.v2_a");
+    for name in ["", "Agent", "-key", "a key", "a\"b", &"a".repeat(65)] {
+        assert_eq!(logged_name(name), "invalid");
+    }
 }

@@ -39,6 +39,7 @@ const RESOURCE_NOT_FOUND: i64 = -32002;
 const SERVER: &str = "naos";
 const NO_RESOURCE: &str = "none";
 const UNKNOWN: &str = "unknown";
+const SECRETS: &str = "secrets";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -63,9 +64,21 @@ struct HttpArgs {
     body: Option<String>,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NoArgs {}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SecretArgs {
+    name: String,
+}
+
 enum Call {
     Shell(ShellRequest),
     Http(GateRequest),
+    Secrets,
+    Secret(String),
 }
 
 /// Serves newline-delimited JSON-RPC until the guest side closes or breaks the framing.
@@ -211,11 +224,14 @@ impl<'a> Session<'a> {
             .and_then(|params| params.get("arguments"))
             .cloned()
             .unwrap_or_else(|| json!({}));
-        if let Some((server, tool)) = name.split_once("__") {
-            return self.call_upstream(server, tool, arguments, started).await;
-        }
-        let server = server_of(name);
-        let tool = if server == UNKNOWN { UNKNOWN } else { name };
+        let (server, tool) = match name.split_once("__") {
+            Some((SECRETS, tool)) if matches!(tool, "list" | "get") => (SECRETS, tool),
+            Some((server, tool)) => {
+                return self.call_upstream(server, tool, arguments, started).await;
+            }
+            None if server_of(name) == UNKNOWN => (UNKNOWN, UNKNOWN),
+            None => (server_of(name), name),
+        };
         let call = match parse_call(name, arguments.clone()) {
             Ok(call) => call,
             Err(reason) => {
@@ -223,10 +239,13 @@ impl<'a> Session<'a> {
                 return Err(reason);
             }
         };
-        let rule = match self.gates.mcp.rules().check(server, name, &arguments) {
+        let rule = match self.gates.mcp.rules().check(server, tool, &arguments) {
             Verdict::Allow(rule) => Some(rule),
             Verdict::Deny { rule, reason } => {
                 self.audit(server, tool, NO_RESOURCE, started, "denied", rule);
+                if let Call::Secret(name) = &call {
+                    audit::secret_read(self.run_id, logged_name(name), "deny");
+                }
                 return Ok(tool_result(reason, true));
             }
         };
@@ -408,7 +427,29 @@ impl<'a> Session<'a> {
             Call::Http(request) => {
                 render_http(self.gates.network.send(request).await.map_err(reason)?)
             }
+            Call::Secrets => Ok(json!(self.gates.mcp.granted()).to_string()),
+            Call::Secret(name) => {
+                let value = self.gates.mcp.secret(&name);
+                let decision = if value.is_some() { "allow" } else { "deny" };
+                audit::secret_read(self.run_id, logged_name(&name), decision);
+                value.ok_or_else(|| "secret is not available".to_owned())
+            }
         }
+    }
+}
+
+/// A name the guest sent is logged only when it has the shape of a secret name.
+fn logged_name(name: &str) -> &str {
+    let plain = |byte: u8| byte.is_ascii_lowercase() || byte.is_ascii_digit();
+    let shaped = name.len() <= 64
+        && name.bytes().next().is_some_and(plain)
+        && name
+            .bytes()
+            .all(|byte| plain(byte) || matches!(byte, b'.' | b'_' | b'-'));
+    if shaped {
+        name
+    } else {
+        "invalid"
     }
 }
 
@@ -430,6 +471,25 @@ fn builtin_tools(gates: &RunGates) -> Vec<Value> {
         .filter(|name| rules.could_allow("shell", name))
         .map(shell_tool)
         .collect();
+    if rules.could_allow(SECRETS, "list") {
+        tools.push(json!({
+            "name": "secrets__list",
+            "description": "The names of the secrets this Run was granted. Never a value.",
+            "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+        }));
+    }
+    if rules.could_allow(SECRETS, "get") {
+        tools.push(json!({
+            "name": "secrets__get",
+            "description": "The value of one granted secret. It is yours from then on: keep it out of files and prompts.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "name": { "type": "string" } },
+                "required": ["name"],
+                "additionalProperties": false,
+            },
+        }));
+    }
     if gates.network.allows_any() && rules.could_allow("network", "http_request") {
         tools.push(json!({
             "name": "http_request",
@@ -496,6 +556,8 @@ fn parse_call(name: &str, arguments: Value) -> Result<Call, String> {
             ShellRequest::Grep { path, pattern }
         }
         "http_request" => return http_request(args(arguments)?).map(Call::Http),
+        "secrets__list" => return args::<NoArgs>(arguments).map(|_| Call::Secrets),
+        "secrets__get" => return Ok(Call::Secret(args::<SecretArgs>(arguments)?.name)),
         _ => return Err("unknown tool".into()),
     };
     Ok(Call::Shell(request))

@@ -28,6 +28,8 @@ const MAX_REASON: usize = 200;
 struct PolicyDoc {
     servers: Vec<ServerDoc>,
     rules: Vec<Value>,
+    #[serde(default)]
+    secrets: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -143,7 +145,9 @@ pub struct McpGate {
     run_id: String,
     servers: Vec<Upstream>,
     rules: Rules,
+    granted: Vec<String>,
     credentials: Mutex<BTreeMap<String, RunCredential>>,
+    secrets: Mutex<BTreeMap<String, RunCredential>>,
 }
 
 impl McpGate {
@@ -159,7 +163,7 @@ impl McpGate {
         scheme: &str,
         gate: &dyn Fn(&str, &Value) -> Result<NetworkGate, AgentError>,
     ) -> Result<Self, AgentError> {
-        let (servers, rules) = match document {
+        let (servers, rules, granted) = match document {
             Some(value) => {
                 let doc: PolicyDoc = serde_json::from_value(value.clone())
                     .map_err(|err| invalid(&err.to_string()))?;
@@ -168,25 +172,49 @@ impl McpGate {
                     .into_iter()
                     .map(|server| Upstream::parse(run_id, server, scheme, gate))
                     .collect::<Result<_, _>>()?;
-                (servers, Rules::parse(&doc.rules)?)
+                (servers, Rules::parse(&doc.rules)?, doc.secrets)
             }
-            None => (vec![], Rules::default()),
+            None => (vec![], Rules::default(), vec![]),
         };
         Ok(Self {
             run_id: run_id.to_owned(),
             servers,
             rules,
+            granted,
             credentials: Mutex::new(BTreeMap::new()),
+            secrets: Mutex::new(BTreeMap::new()),
         })
     }
 
-    pub fn refresh(&self, credentials: &BTreeMap<String, RunCredential>) {
+    pub fn refresh(
+        &self,
+        credentials: &BTreeMap<String, RunCredential>,
+        secrets: &BTreeMap<String, RunCredential>,
+    ) {
         let mut held = self.credentials.lock().expect("credentials");
         if !held.keys().eq(credentials.keys()) {
             let names: Vec<&str> = credentials.keys().map(String::as_str).collect();
             audit::mcp_credentials_updated(&self.run_id, &names.join(","));
         }
         *held = credentials.clone();
+        *self.secrets.lock().expect("secrets") = secrets.clone();
+    }
+
+    /// The names the policy grants to the agent; a credential naos uses itself is never among them.
+    pub fn granted(&self) -> &[String] {
+        &self.granted
+    }
+
+    /// The value of a granted secret the API issued and that has not expired.
+    pub fn secret(&self, name: &str) -> Option<String> {
+        if !self.granted.iter().any(|granted| granted == name) {
+            return None;
+        }
+        let secrets = self.secrets.lock().expect("secrets");
+        let secret = secrets
+            .get(name)
+            .filter(|secret| secret.expires_at > now())?;
+        Some(secret.value.clone())
     }
 
     pub fn servers(&self) -> &[Upstream] {
@@ -333,10 +361,7 @@ impl McpGate {
         let credential = credentials
             .get(name)
             .ok_or_else(|| Failure::credential("credential unavailable"))?;
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_or(u64::MAX, |elapsed| elapsed.as_secs());
-        if credential.expires_at <= now {
+        if credential.expires_at <= now() {
             return Err(Failure::credential("credential expired"));
         }
         Ok(Some(credential.value.clone()))
@@ -549,6 +574,12 @@ impl McpGate {
             .get(name)
             .map(|credential| credential.value.clone())
     }
+}
+
+fn now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(u64::MAX, |elapsed| elapsed.as_secs())
 }
 
 fn from_json(body: &[u8], id: u64) -> Option<Value> {

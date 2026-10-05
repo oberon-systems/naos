@@ -227,6 +227,17 @@ pub fn mcp_credentials_updated(run_id: &str, names: &str) {
     );
 }
 
+// Only the name of a secret is ever logged.
+pub fn secret_read(run_id: &str, name: &str, decision: &str) {
+    audit!(
+        info,
+        "secret_read",
+        run_id = run_id,
+        name = name,
+        decision = decision
+    );
+}
+
 // Arguments are not logged: a header or body may carry a secret. The resource is the policy prefix that matched.
 #[allow(clippy::too_many_arguments)]
 pub fn mcp_call(

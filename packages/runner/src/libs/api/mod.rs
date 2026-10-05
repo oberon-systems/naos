@@ -112,6 +112,9 @@ pub struct DesiredRun {
     pub policies: BTreeMap<String, Option<serde_json::Value>>,
     #[serde(default)]
     pub credentials: BTreeMap<String, RunCredential>,
+    /// What the policy grants to the agent, apart from what naos uses itself.
+    #[serde(default)]
+    pub secrets: BTreeMap<String, RunCredential>,
     /// What to merge, once the policy or an operator decided it.
     #[serde(default)]
     pub merge: Option<Decision>,
