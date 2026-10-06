@@ -14,7 +14,7 @@ Treat Naos as a security boundary, not merely as a VM launcher.
 
 1. Default deny.
 2. Deny overrides allow.
-3. Security policy is immutable for the lifetime of a Run.
+3. Only an operator changes the security policy of a Run, and every change is audited.
 4. Host filesystem, network, shell, and MCP access are explicit capabilities.
 5. Security failures fail closed.
 6. Secrets remain outside the VM whenever possible.

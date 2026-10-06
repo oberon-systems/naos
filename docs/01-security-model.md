@@ -23,7 +23,11 @@ Explicit capabilities:
 
 Default deny. Deny overrides allow.
 
-A security policy is immutable during a Run. Changing the security boundary requires a new Run.
+Nothing changes a security policy during a Run except an operator. An operator may
+replace the policy of a gate on a STARTED Run: the change is audited, the Run keeps
+every policy it held, and a call in flight ends under the policy it started with
+([03](03-api-design.md#changing-a-policy-of-a-started-run)). The mount policy never
+changes, because the mounts are fixed when the VM starts.
 
 ## Failure behavior
 

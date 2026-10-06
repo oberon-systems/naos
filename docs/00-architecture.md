@@ -100,6 +100,6 @@ request.
 
 - Run is the primary lifecycle entity.
 - VM is disposable.
-- Security configuration is immutable for the Run.
+- Only an audited operator action changes the security configuration of a Run.
 - Runner can reconcile after restart.
 - No component gets implicit authority.

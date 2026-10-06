@@ -66,6 +66,8 @@ describe, so a change and its event land or fail together.
 | `merge_decided` | operator | `paths` and `resolutions` counts |
 | `merge_reported` | runner | `outcome`, `conflicts` and the `applied`, `skipped`, `exported`, `backed_up` counts |
 | `policy_created` | operator | `policy_id`, `kind` |
+| `policy_named` | operator | `policy_id`, `kind`, `name` |
+| `policy_changed` | operator | `kind`, the policy ids `from` and `to` of a STARTED Run, null for none or for a temporary document, and the `digest` of the new document |
 | `image_registered` | operator | `image_id`, `version`, `digest` |
 | `secret_created` | operator | `name` only |
 | `secret_rotated` | operator | `name` only |

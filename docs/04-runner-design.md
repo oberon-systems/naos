@@ -102,7 +102,7 @@ this table. While the runtime cannot list VMs, the heartbeat offers capacity
 | PENDING | dead | destroy it, then claim and create |
 | STARTING | running or missing | create or reuse the VM, report STARTED |
 | STARTING | dead | destroy it, then create |
-| STARTED | running | refresh the gates, reattach the MCP session |
+| STARTED | running | refresh the gates, apply a changed mcp policy, reattach the MCP session |
 | STARTED | dead or missing | report FAILED `vm lost`, destroy a dead VM |
 | STOPPING | any | stop the VM, report COLLECTING |
 | COLLECTING | running or dead | collect the workspace diff once and report it; on failure report FAILED `collection failed` |
@@ -133,7 +133,9 @@ steps, and any failure stops it and removes the VM directory:
 1. build the network, shell and MCP gates from the policy snapshots and
    register them against the Run, then refuse the Run when it grants a policy
    kind the runtime does not know; every reconcile hands the kept MCP gate the
-   credentials of the latest desired state;
+   mcp document and the credentials of the latest desired state, and the
+   gate swaps its policy when the document changed
+   ([08](08-mcp-gate.md#live-changes));
 2. download the image from the `image_url` the API returned into the cache
    unless a file already has its name: the agent follows at most five
    redirects and never sends its runner token there, the download goes to a

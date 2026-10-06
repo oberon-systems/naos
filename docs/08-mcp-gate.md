@@ -43,7 +43,7 @@ Messages are newline-delimited JSON-RPC 2.0, the MCP stdio framing:
 
 | Message | Answer |
 |---|---|
-| `initialize` | the requested protocol version when supported, else the latest; `tools` capability, and `resources` when the MCP policy allows any; server `naos` |
+| `initialize` | the requested protocol version when supported, else the latest; `tools` capability, and `resources` when the MCP policy allows any, both with `listChanged`; server `naos` |
 | `tools/list` | the tools the gates grant and some rule could allow |
 | `tools/call` | a tool result, see [Calls](#calls) |
 | `resources/list`, `resources/read` | see [Resources](#resources); `-32601` without resources in the policy |
@@ -210,7 +210,8 @@ External servers are registered once, in the registry of the API
 When a Run is created the API copies the registry entry of each server an
 `allow` rule names and puts it beside the rules. The broker reads this
 document, and it stays as it is for the Run even when the registry changes
-later:
+later, until an operator changes the policy of the Run
+([Live changes](#live-changes)):
 
 ```json
 {
@@ -258,6 +259,32 @@ answers 404. A JSON or `text/event-stream` answer is accepted.
 some rule could allow and renames them `<server>__<tool>`. A server that
 fails or times out is left out of the list. A call checks the rules and the
 budgets before anything leaves the host.
+
+## Live changes
+
+An operator changes the `mcp` policy of a STARTED Run through the API
+([03](03-api-design.md#changing-a-policy-of-a-started-run)), and the desired
+state then carries the new document with its credentials and secrets. The
+runner hands it to the Run's gate on its next reconcile pass:
+
+- The broker answers one request at a time and each request takes the
+  policy whole, so the swap falls between two calls and a call in flight
+  ends under the policy it started with.
+- After the swap the broker sends `notifications/tools/list_changed` to an
+  initialized agent, and `notifications/resources/list_changed` when the old
+  or the new policy has resources, so the agent lists again.
+- A rule that is the same in both documents keeps the budget it spent. A
+  server whose registry entry is the same keeps its session and its
+  per-minute window. Everything else starts fresh.
+- A server taken away is unknown from the next call on, its credential
+  leaves the gate with the same reconcile, and the broker closes its session
+  with an HTTP `DELETE` once no call in flight holds it.
+- A document the runner cannot read grants nothing: every call is denied
+  and the runner writes `mcp_rejected` with `invalid policy`.
+
+An agent that initialized without resources is not told the `resources`
+capability later; it still gets `notifications/tools/list_changed`, and the
+resource methods answer from then on.
 
 ## Credentials
 
@@ -334,7 +361,7 @@ The broker writes to the `audit` target ([11](11-observability.md)):
 
 | Event | Fields |
 |---|---|
-| `mcp_policy_configured` | `run_id` |
+| `mcp_policy_configured` | `run_id`; at the start of the VM and each time the broker holds a changed policy |
 | `mcp_attached` | `run_id` |
 | `mcp_credentials_updated` | `run_id`, `names` |
 | `mcp_rejected` | `run_id`, `reason` |
@@ -389,7 +416,11 @@ The broker tests in `packages/runner/src/libs/mcp/tests.rs` verify that:
   grant, a server credential, an expired secret and one the API did not issue
   are never returned;
 - a server error, an unreachable server, a slow server, a spent budget and an
-  expired session are handled.
+  expired session are handled;
+- a replaced policy is announced and decides the next call, a call in flight
+  ends under its own policy, a removed server is unknown, loses its
+  credential and has its session closed, an unreadable document grants
+  nothing, and a kept rule or server keeps its budget and session.
 
 The rule matching itself is tested in
 `packages/runner/src/libs/mcp/rules/tests.rs`.
@@ -399,7 +430,9 @@ The API tests in `packages/api/tests/test_mcp.py`, `test_mcp_servers.py`,
 registry, secrets and credential issuance: equivalent documents share one
 digest, a rule that is malformed or can never match is refused, a Run keeps
 the entry it was created with, an unknown or disabled server starts no Run,
-and a disable reaches PENDING Runs only.
+and a disable reaches PENDING Runs only. `test_run_policies.py` covers the
+change of a started Run: a stored policy, a temporary and a saved document, the history,
+the audit event and every refusal.
 
 The smoke test is the end-to-end pass: the guest runs `naos-mcp` over the gate
 port and sends `tools/list`, an allowed and a refused call of each built-in
@@ -407,7 +440,9 @@ gate, a call of the registered external server's tool, one allowed and one
 denied call per rule kind (a whole server, an exact tool, equality, a prefix,
 a regular expression, a schema fragment and a budget), a read of a granted
 secret, a refused read of the server's credential and a request reusing an
-id. It also fails when the secret's value shows up in the runner log, its
+id. Before those calls it edits the policy of the started Run to add a
+second server, and afterwards gives the Run its stored policy back and
+checks that the server is unknown. It also fails when the secret's value shows up in the runner log, its
 state directory or the audit. It fails unless the built-in tools are listed, the workspace file comes back, the
 reused id is refused, and the runner logged an `mcp_call` for every one of
 those decisions, the external server included. Nothing answers as that server,

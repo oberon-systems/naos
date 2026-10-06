@@ -105,6 +105,7 @@ GET /api/v1/runs
 GET /api/v1/runs/summary
 GET /api/v1/runs/{run_id}
 POST /api/v1/runs/{run_id}/stop
+POST /api/v1/runs/{run_id}/policies
 GET /api/v1/runners
 POST /api/v1/runners/{runner_id}/revoke
 POST /api/v1/runners/{runner_id}/drain
@@ -164,6 +165,7 @@ beside the Run itself, resolved by the API rather than by the caller:
 | `runner` | `id` and `name` of the runner holding the lease, or null |
 | `lease_id` | The lease that fences the Run, or null while it queues |
 | `mcp_document` | The registry entries, the rules and the names of the granted secrets the Run holds, as the runner reads them, or null without an `mcp` policy |
+| `policy_history` | On `GET /runs/{run_id}` only: every policy change of the Run, oldest first, as `seq`, `kind`, `previous_id`, `policy_id` and `created_at` |
 | `profile_id` | The profile the spec was copied from, or null |
 | `merge` | `changed` and `conflicts` of the collected diff, or null |
 | `started_at` | When the Run reached STARTING, or null while it queues |
@@ -308,21 +310,64 @@ The API resolves the document into its canonical form before storing it, so
 equivalent documents share one digest and therefore one id. Ids carry the kind:
 `mntpol_`, `netpol_`, `shellpol_`, `mcppol_`, `modelpol_`.
 
+A policy may carry a `name`, lowercase letters, digits, `.`, `_` and `-`, at
+most 64 characters and unique within its kind. Nothing overwrites a stored
+policy: a changed document is another policy with another id. A name that
+another policy of the kind holds is 409, and so is a second name for a
+document that already has one. An unnamed policy takes the name of a later
+`POST` with the same document, and `policy_named` records it.
+
 A Run names a policy per kind under `spec.mounts`, `spec.network`, `spec.shell`,
-`spec.mcp` and `spec.model`, and the reference is immutable once the Run
-starts. The runner receives the resolved document as a snapshot rather than
+`spec.mcp` and `spec.model`, and the spec never changes after that. The
+runner receives the resolved document as a snapshot rather than
 the id. For `mcp` that snapshot is the Run's own, taken when the Run is
-created ([MCP servers](#mcp-servers)). The network document is described in [06](06-network-gate.md), the
+created ([MCP servers](#mcp-servers)) and again when an operator changes the
+policy ([Changing a policy of a started Run](#changing-a-policy-of-a-started-run)). The network document is described in [06](06-network-gate.md), the
 shell document in [07](07-shell-gate.md), the MCP document in
 [08](08-mcp-gate.md), the model document in [13](13-model-gateway.md).
 
 `GET /policies` lists every policy newest first; `kind` narrows it to one
-kind, and `q` to the policies whose id or digest holds the substring, ignoring
+kind, and `q` to the policies whose id, digest or name holds the substring, ignoring
 case. Each policy, here and in `GET /policies/{policy_id}`, carries
 `profiles`, the ids of the profiles naming it now, and `runs_open` and
-`runs_total`, the Runs whose spec names it that are not terminal and ever.
+`runs_total`, the Runs that hold it now, not terminal and ever.
 `GET /profiles?policy=` and `GET /runs?policy=` list those profiles and Runs.
 The web form reads the list to offer a policy per kind.
+
+## Changing a policy of a started Run
+
+An operator edits the policy of a gate while the Run works, without a restart.
+`POST /api/v1/runs/{run_id}/policies` takes `kind` and exactly one of:
+
+- `document`, the edited document. By default it is temporary: validated
+  like `POST /policies`, it belongs to this Run alone, creates no policy and
+  has no id. With `save` true it is stored as a policy first, under `name`
+  when one is given, and the Run holds that policy;
+- `policy_id`, a policy that is already stored.
+
+The policy a Run or a profile uses is never overwritten either way: an edit
+changes this Run only, and a saved edit is a new policy.
+
+```bash
+curl -fsS "$api/api/v1/runs/$run/policies" -d '{"kind": "mcp", "document": {"rules": [{"server": "alpha", "tool": "search", "effect": "allow"}]}}'
+curl -fsS "$api/api/v1/runs/$run/policies" -d '{"kind": "mcp", "save": true, "name": "alpha-search", "document": {"rules": [{"server": "alpha", "tool": "search", "effect": "allow"}]}}'
+curl -fsS "$api/api/v1/runs/$run/policies" -d '{"kind": "mcp", "policy_id": "mcppol_0123456789abcdef0123456789abcdef"}'
+```
+
+| Answer | When |
+|---|---|
+| 200 with the Run | the Run holds the policy from now on, or already held exactly it |
+| 404 | the Run does not exist |
+| 409 | the Run is not STARTED, the kind is `network`, `shell` or `model`, which the runner cannot apply to a running VM yet, or the `name` to save under is taken |
+| 422 | `kind` is `mount`, the policy does not exist or is of another kind, the document is invalid or names an unknown or disabled server, or `save` or `name` comes without what it needs |
+
+For `mcp` the API resolves the registry at that moment and replaces the
+Run's `mcp_document`, so the next desired state carries the new servers,
+rules, credentials and granted secrets. `spec.mcp` keeps the policy the Run
+was created with. Every change adds a row to `policy_history`, where
+`policy_id` is null for a temporary document, and writes `policy_changed`
+([11](11-observability.md)). The runner applies the change on its next
+reconcile pass ([08](08-mcp-gate.md#live-changes)).
 
 ## Profiles
 
@@ -395,7 +440,8 @@ disabled at that moment gets 422. A Run without an `mcp` policy has no rules
 and so no tools at all.
 
 A disable reaches only Runs that are still PENDING and removes the server's
-entry, never a rule: from STARTING on a Run keeps the entry it has. The runner reads the desired state again after its
+entry, never a rule: from STARTING on a Run keeps the entry it has until an
+operator changes its policy. The runner reads the desired state again after its
 claim and starts the Run from that answer, so a disable that lands before the
 claim is always in effect.
 
