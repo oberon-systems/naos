@@ -1,0 +1,99 @@
+{
+  "id": "9ba175b7-29ee-8074-8008-bfb9c8a408dc",
+  "name": "title",
+  "type": "frame",
+  "x": 1584,
+  "y": 23.499999999999993,
+  "width": 322,
+  "height": 28,
+  "rotation": 0,
+  "selrect": {
+    "x": 1584,
+    "y": 23.499999999999993,
+    "width": 322,
+    "height": 28,
+    "x1": 1584,
+    "y1": 23.499999999999993,
+    "x2": 1906,
+    "y2": 51.49999999999999
+  },
+  "points": [
+    {
+      "x": 1584,
+      "y": 23.499999999999993
+    },
+    {
+      "x": 1906,
+      "y": 23.499999999999993
+    },
+    {
+      "x": 1906,
+      "y": 51.49999999999999
+    },
+    {
+      "x": 1584,
+      "y": 51.49999999999999
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "9ba175b7-29ee-8074-8008-bfb9c89cc7f6",
+  "frameId": "9ba175b7-29ee-8074-8008-bfb9c89cc7f6",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "layoutItemHSizing": "auto",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 10,
+    "columnGap": 10
+  },
+  "pageId": "9ba175b7-29ee-8074-8008-bfb97cbfe9a3",
+  "layoutItemVSizing": "auto",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "row",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": [],
+  "shapes": [
+    "9ba175b7-29ee-8074-8008-bfb9c8ec4499",
+    "9ba175b7-29ee-8074-8008-bfb9c8dbd0d3",
+    "9ba175b7-29ee-8074-8008-bfb9c8cb03da",
+    "9ba175b7-29ee-8074-8008-bfb9c8c35e15",
+    "9ba175b7-29ee-8074-8008-bfb9c8bdd262",
+    "9ba175b7-29ee-8074-8008-bfb9c8aacec8"
+  ]
+}

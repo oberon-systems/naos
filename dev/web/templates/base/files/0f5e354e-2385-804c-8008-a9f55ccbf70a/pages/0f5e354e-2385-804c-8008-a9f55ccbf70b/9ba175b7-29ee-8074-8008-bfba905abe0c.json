@@ -1,0 +1,100 @@
+{
+  "id": "9ba175b7-29ee-8074-8008-bfba905abe0c",
+  "name": "facts",
+  "type": "frame",
+  "x": 7620,
+  "y": 772.0000000000002,
+  "width": 420,
+  "height": 194.0000000000001,
+  "rotation": 0,
+  "selrect": {
+    "x": 7620,
+    "y": 772.0000000000002,
+    "width": 420,
+    "height": 194.0000000000001,
+    "x1": 7620,
+    "y1": 772.0000000000002,
+    "x2": 8040,
+    "y2": 966.0000000000003
+  },
+  "points": [
+    {
+      "x": 7620,
+      "y": 772.0000000000002
+    },
+    {
+      "x": 8040,
+      "y": 772.0000000000002
+    },
+    {
+      "x": 8040,
+      "y": 966.0000000000003
+    },
+    {
+      "x": 7620,
+      "y": 966.0000000000003
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "9ba175b7-29ee-8074-8008-bfba90318eba",
+  "frameId": "9ba175b7-29ee-8074-8008-bfba90318eba",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "layoutItemHSizing": "fix",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 2,
+    "columnGap": 2
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "auto",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": [],
+  "shapes": [
+    "9ba175b7-29ee-8074-8008-bfba9459cad5",
+    "9ba175b7-29ee-8074-8008-bfba93fd9157",
+    "9ba175b7-29ee-8074-8008-bfba92f9f45c",
+    "9ba175b7-29ee-8074-8008-bfba92a01e4f",
+    "9ba175b7-29ee-8074-8008-bfba91f92dd8",
+    "9ba175b7-29ee-8074-8008-bfba917100f9",
+    "9ba175b7-29ee-8074-8008-bfba908443e3"
+  ]
+}

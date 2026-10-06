@@ -1,0 +1,147 @@
+{
+  "id": "9ba175b7-29ee-8074-8008-bfb9cdb076bb",
+  "name": "Text",
+  "type": "text",
+  "x": 784,
+  "y": 1019,
+  "width": 121,
+  "height": 26,
+  "rotation": 0,
+  "selrect": {
+    "x": 784,
+    "y": 1019,
+    "width": 121,
+    "height": 26,
+    "x1": 784,
+    "y1": 1019,
+    "x2": 905,
+    "y2": 1045
+  },
+  "points": [
+    {
+      "x": 784,
+      "y": 1019
+    },
+    {
+      "x": 905,
+      "y": 1019
+    },
+    {
+      "x": 905,
+      "y": 1045
+    },
+    {
+      "x": 784,
+      "y": 1045
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "9ba175b7-29ee-8074-8008-bfb9cda72885",
+  "frameId": "9ba175b7-29ee-8074-8008-bfb9cda72885",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-width",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "18",
+                "fontWeight": "700",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "700",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#101828",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "Disable alpha?"
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "18",
+            "fontWeight": "700",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "700",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#101828",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 784,
+      "y": 1042.2000004053116,
+      "width": 120.17500305175781,
+      "height": 21.600000381469727,
+      "x1": 0,
+      "y1": 1.600000023841858,
+      "x2": 120.17500305175781,
+      "y2": 23.200000405311584,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "18px",
+      "fontWeight": "700",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#101828",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "Disable alpha?"
+    }
+  ],
+  "pageId": "9ba175b7-29ee-8074-8008-bfb97cbfe9a3"
+}

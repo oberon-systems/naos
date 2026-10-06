@@ -1,0 +1,108 @@
+{
+  "id": "9ba175b7-29ee-8074-8008-bfbadf8f81f0",
+  "name": "policy alpha-read-only",
+  "type": "frame",
+  "x": 8444,
+  "y": 1789,
+  "width": 672,
+  "height": 55,
+  "rotation": 0,
+  "selrect": {
+    "x": 8444,
+    "y": 1789,
+    "width": 672,
+    "height": 55,
+    "x1": 8444,
+    "y1": 1789,
+    "x2": 9116,
+    "y2": 1844
+  },
+  "points": [
+    {
+      "x": 8444,
+      "y": 1789
+    },
+    {
+      "x": 9116,
+      "y": 1789
+    },
+    {
+      "x": 9116,
+      "y": 1844
+    },
+    {
+      "x": 8444,
+      "y": 1844
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "9ba175b7-29ee-8074-8008-bfbade1062b0",
+  "frameId": "9ba175b7-29ee-8074-8008-bfbade1062b0",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 10,
+    "p2": 12,
+    "p3": 10,
+    "p4": 12
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 8,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "auto",
+  "r3": 8,
+  "layoutJustifyContent": "space-between",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 8,
+  "layoutFlexDir": "row",
+  "layoutAlignContent": "stretch",
+  "strokes": [
+    {
+      "strokeStyle": "solid",
+      "strokeColor": "#101828",
+      "strokeOpacity": 1,
+      "strokeAlignment": "inner",
+      "strokeWidth": 1
+    }
+  ],
+  "proportion": 1,
+  "r4": 8,
+  "fills": [
+    {
+      "fillColor": "#ffffff",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "9ba175b7-29ee-8074-8008-bfbae08a810b",
+    "9ba175b7-29ee-8074-8008-bfbadfb82a4e"
+  ]
+}

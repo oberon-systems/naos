@@ -1,0 +1,101 @@
+{
+  "id": "9ba175b7-29ee-8074-8008-bfba127e3304",
+  "name": "card body",
+  "type": "frame",
+  "x": 5300,
+  "y": 444,
+  "width": 356,
+  "height": 236,
+  "rotation": 0,
+  "selrect": {
+    "x": 5300,
+    "y": 444,
+    "width": 356,
+    "height": 236,
+    "x1": 5300,
+    "y1": 444,
+    "x2": 5656,
+    "y2": 680
+  },
+  "points": [
+    {
+      "x": 5300,
+      "y": 444
+    },
+    {
+      "x": 5656,
+      "y": 444
+    },
+    {
+      "x": 5656,
+      "y": 680
+    },
+    {
+      "x": 5300,
+      "y": 680
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "9ba175b7-29ee-8074-8008-bfba124eada8",
+  "frameId": "9ba175b7-29ee-8074-8008-bfba124eada8",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 16,
+    "p3": 14,
+    "p4": 16
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 4,
+    "columnGap": 4
+  },
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
+  "layoutItemVSizing": "auto",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": [],
+  "shapes": [
+    "9ba175b7-29ee-8074-8008-bfba14c67594",
+    "9ba175b7-29ee-8074-8008-bfba14401ae5",
+    "9ba175b7-29ee-8074-8008-bfba1435e1e4",
+    "9ba175b7-29ee-8074-8008-bfba13b5eda4",
+    "9ba175b7-29ee-8074-8008-bfba13aae787",
+    "9ba175b7-29ee-8074-8008-bfba13245445",
+    "9ba175b7-29ee-8074-8008-bfba1317295e",
+    "9ba175b7-29ee-8074-8008-bfba128e9027"
+  ]
+}

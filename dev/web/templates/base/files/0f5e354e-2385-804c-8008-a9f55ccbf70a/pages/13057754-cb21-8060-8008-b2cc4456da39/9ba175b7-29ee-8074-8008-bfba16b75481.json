@@ -1,0 +1,223 @@
+{
+  "id": "9ba175b7-29ee-8074-8008-bfba16b75481",
+  "name": "Text",
+  "type": "text",
+  "x": 5342,
+  "y": 867,
+  "width": 286,
+  "height": 62,
+  "rotation": 0,
+  "selrect": {
+    "x": 5342,
+    "y": 867,
+    "width": 286,
+    "height": 62,
+    "x1": 5342,
+    "y1": 867,
+    "x2": 5628,
+    "y2": 929
+  },
+  "points": [
+    {
+      "x": 5342,
+      "y": 867
+    },
+    {
+      "x": 5628,
+      "y": 867
+    },
+    {
+      "x": 5628,
+      "y": 929
+    },
+    {
+      "x": 5342,
+      "y": 929
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "9ba175b7-29ee-8074-8008-bfba167cae04",
+  "frameId": "9ba175b7-29ee-8074-8008-bfba167cae04",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-height",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "11",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#93370d",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "A value the agent has read belongs to the agent: it may reach the model provider, its own files and the console log. naos never shows it. Create, rotate and delete under Secrets."
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "11",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#93370d",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "layoutItemHSizing": "fill",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 5342,
+      "y": 880.6000002026558,
+      "width": 261.4375,
+      "height": 12.800000190734863,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 261.4375,
+      "y2": 13.600000202655792,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#93370d",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "A value the agent has read belongs to the agent: it may "
+    },
+    {
+      "x": 5342,
+      "y": 896,
+      "width": 277.1875,
+      "height": 12.799999237060547,
+      "x1": 0,
+      "y1": 16.200000762939453,
+      "x2": 277.1875,
+      "y2": 29,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#93370d",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "reach the model provider, its own files and the console log. "
+    },
+    {
+      "x": 5342,
+      "y": 911.4000015258789,
+      "width": 248.35000610351562,
+      "height": 12.80000114440918,
+      "x1": 0,
+      "y1": 31.600000381469727,
+      "x2": 248.35000610351562,
+      "y2": 44.400001525878906,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#93370d",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "naos never shows it. Create, rotate and delete under "
+    },
+    {
+      "x": 5342,
+      "y": 926.7999992370605,
+      "width": 38.5,
+      "height": 12.799999237060547,
+      "x1": 0,
+      "y1": 47,
+      "x2": 38.5,
+      "y2": 59.79999923706055,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#93370d",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "Secrets."
+    }
+  ],
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39"
+}

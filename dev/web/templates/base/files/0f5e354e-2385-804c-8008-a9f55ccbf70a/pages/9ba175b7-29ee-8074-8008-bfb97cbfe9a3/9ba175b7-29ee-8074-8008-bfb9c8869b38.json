@@ -1,0 +1,121 @@
+{
+  "id": "9ba175b7-29ee-8074-8008-bfb9c8869b38",
+  "name": "MCP server \u2014 Overview",
+  "type": "frame",
+  "x": 1560,
+  "y": 0,
+  "width": 940,
+  "height": 585,
+  "rotation": 0,
+  "selrect": {
+    "x": 1560,
+    "y": 0,
+    "width": 940,
+    "height": 585,
+    "x1": 1560,
+    "y1": 0,
+    "x2": 2500,
+    "y2": 585
+  },
+  "points": [
+    {
+      "x": 1560,
+      "y": 0
+    },
+    {
+      "x": 2500,
+      "y": 0
+    },
+    {
+      "x": 2500,
+      "y": 585
+    },
+    {
+      "x": 1560,
+      "y": 585
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "00000000-0000-0000-0000-000000000000",
+  "frameId": "00000000-0000-0000-0000-000000000000",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 12,
+  "layoutItemHSizing": "fix",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "9ba175b7-29ee-8074-8008-bfb97cbfe9a3",
+  "layoutItemVSizing": "auto",
+  "r3": 12,
+  "layoutJustifyContent": "start",
+  "r1": 12,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [
+    {
+      "strokeStyle": "solid",
+      "strokeColor": "#e4e7ec",
+      "strokeOpacity": 1,
+      "strokeAlignment": "inner",
+      "strokeWidth": 1
+    }
+  ],
+  "proportion": 1,
+  "shadow": [
+    {
+      "id": "9ba175b7-29ee-8074-8008-bfb9c88b1a0c",
+      "style": "drop-shadow",
+      "color": {
+        "color": "#000000",
+        "opacity": 0.2
+      },
+      "offsetX": 0,
+      "offsetY": 18,
+      "blur": 48,
+      "spread": -8,
+      "hidden": false
+    }
+  ],
+  "r4": 12,
+  "fills": [
+    {
+      "fillColor": "#ffffff",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "9ba175b7-29ee-8074-8008-bfb9c95ed654",
+    "9ba175b7-29ee-8074-8008-bfb9c95af7cd",
+    "9ba175b7-29ee-8074-8008-bfb9c890544e"
+  ]
+}

@@ -1,0 +1,173 @@
+{
+  "id": "9ba175b7-29ee-8074-8008-bfbaee19e33a",
+  "name": "Text",
+  "type": "text",
+  "x": 9284,
+  "y": 1885.9999999999993,
+  "width": 432,
+  "height": 34,
+  "rotation": 0,
+  "selrect": {
+    "x": 9284,
+    "y": 1885.9999999999993,
+    "width": 432,
+    "height": 34,
+    "x1": 9284,
+    "y1": 1885.9999999999993,
+    "x2": 9716,
+    "y2": 1919.9999999999993
+  },
+  "points": [
+    {
+      "x": 9284,
+      "y": 1885.9999999999993
+    },
+    {
+      "x": 9716,
+      "y": 1885.9999999999993
+    },
+    {
+      "x": 9716,
+      "y": 1919.9999999999993
+    },
+    {
+      "x": 9284,
+      "y": 1919.9999999999993
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "9ba175b7-29ee-8074-8008-bfbae83effd6",
+  "frameId": "9ba175b7-29ee-8074-8008-bfbae83effd6",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-height",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "12",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#667085",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "A call in flight ends under the old policy. The change is recorded as policy_changed with both policies."
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "12",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#667085",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "layoutItemHSizing": "fill",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 9284,
+      "y": 1901.9999998211854,
+      "width": 425.01251220703125,
+      "height": 15.199999809265137,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 425.01251220703125,
+      "y2": 15.999999821186066,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#667085",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "A call in flight ends under the old policy. The change is recorded as policy_changed "
+    },
+    {
+      "x": 9284,
+      "y": 1918.7999992370599,
+      "width": 92.70000457763672,
+      "height": 15.19999885559082,
+      "x1": 0,
+      "y1": 17.600000381469727,
+      "x2": 92.70000457763672,
+      "y2": 32.79999923706055,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#667085",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "with both policies."
+    }
+  ],
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b"
+}

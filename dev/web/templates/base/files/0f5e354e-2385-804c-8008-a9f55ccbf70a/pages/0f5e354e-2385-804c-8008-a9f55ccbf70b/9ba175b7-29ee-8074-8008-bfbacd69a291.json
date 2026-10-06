@@ -1,0 +1,108 @@
+{
+  "id": "9ba175b7-29ee-8074-8008-bfbacd69a291",
+  "name": "input",
+  "type": "frame",
+  "x": 7734,
+  "y": 1945,
+  "width": 170,
+  "height": 32,
+  "rotation": 0,
+  "selrect": {
+    "x": 7734,
+    "y": 1945,
+    "width": 170,
+    "height": 32,
+    "x1": 7734,
+    "y1": 1945,
+    "x2": 7904,
+    "y2": 1977
+  },
+  "points": [
+    {
+      "x": 7734,
+      "y": 1945
+    },
+    {
+      "x": 7904,
+      "y": 1945
+    },
+    {
+      "x": 7904,
+      "y": 1977
+    },
+    {
+      "x": 7734,
+      "y": 1977
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "9ba175b7-29ee-8074-8008-bfbacd266405",
+  "frameId": "9ba175b7-29ee-8074-8008-bfbacd266405",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 7,
+    "p2": 12,
+    "p3": 7,
+    "p4": 12
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 6,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "fix",
+  "r3": 6,
+  "layoutJustifyContent": "space-between",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 6,
+  "layoutFlexDir": "row",
+  "layoutAlignContent": "stretch",
+  "strokes": [
+    {
+      "strokeStyle": "solid",
+      "strokeColor": "#e4e7ec",
+      "strokeOpacity": 1,
+      "strokeAlignment": "inner",
+      "strokeWidth": 1
+    }
+  ],
+  "proportion": 1,
+  "r4": 6,
+  "fills": [
+    {
+      "fillColor": "#fafafb",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "9ba175b7-29ee-8074-8008-bfbacdb092da",
+    "9ba175b7-29ee-8074-8008-bfbacd984a52"
+  ]
+}

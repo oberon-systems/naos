@@ -1,0 +1,108 @@
+{
+  "id": "9ba175b7-29ee-8074-8008-bfb9cb9383fd",
+  "name": "Card Last calls",
+  "type": "frame",
+  "x": 2120,
+  "y": 341,
+  "width": 356,
+  "height": 167,
+  "rotation": 0,
+  "selrect": {
+    "x": 2120,
+    "y": 341,
+    "width": 356,
+    "height": 167,
+    "x1": 2120,
+    "y1": 341,
+    "x2": 2476,
+    "y2": 508
+  },
+  "points": [
+    {
+      "x": 2120,
+      "y": 341
+    },
+    {
+      "x": 2476,
+      "y": 341
+    },
+    {
+      "x": 2476,
+      "y": 508
+    },
+    {
+      "x": 2120,
+      "y": 508
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "9ba175b7-29ee-8074-8008-bfb9caf1d001",
+  "frameId": "9ba175b7-29ee-8074-8008-bfb9caf1d001",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 10,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "9ba175b7-29ee-8074-8008-bfb97cbfe9a3",
+  "layoutItemVSizing": "auto",
+  "r3": 10,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 10,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [
+    {
+      "strokeStyle": "solid",
+      "strokeColor": "#e4e7ec",
+      "strokeOpacity": 1,
+      "strokeAlignment": "inner",
+      "strokeWidth": 1
+    }
+  ],
+  "proportion": 1,
+  "r4": 10,
+  "fills": [
+    {
+      "fillColor": "#ffffff",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "9ba175b7-29ee-8074-8008-bfb9cba77702",
+    "9ba175b7-29ee-8074-8008-bfb9cb999d1b"
+  ]
+}

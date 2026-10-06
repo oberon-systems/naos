@@ -1,0 +1,107 @@
+{
+  "id": "9ba175b7-29ee-8074-8008-bfbae677ff00",
+  "name": "button Cancel",
+  "type": "frame",
+  "x": 8920,
+  "y": 2090.9999999999995,
+  "width": 69,
+  "height": 35,
+  "rotation": 0,
+  "selrect": {
+    "x": 8920,
+    "y": 2090.9999999999995,
+    "width": 69,
+    "height": 35,
+    "x1": 8920,
+    "y1": 2090.9999999999995,
+    "x2": 8989,
+    "y2": 2125.9999999999995
+  },
+  "points": [
+    {
+      "x": 8920,
+      "y": 2090.9999999999995
+    },
+    {
+      "x": 8989,
+      "y": 2090.9999999999995
+    },
+    {
+      "x": 8989,
+      "y": 2125.9999999999995
+    },
+    {
+      "x": 8920,
+      "y": 2125.9999999999995
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "9ba175b7-29ee-8074-8008-bfbae64d95ec",
+  "frameId": "9ba175b7-29ee-8074-8008-bfbae64d95ec",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 8,
+    "p2": 14,
+    "p3": 8,
+    "p4": 14
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 6,
+  "layoutItemHSizing": "auto",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "auto",
+  "r3": 6,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 6,
+  "layoutFlexDir": "row",
+  "layoutAlignContent": "stretch",
+  "strokes": [
+    {
+      "strokeStyle": "solid",
+      "strokeColor": "#d0d5dd",
+      "strokeOpacity": 1,
+      "strokeAlignment": "inner",
+      "strokeWidth": 1
+    }
+  ],
+  "proportion": 1,
+  "r4": 6,
+  "fills": [
+    {
+      "fillColor": "#ffffff",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "9ba175b7-29ee-8074-8008-bfbae6b066a5"
+  ]
+}

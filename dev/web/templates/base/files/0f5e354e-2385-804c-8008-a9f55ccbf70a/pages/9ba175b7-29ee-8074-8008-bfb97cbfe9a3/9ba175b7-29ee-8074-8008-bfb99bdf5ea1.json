@@ -1,0 +1,106 @@
+{
+  "id": "9ba175b7-29ee-8074-8008-bfb99bdf5ea1",
+  "name": "Server shell",
+  "type": "frame",
+  "x": 24,
+  "y": 535,
+  "width": 1392,
+  "height": 58,
+  "rotation": 0,
+  "selrect": {
+    "x": 24,
+    "y": 535,
+    "width": 1392,
+    "height": 58,
+    "x1": 24,
+    "y1": 535,
+    "x2": 1416,
+    "y2": 593
+  },
+  "points": [
+    {
+      "x": 24,
+      "y": 535
+    },
+    {
+      "x": 1416,
+      "y": 535
+    },
+    {
+      "x": 1416,
+      "y": 593
+    },
+    {
+      "x": 24,
+      "y": 593
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "9ba175b7-29ee-8074-8008-bfb99959db53",
+  "frameId": "9ba175b7-29ee-8074-8008-bfb99959db53",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 16,
+    "p3": 0,
+    "p4": 16
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "9ba175b7-29ee-8074-8008-bfb97cbfe9a3",
+  "layoutItemVSizing": "fix",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "row",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": [
+    {
+      "fillColor": "#ffffff",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "9ba175b7-29ee-8074-8008-bfb99c7f1545",
+    "9ba175b7-29ee-8074-8008-bfb99c543a54",
+    "9ba175b7-29ee-8074-8008-bfb99c39bd8a",
+    "9ba175b7-29ee-8074-8008-bfb99c2acc9c",
+    "9ba175b7-29ee-8074-8008-bfb99c1c5579",
+    "9ba175b7-29ee-8074-8008-bfb99c0e488c",
+    "9ba175b7-29ee-8074-8008-bfb99bfa88b7",
+    "9ba175b7-29ee-8074-8008-bfb99be58224"
+  ]
+}
