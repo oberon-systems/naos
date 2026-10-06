@@ -193,3 +193,22 @@ fn a_rule_the_broker_cannot_enforce_fails_the_gate() {
         assert!(Rules::parse(std::slice::from_ref(&rule)).is_err(), "{rule}");
     }
 }
+
+#[test]
+fn a_rule_that_stays_keeps_what_it_spent() {
+    let kept = json!({"server": "alpha", "tool": "search", "effect": "allow", "max_calls": 1});
+    let fresh = json!({"server": "alpha", "tool": "fetch", "effect": "allow", "max_calls": 1});
+    let held = Rules::parse(std::slice::from_ref(&kept)).expect("rules");
+    assert_eq!(held.check("alpha", "search", &json!({})), Verdict::Allow(0));
+
+    let next = held.succeed(&[fresh, kept]).expect("rules");
+
+    assert_eq!(next.check("alpha", "fetch", &json!({})), Verdict::Allow(0));
+    assert_eq!(
+        next.check("alpha", "search", &json!({})),
+        Verdict::Deny {
+            rule: Some(1),
+            reason: "budget of rule 1 is spent".into()
+        }
+    );
+}

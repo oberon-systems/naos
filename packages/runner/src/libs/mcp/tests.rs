@@ -1171,3 +1171,204 @@ fn a_guest_string_is_logged_only_when_it_is_a_secret_name() {
         assert_eq!(logged_name(name), "invalid");
     }
 }
+
+/// The guest end of one live session, so a test can act between two requests.
+struct Wire {
+    lines: tokio::io::Lines<BufReader<tokio::io::ReadHalf<tokio::io::DuplexStream>>>,
+    write: tokio::io::WriteHalf<tokio::io::DuplexStream>,
+}
+
+impl Wire {
+    async fn send(&mut self, line: &str) {
+        self.write.write_all(line.as_bytes()).await.expect("send");
+    }
+
+    async fn next(&mut self) -> Value {
+        let line = self.lines.next_line().await.expect("read").expect("line");
+        serde_json::from_str(&line).expect("json")
+    }
+
+    async fn ask(&mut self, line: &str) -> Value {
+        self.send(line).await;
+        self.next().await
+    }
+}
+
+async fn live<F: Future<Output = ()>>(gates: &RunGates, drive: impl FnOnce(Wire) -> F) {
+    let (guest, host) = tokio::io::duplex(MAX_LINE);
+    let (read, write) = tokio::io::split(host);
+    let (lines, guest) = tokio::io::split(guest);
+    let wire = Wire {
+        lines: BufReader::new(lines).lines(),
+        write: guest,
+    };
+    let mut session = Session::new("run_a", gates, CALL_TIMEOUT);
+    tokio::select! {
+        outcome = session.run(read, write) => panic!("the session ended: {outcome:?}"),
+        () = drive(wire) => {}
+    }
+}
+
+fn alpha_document(address: SocketAddr, rules: Value) -> Value {
+    json!({
+        "servers": [{
+            "name": "alpha",
+            "url": format!("http://example.com:{}/mcp", address.port()),
+            "credential": "alpha-token",
+            "timeout_seconds": 30,
+            "max_calls_per_minute": 60,
+        }],
+        "rules": rules,
+    })
+}
+
+fn alpha_gates(address: SocketAddr, rules: Value) -> RunGates {
+    let gates = RunGates {
+        mcp: McpGate::local(&alpha_document(address, rules), vec![address.ip()]).expect("policy"),
+        ..no_gates()
+    };
+    grant(&gates, u64::MAX);
+    gates
+}
+
+const INITIALIZE: &str = "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":{}}\n";
+
+#[tokio::test]
+async fn a_replaced_policy_is_announced_and_decides_the_next_call() {
+    let list = json!([{"server": "secrets", "tool": "list", "effect": "allow"}]);
+    let gates = RunGates {
+        mcp: ruled_mcp(list),
+        ..no_gates()
+    };
+    let gates = &gates;
+    let other =
+        json!({"servers": [], "rules": [{"server": "network", "tool": "*", "effect": "allow"}]});
+
+    live(gates, |mut wire| async move {
+        let started = wire.ask(INITIALIZE).await;
+        assert_eq!(
+            started["result"]["capabilities"],
+            json!({"tools": {"listChanged": true}})
+        );
+        assert!(!tool_text(&wire.ask(&call(1, "secrets__list", json!({}))).await).0);
+
+        gates.mcp.replace(Some(&other));
+        assert_eq!(
+            wire.next().await,
+            json!({"jsonrpc": "2.0", "method": "notifications/tools/list_changed"})
+        );
+        assert_eq!(
+            tool_text(&wire.ask(&call(2, "secrets__list", json!({}))).await),
+            (true, rules::NO_RULE.to_owned())
+        );
+
+        gates.mcp.replace(Some(&other));
+        gates.mcp.replace(Some(&json!({"rules": "alpha"})));
+        assert_eq!(
+            wire.next().await["method"],
+            "notifications/tools/list_changed"
+        );
+        let listed = wire.ask(&request(3, "tools/list", json!({}))).await;
+        assert_eq!(listed["result"]["tools"], json!([]));
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn a_call_in_flight_ends_under_the_policy_it_started_with() {
+    let server = upstream(answers, false).await;
+    Mock::given(body_partial_json(json!({"method": "tools/call"})))
+        .respond_with(move |request: &Request| {
+            let message: Value = serde_json::from_slice(&request.body).expect("json");
+            let reply = json!({"jsonrpc": "2.0", "id": message["id"], "result": {
+                "content": [{"type": "text", "text": "found"}], "isError": false}});
+            ResponseTemplate::new(200)
+                .set_delay(Duration::from_millis(500))
+                .set_body_json(reply)
+        })
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    let rules = json!([
+        {"server": "alpha", "tool": "search", "effect": "allow"},
+        {"server": "alpha", "resource": "docs://alpha/", "effect": "allow"},
+    ]);
+    let gates = alpha_gates(*server.address(), rules);
+    let gates = &gates;
+
+    live(gates, |mut wire| async move {
+        wire.ask(INITIALIZE).await;
+        wire.send(&call(1, "alpha__search", json!({}))).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        gates.mcp.replace(Some(&json!({
+            "servers": [],
+            "rules": [{"server": "alpha", "tool": "search", "effect": "allow"}],
+        })));
+        gates.mcp.refresh(&BTreeMap::new(), &BTreeMap::new());
+
+        assert_eq!(tool_text(&wire.next().await), (false, "found".to_owned()));
+        assert_eq!(
+            wire.next().await["method"],
+            "notifications/tools/list_changed"
+        );
+        assert_eq!(
+            wire.next().await["method"],
+            "notifications/resources/list_changed"
+        );
+        let refused = wire.ask(&call(2, "alpha__search", json!({}))).await;
+        assert_eq!(error_code(&refused), INVALID_PARAMS);
+        let read = wire
+            .ask(&request(
+                3,
+                "resources/read",
+                json!({"uri": "docs://alpha/guide"}),
+            ))
+            .await;
+        assert_eq!(error_code(&read), METHOD_NOT_FOUND);
+    })
+    .await;
+
+    assert_eq!(gates.mcp.credential_value("alpha-token"), None);
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    let received = server.received_requests().await.expect("recording");
+    let calls = |method: &str| {
+        received
+            .iter()
+            .filter(|request| request.method.as_str() == method)
+            .count()
+    };
+    assert_eq!((calls("POST"), calls("DELETE")), (3, 1));
+    let closed = received.last().expect("request");
+    assert_eq!(closed.headers["mcp-session-id"], "session-alpha");
+}
+
+#[tokio::test]
+async fn what_a_new_policy_keeps_stays_spent_and_open() {
+    let server = upstream(answers, false).await;
+    let kept = json!({"server": "alpha", "tool": "search", "effect": "allow", "max_calls": 1});
+    let gates = alpha_gates(*server.address(), json!([kept]));
+    let search = call(1, "alpha__search", json!({}));
+    let wider = json!([
+        {"server": "alpha", "tool": "delete", "effect": "allow", "max_calls": 1},
+        kept,
+    ]);
+
+    let (_, first) = exchange(&gates, search.as_bytes()).await;
+    gates
+        .mcp
+        .replace(Some(&alpha_document(*server.address(), wider)));
+    let input = [search, call(2, "alpha__delete", json!({}))].concat();
+    let (_, later) = exchange(&gates, input.as_bytes()).await;
+
+    assert_eq!(tool_text(&first[0]), (false, "found".to_owned()));
+    assert_eq!(
+        tool_text(&later[0]),
+        (true, "budget of rule 1 is spent".to_owned())
+    );
+    assert_eq!(tool_text(&later[1]), (false, "found".to_owned()));
+    let opened = methods(&server).await;
+    assert_eq!(
+        opened.iter().filter(|name| *name == "initialize").count(),
+        1
+    );
+}

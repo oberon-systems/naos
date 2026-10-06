@@ -195,8 +195,8 @@ impl QemuRuntime {
                 granted.join(", ")
             )));
         }
-        // The policy is immutable for the life of the Run, so a reconcile keeps the gate it
-        // registered: rebuilding it would hand the Run a fresh request budget every tick.
+        // A reconcile keeps the gate it registered, so budgets survive a tick; only the mcp
+        // policy can change under a running VM, and its gate swaps it in place.
         let kept = self
             .gates
             .lock()
@@ -204,6 +204,7 @@ impl QemuRuntime {
             .entry(run.id.clone())
             .or_insert_with(|| Arc::new(gates))
             .clone();
+        kept.mcp.replace(policy("mcp"));
         kept.mcp.refresh(&run.credentials, &run.secrets);
         kept.model.refresh(&run.credentials);
         Ok(())

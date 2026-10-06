@@ -18,9 +18,9 @@ use crate::libs::shell::{ShellRequest, ShellResponse};
 
 mod rules;
 mod upstream;
-use rules::Verdict;
+use rules::{Rules, Verdict};
 pub use upstream::McpGate;
-use upstream::{Failure, Upstream};
+use upstream::{Failure, Policy, Upstream};
 
 const MAX_LINE: usize = 1024 * 1024;
 const MAX_IDS: usize = 65536;
@@ -102,6 +102,8 @@ struct Session<'a> {
     gates: &'a RunGates,
     timeout: Duration,
     seen: HashSet<String>,
+    initialized: bool,
+    resources: bool,
 }
 
 impl<'a> Session<'a> {
@@ -111,6 +113,8 @@ impl<'a> Session<'a> {
             gates,
             timeout,
             seen: HashSet::new(),
+            initialized: false,
+            resources: gates.mcp.policy().has_resources(),
         }
     }
 
@@ -121,12 +125,21 @@ impl<'a> Session<'a> {
     {
         let mut reader = BufReader::new(read);
         let mut line = Vec::new();
+        let mut changes = self.gates.mcp.changes();
         loop {
             line.clear();
-            let read = (&mut reader)
-                .take(MAX_LINE as u64 + 1)
-                .read_until(b'\n', &mut line)
-                .await?;
+            let read = {
+                let mut limited = (&mut reader).take(MAX_LINE as u64 + 1);
+                let next = limited.read_until(b'\n', &mut line);
+                tokio::pin!(next);
+                // Requests are answered one at a time, so a change is announced between calls.
+                loop {
+                    tokio::select! {
+                        read = &mut next => break read?,
+                        Ok(()) = changes.changed() => self.announce(&mut write).await?,
+                    }
+                }
+            };
             if read == 0 {
                 return Ok(());
             }
@@ -146,6 +159,22 @@ impl<'a> Session<'a> {
                 write.flush().await?;
             }
         }
+    }
+
+    /// Tells an initialized agent that what it listed is stale.
+    async fn announce<W: AsyncWrite + Unpin>(&mut self, write: &mut W) -> Result<(), AgentError> {
+        let resources = self.gates.mcp.policy().has_resources();
+        let listed = std::mem::replace(&mut self.resources, resources) || resources;
+        if !self.initialized {
+            return Ok(());
+        }
+        let mut out = notification("notifications/tools/list_changed");
+        if listed {
+            out.extend(notification("notifications/resources/list_changed"));
+        }
+        write.write_all(&out).await?;
+        write.flush().await?;
+        Ok(())
     }
 
     async fn respond(&mut self, raw: &[u8]) -> Result<Option<Value>, AgentError> {
@@ -173,17 +202,20 @@ impl<'a> Session<'a> {
             audit::mcp_rejected(self.run_id, "request without a method");
             return Ok(Some(error(id, INVALID_REQUEST, "invalid request")));
         };
+        let policy = self.gates.mcp.policy();
+        let policy = policy.as_ref();
         let result = match method {
             "initialize" => {
+                self.initialized = true;
                 let requested = message
                     .pointer("/params/protocolVersion")
                     .and_then(Value::as_str);
                 let version = requested
                     .filter(|version| PROTOCOL_VERSIONS.contains(version))
                     .unwrap_or(PROTOCOL_VERSIONS[0]);
-                let mut capabilities = json!({ "tools": { "listChanged": false } });
-                if self.gates.mcp.has_resources() {
-                    capabilities["resources"] = json!({ "listChanged": false });
+                let mut capabilities = json!({ "tools": { "listChanged": true } });
+                if policy.has_resources() {
+                    capabilities["resources"] = json!({ "listChanged": true });
                 }
                 json!({
                     "protocolVersion": version,
@@ -192,16 +224,16 @@ impl<'a> Session<'a> {
                 })
             }
             "ping" => json!({}),
-            "tools/list" => json!({ "tools": self.tools().await }),
-            "tools/call" => match self.call(message.get("params")).await {
+            "tools/list" => json!({ "tools": self.tools(policy).await }),
+            "tools/call" => match self.call(policy, message.get("params")).await {
                 Ok(result) => result,
                 Err(message) => return Ok(Some(error(id, INVALID_PARAMS, &message))),
             },
-            "resources/list" if self.gates.mcp.has_resources() => {
-                json!({ "resources": self.resources().await })
+            "resources/list" if policy.has_resources() => {
+                json!({ "resources": self.resources(policy).await })
             }
-            "resources/read" if self.gates.mcp.has_resources() => {
-                match self.read(message.get("params")).await {
+            "resources/read" if policy.has_resources() => {
+                match self.read(policy, message.get("params")).await {
                     Ok(result) => result,
                     Err((code, message)) => return Ok(Some(error(id, code, &message))),
                 }
@@ -214,7 +246,7 @@ impl<'a> Session<'a> {
     }
 
     /// A malformed call is a JSON-RPC error; a gate refusal is a tool result the agent can read.
-    async fn call(&self, params: Option<&Value>) -> Result<Value, String> {
+    async fn call(&self, policy: &Policy, params: Option<&Value>) -> Result<Value, String> {
         let started = Instant::now();
         let name = params
             .and_then(|params| params.get("name"))
@@ -227,7 +259,9 @@ impl<'a> Session<'a> {
         let (server, tool) = match name.split_once("__") {
             Some((SECRETS, tool)) if matches!(tool, "list" | "get") => (SECRETS, tool),
             Some((server, tool)) => {
-                return self.call_upstream(server, tool, arguments, started).await;
+                return self
+                    .call_upstream(policy, server, tool, arguments, started)
+                    .await;
             }
             None if server_of(name) == UNKNOWN => (UNKNOWN, UNKNOWN),
             None => (server_of(name), name),
@@ -239,7 +273,7 @@ impl<'a> Session<'a> {
                 return Err(reason);
             }
         };
-        let rule = match self.gates.mcp.rules().check(server, tool, &arguments) {
+        let rule = match policy.rules().check(server, tool, &arguments) {
             Verdict::Allow(rule) => Some(rule),
             Verdict::Deny { rule, reason } => {
                 self.audit(server, tool, NO_RESOURCE, started, "denied", rule);
@@ -249,7 +283,7 @@ impl<'a> Session<'a> {
                 return Ok(tool_result(reason, true));
             }
         };
-        let outcome = tokio::time::timeout(self.timeout, self.dispatch(call)).await;
+        let outcome = tokio::time::timeout(self.timeout, self.dispatch(policy, call)).await;
         let (text, category) = match outcome {
             Ok(Ok(text)) => (Ok(text), "none"),
             Ok(Err(reason)) => (Err(reason), "denied"),
@@ -264,16 +298,17 @@ impl<'a> Session<'a> {
 
     async fn call_upstream(
         &self,
+        policy: &Policy,
         server: &str,
         tool: &str,
         arguments: Value,
         started: Instant,
     ) -> Result<Value, String> {
-        let Some(upstream) = self.gates.mcp.server(server) else {
+        let Some(upstream) = policy.server(server) else {
             self.audit(UNKNOWN, UNKNOWN, NO_RESOURCE, started, "invalid", None);
             return Err("unknown tool".into());
         };
-        let rules = self.gates.mcp.rules();
+        let rules = policy.rules();
         let logged = if rules.could_allow(&upstream.name, tool) {
             tool
         } else {
@@ -304,12 +339,12 @@ impl<'a> Session<'a> {
             .unwrap_or_else(|reason| tool_result(reason, true)))
     }
 
-    async fn tools(&self) -> Vec<Value> {
-        let rules = self.gates.mcp.rules();
-        let mut tools = builtin_tools(self.gates);
-        let servers = self.gates.mcp.servers().iter();
+    async fn tools(&self, policy: &Policy) -> Vec<Value> {
+        let rules = policy.rules();
+        let mut tools = builtin_tools(self.gates, rules);
+        let servers = policy.servers().iter();
         for upstream in servers.filter(|server| rules.lists_tools(&server.name)) {
-            let work = self.gates.mcp.list_tools(upstream);
+            let work = self.gates.mcp.list_tools(policy, upstream);
             if let Ok(listed) = self
                 .guarded(upstream, "tools/list", NO_RESOURCE, None, work)
                 .await
@@ -320,12 +355,12 @@ impl<'a> Session<'a> {
         tools
     }
 
-    async fn resources(&self) -> Vec<Value> {
-        let rules = self.gates.mcp.rules();
+    async fn resources(&self, policy: &Policy) -> Vec<Value> {
+        let rules = policy.rules();
         let mut resources = Vec::new();
-        let servers = self.gates.mcp.servers().iter();
+        let servers = policy.servers().iter();
         for upstream in servers.filter(|server| rules.lists_resources(&server.name)) {
-            let work = self.gates.mcp.list_resources(upstream);
+            let work = self.gates.mcp.list_resources(policy, upstream);
             if let Ok(listed) = self
                 .guarded(upstream, "resources/list", NO_RESOURCE, None, work)
                 .await
@@ -336,7 +371,7 @@ impl<'a> Session<'a> {
         resources
     }
 
-    async fn read(&self, params: Option<&Value>) -> Result<Value, (i64, String)> {
+    async fn read(&self, policy: &Policy, params: Option<&Value>) -> Result<Value, (i64, String)> {
         let started = Instant::now();
         let Some(uri) = params
             .and_then(|params| params.get("uri"))
@@ -352,7 +387,7 @@ impl<'a> Session<'a> {
             );
             return Err((INVALID_PARAMS, "invalid arguments: uri is required".into()));
         };
-        let (upstream, prefix, rule) = match self.gates.mcp.resource(uri) {
+        let (upstream, prefix, rule) = match policy.resource(uri) {
             Ok(found) => found,
             Err(rule) => {
                 self.audit(
@@ -419,7 +454,7 @@ impl<'a> Session<'a> {
         );
     }
 
-    async fn dispatch(&self, call: Call) -> Result<String, String> {
+    async fn dispatch(&self, policy: &Policy, call: Call) -> Result<String, String> {
         match call {
             Call::Shell(request) => {
                 render_shell(self.gates.shell.call(request).await.map_err(reason)?)
@@ -427,9 +462,9 @@ impl<'a> Session<'a> {
             Call::Http(request) => {
                 render_http(self.gates.network.send(request).await.map_err(reason)?)
             }
-            Call::Secrets => Ok(json!(self.gates.mcp.granted()).to_string()),
+            Call::Secrets => Ok(json!(policy.granted()).to_string()),
             Call::Secret(name) => {
-                let value = self.gates.mcp.secret(&name);
+                let value = self.gates.mcp.secret(policy, &name);
                 let decision = if value.is_some() { "allow" } else { "deny" };
                 audit::secret_read(self.run_id, logged_name(&name), decision);
                 value.ok_or_else(|| "secret is not available".to_owned())
@@ -463,8 +498,7 @@ fn server_of(name: &str) -> &'static str {
 }
 
 /// Only what the gate granted and some rule could allow is listed; a call still meets both.
-fn builtin_tools(gates: &RunGates) -> Vec<Value> {
-    let rules = gates.mcp.rules();
+fn builtin_tools(gates: &RunGates, rules: &Rules) -> Vec<Value> {
     let mut tools: Vec<Value> = gates
         .shell
         .granted()
@@ -639,6 +673,14 @@ fn reason(err: AgentError) -> String {
 
 fn elapsed_ms(started: Instant) -> u64 {
     u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX)
+}
+
+fn notification(method: &str) -> Vec<u8> {
+    let mut line = json!({ "jsonrpc": "2.0", "method": method })
+        .to_string()
+        .into_bytes();
+    line.push(b'\n');
+    line
 }
 
 fn error(id: Value, code: i64, message: &str) -> Value {

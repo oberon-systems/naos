@@ -1,16 +1,19 @@
 //! External MCP servers named by the Run's mcp policy, reached over Streamable HTTP through a gate of their own.
 use std::collections::BTreeMap;
+use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, CONTENT_TYPE};
 use reqwest::{Method, StatusCode, Url};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use tokio::runtime::Handle;
+use tokio::sync::watch;
 
 use super::rules::Rules;
-use super::PROTOCOL_VERSIONS;
+use super::{CALL_TIMEOUT, PROTOCOL_VERSIONS};
 use crate::libs::api::RunCredential;
 use crate::libs::audit;
 use crate::libs::error::AgentError;
@@ -22,6 +25,9 @@ const SESSION_HEADER: &str = "mcp-session-id";
 const VERSION_HEADER: &str = "mcp-protocol-version";
 const REDACTED: &str = "<redacted>";
 const MAX_REASON: usize = 200;
+const CLOSE_POLL: Duration = Duration::from_millis(50);
+
+type GateFactory = Box<dyn Fn(&str, &Value) -> Result<NetworkGate, AgentError> + Send + Sync>;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -96,7 +102,7 @@ impl Upstream {
         run_id: &str,
         doc: ServerDoc,
         scheme: &str,
-        gate: &dyn Fn(&str, &Value) -> Result<NetworkGate, AgentError>,
+        gate: &GateFactory,
     ) -> Result<Self, AgentError> {
         let url = Url::parse(&doc.url).map_err(|err| invalid(&format!("{}: {err}", doc.name)))?;
         let host = url
@@ -125,6 +131,39 @@ impl Upstream {
         })
     }
 
+    fn same(&self, doc: &ServerDoc) -> bool {
+        self.name == doc.name
+            && self.url == doc.url
+            && self.credential == doc.credential
+            && self.timeout == Duration::from_secs(doc.timeout_seconds)
+            && self.max_calls == doc.max_calls_per_minute
+    }
+
+    /// Ends the session a removed server still holds; the answer does not matter.
+    async fn close(&self, bearer: Option<String>) {
+        let held = self.handshake.lock().expect("handshake").take();
+        let Some(session) = held.and_then(|handshake| handshake.session) else {
+            return;
+        };
+        let mut headers = HeaderMap::new();
+        if let Ok(session) = HeaderValue::from_str(&session) {
+            headers.insert(SESSION_HEADER, session);
+        }
+        let bearer =
+            bearer.and_then(|secret| HeaderValue::from_str(&format!("Bearer {secret}")).ok());
+        if let Some(mut bearer) = bearer {
+            bearer.set_sensitive(true);
+            headers.insert(AUTHORIZATION, bearer);
+        }
+        let request = GateRequest {
+            method: Method::DELETE,
+            url: self.url.clone(),
+            headers,
+            body: None,
+        };
+        let _ = tokio::time::timeout(self.timeout, self.network.send(request)).await;
+    }
+
     fn spend(&self) -> Result<(), Failure> {
         let mut window = self.window.lock().expect("window");
         let now = Instant::now();
@@ -139,65 +178,45 @@ impl Upstream {
     }
 }
 
-/// The external servers of one Run and the credentials the API last issued for it.
-#[derive(Debug)]
-pub struct McpGate {
-    run_id: String,
-    servers: Vec<Upstream>,
+/// What one mcp document grants. A request takes it whole, so it ends under the policy it began with.
+#[derive(Debug, Default)]
+pub struct Policy {
+    document: Option<Value>,
+    servers: Vec<Arc<Upstream>>,
     rules: Rules,
     granted: Vec<String>,
-    credentials: Mutex<BTreeMap<String, RunCredential>>,
-    secrets: Mutex<BTreeMap<String, RunCredential>>,
 }
 
-impl McpGate {
-    pub fn from_snapshot(run_id: &str, document: Option<&Value>) -> Result<Self, AgentError> {
-        Self::build(run_id, document, "https", &|run_id, policy| {
-            NetworkGate::from_snapshot(run_id, Some(policy))
-        })
-    }
-
+impl Policy {
+    /// A server or a rule that `kept` already holds unchanged stays the same object, budget and all.
     fn build(
         run_id: &str,
         document: Option<&Value>,
         scheme: &str,
-        gate: &dyn Fn(&str, &Value) -> Result<NetworkGate, AgentError>,
+        gate: &GateFactory,
+        kept: &Self,
     ) -> Result<Self, AgentError> {
-        let (servers, rules, granted) = match document {
-            Some(value) => {
-                let doc: PolicyDoc = serde_json::from_value(value.clone())
-                    .map_err(|err| invalid(&err.to_string()))?;
-                let servers = doc
-                    .servers
-                    .into_iter()
-                    .map(|server| Upstream::parse(run_id, server, scheme, gate))
-                    .collect::<Result<_, _>>()?;
-                (servers, Rules::parse(&doc.rules)?, doc.secrets)
-            }
-            None => (vec![], Rules::default(), vec![]),
+        let Some(value) = document else {
+            return Ok(Self::default());
         };
+        let doc: PolicyDoc =
+            serde_json::from_value(value.clone()).map_err(|err| invalid(&err.to_string()))?;
+        let servers = doc
+            .servers
+            .into_iter()
+            .map(
+                |server| match kept.servers.iter().find(|held| held.same(&server)) {
+                    Some(held) => Ok(Arc::clone(held)),
+                    None => Upstream::parse(run_id, server, scheme, gate).map(Arc::new),
+                },
+            )
+            .collect::<Result<_, AgentError>>()?;
         Ok(Self {
-            run_id: run_id.to_owned(),
+            document: Some(value.clone()),
             servers,
-            rules,
-            granted,
-            credentials: Mutex::new(BTreeMap::new()),
-            secrets: Mutex::new(BTreeMap::new()),
+            rules: kept.rules.succeed(&doc.rules)?,
+            granted: doc.secrets,
         })
-    }
-
-    pub fn refresh(
-        &self,
-        credentials: &BTreeMap<String, RunCredential>,
-        secrets: &BTreeMap<String, RunCredential>,
-    ) {
-        let mut held = self.credentials.lock().expect("credentials");
-        if !held.keys().eq(credentials.keys()) {
-            let names: Vec<&str> = credentials.keys().map(String::as_str).collect();
-            audit::mcp_credentials_updated(&self.run_id, &names.join(","));
-        }
-        *held = credentials.clone();
-        *self.secrets.lock().expect("secrets") = secrets.clone();
     }
 
     /// The names the policy grants to the agent; a credential naos uses itself is never among them.
@@ -205,24 +224,13 @@ impl McpGate {
         &self.granted
     }
 
-    /// The value of a granted secret the API issued and that has not expired.
-    pub fn secret(&self, name: &str) -> Option<String> {
-        if !self.granted.iter().any(|granted| granted == name) {
-            return None;
-        }
-        let secrets = self.secrets.lock().expect("secrets");
-        let secret = secrets
-            .get(name)
-            .filter(|secret| secret.expires_at > now())?;
-        Some(secret.value.clone())
-    }
-
-    pub fn servers(&self) -> &[Upstream] {
+    pub fn servers(&self) -> &[Arc<Upstream>] {
         &self.servers
     }
 
     pub fn server(&self, name: &str) -> Option<&Upstream> {
-        self.servers.iter().find(|server| server.name == name)
+        let found = self.servers.iter().find(|server| server.name == name)?;
+        Some(found)
     }
 
     pub fn rules(&self) -> &Rules {
@@ -247,14 +255,144 @@ impl McpGate {
         }
         Err(denied)
     }
+}
 
-    pub async fn list_tools(&self, upstream: &Upstream) -> Result<Vec<Value>, Failure> {
+/// The mcp policy one Run holds now and the credentials the API last issued for it.
+pub struct McpGate {
+    run_id: String,
+    scheme: &'static str,
+    gate: GateFactory,
+    policy: Mutex<Arc<Policy>>,
+    changes: watch::Sender<()>,
+    credentials: Mutex<BTreeMap<String, RunCredential>>,
+    secrets: Mutex<BTreeMap<String, RunCredential>>,
+}
+
+impl fmt::Debug for McpGate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("McpGate")
+            .field("run_id", &self.run_id)
+            .field("policy", &self.policy())
+            .finish_non_exhaustive()
+    }
+}
+
+impl McpGate {
+    pub fn from_snapshot(run_id: &str, document: Option<&Value>) -> Result<Self, AgentError> {
+        let gate = |run_id: &str, policy: &Value| NetworkGate::from_snapshot(run_id, Some(policy));
+        Self::build(run_id, document, "https", Box::new(gate))
+    }
+
+    fn build(
+        run_id: &str,
+        document: Option<&Value>,
+        scheme: &'static str,
+        gate: GateFactory,
+    ) -> Result<Self, AgentError> {
+        let policy = Policy::build(run_id, document, scheme, &gate, &Policy::default())?;
+        Ok(Self {
+            run_id: run_id.to_owned(),
+            scheme,
+            gate,
+            policy: Mutex::new(Arc::new(policy)),
+            changes: watch::channel(()).0,
+            credentials: Mutex::new(BTreeMap::new()),
+            secrets: Mutex::new(BTreeMap::new()),
+        })
+    }
+
+    pub fn policy(&self) -> Arc<Policy> {
+        Arc::clone(&self.policy.lock().expect("policy"))
+    }
+
+    /// Fires after every replaced policy, so a session can tell the agent to list again.
+    pub fn changes(&self) -> watch::Receiver<()> {
+        self.changes.subscribe()
+    }
+
+    /// Swaps in the policy of a changed document; one that cannot be read grants nothing.
+    pub fn replace(&self, document: Option<&Value>) {
+        let held = self.policy();
+        if held.document.as_ref() == document {
+            return;
+        }
+        let built = Policy::build(&self.run_id, document, self.scheme, &self.gate, &held);
+        let next = match built {
+            Ok(next) => {
+                audit::mcp_policy_configured(&self.run_id);
+                next
+            }
+            Err(err) => {
+                tracing::warn!(run_id = %self.run_id, error = %err, "the new mcp policy grants nothing");
+                audit::mcp_rejected(&self.run_id, "invalid policy");
+                Policy {
+                    document: document.cloned(),
+                    ..Policy::default()
+                }
+            }
+        };
+        for server in &held.servers {
+            if next.servers.iter().any(|kept| Arc::ptr_eq(kept, server)) {
+                continue;
+            }
+            let Ok(runtime) = Handle::try_current() else {
+                continue;
+            };
+            let bearer = self.bearer(server).ok().flatten();
+            let server = Arc::clone(server);
+            // A call in flight still holds the server and may yet open its session, so the
+            // session is looked at and closed only once that call ended.
+            runtime.spawn(async move {
+                let idle = async {
+                    while Arc::strong_count(&server) > 1 {
+                        tokio::time::sleep(CLOSE_POLL).await;
+                    }
+                };
+                let _ = tokio::time::timeout(CALL_TIMEOUT, idle).await;
+                server.close(bearer).await;
+            });
+        }
+        *self.policy.lock().expect("policy") = Arc::new(next);
+        self.changes.send_replace(());
+    }
+
+    pub fn refresh(
+        &self,
+        credentials: &BTreeMap<String, RunCredential>,
+        secrets: &BTreeMap<String, RunCredential>,
+    ) {
+        let mut held = self.credentials.lock().expect("credentials");
+        if !held.keys().eq(credentials.keys()) {
+            let names: Vec<&str> = credentials.keys().map(String::as_str).collect();
+            audit::mcp_credentials_updated(&self.run_id, &names.join(","));
+        }
+        *held = credentials.clone();
+        *self.secrets.lock().expect("secrets") = secrets.clone();
+    }
+
+    /// The value of a secret the policy grants, the API issued and that has not expired.
+    pub fn secret(&self, policy: &Policy, name: &str) -> Option<String> {
+        if !policy.granted.iter().any(|granted| granted == name) {
+            return None;
+        }
+        let secrets = self.secrets.lock().expect("secrets");
+        let secret = secrets
+            .get(name)
+            .filter(|secret| secret.expires_at > now())?;
+        Some(secret.value.clone())
+    }
+
+    pub async fn list_tools(
+        &self,
+        policy: &Policy,
+        upstream: &Upstream,
+    ) -> Result<Vec<Value>, Failure> {
         let listed = self.list(upstream, "tools/list", "tools").await?;
         Ok(listed
             .into_iter()
             .filter_map(|mut tool| {
                 let name = tool.get("name")?.as_str()?.to_owned();
-                self.rules.could_allow(&upstream.name, &name).then(|| {
+                policy.rules.could_allow(&upstream.name, &name).then(|| {
                     tool["name"] = json!(format!("{}__{name}", upstream.name));
                     tool
                 })
@@ -284,7 +422,11 @@ impl McpGate {
         Ok(result)
     }
 
-    pub async fn list_resources(&self, upstream: &Upstream) -> Result<Vec<Value>, Failure> {
+    pub async fn list_resources(
+        &self,
+        policy: &Policy,
+        upstream: &Upstream,
+    ) -> Result<Vec<Value>, Failure> {
         let listed = self.list(upstream, "resources/list", "resources").await?;
         Ok(listed
             .into_iter()
@@ -292,7 +434,7 @@ impl McpGate {
                 resource
                     .get("uri")
                     .and_then(Value::as_str)
-                    .is_some_and(|uri| self.rules.resource(&upstream.name, uri).is_ok())
+                    .is_some_and(|uri| policy.rules.resource(&upstream.name, uri).is_ok())
             })
             .collect())
     }
@@ -563,9 +705,8 @@ impl From<Refusal> for Failure {
 impl McpGate {
     /// Test-only: plain http to a local server, answered through `NetworkGate::local`.
     pub(crate) fn local(document: &Value, ips: Vec<std::net::IpAddr>) -> Result<Self, AgentError> {
-        Self::build("run_a", Some(document), "http", &|_, policy| {
-            NetworkGate::local(policy, ips.clone())
-        })
+        let gate = move |_: &str, policy: &Value| NetworkGate::local(policy, ips.clone());
+        Self::build("run_a", Some(document), "http", Box::new(gate))
     }
 
     pub(crate) fn credential_value(&self, name: &str) -> Option<String> {

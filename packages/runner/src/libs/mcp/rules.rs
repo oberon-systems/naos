@@ -1,6 +1,6 @@
 //! The rules of a Run's mcp policy: what a call must match before it reaches a gate or a server.
 use std::collections::BTreeMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use regex::Regex;
@@ -238,13 +238,14 @@ struct Spent {
 
 #[derive(Debug)]
 struct Rule {
+    doc: Value,
     server: String,
     target: Target,
     effect: Effect,
     arguments: Vec<(String, Constraint)>,
     per_minute: Option<u32>,
     per_run: Option<u64>,
-    spent: Mutex<Spent>,
+    spent: Arc<Mutex<Spent>>,
 }
 
 impl Rule {
@@ -264,17 +265,18 @@ impl Rule {
             return Err("a budget of zero calls".into());
         }
         Ok(Self {
+            doc: value.clone(),
             server: doc.server,
             target,
             effect: doc.effect,
             arguments,
             per_minute: doc.max_calls_per_minute,
             per_run: doc.max_calls,
-            spent: Mutex::new(Spent {
+            spent: Arc::new(Mutex::new(Spent {
                 window: Instant::now(),
                 in_window: 0,
                 total: 0,
-            }),
+            })),
         })
     }
 
@@ -341,6 +343,17 @@ impl Rules {
             })
             .collect::<Result<_, _>>()?;
         Ok(Self { rules })
+    }
+
+    /// The rules that replace these; a rule that stays as it was keeps what it already spent.
+    pub fn succeed(&self, rules: &[Value]) -> Result<Self, AgentError> {
+        let mut next = Self::parse(rules)?;
+        for rule in &mut next.rules {
+            if let Some(kept) = self.rules.iter().find(|kept| kept.doc == rule.doc) {
+                rule.spent = Arc::clone(&kept.spent);
+            }
+        }
+        Ok(next)
     }
 
     /// A matching deny wins; otherwise the first matching allow rule with budget left is charged.
