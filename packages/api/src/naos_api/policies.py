@@ -7,7 +7,7 @@ from sqlalchemy import ColumnElement
 from sqlmodel import Session, case, col, func, or_, select
 
 from naos_api import audit, mcp_servers
-from naos_api.errors import NotFoundError, PolicyError
+from naos_api.errors import NotFoundError, PolicyError, PolicyNameError
 from naos_api.lifecycle import TERMINAL
 from naos_api.mcp import McpPolicyIn, external_servers, resolve_mcp_policy
 from naos_api.model import ModelPolicyIn, resolve_model_policy
@@ -31,10 +31,30 @@ def _find(session: Session, kind: PolicyKind, digest: str) -> Policy | None:
     return session.exec(statement).first()
 
 
-def _store(session: Session, kind: PolicyKind, document: dict[str, Any]) -> tuple[Policy, bool]:
+# A document is one policy and carries one name; a name never moves to another policy.
+def _name(session: Session, policy: Policy, name: str) -> None:
+    if policy.name == name:
+        return
+    if policy.name is not None:
+        raise PolicyNameError(f"this document is already stored as {policy.name}")
+    taken = select(Policy).where(Policy.kind == policy.kind, Policy.name == name)
+    if session.exec(taken).first() is not None:
+        raise PolicyNameError(f"a {policy.kind} policy named {name} already exists")
+    policy.name = name
+    session.add(policy)
+    named = {"policy_id": policy.id, "kind": str(policy.kind), "name": name}
+    audit.record(session, "policy_named", actor="operator", **named)
+
+
+def _store(
+    session: Session, kind: PolicyKind, document: dict[str, Any], name: str | None = None
+) -> tuple[Policy, bool]:
     digest = digest_of(document)
     existing = _find(session, kind, digest)
     if existing is not None:
+        if name is not None:
+            _name(session, existing, name)
+            session.commit()
         return existing, False
 
     policy = Policy(
@@ -42,6 +62,8 @@ def _store(session: Session, kind: PolicyKind, document: dict[str, Any]) -> tupl
     )
     session.add(policy)
     audit.record(session, "policy_created", actor="operator", policy_id=policy.id, kind=str(kind))
+    if name is not None:
+        _name(session, policy, name)
     try:
         session.commit()
     except Exception:
@@ -54,31 +76,42 @@ def _store(session: Session, kind: PolicyKind, document: dict[str, Any]) -> tupl
 
 
 def create_mount_policy(
-    session: Session, policy: MountPolicyIn, allowed_roots: Sequence[str]
+    session: Session,
+    policy: MountPolicyIn,
+    allowed_roots: Sequence[str],
+    name: str | None = None,
 ) -> tuple[Policy, bool]:
     resolved = resolve_mount_policy(policy, allowed_roots)
-    return _store(session, PolicyKind.MOUNT, resolved.model_dump(mode="json"))
+    return _store(session, PolicyKind.MOUNT, resolved.model_dump(mode="json"), name)
 
 
-def create_network_policy(session: Session, policy: NetworkPolicyIn) -> tuple[Policy, bool]:
+def create_network_policy(
+    session: Session, policy: NetworkPolicyIn, name: str | None = None
+) -> tuple[Policy, bool]:
     resolved = resolve_network_policy(policy)
-    return _store(session, PolicyKind.NETWORK, resolved.model_dump(mode="json"))
+    return _store(session, PolicyKind.NETWORK, resolved.model_dump(mode="json"), name)
 
 
-def create_shell_policy(session: Session, policy: ShellPolicyIn) -> tuple[Policy, bool]:
+def create_shell_policy(
+    session: Session, policy: ShellPolicyIn, name: str | None = None
+) -> tuple[Policy, bool]:
     resolved = resolve_shell_policy(policy)
-    return _store(session, PolicyKind.SHELL, resolved.model_dump(mode="json"))
+    return _store(session, PolicyKind.SHELL, resolved.model_dump(mode="json"), name)
 
 
-def create_mcp_policy(session: Session, policy: McpPolicyIn) -> tuple[Policy, bool]:
+def create_mcp_policy(
+    session: Session, policy: McpPolicyIn, name: str | None = None
+) -> tuple[Policy, bool]:
     document = resolve_mcp_policy(policy).model_dump(mode="json")
     mcp_servers.check_names(session, external_servers(document))
-    return _store(session, PolicyKind.MCP, document)
+    return _store(session, PolicyKind.MCP, document, name)
 
 
-def create_model_policy(session: Session, policy: ModelPolicyIn) -> tuple[Policy, bool]:
+def create_model_policy(
+    session: Session, policy: ModelPolicyIn, name: str | None = None
+) -> tuple[Policy, bool]:
     resolved = resolve_model_policy(policy)
-    return _store(session, PolicyKind.MODEL, resolved.model_dump(mode="json"))
+    return _store(session, PolicyKind.MODEL, resolved.model_dump(mode="json"), name)
 
 
 def list_policies(
@@ -93,6 +126,7 @@ def list_policies(
             or_(
                 func.lower(col(Policy.id)).contains(needle),
                 func.lower(col(Policy.digest)).contains(needle),
+                func.lower(col(Policy.name)).contains(needle),
             )
         )
     return session.exec(statement.order_by(col(Policy.created_at).desc(), col(Policy.id))).all()

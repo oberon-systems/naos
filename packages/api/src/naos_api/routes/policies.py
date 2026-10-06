@@ -11,31 +11,36 @@ from naos_api.mounts import MountPolicyIn
 from naos_api.network import NetworkPolicyIn
 from naos_api.routes.deps import MountRootsDep, SessionDep
 from naos_api.shell import ShellPolicyIn
-from naos_api.spec import PolicyKind, StrictModel
+from naos_api.spec import PolicyKind, PolicyName, StrictModel
 
 
 class MountPolicyCreate(StrictModel):
     kind: Literal["mount"]
+    name: PolicyName | None = None
     document: MountPolicyIn
 
 
 class NetworkPolicyCreate(StrictModel):
     kind: Literal["network"]
+    name: PolicyName | None = None
     document: NetworkPolicyIn
 
 
 class ShellPolicyCreate(StrictModel):
     kind: Literal["shell"]
+    name: PolicyName | None = None
     document: ShellPolicyIn
 
 
 class McpPolicyCreate(StrictModel):
     kind: Literal["mcp"]
+    name: PolicyName | None = None
     document: McpPolicyIn
 
 
 class ModelPolicyCreate(StrictModel):
     kind: Literal["model"]
+    name: PolicyName | None = None
     document: ModelPolicyIn
 
 
@@ -52,6 +57,7 @@ PolicyCreate = Annotated[
 class PolicyRead(BaseModel):
     id: str
     kind: PolicyKind
+    name: str | None
     digest: str
     document: dict[str, Any]
     created_at: int
@@ -65,6 +71,7 @@ class PolicyRead(BaseModel):
         return cls(
             id=policy.id,
             kind=policy.kind,
+            name=policy.name,
             digest=policy.digest,
             document=policy.document,
             created_at=policy.created_at,
@@ -86,15 +93,15 @@ def create_policy(
     body: PolicyCreate, session: SessionDep, roots: MountRootsDep, response: Response
 ) -> PolicyRead:
     if isinstance(body, MountPolicyCreate):
-        policy, created = policies.create_mount_policy(session, body.document, roots)
+        policy, created = policies.create_mount_policy(session, body.document, roots, body.name)
     elif isinstance(body, NetworkPolicyCreate):
-        policy, created = policies.create_network_policy(session, body.document)
+        policy, created = policies.create_network_policy(session, body.document, body.name)
     elif isinstance(body, ShellPolicyCreate):
-        policy, created = policies.create_shell_policy(session, body.document)
+        policy, created = policies.create_shell_policy(session, body.document, body.name)
     elif isinstance(body, McpPolicyCreate):
-        policy, created = policies.create_mcp_policy(session, body.document)
+        policy, created = policies.create_mcp_policy(session, body.document, body.name)
     else:
-        policy, created = policies.create_model_policy(session, body.document)
+        policy, created = policies.create_model_policy(session, body.document, body.name)
     if not created:
         response.status_code = 200
     return _read(session, policy)

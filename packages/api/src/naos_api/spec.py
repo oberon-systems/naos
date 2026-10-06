@@ -20,6 +20,7 @@ class PolicyKind(StrEnum):
 
 
 PolicyId = Annotated[str, Field(pattern=r"^[a-z]+_[0-9a-f]{32}$")]
+PolicyName = Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9._-]{0,63}$")]
 ImageId = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")]
 Digest = Annotated[str, Field(pattern=r"^sha256:[0-9a-f]{64}$")]
 RunnerId = Annotated[str, Field(pattern=r"^[A-Za-z0-9_]{1,64}$")]

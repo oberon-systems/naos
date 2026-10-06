@@ -14,11 +14,13 @@ from naos_api.errors import (
     InvalidTransitionError,
     NotFoundError,
     PolicyError,
+    PolicyLockedError,
 )
 from naos_api.images.service import booted_image, check_image
 from naos_api.lifecycle import ACTIVE, TERMINAL, RunStatus, ensure_transition
-from naos_api.models import Lease, Merge, Policy, Profile, Run, Runner
-from naos_api.policies import check_refs, names_policy
+from naos_api.mcp import McpPolicyIn, resolve_mcp_policy
+from naos_api.models import Lease, Merge, Policy, Profile, Run, Runner, RunPolicy
+from naos_api.policies import check_refs, create_mcp_policy, names_policy
 from naos_api.spec import PolicyKind, RunSpec, digest_of
 
 MAX_REASON_LENGTH = 500
@@ -34,6 +36,9 @@ STATES: dict[RunState, frozenset[RunStatus]] = {
     "waiting_merge": frozenset({RunStatus.WAITING_MERGE}),
     "failed": frozenset({RunStatus.FAILED}),
 }
+
+# The kinds a runner can apply to a running VM; mounts are fixed when the VM starts.
+LIVE_KINDS = frozenset({PolicyKind.MCP})
 
 _STOP_TARGETS = {
     RunStatus.PENDING: RunStatus.CANCELLED,
@@ -363,3 +368,74 @@ def stop_run(session: Session, run_id: str) -> Run:
         except InvalidTransitionError:
             continue
     raise InvalidTransitionError(f"run {run_id} kept changing while being stopped")
+
+
+def policy_history(session: Session, run_id: str) -> Sequence[RunPolicy]:
+    statement = select(RunPolicy).where(col(RunPolicy.run_id) == run_id)
+    return session.exec(statement.order_by(col(RunPolicy.seq))).all()
+
+
+def _stored(session: Session, kind: PolicyKind, policy_id: str) -> dict[str, Any]:
+    policy = session.get(Policy, policy_id)
+    if policy is None or policy.kind != kind:
+        raise PolicyError(f"{kind} policy {policy_id} does not exist")
+    return policy.document
+
+
+def change_policy(
+    session: Session,
+    run_id: str,
+    kind: PolicyKind,
+    policy_id: str | None,
+    edited: McpPolicyIn | None = None,
+    save_as: str | None = None,
+    *,
+    save: bool = False,
+) -> Run:
+    """Gives a STARTED Run a stored policy or an edited document.
+
+    The document belongs to this Run alone unless `save` stores it as a policy first.
+    """
+    run = get_run(session, run_id)
+    if kind is PolicyKind.MOUNT:
+        raise PolicyError("the mount policy of a run cannot change")
+    if kind not in LIVE_KINDS:
+        raise PolicyLockedError(f"the {kind} policy of a running run cannot change yet")
+    if edited is not None:
+        rules = resolve_mcp_policy(edited).model_dump(mode="json")
+    elif policy_id is not None:
+        rules = _stored(session, kind, policy_id)
+    else:
+        raise PolicyError("a change names a policy or carries a document")
+    stale = InvalidTransitionError(f"run {run_id} is {run.status}, expected STARTED")
+    if run.status is not RunStatus.STARTED:
+        raise stale
+    document = mcp_servers.snapshot(session, rules)
+    previous = run.mcp_policy_id
+    if edited is not None and save:
+        policy_id = create_mcp_policy(session, edited, save_as)[0].id
+    if previous == policy_id and run.mcp_document == document:
+        return run
+    result = session.exec(
+        update(Run)
+        .where(col(Run.id) == run_id, col(Run.status) == RunStatus.STARTED)
+        .values(mcp_policy_id=policy_id, mcp_document=document, updated_at=now_ts())
+    )
+    if result.rowcount != 1:
+        session.rollback()
+        raise stale
+    held = select(func.coalesce(func.max(RunPolicy.seq), 0)).where(col(RunPolicy.run_id) == run_id)
+    session.add(
+        RunPolicy(
+            run_id=run_id,
+            seq=session.exec(held).one() + 1,
+            kind=kind,
+            policy_id=policy_id,
+            previous_id=previous,
+            document=document,
+        )
+    )
+    changed = {"kind": str(kind), "from": previous, "to": policy_id, "digest": digest_of(rules)}
+    audit.record(session, "policy_changed", actor="operator", run_id=run_id, **changed)
+    session.commit()
+    return get_run(session, run_id)

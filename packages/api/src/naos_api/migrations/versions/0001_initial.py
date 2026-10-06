@@ -147,11 +147,13 @@ def upgrade() -> None:
         "policies",
         sa.Column("id", sa.String(), nullable=False),
         sa.Column("kind", POLICY_KIND, nullable=False),
+        sa.Column("name", sa.String(), nullable=True),
         sa.Column("digest", sa.String(), nullable=False),
         sa.Column("document", sa.JSON(), nullable=False),
         sa.Column("created_at", sa.Integer(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("kind", "digest"),
+        sa.UniqueConstraint("kind", "name"),
     )
     op.create_table(
         "profiles",
@@ -163,6 +165,17 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.Integer(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("name"),
+    )
+    op.create_table(
+        "run_policies",
+        sa.Column("run_id", sa.String(), nullable=False),
+        sa.Column("seq", sa.Integer(), nullable=False),
+        sa.Column("kind", POLICY_KIND, nullable=False),
+        sa.Column("policy_id", sa.String(), nullable=True),
+        sa.Column("previous_id", sa.String(), nullable=True),
+        sa.Column("document", sa.JSON(), nullable=True),
+        sa.Column("created_at", sa.Integer(), nullable=False),
+        sa.PrimaryKeyConstraint("run_id", "seq"),
     )
     op.create_table(
         "runs",
@@ -211,6 +224,7 @@ def downgrade() -> None:
     for table in (
         "secrets",
         "runs",
+        "run_policies",
         "profiles",
         "policies",
         "merges",

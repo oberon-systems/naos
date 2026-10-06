@@ -18,6 +18,14 @@ class PolicyError(DomainError):
     """The submitted policy is invalid or does not resolve to a policy."""
 
 
+class PolicyNameError(DomainError):
+    """The policy name is taken, or the document is already stored under another name."""
+
+
+class PolicyLockedError(DomainError):
+    """The policy of this kind cannot be replaced on a running Run."""
+
+
 class LeaseError(DomainError):
     """The runner lease is missing, expired, or belongs to another runner."""
 

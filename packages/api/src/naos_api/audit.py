@@ -39,6 +39,8 @@ API_EVENTS: dict[str, frozenset[str]] = {
         {"outcome", "applied", "skipped", "exported", "backed_up", "conflicts"}
     ),
     "policy_created": frozenset({"policy_id", "kind"}),
+    "policy_named": frozenset({"policy_id", "kind", "name"}),
+    "policy_changed": frozenset({"kind", "from", "to", "digest"}),
     "image_registered": frozenset({"image_id", "version", "digest"}),
     "secret_created": frozenset({"name"}),
     "secret_rotated": frozenset({"name"}),

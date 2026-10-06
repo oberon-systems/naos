@@ -9,10 +9,11 @@ from naos_api.spec import PolicyKind
 
 class Policy(SQLModel, table=True):
     __tablename__ = "policies"
-    __table_args__ = (UniqueConstraint("kind", "digest"),)
+    __table_args__ = (UniqueConstraint("kind", "digest"), UniqueConstraint("kind", "name"))
 
     id: str = Field(primary_key=True)
     kind: PolicyKind
+    name: str | None = None
     digest: str
     document: dict[str, Any] = Field(sa_column=Column(JSON, nullable=False))
     created_at: int = Field(default_factory=now_ts)
@@ -69,7 +70,7 @@ class Run(SQLModel, table=True):
     network_policy_id: str | None = None
     shell_policy_id: str | None = None
     mcp_policy_id: str | None = None
-    # The registry entries the mcp policy named, copied when the Run was created.
+    # The registry entries the mcp policy named, copied when the Run took that policy.
     mcp_document: dict[str, Any] | None = Field(
         default=None, sa_column=Column(JSON(none_as_null=True))
     )
@@ -83,6 +84,19 @@ class Run(SQLModel, table=True):
     updated_at: int = Field(default_factory=now_ts)
     started_at: int | None = None
     finished_at: int | None = None
+
+
+class RunPolicy(SQLModel, table=True):
+    __tablename__ = "run_policies"
+
+    run_id: str = Field(primary_key=True)
+    seq: int = Field(primary_key=True)
+    kind: PolicyKind
+    # Unset for a document written for this Run alone.
+    policy_id: str | None = None
+    previous_id: str | None = None
+    document: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON(none_as_null=True)))
+    created_at: int = Field(default_factory=now_ts)
 
 
 class Profile(SQLModel, table=True):

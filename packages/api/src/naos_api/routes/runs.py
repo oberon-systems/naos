@@ -1,14 +1,16 @@
 from typing import Annotated, Any, Literal, Self
 
 from fastapi import APIRouter, Query, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+from sqlmodel import Session
 
 from naos_api import consoles, gates, merges, runs
 from naos_api.clock import NowDep
 from naos_api.lifecycle import RunStatus
-from naos_api.models import Merge, Run
+from naos_api.mcp import McpPolicyIn
+from naos_api.models import Merge, Run, RunPolicy
 from naos_api.routes.deps import IdempotencyKey, SessionDep
-from naos_api.spec import RunSpec, StrictModel
+from naos_api.spec import PolicyId, PolicyKind, PolicyName, RunSpec, StrictModel
 
 MergePath = Annotated[str, Field(min_length=1, max_length=4096)]
 RunState = Literal["active", "queued", "waiting_merge", "failed"]
@@ -24,6 +26,36 @@ class MergeSummary(BaseModel):
     conflicts: int
 
 
+class PolicyChangeRead(BaseModel):
+    seq: int
+    kind: PolicyKind
+    policy_id: str | None
+    previous_id: str | None
+    created_at: int
+
+    @classmethod
+    def of(cls, change: RunPolicy) -> Self:
+        return cls.model_validate(change, from_attributes=True)
+
+
+class PolicyChangeIn(StrictModel):
+    kind: PolicyKind
+    policy_id: PolicyId | None = None
+    document: McpPolicyIn | None = None
+    save: bool = False
+    name: PolicyName | None = None
+
+    @model_validator(mode="after")
+    def _one_source(self) -> Self:
+        if (self.policy_id is None) == (self.document is None):
+            raise ValueError("give either policy_id or document")
+        if self.save and self.document is None:
+            raise ValueError("only an edited document is saved")
+        if self.name is not None and not self.save:
+            raise ValueError("a name needs save")
+        return self
+
+
 class RunRead(BaseModel):
     id: str
     seq: int
@@ -33,6 +65,7 @@ class RunRead(BaseModel):
     profile_id: str | None = None
     lease_id: str | None = None
     mcp_document: dict[str, Any] | None = None
+    policy_history: list[PolicyChangeRead] = []
     workspace: str | None = None
     runner: RunnerRef | None = None
     merge: MergeSummary | None = None
@@ -158,7 +191,20 @@ def run_summary(session: SessionDep) -> RunSummaryRead:
 @router.get("/runs/{run_id}")
 def get_run(run_id: str, session: SessionDep) -> RunRead:
     run = runs.get_run(session, run_id)
-    return RunRead.viewed(runs.view_runs(session, [run])[0])
+    return _held(session, RunRead.viewed(runs.view_runs(session, [run])[0]))
+
+
+def _held(session: Session, read: RunRead) -> RunRead:
+    history = [PolicyChangeRead.of(change) for change in runs.policy_history(session, read.id)]
+    return read.model_copy(update={"policy_history": history})
+
+
+@router.post("/runs/{run_id}/policies")
+def change_policy(run_id: str, body: PolicyChangeIn, session: SessionDep) -> RunRead:
+    run = runs.change_policy(
+        session, run_id, body.kind, body.policy_id, body.document, body.name, save=body.save
+    )
+    return _held(session, RunRead.of(run))
 
 
 @router.post("/runs/{run_id}/stop")
