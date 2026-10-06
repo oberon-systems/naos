@@ -171,6 +171,11 @@ def _delete_refused(data: Row) -> str:
     return _joined(data["name"], f"named by {data['named_by']}", held)
 
 
+def _policy_changed(data: Row) -> str:
+    held = data["to"] or f"edited for this run \u00b7 {str(data['digest'])[:8]}\u2026"
+    return _joined(data["kind"], f"{data['from'] or 'none'} \u2192 {held}")
+
+
 PROFILE: dict[str, Check] = {"profile_id": _text, "name": _text}
 SECRET: dict[str, Check] = {"name": _text}
 
@@ -206,6 +211,10 @@ API: dict[str, Schema] = {
         lambda d: d["to"] == "FAILED",
     ),
     "run_stop_requested": Schema({"status": _text}, _data(lambda d: f"while {d['status']}")),
+    "policy_changed": Schema(
+        {"kind": _text, "from": _maybe_text, "to": _maybe_text, "digest": _text},
+        _data(_policy_changed),
+    ),
     "waiting_rebound": Schema({"lease_id": _text}, _data(lambda d: str(d["lease_id"]))),
     "credentials_issued": Schema(
         {"names": _names, "ttl": _count}, _data(_credentials), optional=frozenset({"ttl"})
