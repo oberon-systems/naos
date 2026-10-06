@@ -145,7 +145,9 @@ workspace_tree() {
 fail() {
     echo "$1" >&2
     echo "--- last lines of the guest console ---" >&2
-    tail -40 "$TEMP_DIR/console.log" >&2
+    # The console carries terminal escapes that would repaint the reason printed above.
+    tail -40 "$TEMP_DIR/console.log" | sed 's/\x1b\[[0-9;?]*[A-Za-z]//g' | tr -d '\r\033' >&2
+    echo "smoke failed: $1" >&2
     exit 1
 }
 
@@ -355,7 +357,7 @@ check_gates() {
     grep -q 'duplicate request id' "$TEMP_DIR/console.log" ||
         fail "a reused request id was accepted"
     for call in "shell read_file allow" "network http_request allow" "shell read_file deny" \
-        "shell git_status deny" "network http_request deny" "alpha search deny" \
+        "shell git_status deny" "network http_request deny" "alpha search deny" "delta search deny" \
         "shell list_dir allow" "shell list_dir deny" "shell grep allow" "shell grep deny"; do
         # shellcheck disable=SC2086  # the three fields are one argument each
         [ "$(mcp_calls $call)" -ge 1 ] || fail "no mcp_call for: $call"
@@ -363,8 +365,12 @@ check_gates() {
     # One denied call per rule kind: a whole server by prefix, equality, a regex, a schema, a budget.
     [ "$(grep -o 'denied by rule [0-9]*' "$TEMP_DIR/console.log" | sort -u | wc -l)" -eq 3 ] ||
         fail "the deny rules did not each refuse their call"
-    [ "$(grep -o 'no rule allows this call' "$TEMP_DIR/console.log" | wc -l)" -ge 4 ] ||
+    # Counted in the runner log: the console is a terminal, and a burst of replies can lose a line.
+    [ "$(grep '"event":"mcp_call"' "$TEMP_DIR/agent.log" |
+        grep -c '"decision":"deny".*"category":"denied","rule":"none"')" -ge 4 ] ||
         fail "a call no rule allows was not refused"
+    grep -q 'no rule allows this call' "$TEMP_DIR/console.log" ||
+        fail "a refused call did not say that no rule allows it"
     # The granted secret reaches the guest and nothing else of naos; the server credential never does.
     grep -qF -- "$agent_secret" "$TEMP_DIR/console.log" || fail "the granted secret did not come back"
     grep -qF -- "$secret" "$TEMP_DIR/console.log" && fail "a server credential reached the guest"
@@ -384,6 +390,37 @@ check_gates() {
     for event in shell_allowed shell_denied network_allowed network_denied; do
         [ "$(events "$event")" -ge 1 ] || fail "$event is missing from the agent log"
     done
+}
+
+# The runner holds a changed mcp policy once it logs one more mcp_policy_configured.
+policy_applied() {
+    [ "$(events mcp_policy_configured)" -gt "$configured" ]
+}
+
+change_policy() {
+    configured="$(events mcp_policy_configured)"
+    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/policies" -o /dev/null -d "$1"
+    wait_for 60 policy_applied
+}
+
+# The server added to the started Run was routed to, and is unknown once it was taken away.
+check_live_policy() {
+    grep -q NAOS-SMOKE-DETACHED "$TEMP_DIR/console.log" || fail "the guest did not call the removed server"
+    [ "$(mcp_calls unknown unknown deny)" -ge 1 ] ||
+        fail "a server taken away from the run still answered"
+    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run" | "$VENV/bin/python" -c '
+import json, sys
+
+held = [(row["previous_id"], row["policy_id"]) for row in json.load(sys.stdin)["policy_history"]]
+if held != [(sys.argv[1], None), (None, sys.argv[1])]:
+    sys.exit(f"the run did not keep the policies it held: {held}")
+' "$mcp_policy"
+    curl -fsS "${auth[@]}" "$api/api/v1/audit?event=policy_changed&run_id=$run" | "$VENV/bin/python" -c '
+import json, sys
+
+if len(json.load(sys.stdin)) != 2:
+    sys.exit("the policy changes of the run are not audited")
+'
 }
 
 check_diff() {
@@ -993,9 +1030,10 @@ EOF
 curl -fsS "${auth[@]}" "$api/api/v1/mcp-servers" -o /dev/null -d @- <<EOF
 {"name": "alpha", "url": "https://example.com/mcp", "credential": "alpha-token"}
 EOF
-mcp_policy="$(
-    curl -fsS "${auth[@]}" "$api/api/v1/policies" -d @- <<EOF | field id
-{"kind": "mcp", "document": {"rules": [
+curl -fsS "${auth[@]}" "$api/api/v1/mcp-servers" -o /dev/null \
+    -d '{"name": "delta", "url": "https://example.com/delta"}'
+mcp_rules="$(
+    cat <<'EOF'
   {"server": "shell", "tool": "*", "effect": "allow"},
   {"server": "shell", "tool": "*", "effect": "deny",
    "arguments": {"path": {"prefix": "/naos/alpha/dir"}}},
@@ -1009,8 +1047,11 @@ mcp_policy="$(
   {"server": "secrets", "tool": "list", "effect": "allow"},
   {"server": "secrets", "tool": "get", "effect": "allow",
    "arguments": {"name": {"equals": "agent-key"}}}
-]}}
 EOF
+)"
+mcp_policy="$(
+    curl -fsS "${auth[@]}" "$api/api/v1/policies" \
+        -d "{\"kind\": \"mcp\", \"document\": {\"rules\": [$mcp_rules]}}" | field id
 )"
 # A policy names registered servers only, and a rule that can never match is refused.
 for rule in '{"server": "beta", "tool": "search", "effect": "allow"}' \
@@ -1115,6 +1156,9 @@ echo "creating, rotating and deleting a secret through the web..."
 check_secrets_page
 check_run_detail STARTED
 check_confirms
+echo "editing the mcp policy of the started run: one more server..."
+delta_rule='{"server": "delta", "tool": "search", "effect": "allow"}'
+change_policy "{\"kind\": \"mcp\", \"document\": {\"rules\": [$mcp_rules, $delta_rule]}}"
 echo "editing the workspace and calling the gates from the console..."
 # shellcheck disable=SC2016  # the guest shell expands these, not this one
 guest \
@@ -1147,6 +1191,7 @@ guest \
     '{"jsonrpc":"2.0","id":27,"method":"tools/call","params":{"name":"secrets__list","arguments":{}}}' \
     '{"jsonrpc":"2.0","id":28,"method":"tools/call","params":{"name":"secrets__get","arguments":{"name":"agent-key"}}}' \
     '{"jsonrpc":"2.0","id":29,"method":"tools/call","params":{"name":"secrets__get","arguments":{"name":"alpha-token"}}}' \
+    '{"jsonrpc":"2.0","id":30,"method":"tools/call","params":{"name":"delta__search","arguments":{}}}' \
     '{"jsonrpc":"2.0","id":11,"method":"ping"}' \
     "JSON" \
     "{ cat /tmp/rpc; sleep 20; } | naos-mcp" \
@@ -1168,6 +1213,15 @@ guest \
 check_gates
 check_models
 check_model_card
+echo "giving the started run its stored mcp policy back: the server is gone..."
+change_policy "{\"kind\": \"mcp\", \"policy_id\": \"$mcp_policy\"}"
+guest \
+    "cat > /tmp/rpc <<'JSON'" \
+    '{"jsonrpc":"2.0","id":31,"method":"tools/call","params":{"name":"delta__search","arguments":{}}}' \
+    "JSON" \
+    "{ cat /tmp/rpc; sleep 5; } | naos-mcp" \
+    "echo NAOS-SMOKE-DETACHED"
+check_live_policy
 echo "reading the console through the api and the terminal tab..."
 wait_for 30 console_shipped
 check_terminal
