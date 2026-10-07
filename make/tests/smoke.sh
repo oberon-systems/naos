@@ -392,15 +392,15 @@ check_gates() {
     done
 }
 
-# The runner holds a changed mcp policy once it logs one more mcp_policy_configured.
+# The runner holds a changed policy once it logs one more <kind>_policy_configured.
 policy_applied() {
-    [ "$(events mcp_policy_configured)" -gt "$configured" ]
+    [ "$(events "$1_policy_configured")" -gt "$configured" ]
 }
 
 change_policy() {
-    configured="$(events mcp_policy_configured)"
-    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/policies" -o /dev/null -d "$1"
-    wait_for 60 policy_applied
+    configured="$(events "$1_policy_configured")"
+    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/policies" -o /dev/null -d "$2"
+    wait_for 60 policy_applied "$1"
 }
 
 # The server added to the started Run was routed to, and is unknown once it was taken away.
@@ -411,16 +411,28 @@ check_live_policy() {
     curl -fsS "${auth[@]}" "$api/api/v1/runs/$run" | "$VENV/bin/python" -c '
 import json, sys
 
-held = [(row["previous_id"], row["policy_id"]) for row in json.load(sys.stdin)["policy_history"]]
-if held != [(sys.argv[1], None), (None, sys.argv[1])]:
+rows = json.load(sys.stdin)["policy_history"]
+held = [(row["kind"], row["previous_id"], row["policy_id"]) for row in rows]
+mcp, shell = sys.argv[1:]
+kept = [("mcp", mcp, None), ("mcp", None, mcp), ("shell", shell, None), ("shell", None, shell)]
+if held != kept:
     sys.exit(f"the run did not keep the policies it held: {held}")
-' "$mcp_policy"
+' "$mcp_policy" "$shell_policy"
     curl -fsS "${auth[@]}" "$api/api/v1/audit?event=policy_changed&run_id=$run" | "$VENV/bin/python" -c '
 import json, sys
 
-if len(json.load(sys.stdin)) != 2:
+if len(json.load(sys.stdin)) != 4:
     sys.exit("the policy changes of the run are not audited")
 '
+}
+
+# A capability taken away from the started Run is denied, and answers again once it is given back.
+check_live_shell() {
+    grep -q NAOS-SMOKE-REGRANTED "$TEMP_DIR/console.log" || fail "the guest did not call the gate again"
+    grep '"event":"shell_denied"' "$TEMP_DIR/agent.log" | grep '"capability":"list_dir"' |
+        grep -q 'capability not granted' || fail "a capability taken away from the run still answered"
+    [ "$(mcp_calls shell list_dir allow)" -gt "$listed" ] ||
+        fail "a capability given back to the run did not answer"
 }
 
 check_diff() {
@@ -1311,7 +1323,7 @@ check_run_detail STARTED
 check_confirms
 echo "editing the mcp policy of the started run: one more server..."
 delta_rule='{"server": "delta", "tool": "search", "effect": "allow"}'
-change_policy "{\"kind\": \"mcp\", \"document\": {\"rules\": [$mcp_rules, $delta_rule]}}"
+change_policy mcp "{\"kind\": \"mcp\", \"document\": {\"rules\": [$mcp_rules, $delta_rule]}}"
 echo "editing the workspace and calling the gates from the console..."
 # shellcheck disable=SC2016  # the guest shell expands these, not this one
 guest \
@@ -1367,14 +1379,27 @@ check_gates
 check_models
 check_model_card
 echo "giving the started run its stored mcp policy back: the server is gone..."
-change_policy "{\"kind\": \"mcp\", \"policy_id\": \"$mcp_policy\"}"
+change_policy mcp "{\"kind\": \"mcp\", \"policy_id\": \"$mcp_policy\"}"
+echo "editing the shell policy of the started run: list_dir is taken away..."
+change_policy shell '{"kind": "shell", "document": {"allow": ["read_file", "grep"]}}'
 guest \
     "cat > /tmp/rpc <<'JSON'" \
     '{"jsonrpc":"2.0","id":31,"method":"tools/call","params":{"name":"delta__search","arguments":{}}}' \
+    '{"jsonrpc":"2.0","id":32,"method":"tools/call","params":{"name":"list_dir","arguments":{"path":"/naos/alpha"}}}' \
     "JSON" \
     "{ cat /tmp/rpc; sleep 5; } | naos-mcp" \
     "echo NAOS-SMOKE-DETACHED"
+echo "giving the started run its stored shell policy back..."
+listed="$(mcp_calls shell list_dir allow)"
+change_policy shell "{\"kind\": \"shell\", \"policy_id\": \"$shell_policy\"}"
+guest \
+    "cat > /tmp/rpc <<'JSON'" \
+    '{"jsonrpc":"2.0","id":33,"method":"tools/call","params":{"name":"list_dir","arguments":{"path":"/naos/alpha"}}}' \
+    "JSON" \
+    "{ cat /tmp/rpc; sleep 5; } | naos-mcp" \
+    "echo NAOS-SMOKE-REGRANTED"
 check_live_policy
+check_live_shell
 echo "reading the console through the api and the terminal tab..."
 wait_for 30 console_shipped
 check_terminal
