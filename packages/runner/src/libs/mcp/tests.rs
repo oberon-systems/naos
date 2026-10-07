@@ -1277,6 +1277,38 @@ async fn a_replaced_policy_is_announced_and_decides_the_next_call() {
 }
 
 #[tokio::test]
+async fn a_replaced_shell_policy_is_announced_and_decides_the_next_call() {
+    let dir = TempDir::new().expect("tempdir");
+    fs::write(dir.path().join("notes.txt"), "alpha\n").expect("write");
+    let gates = shell_gates(&dir, &["read_file"]);
+    let gates = &gates;
+    let read = |id| {
+        call(
+            id,
+            "read_file",
+            json!({"path": format!("{GUEST}/notes.txt")}),
+        )
+    };
+
+    live(gates, |mut wire| async move {
+        wire.ask(INITIALIZE).await;
+        assert!(!tool_text(&wire.ask(&read(1)).await).0);
+
+        gates.shell.replace(Some(&json!({ "allow": ["list_dir"] })));
+        assert_eq!(
+            wire.next().await,
+            json!({"jsonrpc": "2.0", "method": "notifications/tools/list_changed"})
+        );
+        let listed = wire.ask(&request(2, "tools/list", json!({}))).await;
+        assert_eq!(listed["result"]["tools"][0]["name"], "list_dir");
+        assert_eq!(listed["result"]["tools"].as_array().map(Vec::len), Some(1));
+        assert!(tool_text(&wire.ask(&read(3)).await).0);
+        assert!(!tool_text(&wire.ask(&call(4, "list_dir", json!({"path": GUEST}))).await).0);
+    })
+    .await;
+}
+
+#[tokio::test]
 async fn a_call_in_flight_ends_under_the_policy_it_started_with() {
     let server = upstream(answers, false).await;
     Mock::given(body_partial_json(json!({"method": "tools/call"})))

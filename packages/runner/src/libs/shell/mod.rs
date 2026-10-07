@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
+use tokio::sync::watch;
 
 const MAX_PATH: usize = 4096;
 const MAX_FILE_BYTES: u64 = 4 * 1024 * 1024;
@@ -134,11 +135,12 @@ pub enum ShellResponse {
     Text(String),
 }
 
-/// Immutable per-Run capability set over the host paths the mount policy named.
+/// Per-Run capability set over the host paths the mount policy named; only the set can change.
 #[derive(Debug)]
 pub struct ShellGate {
     run_id: String,
-    allow: BTreeSet<Capability>,
+    allow: Mutex<BTreeSet<Capability>>,
+    changes: watch::Sender<()>,
     roots: Arc<[Root]>,
     git_binary: PathBuf,
     git_timeout: Duration,
@@ -152,12 +154,7 @@ impl ShellGate {
         mounts: Option<&Value>,
         git_binary: &Path,
     ) -> Result<Self, AgentError> {
-        let policy: PolicyDoc = match shell {
-            Some(value) => {
-                serde_json::from_value(value.clone()).map_err(|err| invalid(&format!("{err}")))?
-            }
-            None => PolicyDoc { allow: vec![] },
-        };
+        let allow = granted_by(shell)?;
         let mut roots = Vec::new();
         if let Some(value) = mounts {
             let doc: MountDoc = serde_json::from_value(value.clone())
@@ -173,7 +170,8 @@ impl ShellGate {
         roots.sort_by_key(|root| std::cmp::Reverse(root.guest.as_os_str().len()));
         Ok(Self {
             run_id: run_id.to_owned(),
-            allow: policy.allow.into_iter().collect(),
+            allow: Mutex::new(allow),
+            changes: watch::channel(()).0,
             roots: roots.into(),
             git_binary: git_binary.to_owned(),
             git_timeout: GIT_TIMEOUT,
@@ -181,8 +179,34 @@ impl ShellGate {
         })
     }
 
-    pub fn granted(&self) -> impl Iterator<Item = &'static str> + '_ {
-        self.allow.iter().map(|capability| capability.name())
+    pub fn granted(&self) -> Vec<&'static str> {
+        let allow = self.allow.lock().expect("allow");
+        allow.iter().map(|capability| capability.name()).collect()
+    }
+
+    /// Fires after every replaced policy, so a session can tell the agent to list again.
+    pub fn changes(&self) -> watch::Receiver<()> {
+        self.changes.subscribe()
+    }
+
+    /// Swaps in the capabilities of a changed document; one that cannot be read grants nothing.
+    pub fn replace(&self, shell: Option<&Value>) {
+        let next = granted_by(shell);
+        let readable = next.is_ok();
+        let next = next.unwrap_or_default();
+        {
+            let mut allow = self.allow.lock().expect("allow");
+            if *allow == next {
+                return;
+            }
+            *allow = next;
+        }
+        if readable {
+            audit::shell_policy_configured(&self.run_id);
+        } else {
+            tracing::warn!(run_id = %self.run_id, "the new shell policy grants nothing");
+        }
+        self.changes.send_replace(());
     }
 
     /// The whole capability surface: budget, grant, path confinement, then the operation.
@@ -190,7 +214,8 @@ impl ShellGate {
         let capability = request.capability();
         let path = request.path();
         self.spend(capability, path)?;
-        if !self.allow.contains(&capability) {
+        // Read once, so a call in flight ends under the policy it started with.
+        if !self.allow.lock().expect("allow").contains(&capability) {
             return Err(self.deny(capability, path, "capability not granted"));
         }
         let target = match self.resolve(path) {
@@ -437,6 +462,15 @@ fn list_dir(target: &Path) -> Result<ShellResponse, &'static str> {
     }
     entries.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(ShellResponse::Entries(entries))
+}
+
+fn granted_by(shell: Option<&Value>) -> Result<BTreeSet<Capability>, AgentError> {
+    let Some(value) = shell else {
+        return Ok(BTreeSet::new());
+    };
+    let policy: PolicyDoc =
+        serde_json::from_value(value.clone()).map_err(|err| invalid(&format!("{err}")))?;
+    Ok(policy.allow.into_iter().collect())
 }
 
 fn invalid(reason: &str) -> AgentError {

@@ -234,6 +234,36 @@ async fn sync_refreshes_credentials_on_the_kept_gate_and_never_launches() {
 }
 
 #[tokio::test]
+async fn sync_swaps_a_changed_shell_policy_on_the_kept_gate() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let runtime =
+        QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
+    let mut run = desired_run("run_a", RunStatus::Started);
+    let vm = LocalVm {
+        vm_id: "vm_0123456789abcdef0123456789abcdef".into(),
+        run_id: run.id.clone(),
+        running: true,
+    };
+    let grant = |run: &mut DesiredRun, allow: &[&str]| {
+        run.policies
+            .insert("shell".into(), Some(json!({ "allow": allow })));
+    };
+
+    grant(&mut run, &["read_file"]);
+    runtime.sync(&run, &vm).await.expect("sync");
+    let first = runtime.gates(&run.id).expect("gates");
+    grant(&mut run, &["grep", "list_dir"]);
+    runtime.sync(&run, &vm).await.expect("sync again");
+
+    let kept = runtime.gates(&run.id).expect("gates");
+    assert!(Arc::ptr_eq(&first, &kept));
+    assert_eq!(kept.shell.granted(), ["list_dir", "grep"]);
+    grant(&mut run, &["rm"]);
+    runtime.sync(&run, &vm).await.expect_err("refused");
+    assert!(kept.shell.granted().is_empty());
+}
+
+#[tokio::test]
 async fn runs_sharing_a_guest_path_read_only_their_own_mounts() {
     let dir = tempfile::tempdir().expect("tempdir");
     let runtime =

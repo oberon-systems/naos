@@ -126,6 +126,7 @@ impl<'a> Session<'a> {
         let mut reader = BufReader::new(read);
         let mut line = Vec::new();
         let mut changes = self.gates.mcp.changes();
+        let mut shell = self.gates.shell.changes();
         loop {
             line.clear();
             let read = {
@@ -137,6 +138,7 @@ impl<'a> Session<'a> {
                     tokio::select! {
                         read = &mut next => break read?,
                         Ok(()) = changes.changed() => self.announce(&mut write).await?,
+                        Ok(()) = shell.changed() => self.announce(&mut write).await?,
                     }
                 }
             };
@@ -502,6 +504,7 @@ fn builtin_tools(gates: &RunGates, rules: &Rules) -> Vec<Value> {
     let mut tools: Vec<Value> = gates
         .shell
         .granted()
+        .into_iter()
         .filter(|name| rules.could_allow("shell", name))
         .map(shell_tool)
         .collect();

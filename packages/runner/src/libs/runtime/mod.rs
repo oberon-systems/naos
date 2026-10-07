@@ -175,6 +175,10 @@ impl QemuRuntime {
     /// ever fetched, and every call hands the kept MCP gate the latest credentials.
     fn register(&self, run: &DesiredRun) -> Result<(), AgentError> {
         let policy = |kind: &str| run.policies.get(kind).and_then(Option::as_ref);
+        // Before the admission below, so a shell document it refuses is not left granting.
+        if let Some(kept) = self.gates(&run.id) {
+            kept.shell.replace(policy("shell"));
+        }
         let gates = RunGates {
             network: NetworkGate::from_snapshot(&run.id, policy("network"))?,
             shell: ShellGate::from_snapshot(
@@ -198,8 +202,8 @@ impl QemuRuntime {
                 granted.join(", ")
             )));
         }
-        // A reconcile keeps the gate it registered, so budgets survive a tick; only the mcp
-        // policy can change under a running VM, and its gate swaps it in place.
+        // A reconcile keeps the gate it registered, so budgets survive a tick; the shell and mcp
+        // policies can change under a running VM, and their gates swap them in place.
         let kept = self
             .gates
             .lock()

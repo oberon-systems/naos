@@ -579,3 +579,72 @@ async fn git_that_cannot_run_is_denied() {
     assert!(absent.to_string().contains("git could not run"));
     assert!(not_a_repo.to_string().contains("git failed"));
 }
+
+#[tokio::test]
+async fn a_replaced_policy_decides_the_next_call_over_the_same_mounts() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    fs::write(dir.path().join("notes.txt"), "alpha\n").expect("write");
+    let gate = gate(&dir, &["read_file"]);
+    let mut changes = gate.changes();
+    let list = || ShellRequest::ListDir {
+        path: GUEST.to_owned(),
+    };
+    gate.call(read("notes.txt")).await.expect("granted");
+    gate.call(list()).await.expect_err("not granted yet");
+
+    gate.replace(Some(&json!({ "allow": ["list_dir"] })));
+
+    assert!(changes.has_changed().expect("open"));
+    changes.borrow_and_update();
+    let removed = gate.call(read("notes.txt")).await.expect_err("denied");
+    assert!(removed.to_string().contains("capability not granted"));
+    gate.call(list()).await.expect("granted");
+    gate.replace(Some(&json!({ "allow": ["list_dir"] })));
+    assert!(!changes.has_changed().expect("open"));
+    assert_eq!(gate.granted(), ["list_dir"]);
+}
+
+#[tokio::test]
+async fn a_policy_that_cannot_be_read_grants_nothing() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    fs::write(dir.path().join("notes.txt"), "alpha\n").expect("write");
+    let gate = gate(&dir, &["read_file"]);
+
+    gate.replace(Some(&json!({ "allow": ["rm"] })));
+
+    assert!(gate.granted().is_empty());
+    gate.call(read("notes.txt")).await.expect_err("denied");
+    gate.replace(Some(&json!({ "allow": ["read_file"] })));
+    gate.call(read("notes.txt")).await.expect("granted");
+    gate.replace(None);
+    gate.call(read("notes.txt")).await.expect_err("denied");
+}
+
+#[tokio::test]
+async fn a_call_in_flight_ends_under_the_policy_it_started_with() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let bin = tempfile::tempdir().expect("tempdir");
+    let script = bin.path().join("git");
+    fs::write(&script, "#!/bin/sh\nsleep 1\necho slow\n").expect("write");
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o700)).expect("chmod");
+    let gate = ShellGate::from_snapshot(
+        "run_a",
+        Some(&json!({ "allow": ["git_status"] })),
+        Some(&mounts(dir.path())),
+        &script,
+    )
+    .expect("policy");
+    let status = || ShellRequest::GitStatus {
+        path: GUEST.to_owned(),
+    };
+    let swap = async {
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        gate.replace(Some(&json!({ "allow": ["read_file"] })));
+    };
+
+    let (answer, ()) = tokio::join!(gate.call(status()), swap);
+
+    assert!(matches!(answer, Ok(ShellResponse::Text(text)) if text == "slow\n"));
+    let next = gate.call(status()).await.expect_err("denied");
+    assert!(next.to_string().contains("capability not granted"));
+}
