@@ -255,6 +255,11 @@ and `notifications/initialized`, carries `Mcp-Session-Id` and
 `MCP-Protocol-Version` afterwards, and opens again once when the server
 answers 404. A JSON or `text/event-stream` answer is accepted.
 
+A session belongs to one Run. Two Runs that name the same server open two
+sessions, and the broker closes the sessions of a Run with an HTTP `DELETE`
+when the Run stops, fails to start, is destroyed or loses its lease
+([01](01-security-model.md#run-isolation)).
+
 `tools/list` asks every server an allow rule names a tool of, keeps the tools
 some rule could allow and renames them `<server>__<tool>`. A server that
 fails or times out is left out of the list. A call checks the rules and the
@@ -330,7 +335,8 @@ Nothing puts a secret in place for the agent. A grant is an allow rule on the
   granted is denied by the rules; a secret that is missing, expired or not
   issued is a tool error, `secret is not available`.
 - The runner keeps the values in memory with the Run's gate and drops them
-  with it. They never reach its state directory, its log or the audit.
+  with it, as soon as the Run stops. They never reach its state directory,
+  its log or the audit.
 
 A value `secrets__get` returns belongs to the agent from then on. It may
 reach the model provider, the agent's own files and so the upper disk, and
@@ -370,7 +376,7 @@ The broker writes to the `audit` target ([11](11-observability.md)):
 
 `mcp_credentials_updated` fires when the set of credential names the gate
 holds changes, and `names` lists them comma-separated; values are never
-logged.
+logged. An empty `names` is the gate letting go of the Run.
 
 Every `secrets__get` with a well-formed call writes `secret_read` beside its
 `mcp_call`: the secret name, or `invalid` for a string that is not shaped like
@@ -420,7 +426,11 @@ The broker tests in `packages/runner/src/libs/mcp/tests.rs` verify that:
 - a replaced policy is announced and decides the next call, a call in flight
   ends under its own policy, a removed server is unknown, loses its
   credential and has its session closed, an unreadable document grants
-  nothing, and a kept rule or server keeps its budget and session.
+  nothing, and a kept rule or server keeps its budget and session;
+- two Runs naming one server hold a session, a credential and a budget each,
+  a Run reads only the secrets issued to it, a Run id the guest sends is
+  never read, and a Run that ends closes its own session and leaves the
+  other's open.
 
 The rule matching itself is tested in
 `packages/runner/src/libs/mcp/rules/tests.rs`.
@@ -440,7 +450,11 @@ gate, a call of the registered external server's tool, one allowed and one
 denied call per rule kind (a whole server, an exact tool, equality, a prefix,
 a regular expression, a schema fragment and a budget), a read of a granted
 secret, a refused read of the server's credential and a request reusing an
-id. Before those calls it edits the policy of the started Run to add a
+id. At its end it starts two more Runs side by side, each with an `mcp`
+policy and a secret of its own: each guest reads its own secret and is refused
+the other's, also with the other Run's id forged into the request, before and
+after a restart of the runner, and one Run stops while the other keeps its
+secret. Before those calls it edits the policy of the started Run to add a
 second server, and afterwards gives the Run its stored policy back and
 checks that the server is unknown. It also fails when the secret's value shows up in the runner log, its
 state directory or the audit. It fails unless the built-in tools are listed, the workspace file comes back, the

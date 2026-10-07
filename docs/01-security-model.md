@@ -58,6 +58,44 @@ A model provider's key never enters the VM. The model gateway
 provider's own on the host and redacts the key in every answer, so the agent
 only ever holds a placeholder.
 
+## Run isolation
+
+Runs on one runner share the host and nothing else. Every item below is kept
+per Run, under the Run's id inside the runner, and never in a place another
+Run reads.
+
+| What is isolated | Where it is enforced | What fails closed |
+|---|---|---|
+| The Run a broker serves | The runner connects to the `mcp.sock` of one VM directory and takes the Run id from the `vm.json` it wrote there itself. No field of a guest message is read as a Run id | A VM without registered gates gets no broker: its port stays closed |
+| Server credentials, granted secrets and model provider keys | The API issues them per Run in the desired state, from the policies of that Run alone. The runner holds them in memory with the gates of that Run | A name the Run was not issued is `credential unavailable` or `secret is not available` |
+| Sessions on external servers and their `Mcp-Session-Id` | A session belongs to the gate of one Run. Two Runs that name one registry server open two sessions, each with its own credential | A Run that ends closes its sessions with an HTTP `DELETE`; a closed gate knows no server |
+| Rule budgets, per-minute windows and token budgets | Counted on the gates of the Run | A spent budget denies that Run only |
+| Files | The VM directory and the archive hold ids, logs, disks and the diff. No credential, secret or session id is written to them, to the runner's state directory, its log or the audit | Nothing to restore after a restart: the runner holds a Run again only when the API names it in the desired state |
+
+The runner lets go of everything it holds for a Run, before anything else it
+does, when:
+
+- the Run stops, is collected or its VM is destroyed, so a Run in STOPPING,
+  COLLECTING or WAITING_MERGE holds no credential;
+- a start fails, whether or not a VM directory exists yet;
+- the lease lapses: every Run is let go before the VMs are listed, so a
+  runtime that cannot list its VMs still serves nothing;
+- the Run is no longer in the runner's desired state, because its VM is
+  destroyed as an orphan.
+
+A VM that cannot be killed or removed is left with a closed port. After a
+restart the budgets start afresh, as [Host risks](#host-risks) says, and the
+sessions of the old process are left to the server's own timeout, because
+their ids were never stored.
+
+The tests are in `packages/runner/src/libs/mcp/tests.rs` (two Runs naming one
+server, a secret per Run, a forged Run id, a Run that ends beside another),
+`runtime/tests.rs` (stop, collect, a failed start, a VM that cannot be
+destroyed, a revoked runtime, a restart), `agent/tests.rs` (a lapsed lease)
+and `packages/api/tests/test_runner_lifecycle.py` (two Runs in one desired
+state). `make smoke` runs two Runs side by side, restarts the runner under
+them and stops one while the other keeps going.
+
 ## Host risks
 
 What a feature costs the host, and how it is kept small. A feature adds its
@@ -81,7 +119,8 @@ Prove an untrusted agent cannot:
 - access localhost/private networks;
 - bypass network policy via direct IP or DNS rebinding;
 - execute unauthorized host commands;
-- access another Run/VM;
+- access another Run/VM, or its servers, secrets, sessions and budgets
+  ([Run isolation](#run-isolation));
 - call unauthorized MCP methods;
 - reach a model outside its policy or past its token budget;
 - obtain infrastructure credentials or a model provider's key.

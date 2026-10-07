@@ -128,7 +128,8 @@ reuse.
 ## Runtime
 
 The QEMU runtime turns one desired Run into one VM. Starting a Run takes these
-steps, and any failure stops it and removes the VM directory:
+steps, and any failure stops it, removes the VM directory and drops the gates
+registered for the Run:
 
 1. build the network, shell and MCP gates from the policy snapshots and
    register them against the Run, then refuse the Run when it grants a policy
@@ -252,7 +253,9 @@ attach: operators reach the console through the API
 ## Lease fencing
 
 The agent keeps a local lease deadline, measured from when each heartbeat was
-sent. Once it passes without a successful renewal, the agent destroys every
+sent. Once it passes without a successful renewal, the agent first lets go of
+what it holds for every Run, credentials, secrets and sessions
+([01](01-security-model.md#run-isolation)), and then destroys every
 running VM: the API has already failed those Runs. A stopped VM runs nothing
 and may hold changes waiting for a merge, so it is left to the reconciler. After a restart the deadline
 starts at 60 seconds. Stopping the agent leaves VMs running for the next
