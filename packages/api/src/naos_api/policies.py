@@ -11,7 +11,7 @@ from naos_api.errors import NotFoundError, PolicyError, PolicyNameError
 from naos_api.lifecycle import TERMINAL
 from naos_api.mcp import McpPolicyIn, external_servers, resolve_mcp_policy
 from naos_api.model import ModelPolicyIn, resolve_model_policy
-from naos_api.models import Policy, Profile, Run
+from naos_api.models import Policy, Profile, Run, RunPolicy
 from naos_api.mounts import MountPolicyIn, resolve_mount_policy
 from naos_api.network import NetworkPolicyIn, resolve_network_policy
 from naos_api.shell import ShellPolicyIn, resolve_shell_policy
@@ -146,6 +146,17 @@ RUN_COLUMNS = {
     PolicyKind.MCP: Run.mcp_policy_id,
     PolicyKind.MODEL: Run.model_policy_id,
 }
+
+
+def held_document(session: Session, run: Run, kind: PolicyKind) -> dict[str, Any] | None:
+    """The document of a kind a Run holds now: its latest change, else the policy it names."""
+    changes = select(RunPolicy).where(col(RunPolicy.run_id) == run.id, col(RunPolicy.kind) == kind)
+    change = session.exec(changes.order_by(col(RunPolicy.seq).desc())).first()
+    if change is not None:
+        return change.document
+    policy_id = getattr(run, f"{kind}_policy_id")
+    policy = session.get(Policy, policy_id) if policy_id else None
+    return policy.document if policy else None
 
 
 @dataclass(frozen=True)

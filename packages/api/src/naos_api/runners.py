@@ -12,6 +12,7 @@ from naos_api.errors import InvalidTransitionError, LeaseError, NotFoundError
 from naos_api.images.service import check_image
 from naos_api.lifecycle import CREDENTIAL_BOUND, TERMINAL, RunStatus
 from naos_api.models import Lease, Merge, Policy, Run, Runner
+from naos_api.policies import held_document
 from naos_api.secrets import IssuedCredential, issue_credentials
 from naos_api.spec import PolicyKind, RunSpec
 
@@ -506,10 +507,12 @@ def _policies(session: Session, run: Run) -> dict[PolicyKind, dict[str, Any] | N
     refs = {
         PolicyKind.MOUNT: run.mount_policy_id,
         PolicyKind.NETWORK: run.network_policy_id,
-        PolicyKind.SHELL: run.shell_policy_id,
         PolicyKind.MODEL: run.model_policy_id,
     }
-    policies: dict[PolicyKind, dict[str, Any] | None] = {PolicyKind.MCP: run.mcp_document}
+    policies: dict[PolicyKind, dict[str, Any] | None] = {
+        PolicyKind.MCP: run.mcp_document,
+        PolicyKind.SHELL: held_document(session, run, PolicyKind.SHELL),
+    }
     for kind, policy_id in refs.items():
         policy = session.get(Policy, policy_id) if policy_id else None
         policies[kind] = policy.document if policy else None

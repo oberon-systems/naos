@@ -20,7 +20,14 @@ from naos_api.images.service import booted_image, check_image
 from naos_api.lifecycle import ACTIVE, TERMINAL, RunStatus, ensure_transition
 from naos_api.mcp import McpPolicyIn, resolve_mcp_policy
 from naos_api.models import Lease, Merge, Policy, Profile, Run, Runner, RunPolicy
-from naos_api.policies import check_refs, create_mcp_policy, names_policy
+from naos_api.policies import (
+    check_refs,
+    create_mcp_policy,
+    create_shell_policy,
+    held_document,
+    names_policy,
+)
+from naos_api.shell import ShellPolicyIn, resolve_shell_policy
 from naos_api.spec import PolicyKind, RunSpec, digest_of
 
 MAX_REASON_LENGTH = 500
@@ -38,7 +45,7 @@ STATES: dict[RunState, frozenset[RunStatus]] = {
 }
 
 # The kinds a runner can apply to a running VM; mounts are fixed when the VM starts.
-LIVE_KINDS = frozenset({PolicyKind.MCP})
+LIVE_KINDS = frozenset({PolicyKind.MCP, PolicyKind.SHELL})
 
 _STOP_TARGETS = {
     RunStatus.PENDING: RunStatus.CANCELLED,
@@ -382,12 +389,26 @@ def _stored(session: Session, kind: PolicyKind, policy_id: str) -> dict[str, Any
     return policy.document
 
 
+def _edited(kind: PolicyKind, edited: McpPolicyIn | ShellPolicyIn) -> dict[str, Any]:
+    if kind is PolicyKind.MCP and isinstance(edited, McpPolicyIn):
+        return resolve_mcp_policy(edited).model_dump(mode="json")
+    if kind is PolicyKind.SHELL and isinstance(edited, ShellPolicyIn):
+        return resolve_shell_policy(edited).model_dump(mode="json")
+    raise PolicyError(f"the document is not a {kind} policy")
+
+
+def _saved(session: Session, edited: McpPolicyIn | ShellPolicyIn, name: str | None) -> str:
+    if isinstance(edited, McpPolicyIn):
+        return create_mcp_policy(session, edited, name)[0].id
+    return create_shell_policy(session, edited, name)[0].id
+
+
 def change_policy(
     session: Session,
     run_id: str,
     kind: PolicyKind,
     policy_id: str | None,
-    edited: McpPolicyIn | None = None,
+    edited: McpPolicyIn | ShellPolicyIn | None = None,
     save_as: str | None = None,
     *,
     save: bool = False,
@@ -402,7 +423,7 @@ def change_policy(
     if kind not in LIVE_KINDS:
         raise PolicyLockedError(f"the {kind} policy of a running run cannot change yet")
     if edited is not None:
-        rules = resolve_mcp_policy(edited).model_dump(mode="json")
+        rules = _edited(kind, edited)
     elif policy_id is not None:
         rules = _stored(session, kind, policy_id)
     else:
@@ -410,16 +431,24 @@ def change_policy(
     stale = InvalidTransitionError(f"run {run_id} is {run.status}, expected STARTED")
     if run.status is not RunStatus.STARTED:
         raise stale
-    document = mcp_servers.snapshot(session, rules)
-    previous = run.mcp_policy_id
+    # Only the mcp document is kept on the Run; any other kind is read back from its history.
+    values: dict[str, Any] = {f"{kind}_policy_id": policy_id}
+    if kind is PolicyKind.MCP:
+        document = mcp_servers.snapshot(session, rules)
+        current = run.mcp_document
+        values["mcp_document"] = document
+    else:
+        document = rules
+        current = held_document(session, run, kind)
+    previous = getattr(run, f"{kind}_policy_id")
     if edited is not None and save:
-        policy_id = create_mcp_policy(session, edited, save_as)[0].id
-    if previous == policy_id and run.mcp_document == document:
+        policy_id = values[f"{kind}_policy_id"] = _saved(session, edited, save_as)
+    if previous == policy_id and current == document:
         return run
     result = session.exec(
         update(Run)
         .where(col(Run.id) == run_id, col(Run.status) == RunStatus.STARTED)
-        .values(mcp_policy_id=policy_id, mcp_document=document, updated_at=now_ts())
+        .values(updated_at=now_ts(), **values)
     )
     if result.rowcount != 1:
         session.rollback()

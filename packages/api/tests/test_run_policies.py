@@ -221,3 +221,67 @@ def test_changing_a_policy_needs_an_operator(raw_client: TestClient) -> None:
     body = {"kind": "mcp", "policy_id": "mcppol_" + "0" * 32}
 
     assert raw_client.post("/api/v1/runs/run_alpha/policies", json=body).status_code == 401
+
+
+def _shell(client: TestClient, *allow: str) -> str:
+    body = {"kind": "shell", "document": {"allow": list(allow)}}
+    response = client.post("/api/v1/policies", json=body)
+    assert response.status_code in (200, 201), response.text
+    policy_id: str = response.json()["id"]
+    return policy_id
+
+
+def test_a_started_run_takes_another_shell_policy(
+    client: TestClient, register: Register, spec_body: dict[str, Any]
+) -> None:
+    first, second = _shell(client, "read_file"), _shell(client, "grep", "list_dir")
+    spec_body["shell"] = {"policy": first}
+    runner = register()
+    run_id = _started(client, runner, spec_body, None)
+    path = f"/api/v1/runs/{run_id}/policies"
+
+    changed = _change(client, run_id, second, "shell")
+    assert _change(client, run_id, second, "shell").status_code == 200
+    stored = _desired(client, runner)["policies"]["shell"]
+    edited = client.post(path, json={"kind": "shell", "document": {"allow": ["git_diff"]}})
+    read = client.get(f"/api/v1/runs/{run_id}").json()
+
+    assert changed.status_code == 200, changed.text
+    assert stored == {"allow": ["list_dir", "grep"]}
+    assert edited.status_code == 200, edited.text
+    assert _desired(client, runner)["policies"]["shell"] == {"allow": ["git_diff"]}
+    assert read["spec"]["shell"] == {"policy": first}
+    history = read["policy_history"]
+    assert [(held["kind"], held["previous_id"], held["policy_id"]) for held in history] == [
+        ("shell", first, second),
+        ("shell", second, None),
+    ]
+    events = client.get("/api/v1/audit", params={"event": "policy_changed"}).json()
+    assert sorted(event["data"]["kind"] for event in events) == ["shell", "shell"]
+    assert client.get(f"/api/v1/policies/{first}").json()["document"] == {"allow": ["read_file"]}
+
+
+def test_an_edited_shell_document_is_saved_or_refused(
+    client: TestClient, register: Register, spec_body: dict[str, Any]
+) -> None:
+    rules = {"rules": [{"server": "shell", "tool": "grep", "effect": "allow"}]}
+    mcp = client.post("/api/v1/policies", json={"kind": "mcp", "document": rules}).json()["id"]
+    run_id = _started(client, register(), spec_body, None)
+    path = f"/api/v1/runs/{run_id}/policies"
+    body = {"kind": "shell", "document": {"allow": ["grep"]}, "save": True, "name": "grep-only"}
+
+    saved = client.post(path, json=body)
+
+    assert saved.status_code == 200, saved.text
+    [held] = saved.json()["policy_history"]
+    stored = client.get(f"/api/v1/policies/{held['policy_id']}").json()
+    assert (stored["kind"], stored["name"], stored["runs_open"]) == ("shell", "grep-only", 1)
+    for refused in (
+        {"kind": "shell", "document": {"allow": []}},
+        {"kind": "shell", "document": {"allow": ["rm"]}},
+        {"kind": "shell", "document": rules},
+        {"kind": "mcp", "document": {"allow": ["grep"]}},
+        {"kind": "shell", "policy_id": mcp},
+    ):
+        assert client.post(path, json=refused).status_code == 422, refused
+    assert len(client.get(f"/api/v1/runs/{run_id}").json()["policy_history"]) == 1
