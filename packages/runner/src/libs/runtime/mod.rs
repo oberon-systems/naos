@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::ffi::{OsStr, OsString};
 use std::fmt::Display;
 use std::fs::{self, DirBuilder, OpenOptions};
@@ -97,6 +97,9 @@ pub trait Runtime {
 
     /// Removes the VM; one that holds the agent's changes is archived instead of deleted.
     fn destroy(&self, vm: &LocalVm) -> impl Future<Output = Result<(), AgentError>> + Send;
+
+    /// Lets go of what every Run holds in memory: the lease is gone, so nothing is served under it.
+    fn revoke(&self);
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -213,6 +216,22 @@ impl QemuRuntime {
     /// The gates of a running Run, which its MCP session borrows.
     pub fn gates(&self, run_id: &str) -> Option<Arc<RunGates>> {
         self.gates.lock().expect("gates").get(run_id).cloned()
+    }
+
+    /// Lets go of everything held for one Run: its gates with their credentials and secrets,
+    /// the guest sessions that borrowed them and the sessions it opened on external servers.
+    fn release(&self, run_id: &str) {
+        let gates = self.gates.lock().expect("gates").remove(run_id);
+        if let Some(session) = self.sessions.lock().expect("sessions").remove(run_id) {
+            session.abort();
+        }
+        if let Some(session) = self.model_sessions.lock().expect("sessions").remove(run_id) {
+            session.abort();
+        }
+        if let Some(gates) = gates {
+            gates.mcp.close();
+            gates.model.refresh(&BTreeMap::new());
+        }
     }
 
     /// Serves the guest's gate ports unless live sessions already do; a session that ended is
@@ -558,6 +577,116 @@ impl Runtime for QemuRuntime {
         images: &dyn ImageSource,
     ) -> Result<LocalVm, AgentError> {
         self.register(run)?;
+        let started = self.start(run, images).await;
+        // A start that failed before a VM existed has nothing to destroy, so the gates go here.
+        if started.is_err() {
+            self.release(&run.id);
+        }
+        started
+    }
+
+    async fn sync(&self, run: &DesiredRun, vm: &LocalVm) -> Result<(), AgentError> {
+        self.register(run)?;
+        self.attach(vm, &self.paths(&vm.vm_id)?);
+        Ok(())
+    }
+
+    async fn stop(&self, vm: &LocalVm) -> Result<(), AgentError> {
+        self.release(&vm.run_id);
+        let paths = self.paths(&vm.vm_id)?;
+        if find_pid(&vm.vm_id).is_some() {
+            let powered_down = qemu::qmp(&paths.qmp(), "system_powerdown").await.is_ok()
+                && wait_gone(&vm.vm_id, POWERDOWN_TIMEOUT).await;
+            if !powered_down {
+                terminate(&vm.vm_id).await?;
+            }
+        }
+        release_share(&paths).await?;
+        audit::vm_stopped(&vm.vm_id, &vm.run_id);
+        Ok(())
+    }
+
+    async fn collect(&self, run: &DesiredRun, vm: &LocalVm) -> Result<Diff, AgentError> {
+        self.release(&vm.run_id);
+        let paths = self.paths(&vm.vm_id)?;
+        if let Ok(raw) = fs::read(paths.diff()) {
+            return serde_json::from_slice(&raw).map_err(runtime_error);
+        }
+        terminate(&vm.vm_id).await?;
+        release_share(&paths).await?;
+        let diff = match workspace_of(run)? {
+            Some(workspace) if workspace.mode == WorkspaceMode::ReadWrite => {
+                let upper = paths.upper();
+                tokio::task::spawn_blocking(move || overlay::collect(&upper, &workspace.host))
+                    .await
+                    .map_err(runtime_error)??
+            }
+            _ => Diff::default(),
+        };
+        let staged = paths.dir.join("diff.json.tmp");
+        match fs::remove_file(&staged) {
+            Err(err) if err.kind() != ErrorKind::NotFound => return Err(err.into()),
+            _ => {}
+        }
+        write_private(&staged, &serde_json::to_vec(&diff).map_err(runtime_error)?)?;
+        fs::rename(&staged, paths.diff())?;
+        audit::workspace_collected(&vm.run_id, diff.entries.len(), diff.rejected());
+        Ok(diff)
+    }
+
+    async fn merge(
+        &self,
+        run: &DesiredRun,
+        vm: &LocalVm,
+        decision: &Decision,
+    ) -> Result<Outcome, AgentError> {
+        let paths = self.paths(&vm.vm_id)?;
+        let diff: Diff = serde_json::from_slice(&fs::read(paths.diff())?).map_err(runtime_error)?;
+        let workspace = workspace_of(run)?
+            .filter(|workspace| workspace.mode == WorkspaceMode::ReadWrite)
+            .map(|workspace| workspace.host);
+        let decision = decision.clone();
+        let outcome = tokio::task::spawn_blocking(move || {
+            overlay::merge::merge(
+                &paths.upper(),
+                workspace.as_deref(),
+                &diff,
+                &decision,
+                &paths.merge(),
+            )
+        })
+        .await
+        .map_err(runtime_error)??;
+        match &outcome {
+            Outcome::Applied(report) => audit::merge_applied(
+                &vm.run_id,
+                report.applied.len(),
+                report.backed_up.len(),
+                report.exported.len(),
+            ),
+            Outcome::Conflict { conflicts } => audit::merge_conflict(&vm.run_id, conflicts.len()),
+        }
+        Ok(outcome)
+    }
+
+    async fn destroy(&self, vm: &LocalVm) -> Result<(), AgentError> {
+        self.teardown(vm, true).await
+    }
+
+    fn revoke(&self) {
+        let held: Vec<String> = self.gates.lock().expect("gates").keys().cloned().collect();
+        for run_id in held {
+            self.release(&run_id);
+        }
+    }
+}
+
+impl QemuRuntime {
+    async fn start(
+        &self,
+        run: &DesiredRun,
+        images: &dyn ImageSource,
+    ) -> Result<LocalVm, AgentError> {
         if let Some(existing) = scan(&self.vm_dir)?
             .into_iter()
             .find(|vm| vm.run_id == run.id && vm.running)
@@ -638,96 +767,10 @@ impl Runtime for QemuRuntime {
         }
     }
 
-    async fn sync(&self, run: &DesiredRun, vm: &LocalVm) -> Result<(), AgentError> {
-        self.register(run)?;
-        self.attach(vm, &self.paths(&vm.vm_id)?);
-        Ok(())
-    }
-
-    async fn stop(&self, vm: &LocalVm) -> Result<(), AgentError> {
-        let paths = self.paths(&vm.vm_id)?;
-        if find_pid(&vm.vm_id).is_some() {
-            let powered_down = qemu::qmp(&paths.qmp(), "system_powerdown").await.is_ok()
-                && wait_gone(&vm.vm_id, POWERDOWN_TIMEOUT).await;
-            if !powered_down {
-                terminate(&vm.vm_id).await?;
-            }
-        }
-        release_share(&paths).await?;
-        audit::vm_stopped(&vm.vm_id, &vm.run_id);
-        Ok(())
-    }
-
-    async fn collect(&self, run: &DesiredRun, vm: &LocalVm) -> Result<Diff, AgentError> {
-        let paths = self.paths(&vm.vm_id)?;
-        if let Ok(raw) = fs::read(paths.diff()) {
-            return serde_json::from_slice(&raw).map_err(runtime_error);
-        }
-        terminate(&vm.vm_id).await?;
-        release_share(&paths).await?;
-        let diff = match workspace_of(run)? {
-            Some(workspace) if workspace.mode == WorkspaceMode::ReadWrite => {
-                let upper = paths.upper();
-                tokio::task::spawn_blocking(move || overlay::collect(&upper, &workspace.host))
-                    .await
-                    .map_err(runtime_error)??
-            }
-            _ => Diff::default(),
-        };
-        let staged = paths.dir.join("diff.json.tmp");
-        match fs::remove_file(&staged) {
-            Err(err) if err.kind() != ErrorKind::NotFound => return Err(err.into()),
-            _ => {}
-        }
-        write_private(&staged, &serde_json::to_vec(&diff).map_err(runtime_error)?)?;
-        fs::rename(&staged, paths.diff())?;
-        audit::workspace_collected(&vm.run_id, diff.entries.len(), diff.rejected());
-        Ok(diff)
-    }
-
-    async fn merge(
-        &self,
-        run: &DesiredRun,
-        vm: &LocalVm,
-        decision: &Decision,
-    ) -> Result<Outcome, AgentError> {
-        let paths = self.paths(&vm.vm_id)?;
-        let diff: Diff = serde_json::from_slice(&fs::read(paths.diff())?).map_err(runtime_error)?;
-        let workspace = workspace_of(run)?
-            .filter(|workspace| workspace.mode == WorkspaceMode::ReadWrite)
-            .map(|workspace| workspace.host);
-        let decision = decision.clone();
-        let outcome = tokio::task::spawn_blocking(move || {
-            overlay::merge::merge(
-                &paths.upper(),
-                workspace.as_deref(),
-                &diff,
-                &decision,
-                &paths.merge(),
-            )
-        })
-        .await
-        .map_err(runtime_error)??;
-        match &outcome {
-            Outcome::Applied(report) => audit::merge_applied(
-                &vm.run_id,
-                report.applied.len(),
-                report.backed_up.len(),
-                report.exported.len(),
-            ),
-            Outcome::Conflict { conflicts } => audit::merge_conflict(&vm.run_id, conflicts.len()),
-        }
-        Ok(outcome)
-    }
-
-    async fn destroy(&self, vm: &LocalVm) -> Result<(), AgentError> {
-        self.teardown(vm, true).await
-    }
-}
-
-impl QemuRuntime {
     /// Stops everything the VM holds; `keep_changes` archives an upper disk instead of deleting it.
     async fn teardown(&self, vm: &LocalVm, keep_changes: bool) -> Result<(), AgentError> {
+        // First, so a VM that cannot be killed or removed is left with nothing to ask for.
+        self.release(&vm.run_id);
         let paths = self.paths(&vm.vm_id)?;
         terminate(&vm.vm_id).await?;
         release_share(&paths).await?;
@@ -738,18 +781,6 @@ impl QemuRuntime {
         match fs::remove_dir_all(&paths.dir) {
             Err(err) if err.kind() != ErrorKind::NotFound => return Err(err.into()),
             _ => {}
-        }
-        self.gates.lock().expect("gates").remove(&vm.run_id);
-        if let Some(session) = self.sessions.lock().expect("sessions").remove(&vm.run_id) {
-            session.abort();
-        }
-        if let Some(session) = self
-            .model_sessions
-            .lock()
-            .expect("sessions")
-            .remove(&vm.run_id)
-        {
-            session.abort();
         }
         audit::vm_destroyed(&vm.vm_id, &vm.run_id);
         Ok(())

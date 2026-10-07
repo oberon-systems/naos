@@ -691,3 +691,157 @@ async fn real_image_boots_probes_and_is_cleaned_up() {
         "the guest wrote through the read-only share"
     );
 }
+
+const GRANTED: &str = "agent-key";
+
+/// A started Run that grants one secret to its agent, with the value the API issued for it.
+fn secret_run(run_id: &str, value: &str) -> (DesiredRun, LocalVm) {
+    let mut run = desired_run(run_id, RunStatus::Started);
+    run.policies.insert(
+        "mcp".into(),
+        Some(json!({
+            "servers": [],
+            "secrets": [GRANTED],
+            "rules": [{
+                "server": "secrets", "tool": "get", "effect": "allow",
+                "arguments": {"name": {"equals": GRANTED}},
+            }],
+        })),
+    );
+    run.secrets = BTreeMap::from([(
+        GRANTED.to_owned(),
+        RunCredential {
+            value: value.into(),
+            expires_at: u64::MAX,
+        },
+    )]);
+    let vm = LocalVm {
+        vm_id: format!("vm_{}", random_hex(16).expect("id")),
+        run_id: run_id.into(),
+        running: true,
+    };
+    (run, vm)
+}
+
+fn secret_of(runtime: &QemuRuntime, run_id: &str) -> Option<String> {
+    let gates = runtime.gates(run_id)?;
+    let policy = gates.mcp.policy();
+    gates.mcp.secret(&policy, GRANTED)
+}
+
+fn files_holding(dir: &Path, needle: &[u8]) -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    for entry in fs::read_dir(dir).expect("read dir") {
+        let path = entry.expect("entry").path();
+        if path.is_dir() {
+            found.extend(files_holding(&path, needle));
+        } else if fs::read(&path)
+            .expect("read")
+            .windows(needle.len())
+            .any(|window| window == needle)
+        {
+            found.push(path);
+        }
+    }
+    found
+}
+
+#[tokio::test]
+async fn a_run_that_stops_lets_go_of_its_secrets_and_the_other_keeps_its_own() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let runtime =
+        QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
+    let (alpha, alpha_vm) = secret_run("run_a", "value-alpha");
+    let (beta, beta_vm) = secret_run("run_b", "value-beta");
+    runtime.sync(&alpha, &alpha_vm).await.expect("sync");
+    runtime.sync(&beta, &beta_vm).await.expect("sync");
+    assert_eq!(secret_of(&runtime, "run_a").as_deref(), Some("value-alpha"));
+    let held = runtime.gates("run_a").expect("gates");
+
+    runtime.stop(&alpha_vm).await.expect("stop");
+
+    assert!(runtime.gates("run_a").is_none());
+    assert!(held.mcp.secret_names().is_empty());
+    assert_eq!(secret_of(&runtime, "run_b").as_deref(), Some("value-beta"));
+}
+
+#[tokio::test]
+async fn collecting_a_run_lets_go_of_its_secrets() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let runtime =
+        QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
+    let (run, vm) = secret_run("run_a", "value-alpha");
+    runtime.sync(&run, &vm).await.expect("sync");
+
+    let _ = runtime.collect(&run, &vm).await;
+
+    assert!(runtime.gates("run_a").is_none());
+}
+
+#[tokio::test]
+async fn a_start_that_fails_before_a_vm_exists_leaves_no_gate_behind() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let runtime =
+        QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
+    let (mut run, _) = secret_run("run_a", "value-alpha");
+    run.status = RunStatus::Starting;
+    let oversized = FakeSource::new(vec![0_u8; 2 * 1024 * 1024]);
+
+    assert!(runtime.ensure(&run, &oversized).await.is_err());
+
+    assert!(runtime.gates("run_a").is_none());
+    assert!(vm_dirs(&dir).is_empty());
+}
+
+#[tokio::test]
+async fn a_vm_that_cannot_be_destroyed_is_left_without_its_gates() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let runtime =
+        QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
+    let (run, mut vm) = secret_run("run_a", "value-alpha");
+    runtime.sync(&run, &vm).await.expect("sync");
+    vm.vm_id = "../alpha".into();
+
+    assert!(runtime.destroy(&vm).await.is_err());
+
+    assert!(runtime.gates("run_a").is_none());
+}
+
+#[tokio::test]
+async fn a_revoked_runtime_holds_no_run() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let runtime =
+        QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
+    let (alpha, alpha_vm) = secret_run("run_a", "value-alpha");
+    let (beta, beta_vm) = secret_run("run_b", "value-beta");
+    runtime.sync(&alpha, &alpha_vm).await.expect("sync");
+    runtime.sync(&beta, &beta_vm).await.expect("sync");
+    let held = runtime.gates("run_b").expect("gates");
+
+    runtime.revoke();
+
+    assert!(runtime.gates("run_a").is_none());
+    assert!(runtime.gates("run_b").is_none());
+    assert!(held.mcp.secret_names().is_empty());
+}
+
+#[tokio::test]
+async fn a_restarted_runner_holds_nothing_until_the_api_names_the_run() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let settings = config(&dir, "/bin/false", fake_qemu_img(&dir));
+    let (run, vm) = secret_run("run_a", "value-alpha");
+    let before = QemuRuntime::new(&settings).expect("runtime");
+    before.sync(&run, &vm).await.expect("sync");
+    drop(before);
+
+    let restarted = QemuRuntime::new(&settings).expect("runtime");
+
+    assert!(restarted.gates("run_a").is_none());
+    assert!(files_holding(dir.path(), b"value-alpha").is_empty());
+    restarted.sync(&run, &vm).await.expect("sync");
+    assert_eq!(
+        secret_of(&restarted, "run_a").as_deref(),
+        Some("value-alpha")
+    );
+    assert!(secret_of(&restarted, "run_b").is_none());
+}

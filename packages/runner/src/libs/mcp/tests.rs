@@ -1,6 +1,8 @@
 use std::fs;
 use std::net::SocketAddr;
 use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 use tempfile::TempDir;
 use wiremock::matchers::{body_partial_json, method, path};
@@ -1371,4 +1373,221 @@ async fn what_a_new_policy_keeps_stays_spent_and_open() {
         opened.iter().filter(|name| *name == "initialize").count(),
         1
     );
+}
+
+/// A server that gives every `initialize` a session id of its own, so sessions can be told apart.
+async fn sessions_upstream() -> MockServer {
+    let server = MockServer::start().await;
+    let opened = Arc::new(AtomicUsize::new(0));
+    Mock::given(method("POST"))
+        .and(path("/mcp"))
+        .respond_with(move |request: &Request| {
+            let message: Value = serde_json::from_slice(&request.body).expect("json");
+            let Some(id) = message.get("id").cloned() else {
+                return ResponseTemplate::new(202);
+            };
+            let (result, session) = if message["method"] == "initialize" {
+                let number = opened.fetch_add(1, Ordering::SeqCst) + 1;
+                let result = json!({"protocolVersion": "2025-06-18", "capabilities": {}, "serverInfo": {"name": "alpha", "version": "1"}});
+                (result, format!("session-{number}"))
+            } else {
+                let result = json!({"content": [{"type": "text", "text": "found"}], "isError": false});
+                (result, header(request, "mcp-session-id"))
+            };
+            ResponseTemplate::new(200)
+                .insert_header("mcp-session-id", session.as_str())
+                .set_body_json(json!({"jsonrpc": "2.0", "id": id, "result": result}))
+        })
+        .mount(&server)
+        .await;
+    server
+}
+
+fn header(request: &Request, name: &str) -> String {
+    request.headers[name].to_str().expect("header").to_owned()
+}
+
+/// The session id and the Authorization header of every `tools/call` the server received.
+async fn calls_seen(server: &MockServer) -> Vec<(String, String)> {
+    let received = server.received_requests().await.expect("recording");
+    received
+        .iter()
+        .filter(|request| request.method.as_str() == "POST")
+        .filter(|request| {
+            let message: Value = serde_json::from_slice(&request.body).expect("json");
+            message["method"] == "tools/call"
+        })
+        .map(|request| {
+            (
+                header(request, "mcp-session-id"),
+                header(request, "authorization"),
+            )
+        })
+        .collect()
+}
+
+/// One Run's gates over the shared server, with its own credential value and rule budget.
+fn run_gates(run_id: &str, address: SocketAddr, token: &str, max_calls: u64) -> RunGates {
+    let rules = json!([
+        {"server": "alpha", "tool": "search", "effect": "allow", "max_calls": max_calls},
+    ]);
+    let document = alpha_document(address, rules);
+    let gates = RunGates {
+        mcp: McpGate::local_for(run_id, &document, vec![address.ip()]).expect("policy"),
+        ..no_gates()
+    };
+    gates
+        .mcp
+        .refresh(&issued("alpha-token", token, u64::MAX), &BTreeMap::new());
+    gates
+}
+
+/// One Run's gates with a grant for each of the named secrets and the values issued to it.
+fn keyed_gates(run_id: &str, secrets: &[(&str, &str)]) -> RunGates {
+    let names: Vec<&str> = secrets.iter().map(|(name, _)| *name).collect();
+    let mut rules = vec![json!({"server": "secrets", "tool": "list", "effect": "allow"})];
+    rules.extend(names.iter().map(|name| {
+        json!({"server": "secrets", "tool": "get", "effect": "allow",
+               "arguments": {"name": {"equals": name}}})
+    }));
+    let document = json!({ "servers": [], "secrets": names, "rules": rules });
+    let mut values = BTreeMap::new();
+    for (name, value) in secrets {
+        values.extend(issued(name, value, u64::MAX));
+    }
+    let mut gates = no_gates();
+    gates.mcp = McpGate::from_snapshot(run_id, Some(&document)).expect("policy");
+    gates.mcp.refresh(&BTreeMap::new(), &values);
+    gates
+}
+
+#[tokio::test]
+async fn two_runs_naming_one_server_hold_a_session_a_credential_and_a_budget_each() {
+    let server = sessions_upstream().await;
+    let alpha = run_gates("run_a", *server.address(), "token-alpha", 1);
+    let beta = run_gates("run_b", *server.address(), "token-beta", 1);
+    let search = call(1, "alpha__search", json!({}));
+    let twice = [search.clone(), call(2, "alpha__search", json!({}))].concat();
+
+    let (_, first) = exchange(&alpha, twice.as_bytes()).await;
+    let (_, second) = exchange(&beta, search.as_bytes()).await;
+
+    assert_eq!(tool_text(&first[0]), (false, "found".to_owned()));
+    assert_eq!(
+        tool_text(&first[1]),
+        (true, "budget of rule 0 is spent".to_owned())
+    );
+    assert_eq!(tool_text(&second[0]), (false, "found".to_owned()));
+    assert_eq!(
+        calls_seen(&server).await,
+        [
+            ("session-1".to_owned(), "Bearer token-alpha".to_owned()),
+            ("session-2".to_owned(), "Bearer token-beta".to_owned()),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn a_run_reads_only_the_secrets_issued_to_it() {
+    let alpha = keyed_gates(
+        "run_a",
+        &[
+            ("shared-key", "value-alpha"),
+            ("alpha-only", "private-alpha"),
+        ],
+    );
+    let beta = keyed_gates("run_b", &[("shared-key", "value-beta")]);
+    let input = [
+        call(1, "secrets__list", json!({})),
+        call(2, "secrets__get", json!({"name": "shared-key"})),
+        call(3, "secrets__get", json!({"name": "alpha-only"})),
+    ]
+    .concat();
+    let own = call(1, "secrets__get", json!({"name": "shared-key"}));
+
+    let (_, replies) = exchange(&beta, input.as_bytes()).await;
+    let (_, kept) = exchange(&alpha, own.as_bytes()).await;
+
+    assert_eq!(
+        tool_text(&replies[0]),
+        (false, r#"["shared-key"]"#.to_owned())
+    );
+    assert_eq!(tool_text(&replies[1]), (false, "value-beta".to_owned()));
+    assert_eq!(
+        tool_text(&replies[2]),
+        (true, "no rule allows this call".to_owned())
+    );
+    assert_eq!(tool_text(&kept[0]), (false, "value-alpha".to_owned()));
+}
+
+#[tokio::test]
+async fn a_run_id_the_guest_sends_is_never_read() {
+    let beta = keyed_gates("run_b", &[("shared-key", "value-beta")]);
+    let forged = |id: u64, arguments: Value| {
+        let message = json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "run_id": "run_a",
+            "method": "tools/call",
+            "params": {
+                "name": "secrets__get",
+                "arguments": arguments,
+                "run_id": "run_a",
+                "_meta": { "run_id": "run_a" },
+            },
+        });
+        format!("{message}\n")
+    };
+    let input = [
+        forged(1, json!({"name": "alpha-only"})),
+        forged(2, json!({"name": "shared-key", "run_id": "run_a"})),
+        forged(3, json!({"name": "shared-key"})),
+    ]
+    .concat();
+
+    let (_, replies) = exchange(&beta, input.as_bytes()).await;
+
+    assert_eq!(
+        tool_text(&replies[0]),
+        (true, "no rule allows this call".to_owned())
+    );
+    assert_eq!(error_code(&replies[1]), INVALID_PARAMS);
+    assert_eq!(tool_text(&replies[2]), (false, "value-beta".to_owned()));
+}
+
+#[tokio::test]
+async fn a_run_that_ends_lets_go_of_its_own_session_and_values_only() {
+    let server = sessions_upstream().await;
+    let alpha = run_gates("run_a", *server.address(), "token-alpha", 5);
+    let beta = run_gates("run_b", *server.address(), "token-beta", 5);
+    let search = call(1, "alpha__search", json!({}));
+    let (_, opened) = exchange(&alpha, search.as_bytes()).await;
+    let (_, other) = exchange(&beta, search.as_bytes()).await;
+    assert!(!tool_text(&opened[0]).0 && !tool_text(&other[0]).0);
+
+    alpha.mcp.close();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    let (_, ended) = exchange(&alpha, search.as_bytes()).await;
+    let (_, kept) = exchange(&beta, search.as_bytes()).await;
+
+    assert_eq!(error_code(&ended[0]), INVALID_PARAMS);
+    assert_eq!(alpha.mcp.credential_value("alpha-token"), None);
+    assert_eq!(tool_text(&kept[0]), (false, "found".to_owned()));
+    let received = server.received_requests().await.expect("recording");
+    let closed: Vec<(String, String)> = received
+        .iter()
+        .filter(|request| request.method.as_str() == "DELETE")
+        .map(|request| {
+            (
+                header(request, "mcp-session-id"),
+                header(request, "authorization"),
+            )
+        })
+        .collect();
+    assert_eq!(
+        closed,
+        [("session-1".to_owned(), "Bearer token-alpha".to_owned())]
+    );
+    let last = calls_seen(&server).await.pop().expect("call");
+    assert_eq!(last.0, "session-2");
 }

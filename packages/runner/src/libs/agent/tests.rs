@@ -162,6 +162,27 @@ async fn expired_lease_fences_every_vm() {
 }
 
 #[tokio::test]
+async fn an_expired_lease_revokes_every_run_even_when_the_vms_cannot_be_listed() {
+    let runtime = FakeRuntime::with_vms(vec![vm("run_a")]);
+    runtime.make_unavailable();
+    let (_dir, mut agent) = setup(runtime);
+    agent.lease = LeaseClock::starting(Instant::now(), Duration::ZERO);
+
+    let _ = agent.cycle().await;
+
+    assert_eq!(agent.runtime.revoked(), 1);
+}
+
+#[tokio::test]
+async fn a_live_lease_revokes_nothing() {
+    let (_dir, mut agent) = setup(FakeRuntime::with_vms(vec![vm("run_a")]));
+
+    let _ = agent.cycle().await;
+
+    assert_eq!(agent.runtime.revoked(), 0);
+}
+
+#[tokio::test]
 async fn an_expired_lease_leaves_stopped_vms_to_the_reconciler() {
     let (_dir, mut agent) = setup(FakeRuntime::with_vms(vec![vm("run_a"), dead_vm("run_b")]));
     agent.lease = LeaseClock::starting(Instant::now(), Duration::ZERO);

@@ -204,6 +204,8 @@ impl<A: Api + Sync, R: Runtime> Agent<A, R> {
     }
 
     async fn fence(&self) {
+        // Before the listing, which may fail: a lapsed lease serves no Run, whatever else works.
+        self.runtime.revoke();
         let vms = match self.runtime.list().await {
             Ok(vms) => vms,
             Err(err) => {

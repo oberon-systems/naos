@@ -332,27 +332,42 @@ impl McpGate {
             }
         };
         for server in &held.servers {
-            if next.servers.iter().any(|kept| Arc::ptr_eq(kept, server)) {
-                continue;
+            if !next.servers.iter().any(|kept| Arc::ptr_eq(kept, server)) {
+                self.retire(server);
             }
-            let Ok(runtime) = Handle::try_current() else {
-                continue;
-            };
-            let bearer = self.bearer(server).ok().flatten();
-            let server = Arc::clone(server);
-            // A call in flight still holds the server and may yet open its session, so the
-            // session is looked at and closed only once that call ended.
-            runtime.spawn(async move {
-                let idle = async {
-                    while Arc::strong_count(&server) > 1 {
-                        tokio::time::sleep(CLOSE_POLL).await;
-                    }
-                };
-                let _ = tokio::time::timeout(CALL_TIMEOUT, idle).await;
-                server.close(bearer).await;
-            });
         }
         *self.policy.lock().expect("policy") = Arc::new(next);
+        self.changes.send_replace(());
+    }
+
+    /// Closes the session of a server this gate lets go, with the credential it still holds.
+    fn retire(&self, server: &Arc<Upstream>) {
+        let Ok(runtime) = Handle::try_current() else {
+            return;
+        };
+        let bearer = self.bearer(server).ok().flatten();
+        let server = Arc::clone(server);
+        // A call in flight still holds the server and may yet open its session, so the
+        // session is looked at and closed only once that call ended.
+        runtime.spawn(async move {
+            let idle = async {
+                while Arc::strong_count(&server) > 1 {
+                    tokio::time::sleep(CLOSE_POLL).await;
+                }
+            };
+            let _ = tokio::time::timeout(CALL_TIMEOUT, idle).await;
+            server.close(bearer).await;
+        });
+    }
+
+    /// Ends the Run on this gate: its sessions are closed, and it grants and holds nothing after.
+    pub fn close(&self) {
+        let held = std::mem::take(&mut *self.policy.lock().expect("policy"));
+        for server in &held.servers {
+            self.retire(server);
+        }
+        drop(held);
+        self.refresh(&BTreeMap::new(), &BTreeMap::new());
         self.changes.send_replace(());
     }
 
@@ -705,8 +720,25 @@ impl From<Refusal> for Failure {
 impl McpGate {
     /// Test-only: plain http to a local server, answered through `NetworkGate::local`.
     pub(crate) fn local(document: &Value, ips: Vec<std::net::IpAddr>) -> Result<Self, AgentError> {
+        Self::local_for("run_a", document, ips)
+    }
+
+    pub(crate) fn local_for(
+        run_id: &str,
+        document: &Value,
+        ips: Vec<std::net::IpAddr>,
+    ) -> Result<Self, AgentError> {
         let gate = move |_: &str, policy: &Value| NetworkGate::local(policy, ips.clone());
-        Self::build("run_a", Some(document), "http", Box::new(gate))
+        Self::build(run_id, Some(document), "http", Box::new(gate))
+    }
+
+    pub(crate) fn secret_names(&self) -> Vec<String> {
+        self.secrets
+            .lock()
+            .expect("secrets")
+            .keys()
+            .cloned()
+            .collect()
     }
 
     pub(crate) fn credential_value(&self, name: &str) -> Option<String> {

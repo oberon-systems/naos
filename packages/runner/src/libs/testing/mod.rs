@@ -396,6 +396,7 @@ pub struct FakeRuntime {
     merged: Mutex<Vec<(LocalVm, Decision)>>,
     merge_outcome: Mutex<Option<Outcome>>,
     ensure_delay: Mutex<Duration>,
+    revoked: AtomicUsize,
 }
 
 impl FakeRuntime {
@@ -451,6 +452,10 @@ impl FakeRuntime {
 
     pub fn delay_ensure(&self, delay: Duration) {
         *lock(&self.ensure_delay) = delay;
+    }
+
+    pub fn revoked(&self) -> usize {
+        self.revoked.load(Ordering::SeqCst)
     }
 }
 
@@ -514,6 +519,10 @@ impl Runtime for FakeRuntime {
     async fn destroy(&self, vm: &LocalVm) -> Result<(), AgentError> {
         lock(&self.vms).retain(|existing| existing != vm);
         Ok(())
+    }
+
+    fn revoke(&self) {
+        self.revoked.fetch_add(1, Ordering::SeqCst);
     }
 }
 
