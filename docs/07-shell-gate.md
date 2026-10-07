@@ -75,6 +75,30 @@ confines the path, and only then performs the operation. There is no way to
 reach a capability without those three steps, and no path value survives them
 unresolved.
 
+## Live changes
+
+An operator changes the `shell` policy of a STARTED Run through the API
+([03](03-api-design.md#changing-a-policy-of-a-started-run)), and the desired
+state then carries the new document. The runner hands it to the Run's gate on
+its next reconcile pass:
+
+- The gate swaps the capability set whole. `call` reads the set once, before
+  it confines the path, so the swap falls between two calls and a call in
+  flight ends under the policy it started with.
+- A capability that was added answers the next call, and one that was taken
+  away is denied from the next call on with `capability not granted`.
+- After the swap the broker sends `notifications/tools/list_changed` to an
+  initialized agent ([08](08-mcp-gate.md#live-changes)), so the agent lists
+  again.
+- The roots stay as they were built: the mount policy never changes, and the
+  call budget of the Run is not reset.
+- A document the runner cannot read grants nothing: every call is denied
+  until a readable document arrives, and the reconcile pass reports the error.
+
+```bash
+curl -fsS "$api/api/v1/runs/$run/policies" -d '{"kind": "shell", "document": {"allow": ["read_file", "grep"]}}'
+```
+
 ## Path confinement
 
 Every path an agent submits is a guest path. Confinement walks this order and
@@ -176,7 +200,7 @@ The gate writes to the `audit` target ([11](11-observability.md)):
 
 | Event | Fields |
 |---|---|
-| `shell_policy_configured` | `run_id` |
+| `shell_policy_configured` | `run_id`; at the start of the VM and each time the gate holds a changed policy |
 | `shell_allowed` | `run_id`, `capability`, `path` |
 | `shell_denied` | `run_id`, `capability`, `path`, `reason` |
 
@@ -191,6 +215,9 @@ Acceptance tests must verify:
 - traversal, symlink escape and hard link escape are refused;
 - a path outside every mount is refused;
 - a capability that was not granted is refused on a legal path;
+- a capability added to a running Run answers its next call and a removed one
+  is denied from the next call on;
+- a call in flight finishes under the policy it started with;
 - every limit in the table above holds;
 - a hostile repository config cannot hook an external program;
 - git leaves `.git` untouched.
