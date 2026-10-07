@@ -337,6 +337,41 @@ def test_credentials_reach_only_leased_runs_before_they_stop(
     assert credentials() == {}
 
 
+def test_two_runs_on_one_runner_get_only_their_own_credentials_and_secrets(
+    client: TestClient,
+    register: Register,
+    spec_body: dict[str, Any],
+    mcp_body: dict[str, Any],
+) -> None:
+    client.post("/api/v1/secrets", json={"name": "alpha-token", "value": "value-alpha-token"})
+    granted: dict[str, str] = {}
+    for name, rules in (("alpha-key", mcp_body["rules"]), ("beta-key", [])):
+        client.post("/api/v1/secrets", json={"name": name, "value": f"value-{name}"})
+        grant = {
+            "server": "secrets",
+            "tool": "get",
+            "effect": "allow",
+            "arguments": {"name": {"equals": name}},
+        }
+        body = {"kind": "mcp", "document": {"rules": [*rules, grant]}}
+        spec_body["mcp"] = {"policy": client.post("/api/v1/policies", json=body).json()["id"]}
+        run = client.post("/api/v1/runs", json=spec_body, headers={"Idempotency-Key": name})
+        granted[run.json()["id"]] = name
+    runner = register()
+    _heartbeat(client, runner, capacity=2)
+
+    desired = {run["id"]: run for run in _desired(client, runner).json()["runs"]}
+
+    assert {run_id: set(run["secrets"]) for run_id, run in desired.items()} == {
+        run_id: {name} for run_id, name in granted.items()
+    }
+    held = {granted[run_id]: set(run["credentials"]) for run_id, run in desired.items()}
+    assert held == {"alpha-key": {"alpha-token"}, "beta-key": set()}
+    for run_id, run in desired.items():
+        foreign = {"alpha-key", "beta-key", "alpha-token"} - {granted[run_id], *run["credentials"]}
+        assert not [name for name in foreign if f"value-{name}" in str(run)]
+
+
 def test_model_provider_credentials_are_issued_with_the_run(
     client: TestClient,
     register: Register,
