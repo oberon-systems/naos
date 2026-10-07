@@ -163,7 +163,7 @@ guest() {
         done
         sleep 25
     } | NAOS_AGENT_IMAGE_DIR="$TEMP_DIR/vms" NAOS_AGENT_VM_DIR="$TEMP_DIR/runs" \
-        cargo run -q -p naos-runner --features smoke-stubs -- console "$run" >>"$TEMP_DIR/console.log" 2>&1
+        cargo run -q -p naos-runner --features smoke-stubs -- console "$run" >>"${console_log:-$TEMP_DIR/console.log}" 2>&1
 }
 
 # Every gate call the guest makes is one audit line of the runner, which took the decision.
@@ -813,6 +813,158 @@ for name, texts in wanted.items():
 PY
 }
 
+# A Run of its own through the api: no mounts, and one mcp policy that grants one secret and
+# names the registry server the first Run names too. Prints the id of the Run.
+side_run() {
+    local policy
+    curl -fsS "${auth[@]}" "$api/api/v1/secrets" -o /dev/null -d "{\"name\": \"$1\", \"value\": \"$2\"}"
+    policy="$(
+        curl -fsS "${auth[@]}" "$api/api/v1/policies" -d @- <<EOF | field id
+{"kind": "mcp", "document": {"rules": [
+  {"server": "alpha", "tool": "search", "effect": "allow"},
+  {"server": "secrets", "tool": "list", "effect": "allow"},
+  {"server": "secrets", "tool": "get", "effect": "allow", "arguments": {"name": {"equals": "$1"}}}
+]}}
+EOF
+    )"
+    curl -fsS "${auth[@]}" -H "Idempotency-Key: $1" "$api/api/v1/runs" -d @- <<EOF | field id
+{"image": {"id": "naos-agents", "digest": "$digest"}, "timeout": 3600,
+ "runtime": {"cpu": 2, "memory_mib": 2048, "disk_gib": 8}, "mcp": {"policy": "$policy"}}
+EOF
+}
+
+vm_dir_of() {
+    local meta
+    meta="$(grep -ls "\"run_id\":\"$1\"" "$TEMP_DIR"/runs/*/vm.json | head -n1 || true)"
+    [ -z "$meta" ] || dirname "$meta"
+}
+
+side_booted() {
+    local dir status
+    status="$(run="$1" run_status)"
+    [ "$status" != FAILED ] || fail "run $1 failed to boot"
+    dir="$(vm_dir_of "$1")"
+    [ "$status" = STARTED ] && [ -n "$dir" ] && grep -qs naos-ready "$dir/boot.log" &&
+        grep -qs 'naos-probe ok' "$dir/boot.log"
+}
+
+# One secrets__get as a guest sends it; a third argument forges that Run's id around the call.
+get_secret() {
+    local forged=""
+    [ -z "${3:-}" ] || forged=",\"run_id\":\"$3\",\"_meta\":{\"run_id\":\"$3\"}"
+    printf '{"jsonrpc":"2.0","id":%s,"run_id":"%s","method":"tools/call","params":{"name":"secrets__get","arguments":{"name":"%s"}%s}}' \
+        "$1" "${3:-none}" "$2" "$forged"
+}
+
+# What a Run asks its own broker beside another Run: its secret, the other's, the other's again
+# with that Run's id forged into the request, and the server both Runs name.
+side_guest() {
+    local own="$1" name="$2" foreign="$3" other="$4" id="$5"
+    run="$own" console_log="$TEMP_DIR/side-$own.log" guest \
+        "cat > /tmp/rpc <<'JSON'" \
+        "{\"jsonrpc\":\"2.0\",\"id\":$((id + 1)),\"method\":\"tools/call\",\"params\":{\"name\":\"secrets__list\",\"arguments\":{}}}" \
+        "$(get_secret $((id + 2)) "$name")" \
+        "$(get_secret $((id + 3)) "$foreign")" \
+        "$(get_secret $((id + 4)) "$foreign" "$other")" \
+        "{\"jsonrpc\":\"2.0\",\"id\":$((id + 5)),\"method\":\"tools/call\",\"params\":{\"name\":\"alpha__search\",\"arguments\":{}}}" \
+        "JSON" \
+        "{ cat /tmp/rpc; sleep 20; } | naos-mcp" \
+        "echo NAOS-SMOKE-SIDE-$id"
+}
+
+# The secret reads the runner decided for one Run, by name and decision.
+secret_reads() {
+    grep '"event":"secret_read"' "$TEMP_DIR/agent.log" | grep "\"run_id\":\"$1\"" |
+        grep -cF -- "\"name\":\"$2\",\"decision\":\"$3\"" || true
+}
+
+# The runner let go of a Run once the gate of that Run logs that it holds no credential.
+released() {
+    grep '"event":"mcp_credentials_updated"' "$TEMP_DIR/agent.log" | grep "\"run_id\":\"$1\"" |
+        grep -q '"names":""'
+}
+
+attached_again() {
+    [ "$(events mcp_attached)" -ge "$1" ]
+}
+
+# One of the two Runs after its guest typed `rounds` times: its own secret came back, the other's
+# never did, and every read was decided under its own Run id.
+check_side() {
+    local run_id="$1" name="$2" foreign="$3" value="$4" other_value="$5" rounds="$6"
+    local log="$TEMP_DIR/side-$run_id.log"
+    grep -qF -- "$value" "$log" || fail "run $run_id did not read its own secret"
+    if grep -qF -- "$other_value" "$log"; then
+        fail "run $run_id read the secret of the other run"
+    fi
+    [ "$(secret_reads "$run_id" "$name" allow)" -ge "$rounds" ] ||
+        fail "run $run_id has no allowed secret_read of $name"
+    [ "$(secret_reads "$run_id" "$foreign" deny)" -ge $((rounds * 2)) ] ||
+        fail "run $run_id was not refused $foreign, the forged request included"
+    [ "$(secret_reads "$run_id" "$foreign" allow)" -eq 0 ] ||
+        fail "run $run_id was allowed the secret of the other run"
+    [ "$(grep '"event":"mcp_call"' "$TEMP_DIR/agent.log" | grep "\"run_id\":\"$run_id\"" |
+        grep -c '"server":"alpha","tool":"search"')" -ge "$rounds" ] ||
+        fail "run $run_id did not reach the server both runs name"
+}
+
+# Two Runs on the one runner at the same time, before and after a restart of the runner, and
+# then one of them stopping while the other keeps what it holds.
+check_isolation() {
+    local first second first_value second_value typing attached id run_id value rounds=0
+    first_value="$(token)"
+    second_value="$(token)"
+    first="$(side_run side-a-key "$first_value")"
+    second="$(side_run side-b-key "$second_value")"
+    wait_for 300 side_booted "$first"
+    wait_for 300 side_booted "$second"
+    for id in 40 50; do
+        rounds=$((rounds + 1))
+        side_guest "$first" side-a-key side-b-key "$second" "$id" &
+        typing=$!
+        side_guest "$second" side-b-key side-a-key "$first" "$id"
+        wait "$typing"
+        for run_id in "$first" "$second"; do
+            grep -q "NAOS-SMOKE-SIDE-$id" "$TEMP_DIR/side-$run_id.log" ||
+                fail "the guest of run $run_id did not finish"
+        done
+        check_side "$first" side-a-key side-b-key "$first_value" "$second_value" "$rounds"
+        check_side "$second" side-b-key side-a-key "$second_value" "$first_value" "$rounds"
+        if [ "$id" = 40 ]; then
+            echo "restarting the agent under both runs..."
+            attached="$(events mcp_attached)"
+            kill -- "-$agent"
+            wait_for 30 agent_gone
+            start_agent
+            wait_for 60 enrolled
+            wait_for 120 attached_again $((attached + 2))
+        fi
+    done
+    for value in "$first_value" "$second_value"; do
+        if grep -rqF --exclude=console.log -- "$value" "$TEMP_DIR/agent.log" "$TEMP_DIR/state" "$TEMP_DIR/runs"; then
+            fail "a secret value of a side run reached the runner log or its state"
+        fi
+    done
+    echo "stopping one of the two runs, the other keeps going..."
+    web_post "$first" stop >/dev/null
+    wait_for 120 released "$first"
+    if released "$second"; then
+        fail "stopping one run let go of the gate of the other"
+    fi
+    run="$second" console_log="$TEMP_DIR/side-$second.log" guest \
+        "cat > /tmp/rpc <<'JSON'" \
+        "$(get_secret 61 side-b-key)" \
+        "JSON" \
+        "{ cat /tmp/rpc; sleep 5; } | naos-mcp" \
+        "echo NAOS-SMOKE-KEPT"
+    grep -q NAOS-SMOKE-KEPT "$TEMP_DIR/side-$second.log" ||
+        fail "the guest of the kept run did not finish"
+    [ "$(secret_reads "$second" side-b-key allow)" -ge 3 ] ||
+        fail "the run that kept going lost its secret"
+    web_post "$second" stop >/dev/null
+    wait_for 120 released "$second"
+}
+
 share_gone() {
     ! pgrep -f -- "--socket-path=$TEMP_DIR/runs" >/dev/null
 }
@@ -820,6 +972,7 @@ share_gone() {
 start_agent() {
     NAOS_AGENT_API_URL="$api" \
         NAOS_AGENT_NAME=alpha \
+        NAOS_AGENT_CAPACITY=3 \
         NAOS_AGENT_STATE_DIR="$TEMP_DIR/state" \
         NAOS_AGENT_ENROLLMENT_TOKEN_FILE="$TEMP_DIR/enrollment" \
         NAOS_AGENT_IMAGE_DIR="$TEMP_DIR/vms" \
@@ -1267,4 +1420,6 @@ copy="$(web_post "$run" rerun "$rerun_key")"
 [ "$(web_post "$run" rerun "$rerun_key")" = "$copy" ] || fail "one rerun key made two runs"
 case "$copy" in "$web/runs/run_"*) ;; *) fail "rerun did not open a new run" ;; esac
 web_post "${copy##*/}" stop >/dev/null
+echo "starting two runs side by side, each with its own mcp policy and secret..."
+check_isolation
 echo "smoke test passed"
