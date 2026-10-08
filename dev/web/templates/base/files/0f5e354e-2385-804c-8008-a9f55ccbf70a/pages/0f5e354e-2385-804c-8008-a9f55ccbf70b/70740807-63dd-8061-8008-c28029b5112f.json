@@ -1,0 +1,108 @@
+{
+  "id": "70740807-63dd-8061-8008-c28029b5112f",
+  "name": "Card Requests \u00b7 0",
+  "type": "frame",
+  "x": 10084,
+  "y": 386,
+  "width": 1072,
+  "height": 146,
+  "rotation": 0,
+  "selrect": {
+    "x": 10084,
+    "y": 386,
+    "width": 1072,
+    "height": 146,
+    "x1": 10084,
+    "y1": 386,
+    "x2": 11156,
+    "y2": 532
+  },
+  "points": [
+    {
+      "x": 10084,
+      "y": 386
+    },
+    {
+      "x": 11156,
+      "y": 386
+    },
+    {
+      "x": 11156,
+      "y": 532
+    },
+    {
+      "x": 10084,
+      "y": 532
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "70740807-63dd-8061-8008-c28028fd5b95",
+  "frameId": "70740807-63dd-8061-8008-c28028fd5b95",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 40,
+    "p2": 24,
+    "p3": 40,
+    "p4": 24
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 10,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 6,
+    "columnGap": 6
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "auto",
+  "r3": 10,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 10,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [
+    {
+      "strokeColor": "#e4e7ec",
+      "strokeOpacity": 1,
+      "strokeAlignment": "inner",
+      "strokeWidth": 1
+    }
+  ],
+  "proportion": 1,
+  "r4": 10,
+  "fills": [
+    {
+      "fillColor": "#ffffff",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "70740807-63dd-8061-8008-c2802a09db34",
+    "70740807-63dd-8061-8008-c28029f97ee4",
+    "70740807-63dd-8061-8008-c28029e86e6a"
+  ]
+}

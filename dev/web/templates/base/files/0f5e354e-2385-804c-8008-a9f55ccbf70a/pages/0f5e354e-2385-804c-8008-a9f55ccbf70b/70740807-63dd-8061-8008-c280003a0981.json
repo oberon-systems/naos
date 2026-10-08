@@ -1,0 +1,111 @@
+{
+  "id": "70740807-63dd-8061-8008-c280003a0981",
+  "name": "deny private.example.com 14:31:40",
+  "type": "frame",
+  "x": 8844,
+  "y": 740,
+  "width": 1072,
+  "height": 36,
+  "rotation": 0,
+  "selrect": {
+    "x": 8844,
+    "y": 740,
+    "width": 1072,
+    "height": 36,
+    "x1": 8844,
+    "y1": 740,
+    "x2": 9916,
+    "y2": 776
+  },
+  "points": [
+    {
+      "x": 8844,
+      "y": 740
+    },
+    {
+      "x": 9916,
+      "y": 740
+    },
+    {
+      "x": 9916,
+      "y": 776
+    },
+    {
+      "x": 8844,
+      "y": 776
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "70740807-63dd-8061-8008-c27ffe454110",
+  "frameId": "70740807-63dd-8061-8008-c27ffe454110",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 16,
+    "p3": 0,
+    "p4": 16
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "fix",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "interactions": [
+    {
+      "eventType": "click",
+      "actionType": "open-overlay",
+      "destination": "70740807-63dd-8061-8008-c281124299b6",
+      "positionRelativeTo": null,
+      "preserveScroll": false,
+      "overlayPosType": "center",
+      "closeClickOutside": true,
+      "backgroundOverlay": true
+    }
+  ],
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "row",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": [],
+  "shapes": [
+    "70740807-63dd-8061-8008-c28001249db3",
+    "70740807-63dd-8061-8008-c28001003440",
+    "70740807-63dd-8061-8008-c28000d1e074",
+    "70740807-63dd-8061-8008-c28000aa9c21",
+    "70740807-63dd-8061-8008-c280008a1e71",
+    "70740807-63dd-8061-8008-c2800065d7cd"
+  ]
+}

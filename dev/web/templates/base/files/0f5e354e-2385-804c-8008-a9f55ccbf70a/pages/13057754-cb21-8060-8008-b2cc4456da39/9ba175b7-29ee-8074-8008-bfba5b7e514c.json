@@ -56,6 +56,7 @@
   "flipX": null,
   "flipY": null,
   "proportionLock": false,
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
   "constraintsV": "top",
   "constraintsH": "left",
   "strokes": [],
@@ -65,6 +66,5 @@
       "fillColor": "#b54708",
       "fillOpacity": 1
     }
-  ],
-  "pageId": "13057754-cb21-8060-8008-b2cc4456da39"
+  ]
 }

@@ -1,0 +1,111 @@
+{
+  "id": "70740807-63dd-8061-8008-c28112430df5",
+  "name": "card CORRELATION",
+  "type": "frame",
+  "x": 10084,
+  "y": 1132,
+  "width": 438,
+  "height": 114,
+  "rotation": 0,
+  "selrect": {
+    "x": 10084,
+    "y": 1132,
+    "width": 438,
+    "height": 114,
+    "x1": 10084,
+    "y1": 1132,
+    "x2": 10522,
+    "y2": 1246
+  },
+  "points": [
+    {
+      "x": 10084,
+      "y": 1132
+    },
+    {
+      "x": 10522,
+      "y": 1132
+    },
+    {
+      "x": 10522,
+      "y": 1246
+    },
+    {
+      "x": 10084,
+      "y": 1246
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "70740807-63dd-8061-8008-c2811242ed2f",
+  "frameId": "70740807-63dd-8061-8008-c2811242ed2f",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 14,
+    "p2": 16,
+    "p3": 14,
+    "p4": 16
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "stretch",
+  "layoutPaddingType": "simple",
+  "r2": 10,
+  "shapeRef": "dbbafd92-e887-807a-8008-b3d9041d7fed",
+  "showContent": true,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "auto",
+  "r3": 10,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 10,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [
+    {
+      "strokeStyle": "solid",
+      "strokeColor": "#e4e7ec",
+      "strokeAlignment": "inner",
+      "strokeWidth": 1
+    }
+  ],
+  "proportion": 1,
+  "r4": 10,
+  "fills": [
+    {
+      "fillColor": "#ffffff",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "70740807-63dd-8061-8008-c28112430df6",
+    "70740807-63dd-8061-8008-c28112430df9",
+    "70740807-63dd-8061-8008-c28112430dfc",
+    "70740807-63dd-8061-8008-c28112430dff"
+  ]
+}

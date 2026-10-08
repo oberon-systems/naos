@@ -114,34 +114,34 @@
       }
     ]
   },
+  "pageId": "9ba175b7-29ee-8074-8008-bfb97cbfe9a3",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 513,
       "y": 1553.8000019192696,
-      "width": 88.5875015258789,
-      "height": 16.000001907348633,
-      "x1": 0,
-      "y1": 0.800000011920929,
-      "x2": 88.5875015258789,
-      "y2": 16.80000191926956,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "600",
+      "y1": 0.800000011920929,
+      "width": 88.5875015258789,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 513,
+      "x1": 0,
+      "y2": 16.80000191926956,
       "fills": [
         {
           "fillColor": "#ffffff",
           "fillOpacity": 1
         }
       ],
+      "x2": 88.5875015258789,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 16.000001907348633,
       "text": "Register server"
     }
-  ],
-  "pageId": "9ba175b7-29ee-8074-8008-bfb97cbfe9a3"
+  ]
 }

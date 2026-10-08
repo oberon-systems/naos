@@ -115,59 +115,59 @@
     ]
   },
   "layoutItemHSizing": "fill",
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 9310,
       "y": 1842.600000202655,
-      "width": 381.5375061035156,
-      "height": 12.800000190734863,
-      "x1": 0,
-      "y1": 0.800000011920929,
-      "x2": 381.5375061035156,
-      "y2": 13.600000202655792,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 0.800000011920929,
+      "width": 381.5375061035156,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 9310,
+      "x1": 0,
+      "y2": 13.600000202655792,
       "fills": [
         {
           "fillColor": "#93370d",
           "fillOpacity": 1
         }
       ],
+      "x2": 381.5375061035156,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 12.800000190734863,
       "text": "The agent can call beta and read beta-key from its next call on. A value it reads is "
     },
     {
-      "x": 9310,
       "y": 1857.9999999999993,
-      "width": 243.5,
-      "height": 12.799999237060547,
-      "x1": 0,
-      "y1": 16.200000762939453,
-      "x2": 243.5,
-      "y2": 29,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 16.200000762939453,
+      "width": 243.5,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 9310,
+      "x1": 0,
+      "y2": 29,
       "fills": [
         {
           "fillColor": "#93370d",
           "fillOpacity": 1
         }
       ],
+      "x2": 243.5,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 12.799999237060547,
       "text": "the agent's from then on and cannot be taken back."
     }
-  ],
-  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b"
+  ]
 }

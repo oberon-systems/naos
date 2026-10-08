@@ -115,59 +115,59 @@
     ]
   },
   "layoutItemHSizing": "fill",
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 7630,
       "y": 2288.600000202656,
-      "width": 628.9750366210938,
-      "height": 12.800000190734863,
-      "x1": 0,
-      "y1": 0.800000011920929,
-      "x2": 628.9750366210938,
-      "y2": 13.600000202655792,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 0.800000011920929,
+      "width": 628.9750366210938,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 7630,
+      "x1": 0,
+      "y2": 13.600000202655792,
       "fills": [
         {
           "fillColor": "#93370d",
           "fillOpacity": 1
         }
       ],
+      "x2": 628.9750366210938,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 12.800000190734863,
       "text": "A value the agent reads belongs to the agent from then on: it may reach the model provider, its own files and the console log. A secret "
     },
     {
-      "x": 7630,
       "y": 2304,
-      "width": 225.27500915527344,
-      "height": 12.799999237060547,
-      "x1": 0,
-      "y1": 16.200000762939453,
-      "x2": 225.27500915527344,
-      "y2": 29,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 16.200000762939453,
+      "width": 225.27500915527344,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 7630,
+      "x1": 0,
+      "y2": 29,
       "fills": [
         {
           "fillColor": "#93370d",
           "fillOpacity": 1
         }
       ],
+      "x2": 225.27500915527344,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 12.799999237060547,
       "text": "is granted by its exact name, never by a pattern."
     }
-  ],
-  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b"
+  ]
 }

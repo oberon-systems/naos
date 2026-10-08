@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 7351,
       "y": 44.800001919269555,
-      "width": 34.625,
-      "height": 16.000001907348633,
-      "x1": 0,
-      "y1": 0.800000011920929,
-      "x2": 34.625,
-      "y2": 16.80000191926956,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "600",
+      "y1": 0.800000011920929,
+      "width": 34.625,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 7351,
+      "x1": 0,
+      "y2": 16.80000191926956,
       "fills": [
         {
           "fillColor": "#344054",
           "fillOpacity": 1
         }
       ],
+      "x2": 34.625,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 16.000001907348633,
       "text": "Rerun"
     }
   ]

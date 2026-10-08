@@ -68,6 +68,7 @@
   "layoutAlignItems": "stretch",
   "layoutPaddingType": "simple",
   "r2": 12,
+  "componentRoot": true,
   "showContent": false,
   "layoutItemHSizing": "fix",
   "proportionLock": false,
@@ -82,6 +83,7 @@
   "r1": 12,
   "layoutFlexDir": "column",
   "layoutAlignContent": "stretch",
+  "componentId": "70740807-63dd-8061-8008-c2810e5d2115",
   "strokes": [
     {
       "strokeStyle": "solid",
@@ -90,6 +92,7 @@
       "strokeWidth": 1
     }
   ],
+  "mainInstance": true,
   "proportion": 1,
   "shadow": [
     {
@@ -113,6 +116,7 @@
       "fillOpacity": 1
     }
   ],
+  "componentFile": "0f5e354e-2385-804c-8008-a9f55ccbf70a",
   "shapes": [
     "dbbafd92-e887-807a-8008-b3d903b639eb",
     "dbbafd92-e887-807a-8008-b3d9038f2342",

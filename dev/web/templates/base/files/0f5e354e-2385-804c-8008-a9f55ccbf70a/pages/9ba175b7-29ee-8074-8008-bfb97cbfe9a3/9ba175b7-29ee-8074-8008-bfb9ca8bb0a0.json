@@ -114,34 +114,34 @@
       }
     ]
   },
+  "pageId": "9ba175b7-29ee-8074-8008-bfb97cbfe9a3",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 1923,
       "y": 461.1000002026558,
-      "width": 164.08750915527344,
-      "height": 12.800000190734863,
-      "x1": 0,
-      "y1": 0.800000011920929,
-      "x2": 164.08750915527344,
-      "y2": 13.600000202655792,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 0.800000011920929,
+      "width": 164.08750915527344,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 1923,
+      "x1": 0,
+      "y2": 13.600000202655792,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 164.08750915527344,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 12.800000190734863,
       "text": "allow * \u00b7 deny delete \u00b7 docs://alpha/"
     }
-  ],
-  "pageId": "9ba175b7-29ee-8074-8008-bfb97cbfe9a3"
+  ]
 }

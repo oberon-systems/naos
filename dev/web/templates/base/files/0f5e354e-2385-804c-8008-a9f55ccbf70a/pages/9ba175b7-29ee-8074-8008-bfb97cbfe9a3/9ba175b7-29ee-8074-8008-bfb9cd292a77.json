@@ -114,34 +114,34 @@
       }
     ]
   },
+  "pageId": "9ba175b7-29ee-8074-8008-bfb97cbfe9a3",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 36,
       "y": 1413.800000011921,
-      "width": 105.36250305175781,
-      "height": 12,
-      "x1": 0,
-      "y1": 0.800000011920929,
-      "x2": 105.36250305175781,
-      "y2": 12.800000011920929,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "10px",
       "fontWeight": "600",
+      "y1": 0.800000011920929,
+      "width": 105.36250305175781,
       "textDecoration": "none",
       "letterSpacing": "0.6px",
+      "x": 36,
+      "x1": 0,
+      "y2": 12.800000011920929,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 105.36250305175781,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 12,
       "text": "HOW AGENTS SEE IT"
     }
-  ],
-  "pageId": "9ba175b7-29ee-8074-8008-bfb97cbfe9a3"
+  ]
 }

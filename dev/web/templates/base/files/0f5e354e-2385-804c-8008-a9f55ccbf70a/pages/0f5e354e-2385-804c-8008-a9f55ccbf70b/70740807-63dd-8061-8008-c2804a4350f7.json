@@ -1,0 +1,103 @@
+{
+  "id": "70740807-63dd-8061-8008-c2804a4350f7",
+  "name": "meta row",
+  "type": "frame",
+  "x": 11324,
+  "y": 65,
+  "width": 1072,
+  "height": 20,
+  "rotation": 0,
+  "selrect": {
+    "x": 11324,
+    "y": 65,
+    "width": 1072,
+    "height": 20,
+    "x1": 11324,
+    "y1": 65,
+    "x2": 12396,
+    "y2": 85
+  },
+  "points": [
+    {
+      "x": 11324,
+      "y": 65
+    },
+    {
+      "x": 12396,
+      "y": 65
+    },
+    {
+      "x": 12396,
+      "y": 85
+    },
+    {
+      "x": 11324,
+      "y": 85
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "70740807-63dd-8061-8008-c2804a433bf6",
+  "frameId": "70740807-63dd-8061-8008-c2804a433bf6",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "layoutItemHSizing": "fix",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 12,
+    "columnGap": 12
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "fix",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "row",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": [],
+  "shapes": [
+    "70740807-63dd-8061-8008-c2804a4350f9",
+    "70740807-63dd-8061-8008-c2804a4350fa",
+    "70740807-63dd-8061-8008-c2804a4350fb",
+    "70740807-63dd-8061-8008-c2804a4350fc",
+    "70740807-63dd-8061-8008-c2804a4350fd",
+    "70740807-63dd-8061-8008-c2804a4350fe",
+    "70740807-63dd-8061-8008-c2804a4350ff",
+    "70740807-63dd-8061-8008-c2804a435100",
+    "70740807-63dd-8061-8008-c2804a435101",
+    "70740807-63dd-8061-8008-c2804a435102"
+  ]
+}

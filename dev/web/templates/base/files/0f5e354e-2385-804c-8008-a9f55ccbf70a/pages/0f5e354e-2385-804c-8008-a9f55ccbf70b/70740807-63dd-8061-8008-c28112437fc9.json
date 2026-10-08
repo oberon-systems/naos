@@ -1,0 +1,109 @@
+{
+  "id": "70740807-63dd-8061-8008-c28112437fc9",
+  "name": "tab Overview",
+  "type": "frame",
+  "x": 10084,
+  "y": 931,
+  "width": 56,
+  "height": 27,
+  "rotation": 0,
+  "selrect": {
+    "x": 10084,
+    "y": 931,
+    "width": 56,
+    "height": 27,
+    "x1": 10084,
+    "y1": 931,
+    "x2": 10140,
+    "y2": 958
+  },
+  "points": [
+    {
+      "x": 10084,
+      "y": 931
+    },
+    {
+      "x": 10140,
+      "y": 931
+    },
+    {
+      "x": 10140,
+      "y": 958
+    },
+    {
+      "x": 10084,
+      "y": 958
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "70740807-63dd-8061-8008-c28112437fc5",
+  "frameId": "70740807-63dd-8061-8008-c28112437fc5",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "stretch",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "shapeRef": "dbbafd92-e887-807a-8008-b3d903969c90",
+  "showContent": true,
+  "layoutItemHSizing": "auto",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 9,
+    "columnGap": 9
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "auto",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "interactions": [
+    {
+      "eventType": "click",
+      "actionType": "open-overlay",
+      "destination": "dbbafd92-e887-807a-8008-b3d902dd28e4",
+      "positionRelativeTo": null,
+      "preserveScroll": false,
+      "overlayPosType": "center",
+      "closeClickOutside": true,
+      "backgroundOverlay": true
+    }
+  ],
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": [],
+  "shapes": [
+    "70740807-63dd-8061-8008-c28112437fca",
+    "70740807-63dd-8061-8008-c28112437fcb"
+  ]
+}
