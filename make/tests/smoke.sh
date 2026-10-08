@@ -413,17 +413,18 @@ import json, sys
 
 rows = json.load(sys.stdin)["policy_history"]
 held = [(row["kind"], row["previous_id"], row["policy_id"]) for row in rows]
-mcp, network, shell = sys.argv[1:]
+mcp, network, shell, model = sys.argv[1:]
 kept = [("mcp", mcp, None), ("mcp", None, mcp)]
 kept += [("network", network, None), ("shell", shell, None)]
 kept += [("network", None, network), ("shell", None, shell)]
+kept += [("model", model, None), ("model", None, model)]
 if held != kept:
     sys.exit(f"the run did not keep the policies it held: {held}")
-' "$mcp_policy" "$network_policy" "$shell_policy"
+' "$mcp_policy" "$network_policy" "$shell_policy" "$model_policy"
     curl -fsS "${auth[@]}" "$api/api/v1/audit?event=policy_changed&run_id=$run" | "$VENV/bin/python" -c '
 import json, sys
 
-if len(json.load(sys.stdin)) != 6:
+if len(json.load(sys.stdin)) != 8:
     sys.exit("the policy changes of the run are not audited")
 '
 }
@@ -439,6 +440,23 @@ check_live_network() {
         fail "a host added to the run was not reached"
     [ "$(network_decisions denied www.wikipedia.org)" -gt "$refused" ] ||
         fail "a host taken away from the run still answered"
+}
+
+# One model's calls by decision and category, counted in the runner log.
+model_answers() {
+    grep '"event":"model_call"' "$TEMP_DIR/agent.log" | grep "\"model\":\"$1\"" |
+        grep "\"decision\":\"$2\"" | grep -c "\"category\":\"$3\"" || true
+}
+
+# A model added to the started Run answers, a removed one is refused, and the stored policy given
+# back finds the token budget the Run already spent.
+check_live_models() {
+    grep -q NAOS-SMOKE-MODELS-BACK "$TEMP_DIR/console.log" || fail "the guest did not call the models again"
+    [ "$(model_answers alpha-large allow none)" -ge 1 ] || fail "a model added to the run did not answer"
+    [ "$(model_answers beta-large deny denied)" -ge 1 ] ||
+        fail "a model taken away from the run still answered"
+    [ "$(model_answers beta-large deny budget)" -ge 1 ] ||
+        fail "the stored model policy given back did not keep the spent budget"
 }
 
 # A capability taken away from the started Run is denied, and answers again once it is given back.
@@ -856,7 +874,8 @@ EOF
     )"
     curl -fsS "${auth[@]}" -H "Idempotency-Key: $1" "$api/api/v1/runs" -d @- <<EOF | field id
 {"image": {"id": "naos-agents", "digest": "$digest"}, "timeout": 3600,
- "runtime": {"cpu": 2, "memory_mib": 2048, "disk_gib": 8}, "mcp": {"policy": "$policy"}}
+ "runtime": {"cpu": 2, "memory_mib": 2048, "disk_gib": 8}, "mcp": {"policy": "$policy"},
+ "model": {"policy": "$model_policy"}}
 EOF
 }
 
@@ -1420,7 +1439,28 @@ guest \
     "JSON" \
     "{ cat /tmp/rpc; sleep 5; } | naos-mcp" \
     "echo NAOS-SMOKE-REGRANTED"
+echo "editing the model policy of the started run: beta is taken away, alpha serves one more model..."
+models="{\"providers\": [{\"name\": \"alpha\", \"api\": \"openai\", \"url\": \"https://openai.example.com:$stub_port\",
+  \"credential\": \"openai-key\", \"models\": [\"alpha-mini\", \"alpha-large\"]}],
+  \"max_input_tokens\": 1000, \"max_output_tokens\": 1000}"
+change_policy model "{\"kind\": \"model\", \"document\": $models}"
+# shellcheck disable=SC2016  # the guest shell expands these, not this one
+calls=(
+    "cat > /tmp/added <<'JSON'"
+    '{"model":"alpha-large","messages":[{"role":"user","content":"hi"}]}'
+    "JSON"
+    "cat > /tmp/removed <<'JSON'"
+    '{"model":"beta-large","max_tokens":16,"messages":[{"role":"user","content":"hi"}]}'
+    "JSON"
+    'wget -O - --header "content-type: application/json" --post-file /tmp/added "$OPENAI_BASE_URL/chat/completions"; echo'
+    'wget -O - --header "content-type: application/json" --header "anthropic-version: 2023-06-01" --post-file /tmp/removed "$ANTHROPIC_BASE_URL/v1/messages"; echo'
+)
+guest "${calls[@]}" "echo NAOS-SMOKE-MODELS"
+echo "giving the started run its stored model policy back..."
+change_policy model "{\"kind\": \"model\", \"policy_id\": \"$model_policy\"}"
+guest "${calls[@]}" "echo NAOS-SMOKE-MODELS-BACK"
 check_live_policy
+check_live_models
 check_live_network
 check_live_shell
 echo "reading the console through the api and the terminal tab..."
