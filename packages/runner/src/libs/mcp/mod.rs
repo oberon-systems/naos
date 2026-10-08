@@ -127,6 +127,7 @@ impl<'a> Session<'a> {
         let mut line = Vec::new();
         let mut changes = self.gates.mcp.changes();
         let mut shell = self.gates.shell.changes();
+        let mut network = self.gates.network.changes();
         loop {
             line.clear();
             let read = {
@@ -139,6 +140,7 @@ impl<'a> Session<'a> {
                         read = &mut next => break read?,
                         Ok(()) = changes.changed() => self.announce(&mut write).await?,
                         Ok(()) = shell.changed() => self.announce(&mut write).await?,
+                        Ok(()) = network.changed() => self.announce(&mut write).await?,
                     }
                 }
             };

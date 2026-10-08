@@ -1309,6 +1309,28 @@ async fn a_replaced_shell_policy_is_announced_and_decides_the_next_call() {
 }
 
 #[tokio::test]
+async fn a_replaced_network_policy_is_announced() {
+    let gates = http_gates("127.0.0.1:9".parse().expect("address"));
+    let gates = &gates;
+
+    live(gates, |mut wire| async move {
+        wire.ask(INITIALIZE).await;
+        let listed = wire.ask(&request(1, "tools/list", json!({}))).await;
+        assert_eq!(listed["result"]["tools"][0]["name"], "http_request");
+
+        let closed = json!({"deny": [{"host": "example.com"}]});
+        gates.network.replace(Some(&closed));
+        assert_eq!(
+            wire.next().await["method"],
+            "notifications/tools/list_changed"
+        );
+        let listed = wire.ask(&request(2, "tools/list", json!({}))).await;
+        assert_eq!(listed["result"]["tools"], json!([]));
+    })
+    .await;
+}
+
+#[tokio::test]
 async fn a_call_in_flight_ends_under_the_policy_it_started_with() {
     let server = upstream(answers, false).await;
     Mock::given(body_partial_json(json!({"method": "tools/call"})))

@@ -289,3 +289,83 @@ async fn a_run_cannot_exceed_its_request_budget() {
 
     assert!(err.to_string().contains("rate limit"));
 }
+
+async fn answering(delay: Duration) -> MockServer {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_delay(delay)
+                .set_body_string("beta"),
+        )
+        .mount(&server)
+        .await;
+    server
+}
+
+fn host(name: &str) -> Value {
+    json!({"allow": [{"protocol": "http", "host": name}]})
+}
+
+#[tokio::test]
+async fn a_replaced_policy_decides_the_next_request_and_keeps_the_budget() {
+    let server = answering(Duration::ZERO).await;
+    let address = server.address();
+    let url = |name: &str| format!("http://{name}:{}/", address.port());
+    let gate = NetworkGate::local(&host("example.com"), vec![address.ip()]).expect("policy");
+    let mut changes = gate.changes();
+    gate.send(get(&url("example.com"))).await.expect("allowed");
+    gate.send(get(&url("beta.example.com")))
+        .await
+        .expect_err("not allowed yet");
+
+    gate.replace(Some(&host("beta.example.com")));
+
+    assert!(changes.has_changed().expect("open"));
+    changes.borrow_and_update();
+    gate.send(get(&url("beta.example.com")))
+        .await
+        .expect("allowed");
+    let removed = gate
+        .send(get(&url("example.com")))
+        .await
+        .expect_err("denied");
+    assert!(removed.to_string().contains("no matching allow rule"));
+    gate.replace(Some(&host("beta.example.com")));
+    assert!(!changes.has_changed().expect("open"));
+    assert_eq!(gate.window.lock().expect("window").1, 4);
+}
+
+#[tokio::test]
+async fn a_policy_that_cannot_be_read_grants_nothing() {
+    let server = answering(Duration::ZERO).await;
+    let address = server.address();
+    let url = format!("http://example.com:{}/", address.port());
+    let gate = NetworkGate::local(&host("example.com"), vec![address.ip()]).expect("policy");
+
+    gate.replace(Some(&json!({"allow": [{"protocol": "ftp"}]})));
+
+    assert!(!gate.allows_any());
+    gate.send(get(&url)).await.expect_err("denied");
+    gate.replace(Some(&host("example.com")));
+    gate.send(get(&url)).await.expect("allowed");
+    gate.replace(None);
+    gate.send(get(&url)).await.expect_err("denied");
+}
+
+#[tokio::test]
+async fn a_request_in_flight_ends_under_the_policy_it_started_with() {
+    let server = answering(Duration::from_millis(500)).await;
+    let address = server.address();
+    let url = format!("http://example.com:{}/", address.port());
+    let gate = NetworkGate::local(&host("example.com"), vec![address.ip()]).expect("policy");
+    let swap = async {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        gate.replace(Some(&host("beta.example.com")));
+    };
+
+    let (answer, ()) = tokio::join!(gate.send(get(&url)), swap);
+
+    assert_eq!(answer.expect("response").body, b"beta");
+    gate.send(get(&url)).await.expect_err("denied");
+}

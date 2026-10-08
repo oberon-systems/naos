@@ -6,8 +6,9 @@ use reqwest::{Client, Method, Response, StatusCode, Url};
 use serde::Deserialize;
 use serde_json::Value;
 use std::net::{IpAddr, SocketAddr};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use tokio::sync::watch;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_BODY: usize = 8 * 1024 * 1024;
@@ -92,12 +93,43 @@ pub struct GateResponse {
     pub body: Vec<u8>,
 }
 
-/// Immutable per-Run policy evaluated before each host-side outbound connection.
+/// The rules of one document, taken whole by each request.
+#[derive(Debug, Default)]
+struct Rules {
+    document: Option<Value>,
+    allow: Vec<Rule>,
+    deny: Vec<Rule>,
+}
+
+impl Rules {
+    fn parse(document: Option<&Value>) -> Result<Self, AgentError> {
+        let doc: PolicyDoc = match document {
+            Some(value) => {
+                serde_json::from_value(value.clone()).map_err(|err| invalid(&format!("{err}")))?
+            }
+            None => PolicyDoc {
+                allow: vec![],
+                deny: vec![],
+            },
+        };
+        let rules = |docs: Vec<RuleDoc>| -> Result<Vec<Rule>, AgentError> {
+            docs.into_iter().map(Rule::parse).collect()
+        };
+        Ok(Self {
+            document: document.cloned(),
+            allow: rules(doc.allow)?,
+            deny: rules(doc.deny)?,
+        })
+    }
+}
+
+/// Per-Run policy evaluated before each host-side outbound connection; the budget outlives a
+/// replaced policy.
 #[derive(Debug)]
 pub struct NetworkGate {
     run_id: String,
-    allow: Vec<Rule>,
-    deny: Vec<Rule>,
+    rules: Mutex<Arc<Rules>>,
+    changes: watch::Sender<()>,
     window: Mutex<(Instant, u32)>,
     forbidden: fn(IpAddr) -> bool,
     #[cfg(any(test, feature = "smoke-stubs"))]
@@ -108,27 +140,10 @@ pub struct NetworkGate {
 
 impl NetworkGate {
     pub fn from_snapshot(run_id: &str, document: Option<&Value>) -> Result<Self, AgentError> {
-        let doc: PolicyDoc = match document {
-            Some(value) => {
-                serde_json::from_value(value.clone()).map_err(|err| invalid(&format!("{err}")))?
-            }
-            None => PolicyDoc {
-                allow: vec![],
-                deny: vec![],
-            },
-        };
         Ok(Self {
             run_id: run_id.to_owned(),
-            allow: doc
-                .allow
-                .into_iter()
-                .map(Rule::parse)
-                .collect::<Result<_, _>>()?,
-            deny: doc
-                .deny
-                .into_iter()
-                .map(Rule::parse)
-                .collect::<Result<_, _>>()?,
+            rules: Mutex::new(Arc::new(Rules::parse(document)?)),
+            changes: watch::channel(()).0,
             window: Mutex::new((Instant::now(), 0)),
             forbidden,
             #[cfg(any(test, feature = "smoke-stubs"))]
@@ -139,7 +154,38 @@ impl NetworkGate {
     }
 
     pub fn allows_any(&self) -> bool {
-        !self.allow.is_empty()
+        !self.rules().allow.is_empty()
+    }
+
+    fn rules(&self) -> Arc<Rules> {
+        Arc::clone(&self.rules.lock().expect("rules"))
+    }
+
+    /// Fires after every replaced policy, so a session can tell the agent to list again.
+    pub fn changes(&self) -> watch::Receiver<()> {
+        self.changes.subscribe()
+    }
+
+    /// Swaps in the rules of a changed document; one that cannot be read grants nothing.
+    pub fn replace(&self, document: Option<&Value>) {
+        if self.rules().document.as_ref() == document {
+            return;
+        }
+        let next = match Rules::parse(document) {
+            Ok(next) => {
+                audit::network_policy_configured(&self.run_id);
+                next
+            }
+            Err(err) => {
+                tracing::warn!(run_id = %self.run_id, error = %err, "the new network policy grants nothing");
+                Rules {
+                    document: document.cloned(),
+                    ..Rules::default()
+                }
+            }
+        };
+        *self.rules.lock().expect("rules") = Arc::new(next);
+        self.changes.send_replace(());
     }
 
     /// The whole egress surface: budget, authorization, the pinned request and a bounded body.
@@ -256,14 +302,17 @@ impl NetworkGate {
                 "destination resolves to a reserved address",
             ));
         }
-        if let Some(at) = self
+        // Taken once, so a request in flight ends under the policy it started with.
+        let rules = self.rules();
+        if let Some(at) = rules
             .deny
             .iter()
             .position(|rule| rule.matches(protocol, &host, ips))
         {
             return Err((format!("deny[{at}]"), "explicit deny rule"));
         }
-        self.allow
+        rules
+            .allow
             .iter()
             .position(|rule| rule.matches(protocol, &host, ips))
             .map(|at| format!("allow[{at}]"))
