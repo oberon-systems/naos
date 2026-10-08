@@ -361,6 +361,14 @@ def test_the_summary_counts_the_last_day(
         "category": "read",
         "rule": "0",
     }
+    model = {
+        "run_id": run_id,
+        "provider": "alpha",
+        "model": "alpha-mini",
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "duration_ms": 1,
+    }
     old = _event("network_denied", **net, reason="no rule") | {"at": now_ts() - 2 * 86_400}
     _post_events(
         client,
@@ -371,6 +379,9 @@ def test_the_summary_counts_the_last_day(
             _event("shell_denied", **shell, reason="outside the workspace"),
             _event("mcp_call", **mcp, decision="deny"),
             _event("mcp_call", **mcp, decision="allow"),
+            _event("model_call", **model, decision="deny", category="budget"),
+            _event("model_call", **model, decision="deny", category="denied"),
+            _event("model_call", **model, decision="allow", category="none"),
             _event("run_claimed", run_id="run_stranger"),
         ],
     )
@@ -381,7 +392,7 @@ def test_the_summary_counts_the_last_day(
     assert summary["last_seq"] == rows[-1].seq
     assert summary["events_24h"] == len(rows) - 1
     assert summary["sources"] == ["api", "runner"]
-    assert summary["denials"] == {"network": 1, "shell": 1, "mcp": 1}
+    assert summary["denials"] == {"network": 1, "shell": 1, "mcp": 1, "model": 2}
     assert summary["refused_24h"] == 1
     assert summary["spool_lag"] is not None and summary["spool_lag"] >= 0
 
@@ -393,7 +404,7 @@ def test_an_empty_trail_has_no_spool_lag(client: TestClient) -> None:
         "last_seq": None,
         "events_24h": 0,
         "sources": [],
-        "denials": {"network": 0, "shell": 0, "mcp": 0},
+        "denials": {"network": 0, "shell": 0, "mcp": 0, "model": 0},
         "refused_24h": 0,
         "spool_lag": None,
     }

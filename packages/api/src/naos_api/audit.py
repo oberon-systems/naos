@@ -336,6 +336,8 @@ def find(session: Session, event_id: str) -> AuditEvent:
 
 DAY = 86_400
 DENIALS = {"network_denied": "network", "shell_denied": "shell"}
+# These gates write one event per call, and a denial is the call's decision.
+DECIDED = {"mcp_call": "mcp", "model_call": "model"}
 
 
 class Summary(BaseModel):
@@ -358,12 +360,9 @@ def summary(session: Session, now: int) -> Summary:
         gate: _count(session, since, col(AuditEvent.event) == name)
         for name, gate in DENIALS.items()
     }
-    denials["mcp"] = _count(
-        session,
-        since,
-        col(AuditEvent.event) == "mcp_call",
-        col(AuditEvent.data)["decision"].as_string() == "deny",
-    )
+    denied = col(AuditEvent.data)["decision"].as_string() == "deny"
+    for name, gate in DECIDED.items():
+        denials[gate] = _count(session, since, col(AuditEvent.event) == name, denied)
     refused = session.exec(
         select(AuditEvent.data).where(since, col(AuditEvent.event) == "runner_events_refused")
     ).all()
