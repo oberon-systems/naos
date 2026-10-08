@@ -131,8 +131,9 @@ Both endpoints need the operator token.
 - `GET /api/v1/audit/{event_id}` is one event. An unknown id gets 404.
 - `GET /api/v1/audit/summary` counts the trail: `total`, `last_seq`, and
   over the last 24 hours `events_24h`, the `sources` seen, gate `denials`
-  per gate and `refused_24h`. `spool_lag` is how many seconds the latest
-  runner event took from the runner's log to the API.
+  per gate (`network`, `shell`, `mcp` and `model`) and `refused_24h`.
+  `spool_lag` is how many seconds the latest runner event took from the
+  runner's log to the API.
 
 ```bash
 curl -fsS -H "Authorization: Bearer $operator" "$api/api/v1/runs/$run/events"
