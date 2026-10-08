@@ -20,9 +20,11 @@ from naos_api.images.service import booted_image, check_image
 from naos_api.lifecycle import ACTIVE, TERMINAL, RunStatus, ensure_transition
 from naos_api.mcp import McpPolicyIn, resolve_mcp_policy
 from naos_api.models import Lease, Merge, Policy, Profile, Run, Runner, RunPolicy
+from naos_api.network import NetworkPolicyIn, resolve_network_policy
 from naos_api.policies import (
     check_refs,
     create_mcp_policy,
+    create_network_policy,
     create_shell_policy,
     held_document,
     names_policy,
@@ -45,7 +47,9 @@ STATES: dict[RunState, frozenset[RunStatus]] = {
 }
 
 # The kinds a runner can apply to a running VM; mounts are fixed when the VM starts.
-LIVE_KINDS = frozenset({PolicyKind.MCP, PolicyKind.SHELL})
+LIVE_KINDS = frozenset({PolicyKind.NETWORK, PolicyKind.SHELL, PolicyKind.MCP})
+
+Edited = McpPolicyIn | NetworkPolicyIn | ShellPolicyIn
 
 _STOP_TARGETS = {
     RunStatus.PENDING: RunStatus.CANCELLED,
@@ -389,17 +393,21 @@ def _stored(session: Session, kind: PolicyKind, policy_id: str) -> dict[str, Any
     return policy.document
 
 
-def _edited(kind: PolicyKind, edited: McpPolicyIn | ShellPolicyIn) -> dict[str, Any]:
+def _edited(kind: PolicyKind, edited: Edited) -> dict[str, Any]:
     if kind is PolicyKind.MCP and isinstance(edited, McpPolicyIn):
         return resolve_mcp_policy(edited).model_dump(mode="json")
+    if kind is PolicyKind.NETWORK and isinstance(edited, NetworkPolicyIn):
+        return resolve_network_policy(edited).model_dump(mode="json")
     if kind is PolicyKind.SHELL and isinstance(edited, ShellPolicyIn):
         return resolve_shell_policy(edited).model_dump(mode="json")
     raise PolicyError(f"the document is not a {kind} policy")
 
 
-def _saved(session: Session, edited: McpPolicyIn | ShellPolicyIn, name: str | None) -> str:
+def _saved(session: Session, edited: Edited, name: str | None) -> str:
     if isinstance(edited, McpPolicyIn):
         return create_mcp_policy(session, edited, name)[0].id
+    if isinstance(edited, NetworkPolicyIn):
+        return create_network_policy(session, edited, name)[0].id
     return create_shell_policy(session, edited, name)[0].id
 
 
@@ -408,7 +416,7 @@ def change_policy(
     run_id: str,
     kind: PolicyKind,
     policy_id: str | None,
-    edited: McpPolicyIn | ShellPolicyIn | None = None,
+    edited: Edited | None = None,
     save_as: str | None = None,
     *,
     save: bool = False,

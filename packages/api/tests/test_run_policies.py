@@ -207,7 +207,7 @@ def test_a_change_the_run_cannot_take_is_refused(
     client.post("/api/v1/mcp-servers/beta/disable")
 
     assert _change(client, run_id, mount.json()["id"], "mount").status_code == 422
-    assert _change(client, run_id, network.json()["id"], "network").status_code == 409
+    assert _change(client, run_id, "modelpol_" + "0" * 32, "model").status_code == 409
     assert _change(client, run_id, network.json()["id"]).status_code == 422
     assert _change(client, run_id, "mcppol_" + "0" * 32).status_code == 422
     assert _change(client, run_id, second).status_code == 422
@@ -285,3 +285,46 @@ def test_an_edited_shell_document_is_saved_or_refused(
     ):
         assert client.post(path, json=refused).status_code == 422, refused
     assert len(client.get(f"/api/v1/runs/{run_id}").json()["policy_history"]) == 1
+
+
+def test_a_started_run_takes_another_network_policy(
+    client: TestClient, register: Register, spec_body: dict[str, Any], network_body: dict[str, Any]
+) -> None:
+    created = client.post("/api/v1/policies", json={"kind": "network", "document": network_body})
+    first = created.json()["id"]
+    spec_body["network"] = {"policy": first}
+    runner = register()
+    run_id = _started(client, runner, spec_body, None)
+    path = f"/api/v1/runs/{run_id}/policies"
+    wider = {"allow": [{"protocol": "https", "host": "BETA.example.com."}]}
+    body = {"kind": "network", "document": wider}
+
+    edited = client.post(path, json=body)
+    assert client.post(path, json=body).status_code == 200
+    temporary = _desired(client, runner)["policies"]["network"]
+    saved = client.post(path, json=body | {"save": True, "name": "beta-only"})
+    back = _change(client, run_id, first, "network")
+
+    assert edited.status_code == 200, edited.text
+    assert [rule["host"] for rule in temporary["allow"]] == ["beta.example.com"]
+    assert saved.status_code == 200, saved.text
+    assert back.status_code == 200, back.text
+    document = client.get(f"/api/v1/policies/{first}").json()["document"]
+    assert _desired(client, runner)["policies"]["network"] == document
+    history = back.json()["policy_history"]
+    stored = history[1]["policy_id"]
+    assert [(held["kind"], held["previous_id"], held["policy_id"]) for held in history] == [
+        ("network", first, None),
+        ("network", None, stored),
+        ("network", stored, first),
+    ]
+    assert client.get(f"/api/v1/policies/{stored}").json()["name"] == "beta-only"
+    for refused in (
+        {"kind": "network", "document": {"allow": []}},
+        {"kind": "network", "document": {"allow": [{"host": "localhost"}]}},
+        {"kind": "network", "document": {"allow": ["grep"]}},
+        {"kind": "shell", "document": wider},
+        {"kind": "network", "policy_id": "netpol_" + "0" * 32},
+    ):
+        assert client.post(path, json=refused).status_code == 422, refused
+    assert len(client.get(f"/api/v1/runs/{run_id}").json()["policy_history"]) == 3

@@ -7,10 +7,8 @@ from sqlmodel import Session
 from naos_api import consoles, gates, merges, runs
 from naos_api.clock import NowDep
 from naos_api.lifecycle import RunStatus
-from naos_api.mcp import McpPolicyIn
 from naos_api.models import Merge, Run, RunPolicy
 from naos_api.routes.deps import IdempotencyKey, SessionDep
-from naos_api.shell import ShellPolicyIn
 from naos_api.spec import PolicyId, PolicyKind, PolicyName, RunSpec, StrictModel
 
 MergePath = Annotated[str, Field(min_length=1, max_length=4096)]
@@ -42,7 +40,7 @@ class PolicyChangeRead(BaseModel):
 class PolicyChangeIn(StrictModel):
     kind: PolicyKind
     policy_id: PolicyId | None = None
-    document: McpPolicyIn | ShellPolicyIn | None = None
+    document: runs.Edited | None = None
     save: bool = False
     name: PolicyName | None = None
 

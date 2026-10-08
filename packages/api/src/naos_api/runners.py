@@ -506,11 +506,11 @@ def heartbeat(
 def _policies(session: Session, run: Run) -> dict[PolicyKind, dict[str, Any] | None]:
     refs = {
         PolicyKind.MOUNT: run.mount_policy_id,
-        PolicyKind.NETWORK: run.network_policy_id,
         PolicyKind.MODEL: run.model_policy_id,
     }
     policies: dict[PolicyKind, dict[str, Any] | None] = {
         PolicyKind.MCP: run.mcp_document,
+        PolicyKind.NETWORK: held_document(session, run, PolicyKind.NETWORK),
         PolicyKind.SHELL: held_document(session, run, PolicyKind.SHELL),
     }
     for kind, policy_id in refs.items():
