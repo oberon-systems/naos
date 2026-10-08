@@ -502,7 +502,7 @@ def audit_summary() -> Row:
         "last_seq": 41902,
         "events_24h": 1284,
         "sources": ["api", "runner"],
-        "denials": {"network": 5, "shell": 2, "mcp": 0},
+        "denials": {"network": 5, "shell": 2, "mcp": 0, "model": 0},
         "refused_24h": 0,
         "spool_lag": 4,
     }
