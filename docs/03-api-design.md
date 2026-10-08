@@ -353,13 +353,14 @@ curl -fsS "$api/api/v1/runs/$run/policies" -d '{"kind": "mcp", "document": {"rul
 curl -fsS "$api/api/v1/runs/$run/policies" -d '{"kind": "mcp", "save": true, "name": "alpha-search", "document": {"rules": [{"server": "alpha", "tool": "search", "effect": "allow"}]}}'
 curl -fsS "$api/api/v1/runs/$run/policies" -d '{"kind": "mcp", "policy_id": "mcppol_0123456789abcdef0123456789abcdef"}'
 curl -fsS "$api/api/v1/runs/$run/policies" -d '{"kind": "shell", "document": {"allow": ["read_file", "grep"]}}'
+curl -fsS "$api/api/v1/runs/$run/policies" -d '{"kind": "network", "document": {"allow": [{"protocol": "https", "host": "example.com"}]}}'
 ```
 
 | Answer | When |
 |---|---|
 | 200 with the Run | the Run holds the policy from now on, or already held exactly it |
 | 404 | the Run does not exist |
-| 409 | the Run is not STARTED, the kind is `network` or `model`, which the runner cannot apply to a running VM yet, or the `name` to save under is taken |
+| 409 | the Run is not STARTED, the kind is `model`, which the runner cannot apply to a running VM yet, or the `name` to save under is taken |
 | 422 | `kind` is `mount`, the policy does not exist or is of another kind, the document is invalid, belongs to another kind or names an unknown or disabled server, or `save` or `name` comes without what it needs |
 
 For `mcp` the API resolves the registry at that moment and replaces the
@@ -370,12 +371,14 @@ was created with. Every change adds a row to `policy_history`, where
 ([11](11-observability.md)). The runner applies the change on its next
 reconcile pass ([08](08-mcp-gate.md#live-changes)).
 
-For `shell` the document is the capability list and nothing is resolved. The
-Run keeps it in the `policy_history` row of the change, and the desired state
-carries the document of the latest `shell` row, or the policy the Run was
-created with when there is none. `spec.shell` keeps that first policy. The
-runner swaps the capabilities on its next reconcile pass
-([07](07-shell-gate.md#live-changes)); the mount policy never changes.
+For `network` and `shell` the document is resolved like `POST /policies`
+resolves it. The Run keeps it in the `policy_history` row of the change, and
+the desired state carries the document of the latest row of that kind, or the
+policy the Run was created with when there is none. `spec.network` and
+`spec.shell` keep that first policy. The runner swaps the rules
+([06](06-network-gate.md#live-changes)) or the capabilities
+([07](07-shell-gate.md#live-changes)) on its next reconcile pass; the mount
+policy never changes.
 
 ## Profiles
 

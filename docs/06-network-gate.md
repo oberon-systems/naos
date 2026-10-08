@@ -45,9 +45,9 @@ address literal in `host` is refused - addresses belong in `ip`, which is
 matched against what the destination resolves to. So are `localhost` and any
 name with an empty, over-long or otherwise invalid label.
 
-A Run points at the policy through `spec.network.policy`. The reference becomes
-immutable once the Run starts, and the runner receives the resolved document as
-a snapshot rather than the id.
+A Run points at the policy through `spec.network.policy`, and the runner
+receives the resolved document as a snapshot rather than the id. An operator
+can change the policy of a started Run ([Live changes](#live-changes)).
 
 ## Enforcement point
 
@@ -59,8 +59,8 @@ The runner builds the gate in `Runtime::ensure`, before the image is fetched, so
 a policy it cannot parse fails the Run instead of starting a VM that would be
 enforced by nothing. The gate is then registered against the Run id for as long
 as the VM lives and removed when the VM is destroyed. A reconcile pass keeps the
-gate it registered: the policy is immutable for the life of the Run, and
-rebuilding the gate would hand the Run a fresh request budget on every tick.
+gate it registered and swaps only its rules: rebuilding the gate would hand the
+Run a fresh request budget on every tick.
 
 The gate owns the HTTP client and never hands one out. A caller submits a
 `GateRequest` and receives a `GateResponse`, so an authorization can never be
@@ -103,6 +103,30 @@ The gate is a client, not a proxy. It never issues `CONNECT`, environment proxy
 settings are ignored, and the VM has no network device, so the agent has no
 proxy to reach either way.
 
+## Live changes
+
+An operator changes the `network` policy of a STARTED Run through the API
+([03](03-api-design.md#changing-a-policy-of-a-started-run)), and the desired
+state then carries the new document. The runner hands it to the Run's gate on
+its next reconcile pass:
+
+- The gate swaps the allow and deny lists whole. A request takes both lists
+  once, when it is authorized, so the swap falls between two requests and a
+  request in flight ends under the policy it started with.
+- A host that was added answers the next request, and one that was taken away
+  is denied from the next request on.
+- The request budget belongs to the Run, not to a rule, so every request
+  spent before the swap stays spent.
+- After the swap the broker sends `notifications/tools/list_changed` to an
+  initialized agent ([08](08-mcp-gate.md#live-changes)), because
+  `http_request` is listed only while the policy allows something.
+- A document the runner cannot read grants nothing: every request is denied
+  until a readable document arrives, and the reconcile pass reports the error.
+
+```bash
+curl -fsS "$api/api/v1/runs/$run/policies" -d '{"kind": "network", "document": {"allow": [{"protocol": "https", "host": "example.com"}]}}'
+```
+
 ## Limits
 
 | Limit | Value |
@@ -128,7 +152,7 @@ The gate writes to the `audit` target ([11](11-observability.md)):
 
 | Event | Fields |
 |---|---|
-| `network_policy_configured` | `run_id` |
+| `network_policy_configured` | `run_id`; at the start of the VM and each time the gate holds a changed policy |
 | `network_allowed` | `run_id`, `protocol`, `host`, `rule` |
 | `network_denied` | `run_id`, `protocol`, `host`, `rule`, `reason` |
 
@@ -144,7 +168,10 @@ Acceptance tests must verify:
 - forbidden destinations cannot be reached;
 - direct IP, localhost, RFC1918 and IPv6 loopback are denied;
 - DNS rebinding, redirects and proxy bypass cannot route around the policy;
-- malformed hostnames and malformed policies are refused.
+- malformed hostnames and malformed policies are refused;
+- a host added to a running Run answers its next request and a removed one is
+  denied from the next request on;
+- a request in flight finishes under the policy it started with.
 
 The gate tests in `packages/runner/src/libs/network/tests.rs` cover all of
 these, and `packages/api/tests/test_network.py` covers policy resolution. The
