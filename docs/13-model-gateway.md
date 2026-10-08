@@ -10,8 +10,9 @@ URL works, whichever vendor made it.
 
 ## Transport
 
-A Run with a model policy gets a vsock device, and each guest connection is
-its own vsock stream to the runner:
+Every Run has a model policy ([03](03-api-design.md#policies)), so every VM
+gets a vsock device, and each guest connection is its own vsock stream to the
+runner:
 
 ```text
 agent -> 127.0.0.1:4000 -> socat -> vsock host:<port> -> runner
@@ -122,6 +123,30 @@ overshot by the calls in flight at that moment. The budget and the rate
 window live in the runner's memory, and a restart of the runner starts them
 afresh. Both are listed in [01](01-security-model.md#host-risks).
 
+## Live changes
+
+An operator changes the `model` policy of a STARTED Run through the API
+([03](03-api-design.md#changing-a-policy-of-a-started-run)), and the desired
+state then carries the new document. The runner hands it to the Run's gateway
+on its next reconcile pass and writes `model_policy_configured` once the
+gateway holds it:
+
+- The gateway swaps the providers and the budget whole. A call takes them
+  once, when it is routed, so the swap falls between two calls and a call or
+  stream in flight ends under the policy it started with.
+- A model that was added answers the next call, and one that was taken away
+  is refused with 404 from the next call on.
+- The tokens the Run spent stay spent; only the limits come from the new
+  document. A provider the document names unchanged keeps its rate window.
+- The key of a provider that was taken away leaves the runner with the swap,
+  and the API stops issuing it.
+- A document the runner cannot read grants nothing: every call is refused
+  until a readable document arrives, and the reconcile pass reports the error.
+
+```bash
+curl -fsS "$api/api/v1/runs/$run/policies" -d '{"kind": "model", "document": {"providers": [{"name": "alpha", "api": "openai", "url": "https://api.example.com", "credential": "alpha-key", "models": ["alpha-mini"]}], "max_input_tokens": 2000000, "max_output_tokens": 200000}}'
+```
+
 ## Failure behavior
 
 Every refusal is in the error shape of the dialect of the path: openai
@@ -184,7 +209,16 @@ The tests in `packages/runner/src/libs/model/tests.rs` verify that:
 - usage is read from both event streams;
 - over a connection, a request is answered and the connection ends,
   connections are served side by side, malformed requests are refused, and a
-  client that leaves before or during the answer ends the call.
+  client that leaves before or during the answer ends the call;
+- a changed policy applies from the next call, keeps the tokens spent and the
+  rate window of an unchanged provider, and lets go of a removed key; a
+  stream in flight ends under the policy it started with; a document the
+  runner cannot read grants nothing.
+
+`sync_swaps_a_changed_model_policy_and_lets_go_of_a_removed_key` in
+`packages/runner/src/libs/runtime/tests.rs` checks the same through a
+reconcile pass, and `test_a_started_run_takes_another_model_policy` in
+`packages/api/tests/test_run_policies.py` the API side.
 
 The API tests in `packages/api/tests/test_model.py`,
 `test_runner_lifecycle.py`, `test_secrets.py` and `test_audit.py` cover the
@@ -192,7 +226,9 @@ policy, the credential issue and the audit schema.
 
 The smoke test runs a stub provider of each dialect over https, calls both
 through the gateway from the guest, and is refused a model outside the policy
-and a call past the budget. It fails when a provider key shows up in a log,
+and a call past the budget. It then edits the `model` policy of the started
+Run: a model added to it answers, a removed one is refused, and the stored
+policy given back finds the budget already spent. It fails when a provider key shows up in a log,
 the audit or the console log.
 
 ```bash

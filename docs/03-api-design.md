@@ -318,7 +318,11 @@ document that already has one. An unnamed policy takes the name of a later
 `POST` with the same document, and `policy_named` records it.
 
 A Run names a policy per kind under `spec.mounts`, `spec.network`, `spec.shell`,
-`spec.mcp` and `spec.model`, and the spec never changes after that. The
+`spec.mcp` and `spec.model`, and the spec never changes after that.
+`spec.model` is required: a VM gets its model gateway only when it boots
+([13](13-model-gateway.md#transport)), so a Run without one could never take
+a model later, and `POST /runs` answers 422. A profile may leave it out, but a
+Run started from that profile is refused the same way. The
 runner receives the resolved document as a snapshot rather than
 the id. For `mcp` that snapshot is the Run's own, taken when the Run is
 created ([MCP servers](#mcp-servers)) and again when an operator changes the
@@ -354,13 +358,14 @@ curl -fsS "$api/api/v1/runs/$run/policies" -d '{"kind": "mcp", "save": true, "na
 curl -fsS "$api/api/v1/runs/$run/policies" -d '{"kind": "mcp", "policy_id": "mcppol_0123456789abcdef0123456789abcdef"}'
 curl -fsS "$api/api/v1/runs/$run/policies" -d '{"kind": "shell", "document": {"allow": ["read_file", "grep"]}}'
 curl -fsS "$api/api/v1/runs/$run/policies" -d '{"kind": "network", "document": {"allow": [{"protocol": "https", "host": "example.com"}]}}'
+curl -fsS "$api/api/v1/runs/$run/policies" -d '{"kind": "model", "policy_id": "modelpol_0123456789abcdef0123456789abcdef"}'
 ```
 
 | Answer | When |
 |---|---|
 | 200 with the Run | the Run holds the policy from now on, or already held exactly it |
 | 404 | the Run does not exist |
-| 409 | the Run is not STARTED, the kind is `model`, which the runner cannot apply to a running VM yet, or the `name` to save under is taken |
+| 409 | the Run is not STARTED, or the `name` to save under is taken |
 | 422 | `kind` is `mount`, the policy does not exist or is of another kind, the document is invalid, belongs to another kind or names an unknown or disabled server, or `save` or `name` comes without what it needs |
 
 For `mcp` the API resolves the registry at that moment and replaces the
@@ -371,14 +376,17 @@ was created with. Every change adds a row to `policy_history`, where
 ([11](11-observability.md)). The runner applies the change on its next
 reconcile pass ([08](08-mcp-gate.md#live-changes)).
 
-For `network` and `shell` the document is resolved like `POST /policies`
-resolves it. The Run keeps it in the `policy_history` row of the change, and
+For `network`, `shell` and `model` the document is resolved like
+`POST /policies` resolves it. The Run keeps it in the `policy_history` row of the change, and
 the desired state carries the document of the latest row of that kind, or the
-policy the Run was created with when there is none. `spec.network` and
-`spec.shell` keep that first policy. The runner swaps the rules
-([06](06-network-gate.md#live-changes)) or the capabilities
-([07](07-shell-gate.md#live-changes)) on its next reconcile pass; the mount
-policy never changes.
+policy the Run was created with when there is none. `spec.network`,
+`spec.shell` and `spec.model` keep that first policy. The runner swaps the
+rules ([06](06-network-gate.md#live-changes)), the capabilities
+([07](07-shell-gate.md#live-changes)) or the providers
+([13](13-model-gateway.md#live-changes)) on its next reconcile pass; the
+mount policy never changes. The credentials of the desired state follow the
+held `model` document, so the key of a provider that was taken away is no
+longer issued.
 
 ## Profiles
 

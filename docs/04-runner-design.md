@@ -131,14 +131,16 @@ The QEMU runtime turns one desired Run into one VM. Starting a Run takes these
 steps, and any failure stops it, removes the VM directory and drops the gates
 registered for the Run:
 
-1. build the network, shell and MCP gates from the policy snapshots and
-   register them against the Run, then refuse the Run when it grants a policy
-   kind the runtime does not know; every reconcile hands the kept MCP gate the
-   mcp document and the credentials of the latest desired state, and the
-   gate swaps its policy when the document changed
-   ([08](08-mcp-gate.md#live-changes)); the kept network and shell gates take
-   their documents the same way ([06](06-network-gate.md#live-changes),
-   [07](07-shell-gate.md#live-changes));
+1. build the network, shell, MCP and model gates from the policy snapshots
+   and register them against the Run, then refuse the Run when it grants a
+   policy kind the runtime does not know; every reconcile hands the kept MCP
+   gate the mcp document and the credentials of the latest desired state, and
+   the gate swaps its policy when the document changed
+   ([08](08-mcp-gate.md#live-changes)); the kept network, shell and model
+   gates take their documents the same way
+   ([06](06-network-gate.md#live-changes),
+   [07](07-shell-gate.md#live-changes),
+   [13](13-model-gateway.md#live-changes));
 2. download the image from the `image_url` the API returned into the cache
    unless a file already has its name: the agent follows at most five
    redirects and never sends its runner token there, the download goes to a
