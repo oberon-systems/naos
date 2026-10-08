@@ -19,7 +19,10 @@ BIGGER = {**PROFILE_SPEC, "runtime": {"cpu": 4, "memory_mib": 8192, "disk_gib": 
 
 
 @pytest.fixture
-def image(spec_body: dict[str, Any]) -> dict[str, Any]:
+def image(spec_body: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    # A Run needs a model policy, so the profiles these tests run from name the stored one.
+    for spec in (PROFILE_SPEC, BIGGER):
+        monkeypatch.setitem(spec, "model", spec_body["model"])
     ref: dict[str, Any] = spec_body["image"]
     return ref
 
@@ -99,6 +102,17 @@ def test_the_list_searches_name_and_id(client: TestClient) -> None:
     assert [row["name"] for row in by_name] == ["alpha-build"]
     assert [row["id"] for row in by_id] == [alpha["id"]]
     assert [row["name"] for row in everything] == ["alpha-build", "beta-docs"]
+
+
+def test_a_profile_without_a_model_policy_starts_no_run(
+    client: TestClient, image: dict[str, Any]
+) -> None:
+    spec = {key: value for key, value in PROFILE_SPEC.items() if key != "model"}
+    profile = _create(client, spec=spec)
+
+    _run(client, profile["id"], image, status=422)
+
+    assert client.get("/api/v1/runs").json() == []
 
 
 def test_a_run_copies_the_profile_and_records_it(
@@ -229,7 +243,6 @@ def test_an_update_is_refused_while_a_run_is_active(
         "network": {"policy": None},
         "shell": {"policy": None},
         "mcp": {"policy": None},
-        "model": {"policy": None},
     }
 
 

@@ -15,8 +15,10 @@ from naos_api.app import create_app
 from naos_api.auth import require_principal
 from naos_api.clock import get_now
 from naos_api.db import Database
-from naos_api.models import Image, McpServer
+from naos_api.model import ModelPolicyIn, ProviderIn, resolve_model_policy
+from naos_api.models import Image, McpServer, Policy
 from naos_api.settings import Settings, get_settings
+from naos_api.spec import PolicyKind, digest_of
 
 MOUNT_ROOTS = ["/srv/projects", "/srv/agent-home"]
 IMAGE_DIGEST = "sha256:" + "a" * 64
@@ -155,10 +157,24 @@ def create_run(client: TestClient, spec_body: dict[str, Any]) -> Callable[[str],
 @pytest.fixture
 def spec_body(session: Session) -> dict[str, Any]:
     session.add(Image(id="image_alpha", version="1.0.0", digest=IMAGE_DIGEST, url=IMAGE_URL))
+    provider = ProviderIn(
+        name="gamma",
+        api="openai",
+        url="https://gamma.example.com",
+        credential="gamma-key",
+        models=["gamma-mini"],
+    )
+    models = ModelPolicyIn(providers=[provider], max_input_tokens=1000, max_output_tokens=100)
+    document = resolve_model_policy(models).model_dump(mode="json")
+    # Stored without the service, so tests reading the audit trail see no policy_created.
+    digest = digest_of(document)
+    policy_id = "modelpol_" + "c" * 32
+    session.add(Policy(id=policy_id, kind=PolicyKind.MODEL, digest=digest, document=document))
     session.commit()
     return {
         "image": {"id": "image_alpha", "digest": IMAGE_DIGEST},
         "runtime": {"cpu": 2, "memory_mib": 2048, "disk_gib": 10},
+        "model": {"policy": policy_id},
         "timeout": 3600,
     }
 

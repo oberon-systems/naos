@@ -504,19 +504,14 @@ def heartbeat(
 
 
 def _policies(session: Session, run: Run) -> dict[PolicyKind, dict[str, Any] | None]:
-    refs = {
-        PolicyKind.MOUNT: run.mount_policy_id,
-        PolicyKind.MODEL: run.model_policy_id,
-    }
-    policies: dict[PolicyKind, dict[str, Any] | None] = {
+    mount = session.get(Policy, run.mount_policy_id) if run.mount_policy_id else None
+    return {
+        PolicyKind.MOUNT: mount.document if mount else None,
         PolicyKind.MCP: run.mcp_document,
         PolicyKind.NETWORK: held_document(session, run, PolicyKind.NETWORK),
         PolicyKind.SHELL: held_document(session, run, PolicyKind.SHELL),
+        PolicyKind.MODEL: held_document(session, run, PolicyKind.MODEL),
     }
-    for kind, policy_id in refs.items():
-        policy = session.get(Policy, policy_id) if policy_id else None
-        policies[kind] = policy.document if policy else None
-    return policies
 
 
 def _credential_names(policies: dict[PolicyKind, dict[str, Any] | None]) -> set[str]:

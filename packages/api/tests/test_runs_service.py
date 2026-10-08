@@ -225,6 +225,16 @@ def test_unknown_policy_reference_is_rejected(
     assert runs.list_runs(session) == []
 
 
+def test_a_run_without_a_model_policy_is_rejected(
+    session: Session, spec_body: dict[str, Any]
+) -> None:
+    body = {key: value for key, value in spec_body.items() if key != "model"}
+
+    with pytest.raises(PolicyError, match="model policy"):
+        runs.create_run(session, _spec(body), "key-1")
+    assert runs.list_runs(session) == []
+
+
 def test_policy_reference_of_wrong_kind_is_rejected(
     session: Session, settings: Settings, spec_body: dict[str, Any], mount_body: dict[str, Any]
 ) -> None:

@@ -7,7 +7,8 @@ from naos_api.spec import PolicyKind, RunSpec, digest_of
 
 
 def test_minimal_spec_grants_no_policies(spec_body: dict[str, Any]) -> None:
-    spec = RunSpec.model_validate(spec_body)
+    minimal = {key: value for key, value in spec_body.items() if key != "model"}
+    spec = RunSpec.model_validate(minimal)
 
     assert spec.merge.policy == "ask"
     assert set(spec.policy_refs()) == set(PolicyKind)

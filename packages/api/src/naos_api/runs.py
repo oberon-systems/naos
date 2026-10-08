@@ -14,16 +14,17 @@ from naos_api.errors import (
     InvalidTransitionError,
     NotFoundError,
     PolicyError,
-    PolicyLockedError,
 )
 from naos_api.images.service import booted_image, check_image
 from naos_api.lifecycle import ACTIVE, TERMINAL, RunStatus, ensure_transition
 from naos_api.mcp import McpPolicyIn, resolve_mcp_policy
+from naos_api.model import ModelPolicyIn, resolve_model_policy
 from naos_api.models import Lease, Merge, Policy, Profile, Run, Runner, RunPolicy
 from naos_api.network import NetworkPolicyIn, resolve_network_policy
 from naos_api.policies import (
     check_refs,
     create_mcp_policy,
+    create_model_policy,
     create_network_policy,
     create_shell_policy,
     held_document,
@@ -46,10 +47,7 @@ STATES: dict[RunState, frozenset[RunStatus]] = {
     "failed": frozenset({RunStatus.FAILED}),
 }
 
-# The kinds a runner can apply to a running VM; mounts are fixed when the VM starts.
-LIVE_KINDS = frozenset({PolicyKind.NETWORK, PolicyKind.SHELL, PolicyKind.MCP})
-
-Edited = McpPolicyIn | NetworkPolicyIn | ShellPolicyIn
+Edited = McpPolicyIn | NetworkPolicyIn | ShellPolicyIn | ModelPolicyIn
 
 _STOP_TARGETS = {
     RunStatus.PENDING: RunStatus.CANCELLED,
@@ -131,6 +129,8 @@ def create_run(
     if existing is not None:
         return _replay(existing, request_digest), False
 
+    if spec.model.policy is None:
+        raise PolicyError("a run needs a model policy")
     check_refs(session, spec)
     check_image(session, spec.image)
     _check_runner(session, spec.runner)
@@ -400,6 +400,8 @@ def _edited(kind: PolicyKind, edited: Edited) -> dict[str, Any]:
         return resolve_network_policy(edited).model_dump(mode="json")
     if kind is PolicyKind.SHELL and isinstance(edited, ShellPolicyIn):
         return resolve_shell_policy(edited).model_dump(mode="json")
+    if kind is PolicyKind.MODEL and isinstance(edited, ModelPolicyIn):
+        return resolve_model_policy(edited).model_dump(mode="json")
     raise PolicyError(f"the document is not a {kind} policy")
 
 
@@ -408,6 +410,8 @@ def _saved(session: Session, edited: Edited, name: str | None) -> str:
         return create_mcp_policy(session, edited, name)[0].id
     if isinstance(edited, NetworkPolicyIn):
         return create_network_policy(session, edited, name)[0].id
+    if isinstance(edited, ModelPolicyIn):
+        return create_model_policy(session, edited, name)[0].id
     return create_shell_policy(session, edited, name)[0].id
 
 
@@ -428,8 +432,6 @@ def change_policy(
     run = get_run(session, run_id)
     if kind is PolicyKind.MOUNT:
         raise PolicyError("the mount policy of a run cannot change")
-    if kind not in LIVE_KINDS:
-        raise PolicyLockedError(f"the {kind} policy of a running run cannot change yet")
     if edited is not None:
         rules = _edited(kind, edited)
     elif policy_id is not None:

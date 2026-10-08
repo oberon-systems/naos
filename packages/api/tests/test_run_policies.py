@@ -207,7 +207,7 @@ def test_a_change_the_run_cannot_take_is_refused(
     client.post("/api/v1/mcp-servers/beta/disable")
 
     assert _change(client, run_id, mount.json()["id"], "mount").status_code == 422
-    assert _change(client, run_id, "modelpol_" + "0" * 32, "model").status_code == 409
+    assert _change(client, run_id, "modelpol_" + "0" * 32, "model").status_code == 422
     assert _change(client, run_id, network.json()["id"]).status_code == 422
     assert _change(client, run_id, "mcppol_" + "0" * 32).status_code == 422
     assert _change(client, run_id, second).status_code == 422
@@ -325,6 +325,62 @@ def test_a_started_run_takes_another_network_policy(
         {"kind": "network", "document": {"allow": ["grep"]}},
         {"kind": "shell", "document": wider},
         {"kind": "network", "policy_id": "netpol_" + "0" * 32},
+    ):
+        assert client.post(path, json=refused).status_code == 422, refused
+    assert len(client.get(f"/api/v1/runs/{run_id}").json()["policy_history"]) == 3
+
+
+def _provider(name: str, *models: str) -> dict[str, Any]:
+    url = f"https://{name}.example.com"
+    credential = f"{name}-key"
+    return {"name": name, "api": "openai", "url": url, "credential": credential, "models": models}
+
+
+def test_a_started_run_takes_another_model_policy(
+    client: TestClient, register: Register, spec_body: dict[str, Any]
+) -> None:
+    for name in ("gamma", "delta"):
+        client.post("/api/v1/secrets", json={"name": f"{name}-key", "value": f"secret-{name}"})
+    first = spec_body["model"]["policy"]
+    runner = register()
+    run_id = _started(client, runner, spec_body, None)
+    path = f"/api/v1/runs/{run_id}/policies"
+    budget = {"max_input_tokens": 500, "max_output_tokens": 50}
+    wider = {"providers": [_provider("gamma", "gamma-mini"), _provider("delta", "delta-large")]}
+    only_delta = {"providers": [_provider("delta", "delta-large")]} | budget
+    shared = {"providers": [_provider("gamma", "gamma-mini"), _provider("delta", "gamma-mini")]}
+
+    issued = set(_desired(client, runner)["credentials"])
+    edited = client.post(path, json={"kind": "model", "document": wider | budget})
+    both = _desired(client, runner)
+    saved = client.post(path, json={"kind": "model", "document": only_delta, "save": True})
+    without_gamma = _desired(client, runner)
+    back = _change(client, run_id, first, "model")
+
+    assert issued == {"gamma-key"}
+    assert edited.status_code == 200, edited.text
+    assert [p["name"] for p in both["policies"]["model"]["providers"]] == ["delta", "gamma"]
+    assert set(both["credentials"]) == {"gamma-key", "delta-key"}
+    assert saved.status_code == 200, saved.text
+    assert set(without_gamma["credentials"]) == {"delta-key"}
+    assert without_gamma["policies"]["model"]["max_input_tokens"] == 500
+    assert back.status_code == 200, back.text
+    document = client.get(f"/api/v1/policies/{first}").json()["document"]
+    assert _desired(client, runner)["policies"]["model"] == document
+    history = back.json()["policy_history"]
+    stored = history[1]["policy_id"]
+    assert [(held["kind"], held["previous_id"], held["policy_id"]) for held in history] == [
+        ("model", first, None),
+        ("model", None, stored),
+        ("model", stored, first),
+    ]
+    for refused in (
+        {"kind": "model", "document": {"providers": []} | budget},
+        {"kind": "model", "document": {"providers": [_provider("delta", "a", "a")]} | budget},
+        {"kind": "model", "document": shared | budget},
+        {"kind": "model", "document": {"allow": ["grep"]}},
+        {"kind": "shell", "document": only_delta},
+        {"kind": "model", "policy_id": "modelpol_" + "0" * 32},
     ):
         assert client.post(path, json=refused).status_code == 422, refused
     assert len(client.get(f"/api/v1/runs/{run_id}").json()["policy_history"]) == 3
