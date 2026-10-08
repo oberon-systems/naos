@@ -646,3 +646,102 @@ async fn a_client_that_leaves_during_a_stream_ends_the_relay() {
     })
     .await;
 }
+
+fn changed(address: SocketAddr) -> Value {
+    let mut document = document(address, (1_000, 1_000), 1);
+    document["providers"][1] = json!({
+        "name": "gamma", "api": "openai", "url": format!("http://example.com:{}", address.port()),
+        "credential": "alpha-key", "models": ["gamma-mini"], "timeout_seconds": 5,
+        "max_requests_per_minute": 1,
+    });
+    document
+}
+
+#[tokio::test]
+async fn a_changed_policy_applies_from_the_next_request_and_keeps_what_was_spent() {
+    let server = MockServer::start().await;
+    Mock::given(path(CHAT))
+        .respond_with(openai_answer(3, 1))
+        .mount(&server)
+        .await;
+    Mock::given(path(MESSAGES))
+        .respond_with(anthropic_answer(4, 2))
+        .mount(&server)
+        .await;
+    let address = *server.address();
+    let gate = gate_for(&server, (1_000, 1_000), 1);
+    assert_eq!(answer(&gate, chat("alpha-mini")).await.0, 200);
+    assert_eq!(answer(&gate, messages("beta-large")).await.0, 200);
+
+    gate.replace_local(&changed(address), vec![address.ip()]);
+
+    assert_eq!(answer(&gate, chat("gamma-mini")).await.0, 200);
+    assert_eq!(answer(&gate, messages("beta-large")).await.0, 404);
+    assert_eq!(answer(&gate, chat("alpha-mini")).await.0, 429);
+    assert_eq!(
+        gate.spent(),
+        Usage {
+            input: 10,
+            output: 4
+        }
+    );
+    assert_eq!(gate.served(), ["alpha-mini", "gamma-mini"]);
+    assert!(gate.holds("alpha-key"));
+    assert!(!gate.holds("beta-key"));
+}
+
+#[tokio::test]
+async fn a_stream_in_flight_ends_under_the_policy_it_started_with() {
+    let server = MockServer::start().await;
+    let stream = "data: {\"choices\":[{\"delta\":{\"content\":\"a\"}}]}\n\n\
+                  data: {\"choices\":[],\"usage\":{\"prompt_tokens\":7,\"completion_tokens\":2}}\n\n\
+                  data: [DONE]\n\n";
+    Mock::given(path(CHAT))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(stream, "text/event-stream"))
+        .mount(&server)
+        .await;
+    let address = *server.address();
+    let gate = gate(&server);
+    let mut without_alpha = document(address, (1_000_000, 1_000_000), 60);
+    without_alpha["providers"] = json!([without_alpha["providers"][1].clone()]);
+    let Reply::Relay(mut relay) = gate
+        .handle(request(
+            CHAT,
+            json!({"model": "alpha-mini", "stream": true}),
+        ))
+        .await
+    else {
+        panic!("the call did not reach the provider");
+    };
+
+    gate.replace_local(&without_alpha, vec![address.ip()]);
+    let mut body = Vec::new();
+    while let Some(bytes) = relay.chunk().await.expect("chunk") {
+        body.extend_from_slice(&bytes);
+    }
+    gate.finish(&relay, Ok(()));
+
+    assert!(String::from_utf8_lossy(&body).contains("[DONE]"));
+    assert_eq!(
+        gate.spent(),
+        Usage {
+            input: 7,
+            output: 2
+        }
+    );
+    assert_eq!(answer(&gate, chat("alpha-mini")).await.0, 404);
+    assert!(!gate.holds("alpha-key"));
+}
+
+#[tokio::test]
+async fn an_unreadable_policy_grants_nothing_and_holds_no_key() {
+    let server = MockServer::start().await;
+    let address = *server.address();
+    let gate = gate(&server);
+
+    gate.replace_local(&json!({"providers": "alpha"}), vec![address.ip()]);
+
+    assert_eq!(answer(&gate, chat("alpha-mini")).await.0, 404);
+    assert!(gate.served().is_empty());
+    assert!(!gate.holds("alpha-key") && !gate.holds("beta-key"));
+}

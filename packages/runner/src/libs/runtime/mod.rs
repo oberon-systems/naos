@@ -179,6 +179,7 @@ impl QemuRuntime {
         if let Some(kept) = self.gates(&run.id) {
             kept.network.replace(policy("network"));
             kept.shell.replace(policy("shell"));
+            kept.model.replace(policy("model"));
         }
         let gates = RunGates {
             network: NetworkGate::from_snapshot(&run.id, policy("network"))?,
@@ -203,8 +204,8 @@ impl QemuRuntime {
                 granted.join(", ")
             )));
         }
-        // A reconcile keeps the gate it registered, so budgets survive a tick; the network, shell
-        // and mcp policies can change under a running VM, and their gates swap them in place.
+        // A reconcile keeps the gate it registered, so budgets survive a tick; every policy but
+        // mount can change under a running VM, and its gate swaps it in place.
         let kept = self
             .gates
             .lock()

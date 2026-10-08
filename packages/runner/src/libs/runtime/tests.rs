@@ -293,6 +293,63 @@ async fn sync_swaps_a_changed_network_policy_on_the_kept_gate() {
     assert!(!kept.network.allows_any());
 }
 
+fn provider(name: &str, scheme: &str) -> serde_json::Value {
+    json!({
+        "name": name, "api": "openai", "url": format!("{scheme}://{name}.example.com"),
+        "credential": format!("{name}-key"), "models": [format!("{name}-mini")],
+        "timeout_seconds": 60, "max_requests_per_minute": 60,
+    })
+}
+
+#[tokio::test]
+async fn sync_swaps_a_changed_model_policy_and_lets_go_of_a_removed_key() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let runtime =
+        QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
+    let mut run = desired_run("run_a", RunStatus::Started);
+    let vm = LocalVm {
+        vm_id: "vm_0123456789abcdef0123456789abcdef".into(),
+        run_id: run.id.clone(),
+        running: true,
+    };
+    run.credentials = ["alpha-key", "beta-key"]
+        .into_iter()
+        .map(|name| {
+            let credential = RunCredential {
+                value: format!("value-{name}"),
+                expires_at: u64::MAX,
+            };
+            (name.to_owned(), credential)
+        })
+        .collect();
+    let grant = |run: &mut DesiredRun, providers: Vec<serde_json::Value>| {
+        let document = json!({
+            "providers": providers, "max_input_tokens": 10, "max_output_tokens": 10,
+        });
+        run.policies.insert("model".into(), Some(document));
+    };
+
+    grant(
+        &mut run,
+        vec![provider("alpha", "https"), provider("beta", "https")],
+    );
+    runtime.sync(&run, &vm).await.expect("sync");
+    let first = runtime.gates(&run.id).expect("gates");
+    assert!(first.model.holds("beta-key"));
+    grant(&mut run, vec![provider("alpha", "https")]);
+    runtime.sync(&run, &vm).await.expect("sync again");
+
+    let kept = runtime.gates(&run.id).expect("gates");
+    assert!(Arc::ptr_eq(&first, &kept));
+    assert_eq!(kept.model.served(), ["alpha-mini"]);
+    assert!(kept.model.holds("alpha-key"));
+    assert!(!kept.model.holds("beta-key"));
+    grant(&mut run, vec![provider("alpha", "http")]);
+    runtime.sync(&run, &vm).await.expect_err("refused");
+    assert!(kept.model.served().is_empty());
+    assert!(!kept.model.holds("alpha-key"));
+}
+
 #[tokio::test]
 async fn runs_sharing_a_guest_path_read_only_their_own_mounts() {
     let dir = tempfile::tempdir().expect("tempdir");

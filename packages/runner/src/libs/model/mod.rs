@@ -1,6 +1,6 @@
 //! The model gateway a guest reaches over vsock: plain HTTP in, the provider's HTTPS out.
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
@@ -45,7 +45,7 @@ pub enum Dialect {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct PolicyDoc {
-    providers: Vec<ProviderDoc>,
+    providers: Vec<Value>,
     max_input_tokens: u64,
     max_output_tokens: u64,
 }
@@ -64,6 +64,7 @@ struct ProviderDoc {
 
 #[derive(Debug)]
 struct Provider {
+    source: Value,
     name: String,
     api: Dialect,
     url: String,
@@ -167,40 +168,34 @@ impl Relay {
     }
 }
 
-/// The providers of one Run, its token budget and the credentials the API last issued for it.
-#[derive(Debug)]
-pub struct ModelGate {
-    run_id: String,
-    providers: Vec<Provider>,
+type Connect<'a> = &'a dyn Fn(&str, &Value) -> Result<NetworkGate, AgentError>;
+
+/// One model policy as the gate holds it: the providers it serves and the Run's token budget.
+#[derive(Debug, Default)]
+struct Policy {
+    document: Option<Value>,
+    providers: Vec<Arc<Provider>>,
     budget: Usage,
-    spent: Mutex<Usage>,
-    credentials: Mutex<BTreeMap<String, RunCredential>>,
 }
 
-impl ModelGate {
-    pub fn from_snapshot(run_id: &str, document: Option<&Value>) -> Result<Self, AgentError> {
-        Self::build(run_id, document, "https", &gate)
-    }
-
-    fn build(
+impl Policy {
+    /// A provider the document names unchanged is taken over from `kept` with its rate window.
+    fn parse(
         run_id: &str,
         document: Option<&Value>,
         scheme: &str,
-        gate: &dyn Fn(&str, &Value) -> Result<NetworkGate, AgentError>,
+        gate: Connect<'_>,
+        kept: &[Arc<Provider>],
     ) -> Result<Self, AgentError> {
         let Some(value) = document else {
-            return Ok(Self {
-                run_id: run_id.to_owned(),
-                providers: vec![],
-                budget: Usage::default(),
-                spent: Mutex::new(Usage::default()),
-                credentials: Mutex::new(BTreeMap::new()),
-            });
+            return Ok(Self::default());
         };
         let doc: PolicyDoc =
             serde_json::from_value(value.clone()).map_err(|err| invalid(&err.to_string()))?;
-        let mut providers: Vec<Provider> = Vec::new();
-        for provider in doc.providers {
+        let mut providers: Vec<Arc<Provider>> = Vec::new();
+        for source in doc.providers {
+            let provider: ProviderDoc =
+                serde_json::from_value(source.clone()).map_err(|err| invalid(&err.to_string()))?;
             let url = Url::parse(&provider.url)
                 .map_err(|err| invalid(&format!("{}: {err}", provider.name)))?;
             let host = url
@@ -223,11 +218,16 @@ impl ModelGate {
                     provider.name
                 )));
             }
+            if let Some(same) = kept.iter().find(|old| old.source == source) {
+                providers.push(Arc::clone(same));
+                continue;
+            }
             let network = gate(
                 run_id,
                 &json!({ "allow": [{ "protocol": scheme, "host": host }] }),
             )?;
-            providers.push(Provider {
+            providers.push(Arc::new(Provider {
+                source,
                 name: provider.name,
                 api: provider.api,
                 url: provider.url.trim_end_matches('/').to_owned(),
@@ -237,27 +237,100 @@ impl ModelGate {
                 max_requests: provider.max_requests_per_minute,
                 window: Mutex::new((Instant::now(), 0)),
                 network,
-            });
+            }));
         }
         Ok(Self {
-            run_id: run_id.to_owned(),
+            document: Some(value.clone()),
             providers,
             budget: Usage {
                 input: doc.max_input_tokens,
                 output: doc.max_output_tokens,
             },
+        })
+    }
+
+    fn credentials(&self) -> BTreeSet<&str> {
+        self.providers
+            .iter()
+            .map(|provider| provider.credential.as_str())
+            .collect()
+    }
+}
+
+/// The providers of one Run, its token budget and the credentials the API last issued for it;
+/// the policy can be replaced under a running VM, what the Run spent cannot.
+#[derive(Debug)]
+pub struct ModelGate {
+    run_id: String,
+    policy: Mutex<Arc<Policy>>,
+    spent: Mutex<Usage>,
+    credentials: Mutex<BTreeMap<String, RunCredential>>,
+}
+
+impl ModelGate {
+    pub fn from_snapshot(run_id: &str, document: Option<&Value>) -> Result<Self, AgentError> {
+        Self::build(run_id, document, "https", &gate)
+    }
+
+    fn build(
+        run_id: &str,
+        document: Option<&Value>,
+        scheme: &str,
+        gate: Connect<'_>,
+    ) -> Result<Self, AgentError> {
+        Ok(Self {
+            run_id: run_id.to_owned(),
+            policy: Mutex::new(Arc::new(Policy::parse(
+                run_id,
+                document,
+                scheme,
+                gate,
+                &[],
+            )?)),
             spent: Mutex::new(Usage::default()),
             credentials: Mutex::new(BTreeMap::new()),
         })
     }
 
+    fn policy(&self) -> Arc<Policy> {
+        Arc::clone(&self.policy.lock().expect("policy"))
+    }
+
+    /// Swaps in a changed document between requests; one that cannot be read grants nothing.
+    pub fn replace(&self, document: Option<&Value>) {
+        self.swap(document, "https", &gate);
+    }
+
+    fn swap(&self, document: Option<&Value>, scheme: &str, gate: Connect<'_>) {
+        let current = self.policy();
+        if current.document.as_ref() == document {
+            return;
+        }
+        let next = match Policy::parse(&self.run_id, document, scheme, gate, &current.providers) {
+            Ok(next) => {
+                audit::model_policy_configured(&self.run_id);
+                next
+            }
+            Err(err) => {
+                tracing::warn!(run_id = %self.run_id, error = %err, "the new model policy grants nothing");
+                Policy {
+                    document: document.cloned(),
+                    ..Policy::default()
+                }
+            }
+        };
+        let names = next.credentials();
+        self.credentials
+            .lock()
+            .expect("credentials")
+            .retain(|name, _| names.contains(name.as_str()));
+        *self.policy.lock().expect("policy") = Arc::new(next);
+    }
+
     /// Keeps only the credentials of this gate's providers; the MCP gate holds its own.
     pub fn refresh(&self, credentials: &BTreeMap<String, RunCredential>) {
-        let names: BTreeSet<&str> = self
-            .providers
-            .iter()
-            .map(|provider| provider.credential.as_str())
-            .collect();
+        let policy = self.policy();
+        let names = policy.credentials();
         *self.credentials.lock().expect("credentials") = credentials
             .iter()
             .filter(|(name, _)| names.contains(name.as_str()))
@@ -368,6 +441,7 @@ impl ModelGate {
 
     fn listing(&self) -> Vec<u8> {
         let data: Vec<Value> = self
+            .policy()
             .providers
             .iter()
             .filter(|provider| provider.api == Dialect::Openai)
@@ -393,7 +467,8 @@ impl ModelGate {
             .ok_or_else(|| Refusal::invalid(400, "body has no model"))?
             .to_owned();
         let named = model_name(&model);
-        let provider = self
+        let policy = self.policy();
+        let provider = policy
             .providers
             .iter()
             .find(|provider| provider.api == dialect && provider.models.contains(&model))
@@ -420,7 +495,7 @@ impl ModelGate {
         }
         {
             let spent = self.spent.lock().expect("spent");
-            if spent.input >= self.budget.input || spent.output >= self.budget.output {
+            if spent.input >= policy.budget.input || spent.output >= policy.budget.output {
                 return Err(refuse(429, "the Run's token budget is spent", "budget"));
             }
         }
@@ -593,6 +668,27 @@ impl ModelGate {
         Self::build("run_a", Some(document), "http", &|_, policy| {
             NetworkGate::local(policy, ips.clone())
         })
+    }
+
+    pub(crate) fn replace_local(&self, document: &Value, ips: Vec<std::net::IpAddr>) {
+        self.swap(Some(document), "http", &|_, policy| {
+            NetworkGate::local(policy, ips.clone())
+        });
+    }
+
+    pub(crate) fn served(&self) -> Vec<String> {
+        self.policy()
+            .providers
+            .iter()
+            .flat_map(|provider| provider.models.iter().cloned())
+            .collect()
+    }
+
+    pub(crate) fn holds(&self, credential: &str) -> bool {
+        self.credentials
+            .lock()
+            .expect("credentials")
+            .contains_key(credential)
     }
 }
 
