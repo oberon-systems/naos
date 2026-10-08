@@ -413,17 +413,32 @@ import json, sys
 
 rows = json.load(sys.stdin)["policy_history"]
 held = [(row["kind"], row["previous_id"], row["policy_id"]) for row in rows]
-mcp, shell = sys.argv[1:]
-kept = [("mcp", mcp, None), ("mcp", None, mcp), ("shell", shell, None), ("shell", None, shell)]
+mcp, network, shell = sys.argv[1:]
+kept = [("mcp", mcp, None), ("mcp", None, mcp)]
+kept += [("network", network, None), ("shell", shell, None)]
+kept += [("network", None, network), ("shell", None, shell)]
 if held != kept:
     sys.exit(f"the run did not keep the policies it held: {held}")
-' "$mcp_policy" "$shell_policy"
+' "$mcp_policy" "$network_policy" "$shell_policy"
     curl -fsS "${auth[@]}" "$api/api/v1/audit?event=policy_changed&run_id=$run" | "$VENV/bin/python" -c '
 import json, sys
 
-if len(json.load(sys.stdin)) != 4:
+if len(json.load(sys.stdin)) != 6:
     sys.exit("the policy changes of the run are not audited")
 '
+}
+
+# Every decision of the network gate about one host, counted in the runner log.
+network_decisions() {
+    grep "\"event\":\"network_$1\"" "$TEMP_DIR/agent.log" | grep -c "\"host\":\"$2\"" || true
+}
+
+# A host added to the started Run is reached, and denied again once it is taken away.
+check_live_network() {
+    [ "$(network_decisions allowed www.wikipedia.org)" -ge 1 ] ||
+        fail "a host added to the run was not reached"
+    [ "$(network_decisions denied www.wikipedia.org)" -gt "$refused" ] ||
+        fail "a host taken away from the run still answered"
 }
 
 # A capability taken away from the started Run is denied, and answers again once it is given back.
@@ -1380,25 +1395,33 @@ check_models
 check_model_card
 echo "giving the started run its stored mcp policy back: the server is gone..."
 change_policy mcp "{\"kind\": \"mcp\", \"policy_id\": \"$mcp_policy\"}"
+echo "editing the network policy of the started run: one more host..."
+wider='{"allow": [{"protocol": "https", "host": "www.google.com"}, {"protocol": "https", "host": "www.wikipedia.org"}]}'
+change_policy network "{\"kind\": \"network\", \"document\": $wider}"
 echo "editing the shell policy of the started run: list_dir is taken away..."
 change_policy shell '{"kind": "shell", "document": {"allow": ["read_file", "grep"]}}'
 guest \
     "cat > /tmp/rpc <<'JSON'" \
     '{"jsonrpc":"2.0","id":31,"method":"tools/call","params":{"name":"delta__search","arguments":{}}}' \
     '{"jsonrpc":"2.0","id":32,"method":"tools/call","params":{"name":"list_dir","arguments":{"path":"/naos/alpha"}}}' \
+    '{"jsonrpc":"2.0","id":34,"method":"tools/call","params":{"name":"http_request","arguments":{"method":"GET","url":"https://www.wikipedia.org/"}}}' \
     "JSON" \
     "{ cat /tmp/rpc; sleep 5; } | naos-mcp" \
     "echo NAOS-SMOKE-DETACHED"
-echo "giving the started run its stored shell policy back..."
+echo "giving the started run its stored network and shell policies back..."
+refused="$(network_decisions denied www.wikipedia.org)"
+change_policy network "{\"kind\": \"network\", \"policy_id\": \"$network_policy\"}"
 listed="$(mcp_calls shell list_dir allow)"
 change_policy shell "{\"kind\": \"shell\", \"policy_id\": \"$shell_policy\"}"
 guest \
     "cat > /tmp/rpc <<'JSON'" \
     '{"jsonrpc":"2.0","id":33,"method":"tools/call","params":{"name":"list_dir","arguments":{"path":"/naos/alpha"}}}' \
+    '{"jsonrpc":"2.0","id":35,"method":"tools/call","params":{"name":"http_request","arguments":{"method":"GET","url":"https://www.wikipedia.org/"}}}' \
     "JSON" \
     "{ cat /tmp/rpc; sleep 5; } | naos-mcp" \
     "echo NAOS-SMOKE-REGRANTED"
 check_live_policy
+check_live_network
 check_live_shell
 echo "reading the console through the api and the terminal tab..."
 wait_for 30 console_shipped
