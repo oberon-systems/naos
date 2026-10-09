@@ -185,8 +185,8 @@ status, `open` for the non-terminal ones, `oldest_pending_at`, `failed_24h`
 and `last_failure_reason`, the reason of the newest failure in that window.
 
 `GET /runs/{run_id}/gates/{gate}` is what one gate did for one Run, counted
-from the audit on every read and never stored. `gate` is `model`, `network`
-or `mcp`.
+from the audit on every read and never stored. `gate` is `model`, `network`,
+`shell` or `mcp`.
 
 For `model` it answers `calls`, `denied`, `input_tokens` and `output_tokens`
 summed over the Run's `model_call` events, and `refusals`, the last five
@@ -202,6 +202,16 @@ temporary edit) and its `document`, `configured_at` of the latest
 `denied` counts and `last_at`, denied ones first and at most 200 of them;
 `hosts_total` counts them all. The requests themselves are read from
 `GET /audit` with `run_id` and those two events.
+
+For `shell` it answers the policy the Run holds now, `policy_id` (null for a
+temporary edit or no policy) and its `document`, `configured_at` of the latest
+`shell_policy_configured`, `roots`, the guest paths of the Run's mounts and
+never a host path, `allowed` and `denied` over the Run's `shell_allowed` and
+`shell_denied` events, `called`, the capabilities those events name, and
+`groups`. A group is one `capability` and `path` with its `allowed` and
+`denied` counts and `last_at`, denied ones first and at most 200 of them;
+`groups_total` counts them all. The calls are read from `GET /audit` with
+`run_id` and those two events.
 
 For `mcp` it answers the policy the Run holds now, `policy_id` (null for a
 temporary edit) and its `mcp_document` as `document`, `configured_at` of the

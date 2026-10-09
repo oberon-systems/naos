@@ -16,7 +16,11 @@ Views:
   allowed and denied counts, the hosts the Run reached grouped by host,
   protocol and rule with the denied ones first, and the requests with the
   filters All, Allowed and Denied; a request opens its audit event, and a
-  host or a reason the guest sent shows as plain text;
+  host or a reason the guest sent shows as plain text. The shell view, shown
+  even for a Run without a shell policy, lists the granted capabilities and
+  the guest mount roots, the calls grouped by capability and path with the
+  denied ones first, and the calls with the same filters; a path and a reason
+  show as plain text, and no command output or file content is ever shown;
 - filesystem diff;
 - merge approval;
 - profiles;
