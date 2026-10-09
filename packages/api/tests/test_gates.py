@@ -217,3 +217,70 @@ def test_the_mcp_gate_counts_calls_and_secret_reads(
         "denied": 1,
         "secret_reads": [{"name": "alpha-key", "reads": 2}, {"name": "beta-key", "reads": 1}],
     }
+
+
+def test_a_run_without_a_shell_policy_grants_nothing(
+    client: TestClient, create_run: CreateRun
+) -> None:
+    response = client.get(f"/api/v1/runs/{create_run('key-1')}/gates/shell")
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "policy_id": None,
+        "document": None,
+        "configured_at": None,
+        "roots": [],
+        "allowed": 0,
+        "denied": 0,
+        "called": [],
+        "groups_total": 0,
+        "groups": [],
+    }
+
+
+def test_shell_calls_are_grouped_by_capability_and_path(
+    client: TestClient,
+    session: Session,
+    spec_body: dict[str, Any],
+    mount_body: dict[str, Any],
+    shell_body: dict[str, Any],
+) -> None:
+    shell = client.post("/api/v1/policies", json={"kind": "shell", "document": shell_body})
+    mount = client.post("/api/v1/policies", json={"kind": "mount", "document": mount_body})
+    spec_body["shell"] = {"policy": shell.json()["id"]}
+    spec_body["mounts"] = {"policy": mount.json()["id"]}
+    run = client.post("/api/v1/runs", json=spec_body, headers={"Idempotency-Key": "key-1"}).json()
+    other = client.post("/api/v1/runs", json=spec_body, headers={"Idempotency-Key": "key-2"})
+    outside = {"reason": "path is outside every mount"}
+    read = {"capability": "read_file", "path": "/naos/alpha/a"}
+    for at in (10, 11):
+        _event(session, run["id"], at, "shell_allowed", **read)
+    _event(session, run["id"], 12, "shell_allowed", capability="grep", path="/naos/alpha")
+    _event(session, run["id"], 13, "shell_denied", capability="read_file", path="/etc", **outside)
+    _event(session, run["id"], 14, "shell_denied", capability="read_file", path="/etc", **outside)
+    _event(
+        session,
+        run["id"],
+        15,
+        "shell_denied",
+        capability="git_diff",
+        path="/naos/alpha",
+        reason="capability not granted",
+    )
+    _event(session, other.json()["id"], 16, "shell_denied", capability="grep", path="/", **outside)
+    _event(session, run["id"], 17, "shell_policy_configured")
+
+    gate = client.get(f"/api/v1/runs/{run['id']}/gates/shell").json()
+
+    assert (gate["policy_id"], gate["document"]) == (shell.json()["id"], shell.json()["document"])
+    assert (gate["allowed"], gate["denied"], gate["configured_at"]) == (3, 3, 17)
+    assert gate["roots"] == ["/naos/alpha", "/home/naos/.claude"]
+    assert gate["called"] == ["git_diff", "grep", "read_file"]
+    assert gate["groups_total"] == 4
+    keys = ("capability", "path", "allowed", "denied", "last_at")
+    assert [tuple(group[key] for key in keys) for group in gate["groups"]] == [
+        ("read_file", "/etc", 0, 2, 14),
+        ("git_diff", "/naos/alpha", 0, 1, 15),
+        ("grep", "/naos/alpha", 1, 0, 12),
+        ("read_file", "/naos/alpha/a", 2, 0, 11),
+    ]

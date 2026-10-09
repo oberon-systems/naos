@@ -4,12 +4,12 @@ from pydantic import BaseModel
 from sqlmodel import Session, case, col, func, select
 from sqlmodel.sql.expression import Select
 
-from naos_api.models import AuditEvent, Run
+from naos_api.models import AuditEvent, Policy, Run
 from naos_api.policies import held_document
 from naos_api.spec import PolicyKind
 
 REFUSALS = 5
-HOSTS = 200
+GROUPS = 200
 
 
 class ModelRefusal(BaseModel):
@@ -101,7 +101,7 @@ def network(session: Session, run: Run) -> NetworkGate:
         groups.where(*decided)
         .group_by(host, protocol, rule)
         .order_by(denied.desc(), allowed.desc(), host, protocol, rule)
-        .limit(HOSTS)
+        .limit(GROUPS)
     ).all()
     totals = session.exec(select(allowed, denied).where(*decided)).one()
     every = select(host).where(*decided).group_by(host, protocol, rule)
@@ -123,6 +123,72 @@ def network(session: Session, run: Run) -> NetworkGate:
                 allowed=row[3],
                 denied=row[4],
                 last_at=row[5],
+            )
+            for row in rows
+        ],
+    )
+
+
+class ShellGroup(BaseModel):
+    capability: str
+    path: str
+    allowed: int
+    denied: int
+    last_at: int
+
+
+class ShellGate(BaseModel):
+    policy_id: str | None
+    document: dict[str, Any] | None
+    configured_at: int | None
+    roots: list[str]
+    allowed: int
+    denied: int
+    called: list[str]
+    groups_total: int
+    groups: list[ShellGroup]
+
+
+# Only the guest side of a mount is shown: a denial never names a host path, so neither does this.
+def _roots(session: Session, run: Run) -> list[str]:
+    policy = session.get(Policy, run.mount_policy_id) if run.mount_policy_id else None
+    return [mount["guest_path"] for mount in policy.document["mounts"]] if policy else []
+
+
+def shell(session: Session, run: Run) -> ShellGate:
+    data = col(AuditEvent.data)
+    event = col(AuditEvent.event)
+    mine = col(AuditEvent.run_id) == run.id
+    capability, path = (data[key].as_string() for key in ("capability", "path"))
+    allowed = func.sum(case((event == "shell_allowed", 1), else_=0))
+    denied = func.sum(case((event == "shell_denied", 1), else_=0))
+    decided = (mine, event.in_(("shell_allowed", "shell_denied")))
+    last = func.max(AuditEvent.at)
+    groups: Select[tuple[str, str, int, int, int]] = Select(capability, path, allowed, denied, last)
+    rows = session.exec(
+        groups.where(*decided)
+        .group_by(capability, path)
+        .order_by(denied.desc(), capability, allowed.desc(), path)
+        .limit(GROUPS)
+    ).all()
+    totals = session.exec(select(allowed, denied).where(*decided)).one()
+    every = select(capability).where(*decided).group_by(capability, path)
+    called = select(capability).where(*decided).group_by(capability).order_by(capability)
+    configured = session.exec(
+        select(func.max(AuditEvent.at)).where(mine, event == "shell_policy_configured")
+    ).one()
+    return ShellGate(
+        policy_id=run.shell_policy_id,
+        document=held_document(session, run, PolicyKind.SHELL),
+        configured_at=configured,
+        roots=_roots(session, run),
+        allowed=totals[0] or 0,
+        denied=totals[1] or 0,
+        called=list(session.exec(called).all()),
+        groups_total=session.exec(select(func.count()).select_from(every.subquery())).one(),
+        groups=[
+            ShellGroup(
+                capability=row[0], path=row[1], allowed=row[2], denied=row[3], last_at=row[4]
             )
             for row in rows
         ],
