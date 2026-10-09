@@ -565,6 +565,14 @@ check_live_shell() {
         fail "a capability given back to the run did not answer"
 }
 
+# The shell view lists the capability the Run was denied, with the reason the gate gave.
+check_shell_tab() {
+    curl -fsS "$web/runs/$run/gates/shell?decision=denied" >"$TEMP_DIR/run-shell.html"
+    for text in "SHELL POLICY" "CALLS BY CAPABILITY" "list_dir" "capability not granted" "Denied ·"; do
+        grep -qF -- "$text" "$TEMP_DIR/run-shell.html" || fail "the shell view misses: $text"
+    done
+}
+
 check_diff() {
     local diff
     diff="$(echo "$TEMP_DIR"/runs/*/diff.json)"
@@ -1564,6 +1572,7 @@ check_live_models
 check_live_network
 check_gates_tab
 check_live_shell
+check_shell_tab
 echo "reading the console through the api and the terminal tab..."
 wait_for 30 console_shipped
 check_terminal
