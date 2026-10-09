@@ -10,7 +10,13 @@ Views:
 - Run detail;
 - console;
 - logs;
-- network/shell/MCP events;
+- network/shell/MCP events: the `Gates` tab of the Run detail, after
+  `Logs & Audit`, switches between the gates the Run's policies name. The
+  network view shows the policy in force and when the runner configured it,
+  allowed and denied counts, the hosts the Run reached grouped by host,
+  protocol and rule with the denied ones first, and the requests with the
+  filters All, Allowed and Denied; a request opens its audit event, and a
+  host or a reason the guest sent shows as plain text;
 - filesystem diff;
 - merge approval;
 - profiles;
