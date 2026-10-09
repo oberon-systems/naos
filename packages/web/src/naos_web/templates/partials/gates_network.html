@@ -1,0 +1,201 @@
+{% from "components.html" import dot %}
+<div class="gates__summary">
+    <section class="card run__card">
+        <div class="run__card-header">
+            <h3 class="run__card-title">NETWORK POLICY</h3>
+            {% if network.policy_id %}
+                <a class="card__link"
+                   href="/policies/{{ network.policy_id }}"
+                   hx-get="/policies/{{ network.policy_id }}"
+                   hx-target="#overlay">Open policy</a>
+            {% endif %}
+        </div>
+        <dl class="run__facts">
+            <dt>Policy</dt>
+            <dd class="gates__policy">
+                {% if network.policy_id %}
+                    <a class="action"
+                       href="/policies/{{ network.policy_id }}"
+                       hx-get="/policies/{{ network.policy_id }}"
+                       hx-target="#overlay">{{ network.policy_id }}</a>
+                {% else %}
+                    <span>{{ "temporary edit" if network.policy_tag[0] == "temporary" else "none" }}</span>
+                {% endif %}
+                <code class="profile__tag gates__tag--{{ network.policy_tag[1] }}">{{ network.policy_tag[0] }}</code>
+            </dd>
+            <dt>Configured</dt>
+            <dd>
+                {{ network.configured }}
+            </dd>
+            <dt>Rules</dt>
+            <dd>
+                {{ network.rules }}
+            </dd>
+            <dt>Changed live</dt>
+            <dd>
+                {{ network.changed }}
+            </dd>
+        </dl>
+    </section>
+    {% for tile in network.tiles %}
+        <section class="tile gates__tile">
+            <div class="tile__head">
+                <span class="run__card-title">{{ tile.label | upper }}</span>
+            </div>
+            <div class="tile__value">
+                {% if tile.tone and tile.counted %}{{ dot(tile.tone) }}{% endif %}
+                <span class="tile__number gates__number{{ " gates__number--none" if not tile.counted }}">{{ tile.value }}</span>
+            </div>
+            <span class="tile__note">{{ tile.note }}</span>
+        </section>
+    {% endfor %}
+</div>
+{% if not network.started %}
+    <section class="card gates__empty">
+        <strong>The Run has not started</strong>
+        <span>The runner configures the network gate when it starts the VM.</span>
+        <span>Hosts and requests show here from then on.</span>
+    </section>
+{% elif not network.hosts and not network.allows %}
+    <section class="card gates__empty">
+        <strong>No request yet</strong>
+        <span>This Run's network policy allows nothing, so the agent is not offered http_request.</span>
+        <span>Hosts and requests show here once a changed policy lets the agent ask.</span>
+    </section>
+{% else %}
+    <section class="card run__card">
+        <div class="run__card-header">
+            <h3 class="run__card-title">HOSTS · {{ network.hosts_total }}</h3>
+            <span class="table__secondary">denied first · a host and a rule open on click</span>
+        </div>
+        <table class="table logs__table gates__table">
+            <colgroup>
+                <col class="gates__col-host">
+                <col class="gates__col-protocol">
+                <col class="gates__col-rule">
+                <col class="gates__col-count">
+                <col class="gates__col-count">
+                <col>
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>HOST</th>
+                    <th>PROTOCOL</th>
+                    <th>RULE</th>
+                    <th>ALLOWED</th>
+                    <th>DENIED</th>
+                    <th>LAST REQUEST</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for host in network.hosts %}
+                    {% set href = base ~ "?host=" ~ (host.host | urlencode) %}
+                    <tr>
+                        <td class="gates__host">
+                            <a href="{{ href }}" hx-get="{{ href }}" hx-target="#overlay">{{ host.host }}</a>
+                        </td>
+                        <td>
+                            <code class="profile__tag">{{ host.protocol }}</code>
+                        </td>
+                        <td class="gates__rule{{ " gates__rule--none" if host.rule == "none" }}">
+                            {% if network.policy_id and host.rule != "none" %}
+                                <a href="/policies/{{ network.policy_id }}"
+                                   hx-get="/policies/{{ network.policy_id }}"
+                                   hx-target="#overlay">{{ host.rule }}</a>
+                            {% else %}
+                                {{ host.rule }}
+                            {% endif %}
+                        </td>
+                        <td class="gates__count{{ " gates__count--zero" if not host.allowed }}">{{ host.allowed }}</td>
+                        <td class="gates__count{{ " gates__count--denied" if host.denied else " gates__count--zero" }}">{{ host.denied }}</td>
+                        <td class="logs__time">{{ host.last }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td class="logs__empty" colspan="6">No host reached yet.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    <section class="card run__card">
+        <div class="run__card-header">
+            <h3 class="run__card-title">
+                REQUESTS · {{ network.total }}
+                {% if network.host %}<span class="gates__for">· {{ network.host }}</span>{% endif %}
+            </h3>
+            <div class="logs__kinds">
+                {% if network.host %}
+                    <a class="logs__kind"
+                       href="{{ base }}"
+                       hx-get="{{ base }}"
+                       hx-target="#overlay">Every host</a>
+                {% endif %}
+                {% for key, label in network.filters %}
+                    {% set href = base ~ ("" if key == "all" else "?decision=" ~ key) %}
+                    <a class="logs__kind{{ " logs__kind--active" if key == network.decision }}"
+                       href="{{ href }}"
+                       hx-get="{{ href }}"
+                       hx-target="#overlay">{{ label }}</a>
+                {% endfor %}
+            </div>
+        </div>
+        <table class="table logs__table gates__table">
+            <colgroup>
+                <col class="logs__col-time">
+                <col class="gates__col-decision">
+                <col class="gates__col-protocol">
+                <col class="gates__col-request-host">
+                <col class="gates__col-rule">
+                <col>
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>TIME</th>
+                    <th>DECISION</th>
+                    <th>PROTOCOL</th>
+                    <th>HOST</th>
+                    <th>RULE</th>
+                    <th>REASON</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in network.requests %}
+                    <tr class="gates__request{{ " logs__row--refused" if row.refused }}"
+                        hx-get="/audit/{{ row.id }}"
+                        hx-target="#overlay">
+                        <td class="logs__time">
+                            <a href="/audit/{{ row.id }}">{{ row.time }}</a>
+                        </td>
+                        <td>
+                            <span class="logs__source gates__decision--{{ row.decision }}">{{ row.decision }}</span>
+                        </td>
+                        <td>
+                            <code class="profile__tag">{{ row.protocol }}</code>
+                        </td>
+                        <td class="gates__host">{{ row.host }}</td>
+                        <td class="gates__rule{{ " gates__rule--none" if row.rule == "none" }}">{{ row.rule }}</td>
+                        <td class="gates__reason{{ " gates__reason--denied" if row.decision != "allowed" }}">{{ row.reason }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td class="logs__empty" colspan="6">No request yet.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="gates__footer">
+            <span>A row opens its event. A host and a reason come from the guest's request and show as plain text.</span>
+            <span class="gates__more">
+                <span>{{ network.requests | length }} of {{ network.total }}</span>
+                {% if network.more %}
+                    {% set href = base ~ "?limit=" ~ network.more ~ ("" if network.decision == "all" else "&decision=" ~ network.decision) %}
+                    <a class="logs__export"
+                       href="{{ href }}"
+                       hx-get="{{ href }}"
+                       hx-target="#overlay">Load older</a>
+                {% endif %}
+            </span>
+        </div>
+    </section>
+{% endif %}

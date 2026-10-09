@@ -1,0 +1,188 @@
+{% from "components.html" import dot %}
+{% set shell_base = base ~ "/shell" %}
+<div class="gates__summary">
+    <section class="card run__card">
+        <div class="run__card-header">
+            <h3 class="run__card-title">SHELL POLICY</h3>
+            {% if shell_gate.policy_id %}
+                <a class="card__link"
+                   href="/policies/{{ shell_gate.policy_id }}"
+                   hx-get="/policies/{{ shell_gate.policy_id }}"
+                   hx-target="#overlay">Open policy</a>
+            {% endif %}
+        </div>
+        <dl class="run__facts">
+            <dt>Policy</dt>
+            <dd class="gates__policy">
+                {% if shell_gate.policy_id %}
+                    <a class="action"
+                       href="/policies/{{ shell_gate.policy_id }}"
+                       hx-get="/policies/{{ shell_gate.policy_id }}"
+                       hx-target="#overlay">{{ shell_gate.policy_id }}</a>
+                {% else %}
+                    <span>{{ "temporary edit" if shell_gate.policy_tag[0] == "temporary" else "none" }}</span>
+                {% endif %}
+                <code class="profile__tag gates__tag--{{ shell_gate.policy_tag[1] }}">{{ shell_gate.policy_tag[0] }}</code>
+            </dd>
+            <dt>Configured</dt>
+            <dd>
+                {{ shell_gate.configured }}
+            </dd>
+            <dt>Capabilities</dt>
+            <dd class="gates__tags">
+                {% for name in shell_gate.capabilities %}
+                    <code class="profile__tag">{{ name }}</code>
+                {% else %}
+                    <code class="profile__tag">none</code>
+                {% endfor %}
+            </dd>
+            <dt>Mount root</dt>
+            <dd class="gates__tags">
+                {% for root in shell_gate.roots %}
+                    <code class="profile__tag">{{ root }}</code>
+                {% else %}
+                    <span>none</span>
+                {% endfor %}
+            </dd>
+            <dt>Changed live</dt>
+            <dd>
+                {{ shell_gate.changed }}
+            </dd>
+        </dl>
+    </section>
+    {% for tile in shell_gate.tiles %}
+        <section class="tile gates__tile">
+            <div class="tile__head">
+                <span class="run__card-title">{{ tile.label | upper }}</span>
+            </div>
+            <div class="tile__value">
+                {% if tile.tone and tile.counted %}{{ dot(tile.tone) }}{% endif %}
+                <span class="tile__number gates__number{{ " gates__number--none" if not tile.counted }}">{{ tile.value }}</span>
+            </div>
+            <span class="tile__note">{{ tile.note }}</span>
+        </section>
+    {% endfor %}
+</div>
+{% if not shell_gate.started %}
+    <section class="card gates__empty">
+        <strong>The Run has not started</strong>
+        <span>The runner configures the shell gate when it starts the VM.</span>
+        <span>Calls show here from then on.</span>
+    </section>
+{% elif not shell_gate.groups and not shell_gate.grants %}
+    <section class="card gates__empty">
+        <strong>No call yet</strong>
+        <span>This Run has no shell policy, so the gate grants no capability and the agent is offered no shell tool.</span>
+        <span>Calls and the paths they read show here once a policy grants a capability.</span>
+    </section>
+{% else %}
+    <section class="card run__card">
+        <div class="run__card-header">
+            <h3 class="run__card-title">CALLS BY CAPABILITY · {{ shell_gate.groups_total }}</h3>
+            <span class="table__secondary">denied first · grouped by capability and path</span>
+        </div>
+        <table class="table logs__table gates__table">
+            <colgroup>
+                <col class="gates__col-capability">
+                <col class="gates__col-path">
+                <col class="gates__col-count">
+                <col class="gates__col-count">
+                <col>
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>CAPABILITY</th>
+                    <th>PATH</th>
+                    <th>ALLOWED</th>
+                    <th>DENIED</th>
+                    <th>LAST CALL</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for group in shell_gate.groups %}
+                    <tr>
+                        <td>
+                            <code class="profile__tag">{{ group.capability }}</code>
+                        </td>
+                        <td class="gates__host">{{ group.path }}</td>
+                        <td class="gates__count{{ " gates__count--zero" if not group.allowed }}">{{ group.allowed }}</td>
+                        <td class="gates__count{{ " gates__count--denied" if group.denied else " gates__count--zero" }}">{{ group.denied }}</td>
+                        <td class="logs__time">{{ group.last }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td class="logs__empty" colspan="5">No call yet.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    <section class="card run__card">
+        <div class="run__card-header">
+            <h3 class="run__card-title">CALLS · {{ shell_gate.total }}</h3>
+            <div class="logs__kinds">
+                {% for key, label in shell_gate.filters %}
+                    {% set href = shell_base ~ ("" if key == "all" else "?decision=" ~ key) %}
+                    <a class="logs__kind{{ " logs__kind--active" if key == shell_gate.decision }}"
+                       href="{{ href }}"
+                       hx-get="{{ href }}"
+                       hx-target="#overlay">{{ label }}</a>
+                {% endfor %}
+            </div>
+        </div>
+        <table class="table logs__table gates__table">
+            <colgroup>
+                <col class="logs__col-time">
+                <col class="gates__col-decision">
+                <col class="gates__col-call-capability">
+                <col class="gates__col-call-path">
+                <col>
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>TIME</th>
+                    <th>DECISION</th>
+                    <th>CAPABILITY</th>
+                    <th>PATH</th>
+                    <th>REASON</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in shell_gate.calls %}
+                    <tr class="gates__request{{ " logs__row--refused" if row.refused }}"
+                        hx-get="/audit/{{ row.id }}"
+                        hx-target="#overlay">
+                        <td class="logs__time">
+                            <a href="/audit/{{ row.id }}">{{ row.time }}</a>
+                        </td>
+                        <td>
+                            <span class="logs__source gates__decision--{{ row.decision }}">{{ row.decision }}</span>
+                        </td>
+                        <td>
+                            <code class="profile__tag">{{ row.capability }}</code>
+                        </td>
+                        <td class="gates__host">{{ row.path }}</td>
+                        <td class="gates__reason{{ " gates__reason--denied" if row.decision != "allowed" }}">{{ row.reason }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td class="logs__empty" colspan="5">No call yet.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="gates__footer">
+            <span>A row opens its event. A path and a reason come from the guest's request and show as plain text; output and file content are never logged.</span>
+            <span class="gates__more">
+                <span>{{ shell_gate.calls | length }} of {{ shell_gate.total }}</span>
+                {% if shell_gate.more %}
+                    {% set href = shell_base ~ "?limit=" ~ shell_gate.more ~ ("" if shell_gate.decision == "all" else "&decision=" ~ shell_gate.decision) %}
+                    <a class="logs__export"
+                       href="{{ href }}"
+                       hx-get="{{ href }}"
+                       hx-target="#overlay">Load older</a>
+                {% endif %}
+            </span>
+        </div>
+    </section>
+{% endif %}

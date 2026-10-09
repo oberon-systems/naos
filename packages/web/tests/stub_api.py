@@ -553,6 +553,9 @@ def audit(
     if run_id is not None and event and all(name.startswith("network_") for name in event):
         found = [row for row in NETWORK_EVENTS if row["run_id"] == run_id and row["event"] in event]
         return (found[::-1] if order == "desc" else found)[:limit]
+    if run_id is not None and event and all(name.startswith("shell_") for name in event):
+        found = [row for row in SHELL_EVENTS if row["run_id"] == run_id and row["event"] in event]
+        return (found[::-1] if order == "desc" else found)[:limit]
     if runner_id is None and image_id is None and profile_id is None:
         TRAIL_QUERIES.append({"run_id": run_id, "event": event, "after": after, "order": order})
         found = [
@@ -1575,6 +1578,82 @@ def change_policy(run_id: str, body: Row) -> Row | JSONResponse:
 @stub.get("/api/v1/runs/{run_id}/gates/network")
 def network_gate(run_id: str) -> Row:
     return NETWORK_GATE if run_id == RUNS[0]["id"] else QUIET_NETWORK
+
+
+# The started Run read inside its mount, was refused a path outside it and a capability it lacks.
+SHELL_EVENTS: list[Row] = [
+    _runner(50, NOW - 100, "shell_allowed", {"capability": "list_dir", "path": "/naos/alpha"}),
+    _runner(
+        51,
+        NOW - 60,
+        "shell_denied",
+        {
+            "capability": "read_file",
+            "path": "/naos/<b>alpha</b>/../etc/hosts",
+            "reason": "path is outside every mount",
+        },
+    ),
+    _runner(
+        52,
+        NOW - 30,
+        "shell_denied",
+        {
+            "capability": "git_diff",
+            "path": "/naos/alpha",
+            "reason": "capability not granted",
+            "note": "<script>alert(1)</script>",
+        },
+    ),
+]
+SHELL_GATE: Row = {
+    "policy_id": SHELLPOL,
+    "document": {"allow": ["grep", "list_dir", "read_file"]},
+    "configured_at": NOW - 134,
+    "roots": ["/naos/alpha"],
+    "allowed": 57,
+    "denied": 3,
+    "called": ["git_diff", "list_dir", "read_file"],
+    "groups_total": 3,
+    "groups": [
+        {
+            "capability": "read_file",
+            "path": "/naos/<b>alpha</b>/../etc/hosts",
+            "allowed": 0,
+            "denied": 2,
+            "last_at": NOW - 60,
+        },
+        {
+            "capability": "git_diff",
+            "path": "/naos/alpha",
+            "allowed": 0,
+            "denied": 1,
+            "last_at": NOW - 30,
+        },
+        {
+            "capability": "list_dir",
+            "path": "/naos/alpha",
+            "allowed": 57,
+            "denied": 0,
+            "last_at": NOW - 100,
+        },
+    ],
+}
+QUIET_SHELL: Row = {
+    "policy_id": None,
+    "document": None,
+    "configured_at": None,
+    "roots": ["/naos/beta"],
+    "allowed": 0,
+    "denied": 0,
+    "called": [],
+    "groups_total": 0,
+    "groups": [],
+}
+
+
+@stub.get("/api/v1/runs/{run_id}/gates/shell")
+def shell_gate(run_id: str) -> Row:
+    return SHELL_GATE if run_id == RUNS[0]["id"] else QUIET_SHELL
 
 
 CONSOLE = b"login: naos\r\n$ pytest -q\r\n"

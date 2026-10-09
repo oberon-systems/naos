@@ -3032,6 +3032,17 @@ body {
 .gates__col-count { width: 100px; }
 .gates__col-decision { width: 100px; }
 .gates__col-request-host { width: 250px; }
+.gates__col-capability { width: 140px; }
+.gates__col-path { width: 420px; }
+.gates__col-call-capability { width: 120px; }
+.gates__col-call-path { width: 400px; }
+
+.gates__tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
 
 .gates__table .gates__host,
 .gates__table .gates__host a {

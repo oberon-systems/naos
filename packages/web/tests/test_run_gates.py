@@ -1,7 +1,8 @@
 import re
+from typing import Any
 
 from fastapi.testclient import TestClient
-from stub_api import NETPOL, NOW, RUNS
+from stub_api import NETPOL, NOW, RUNS, SHELLPOL
 
 from naos_web import format, gates
 
@@ -46,7 +47,7 @@ def test_the_gates_of_the_run_are_switched_between(client: TestClient) -> None:
     active = r'logs__kind--active"\s+href="[^"]+"\s+hx-get="[^"]+"\s+hx-target="#overlay">'
     assert re.search(active + "Network<", body)
     assert 'logs__kind--idle">MCP</span>' in body and 'logs__kind--idle">Model</span>' in body
-    assert ">Shell<" not in body
+    assert f'hx-get="/runs/{STARTED}/gates/shell"' in body
 
 
 def test_guest_text_is_inert_and_an_untyped_event_is_refused(client: TestClient) -> None:
@@ -142,3 +143,77 @@ def test_load_older_asks_for_the_next_page_only_when_one_is_full() -> None:
     short = gates.network(RUNS[0], gate, [row], "all", 2, None)
 
     assert full.more == 2 + gates.PAGE and short.more is None
+
+
+def _shell(client: TestClient, run_id: str = STARTED, **params: str) -> str:
+    response = client.get(f"/runs/{run_id}/gates/shell", params=params, headers=HX)
+    assert response.status_code == 200, response.text
+    body: str = response.text
+    return body
+
+
+def test_the_shell_view_reads_the_gate_from_the_audit(client: TestClient) -> None:
+    body = _shell(client)
+
+    active = r'logs__kind--active"\s+href="[^"]+"\s+hx-get="[^"]+"\s+hx-target="#overlay">'
+    assert re.search(active + "Shell<", body)
+    assert f'hx-get="/runs/{STARTED}/gates"' in body
+    assert "SHELL POLICY" in body and SHELLPOL in body and ">stored</code>" in body
+    assert ">list_dir</code>" in body and ">/naos/alpha</code>" in body
+    assert "2 granted · 1 not granted" in body
+    assert "All · 60" in body and "Allowed · 57" in body and "Denied · 3" in body
+    groups = body.split("CALLS BY CAPABILITY ·", 1)[1].split("CALLS ·", 1)[0]
+    order = [groups.index(name) for name in ("read_file", "git_diff", "list_dir")]
+    assert order == sorted(order)
+
+
+def test_shell_guest_text_is_inert_and_an_untyped_event_is_refused(client: TestClient) -> None:
+    body = _shell(client)
+
+    assert "<b>alpha</b>" not in body and "/naos/&lt;b&gt;alpha&lt;/b&gt;/../etc/hosts" in body
+    assert "<script>" not in body
+    assert "refused: unexpected field note" in body
+    assert f'hx-get="/audit/evt_{51:032x}"' in body
+
+
+def test_shell_calls_are_filtered_by_decision(client: TestClient) -> None:
+    denied = _shell(client, decision="denied").split("CALLS ·", 1)[1]
+
+    assert f"/audit/evt_{50:032x}" not in denied and f"/audit/evt_{51:032x}" in denied
+    assert 'href="/runs/run_9f21c4/gates/shell?decision=allowed"' in denied
+
+
+def test_a_run_without_a_shell_policy_grants_nothing(client: TestClient) -> None:
+    body = _shell(client, WAITING)
+
+    assert "grants nothing" in body and "No call yet" in body and ">/naos/beta</code>" in body
+    assert "CALLS BY CAPABILITY ·" not in body
+
+
+def test_a_pending_run_waits_for_its_shell_gate(client: TestClient) -> None:
+    body = _shell(client, PENDING)
+
+    assert "The Run has not started" in body and "CALLS ·" not in body
+
+
+def test_a_shell_gate_without_calls_counts_nothing() -> None:
+    gate: dict[str, Any] = {
+        "policy_id": None,
+        "document": None,
+        "configured_at": None,
+        "roots": [],
+        "allowed": 0,
+        "denied": 0,
+        "called": [],
+        "groups_total": 0,
+        "groups": [],
+    }
+
+    view = gates.shell(RUNS[0], gate, [], "all", gates.PAGE)
+
+    assert view.policy_tag == ("grants nothing", "amber") and view.configured == "never"
+    assert [(tile.value, tile.note) for tile in view.tiles] == [
+        ("0", "no capability is granted"),
+        ("0", "no call was made"),
+        ("0", "none granted"),
+    ]

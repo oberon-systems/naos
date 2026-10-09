@@ -108,6 +108,7 @@ from naos_web.rows import (
 State = Literal["all", "active", "queued", "waiting_merge", "failed"]
 Tab = Literal["overview", "terminal", "logs", "changes", "gates"]
 Network = tuple[gates.Decision, int, str | None]
+ShellView = tuple[gates.Decision, int]
 StateQuery = Annotated[State, Query()]
 Fleet = Literal["all", "live", "stale", "revoked"]
 FleetQuery = Annotated[Fleet, Query()]
@@ -498,11 +499,14 @@ async def _run_panel(
     ask: changes.Asked | None = None,
     error: str | None = None,
     network: Network = ("all", gates.PAGE, None),
+    shell_view: ShellView | None = None,
 ) -> HTMLResponse:
     api: ApiClient = request.app.state.api
     try:
         detail = await api.run_detail(run_id)
-        view = await _network(api, detail.run, network) if tab == "gates" else None
+        on_network = tab == "gates" and shell_view is None
+        network_view = await _network(api, detail.run, network) if on_network else None
+        shell_gate = await _shell(api, detail.run, shell_view) if shell_view else None
         held = tab == "overview" and detail.run["mcp_document"] is not None
         mcp = await _mcp_card(api, detail.run) if held else None
     except ApiError as err:
@@ -528,7 +532,8 @@ async def _run_panel(
         log_kinds=LOG_KINDS,
         log_kind=kind,
         log_rows=events.log_rows(detail.events, detail.runners, kind),
-        network=view,
+        network=network_view,
+        shell_gate=shell_gate,
         mcp=mcp,
     )
 
@@ -542,9 +547,18 @@ async def _network(api: ApiClient, run: Row, network: Network) -> gates.Network:
     decision, limit, host = network
     gate, rows = await asyncio.gather(
         api.run_gate(run["id"], "network"),
-        api.network_trail(run["id"], gates.EVENTS[decision], limit),
+        api.gate_trail(run["id"], gates.EVENTS[decision], limit),
     )
     return gates.network(run, gate, rows, decision, limit, host)
+
+
+async def _shell(api: ApiClient, run: Row, shell: ShellView) -> gates.Shell:
+    decision, limit = shell
+    gate, rows = await asyncio.gather(
+        api.run_gate(run["id"], "shell"),
+        api.gate_trail(run["id"], gates.SHELL_EVENTS[decision], limit),
+    )
+    return gates.shell(run, gate, rows, decision, limit)
 
 
 # Declared after /runs/new, which this path would otherwise take for a run id.
@@ -590,6 +604,17 @@ async def run_gates(
     host: Annotated[str | None, Query(max_length=253)] = None,
 ) -> HTMLResponse:
     return await _run_panel(request, run_id, now, "gates", network=(decision, limit, host))
+
+
+@router.get("/runs/{run_id}/gates/shell", response_class=HTMLResponse)
+async def run_gates_shell(
+    request: Request,
+    run_id: str,
+    now: NowDep,
+    decision: gates.Decision = "all",
+    limit: Annotated[int, Query(ge=1, le=gates.MOST)] = gates.PAGE,
+) -> HTMLResponse:
+    return await _run_panel(request, run_id, now, "gates", shell_view=(decision, limit))
 
 
 @router.get("/runs/{run_id}/changes", response_class=HTMLResponse)
