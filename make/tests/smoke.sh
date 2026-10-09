@@ -805,7 +805,7 @@ wanted = {
     "model": ["PROVIDERS · 2", "BUDGET · PER RUN", "SECRETS · 2", "anthropic-key"],
     "document": ["CANONICAL DOCUMENT", "www.google.com", "New from this"],
     "used": [run, "Open profile"],
-    "mcp": ["SECRETS · 1", "alpha-token"],
+    "mcp": ["SERVERS · 4", "SECRETS GRANTED TO AGENTS · 1", "agent-key", "secrets__list"],
     "exists": ["Policy already exists", shell],
 }
 for name, texts in wanted.items():
