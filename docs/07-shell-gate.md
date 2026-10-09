@@ -48,6 +48,24 @@ id.
 Limits are not part of the document. They are constants of the gate, the same
 way the network gate owns its own ([06](06-network-gate.md)).
 
+## The mcp rule
+
+The agent calls a capability as a tool of the server `shell` of the MCP
+broker, so a call passes two policies. The `mcp` policy decides whether the
+call may be made at all ([08](08-mcp-gate.md#rules)); this policy then decides
+which capabilities the gate performs. A capability granted here but allowed by
+no `mcp` rule is never called, and the agent does not see it listed; a Run
+without an `mcp` policy reaches no capability at all.
+
+```json
+{"server": "shell", "tool": "read_file", "effect": "allow",
+ "arguments": {"path": {"prefix": "/naos/alpha/"}}}
+```
+
+An `mcp` rule can only narrow what this policy grants: `*` on `shell` allows
+the call, and a capability this policy does not grant is still refused by the
+gate.
+
 ## Roots
 
 The gate serves the host paths the mount policy named. It reads the resolved

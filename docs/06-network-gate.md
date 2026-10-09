@@ -49,6 +49,23 @@ A Run points at the policy through `spec.network.policy`, and the runner
 receives the resolved document as a snapshot rather than the id. An operator
 can change the policy of a started Run ([Live changes](#live-changes)).
 
+## The mcp rule
+
+The agent reaches this gate only as the `http_request` tool of the MCP broker,
+so a request passes two policies. The `mcp` policy decides whether the call
+may be made at all ([08](08-mcp-gate.md#rules)); this policy then decides
+which destinations it may reach. A Run with a network policy but no `mcp` rule
+that allows `http_request` on the server `network` cannot send a single
+request, and it does not even see the tool listed.
+
+```json
+{"server": "network", "tool": "http_request", "effect": "allow",
+ "arguments": {"method": {"schema": {"enum": ["GET", "HEAD"]}}}}
+```
+
+An `mcp` rule can only narrow what this policy allows, never widen it: a URL
+the network policy denies stays denied whatever the rule says.
+
 ## Enforcement point
 
 The VM has no network device at all: the QEMU command line carries `-nic none`
@@ -65,7 +82,7 @@ Run a fresh request budget on every tick.
 The gate owns the HTTP client and never hands one out. A caller submits a
 `GateRequest` and receives a `GateResponse`, so an authorization can never be
 reused for a second destination, and no call can escape the limits below. The
-per-Run MCP broker ([08](08-mcp-gate.md)) will be the only caller.
+per-Run MCP broker ([08](08-mcp-gate.md)) is the only caller.
 
 ## Decision order
 
