@@ -165,7 +165,7 @@ beside the Run itself, resolved by the API rather than by the caller:
 | `runner` | `id` and `name` of the runner holding the lease, or null |
 | `lease_id` | The lease that fences the Run, or null while it queues |
 | `mcp_document` | The registry entries, the rules and the names of the granted secrets the Run holds, as the runner reads them, or null without an `mcp` policy |
-| `policy_history` | On `GET /runs/{run_id}` only: every policy change of the Run, oldest first, as `seq`, `kind`, `previous_id`, `policy_id` and `created_at` |
+| `policy_history` | On `GET /runs/{run_id}` only: every policy change of the Run, oldest first, as `seq`, `kind`, `previous_id`, `policy_id`, the `document` the Run took and `created_at` |
 | `profile_id` | The profile the spec was copied from, or null |
 | `merge` | `changed` and `conflicts` of the collected diff, or null |
 | `started_at` | When the Run reached STARTING, or null while it queues |
@@ -185,7 +185,8 @@ status, `open` for the non-terminal ones, `oldest_pending_at`, `failed_24h`
 and `last_failure_reason`, the reason of the newest failure in that window.
 
 `GET /runs/{run_id}/gates/{gate}` is what one gate did for one Run, counted
-from the audit on every read and never stored. `gate` is `model` or `network`.
+from the audit on every read and never stored. `gate` is `model`, `network`
+or `mcp`.
 
 For `model` it answers `calls`, `denied`, `input_tokens` and `output_tokens`
 summed over the Run's `model_call` events, and `refusals`, the last five
@@ -201,6 +202,13 @@ temporary edit) and its `document`, `configured_at` of the latest
 `denied` counts and `last_at`, denied ones first and at most 200 of them;
 `hosts_total` counts them all. The requests themselves are read from
 `GET /audit` with `run_id` and those two events.
+
+For `mcp` it answers the policy the Run holds now, `policy_id` (null for a
+temporary edit) and its `mcp_document` as `document`, `configured_at` of the
+latest `mcp_policy_configured`, `calls` and `denied` over the Run's `mcp_call`
+events, and `secret_reads`: each granted secret the agent read, as `name` and
+`reads`, counted from the allowed `secret_read` events. A value is never part
+of it.
 
 ## Console
 
@@ -458,6 +466,16 @@ Each external server carries `id`, `name`, `kind` `external`, `url`,
 `credential`, `timeout_seconds`, `max_calls_per_minute`, `disabled_at`,
 `created_at`, `updated_at` and `policies`, the ids of the `mcp` policies
 whose rules name it. A built-in server carries `policies` too.
+
+Every server also carries `runs`: the open Runs holding it, as `run_id`,
+`seq`, `status` and `current`. An external server is held while the Run's
+copy lists it, and `current` says whether that copy still equals the entry; a
+built-in server is held while an allow rule names it.
+`GET /api/v1/mcp-servers/{name}` adds `calls`, counted from the `mcp_call`
+events since midnight UTC: `today`, `denied_today`, the `last` call with `at`,
+`tool`, `resource` and `decision`, and the `last_failure` with `id`, `at` and
+`category`. A failure is a call the server or the broker refused, not one a
+rule denied; the list answers `calls` as null.
 
 `POST /policies` validates the rules of an `mcp` document and answers 422
 for a server the registry does not hold, an unknown tool or argument of a

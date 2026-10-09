@@ -22,6 +22,20 @@ Views:
 - profiles;
 - policies, immutable: find by id or digest, read the resolved document and who uses it, create one of each kind;
 - models: the `model` policy kind with its providers, credential names and token budget, picked in the new-run dialog and the profile form; the Run overview shows calls and tokens spent against the budget and the last refusals;
+- MCP: the `MCP` page lists the built-in and external servers with their
+  url, credential name, limits, the policies that name them and the Runs that
+  hold them; a server opens a popup with its entry, its policies and Runs and
+  its calls of the day. An external server is registered, edited, disabled
+  after a confirm that names the Runs it leaves, and enabled again;
+- `mcp` policies: the detail lists the rules by their index, the servers they
+  name and the secrets granted to agents; the form edits the rules and the
+  grants, each a secret by its exact name with an optional read budget, and
+  whether the agent may list the granted names;
+- the Run overview shows an MCP card: the policy the Run holds and the one it
+  was created with, its calls and secret reads, the servers it holds now and
+  the policy history. `Change MCP policy` edits what the Run holds, kept
+  temporary or saved as a new policy, or picks a stored policy, and asks to
+  confirm with the servers and secrets the agent gains or loses;
 - secrets, write-only: see state, expiry, who names and which Runs hold each one, create, rotate, re-date and delete; a value is typed once and never rendered;
 - images.
 
