@@ -391,6 +391,10 @@ def _refusal(row: Row, schema: Schema | None) -> str | None:
     return None
 
 
+def refusal(row: Row) -> str | None:
+    return _refusal(row, SCHEMAS.get(str(row["source"]), {}).get(row["event"]))
+
+
 # Whatever the renderer cannot vouch for is shown as refused, never as the text it carried.
 def log_row(row: Row, runners: dict[str, str]) -> LogRow:
     source = str(row["source"])

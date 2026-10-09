@@ -210,6 +210,11 @@ class ApiClient:
         row: Row = await self._call("GET", f"/runs/{run_id}/gates/{gate}")
         return row
 
+    async def network_trail(self, run_id: str, events: tuple[str, ...], limit: int) -> list[Row]:
+        params = {"run_id": run_id, "event": list(events), "limit": limit, "order": "desc"}
+        rows: list[Row] = await self._call("GET", "/audit", params=params)
+        return rows
+
     async def run_merge(self, run_id: str) -> Row:
         row: Row = await self._call("GET", f"/runs/{run_id}/merge")
         return row

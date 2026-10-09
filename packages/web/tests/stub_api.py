@@ -528,6 +528,9 @@ def audit(
 ) -> list[Row]:
     if secret is not None:
         return SECRET_EVENTS.get(secret, [])[:limit]
+    if run_id is not None and event and all(name.startswith("network_") for name in event):
+        found = [row for row in NETWORK_EVENTS if row["run_id"] == run_id and row["event"] in event]
+        return (found[::-1] if order == "desc" else found)[:limit]
     if runner_id is None and image_id is None and profile_id is None:
         TRAIL_QUERIES.append({"run_id": run_id, "event": event, "after": after, "order": order})
         found = [
@@ -1381,6 +1384,88 @@ IDLE_GATE: Row = {"calls": 0, "denied": 0, "input_tokens": 0, "output_tokens": 0
 @stub.get("/api/v1/runs/{run_id}/gates/model")
 def model_gate(run_id: str) -> Row:
     return MODEL_GATE if run_id == RUNS[0]["id"] else IDLE_GATE
+
+
+# The started Run reached one host, was denied two, and one event carries a field nobody typed.
+NETWORK_EVENTS: list[Row] = [
+    _runner(
+        40,
+        NOW - 100,
+        "network_allowed",
+        {"protocol": "https", "host": "alpha.example.com", "rule": "allow[0]"},
+    ),
+    _runner(
+        41,
+        NOW - 60,
+        "network_denied",
+        {
+            "protocol": "https",
+            "host": "<b>private</b>.example.com",
+            "rule": "none",
+            "reason": "no matching allow rule",
+        },
+    ),
+    _runner(
+        42,
+        NOW - 30,
+        "network_denied",
+        {
+            "protocol": "https",
+            "host": "internal.example.com",
+            "rule": "deny[0]",
+            "reason": "explicit deny rule",
+            "note": "<script>alert(1)</script>",
+        },
+    ),
+]
+NETWORK_GATE: Row = {
+    "policy_id": NETPOL,
+    "document": {"allow": [{"protocol": "https", "host": "alpha.example.com"}], "deny": []},
+    "configured_at": NOW - 134,
+    "allowed": 41,
+    "denied": 3,
+    "hosts_total": 3,
+    "hosts": [
+        {
+            "host": "<b>private</b>.example.com",
+            "protocol": "https",
+            "rule": "none",
+            "allowed": 0,
+            "denied": 2,
+            "last_at": NOW - 60,
+        },
+        {
+            "host": "internal.example.com",
+            "protocol": "https",
+            "rule": "deny[0]",
+            "allowed": 0,
+            "denied": 1,
+            "last_at": NOW - 30,
+        },
+        {
+            "host": "alpha.example.com",
+            "protocol": "https",
+            "rule": "allow[0]",
+            "allowed": 41,
+            "denied": 0,
+            "last_at": NOW - 100,
+        },
+    ],
+}
+QUIET_NETWORK: Row = {
+    "policy_id": None,
+    "document": None,
+    "configured_at": None,
+    "allowed": 0,
+    "denied": 0,
+    "hosts_total": 0,
+    "hosts": [],
+}
+
+
+@stub.get("/api/v1/runs/{run_id}/gates/network")
+def network_gate(run_id: str) -> Row:
+    return NETWORK_GATE if run_id == RUNS[0]["id"] else QUIET_NETWORK
 
 
 CONSOLE = b"login: naos\r\n$ pytest -q\r\n"

@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from naos_web import audit as trail
-from naos_web import changes, confirm, events, new_run, profiles, register, terminal
+from naos_web import changes, confirm, events, gates, new_run, profiles, register, terminal
 from naos_web import policies as documents
 from naos_web import secrets as vault
 from naos_web.client import ApiClient, ApiError, Choices, Dashboard, Row, RunDetail
@@ -84,7 +84,8 @@ from naos_web.rows import (
 )
 
 State = Literal["all", "active", "queued", "waiting_merge", "failed"]
-Tab = Literal["overview", "terminal", "logs", "changes"]
+Tab = Literal["overview", "terminal", "logs", "changes", "gates"]
+Network = tuple[gates.Decision, int, str | None]
 StateQuery = Annotated[State, Query()]
 Fleet = Literal["all", "live", "stale", "revoked"]
 FleetQuery = Annotated[Fleet, Query()]
@@ -474,10 +475,12 @@ async def _run_panel(
     entry: int | None = None,
     ask: changes.Asked | None = None,
     error: str | None = None,
+    network: Network = ("all", gates.PAGE, None),
 ) -> HTMLResponse:
     api: ApiClient = request.app.state.api
     try:
         detail = await api.run_detail(run_id)
+        view = await _network(api, detail.run, network) if tab == "gates" else None
     except ApiError as err:
         return failed_overlay(request, PAGES["runs"], err)
     diff = _changes(detail, now, shown, entry, ask, error)
@@ -501,7 +504,17 @@ async def _run_panel(
         log_kinds=LOG_KINDS,
         log_kind=kind,
         log_rows=events.log_rows(detail.events, detail.runners, kind),
+        network=view,
     )
+
+
+async def _network(api: ApiClient, run: Row, network: Network) -> gates.Network:
+    decision, limit, host = network
+    gate, rows = await asyncio.gather(
+        api.run_gate(run["id"], "network"),
+        api.network_trail(run["id"], gates.EVENTS[decision], limit),
+    )
+    return gates.network(run, gate, rows, decision, limit, host)
 
 
 # Declared after /runs/new, which this path would otherwise take for a run id.
@@ -535,6 +548,18 @@ async def run_logs(
     request: Request, run_id: str, now: NowDep, kind: events.Kind = "all"
 ) -> HTMLResponse:
     return await _run_panel(request, run_id, now, "logs", kind)
+
+
+@router.get("/runs/{run_id}/gates", response_class=HTMLResponse)
+async def run_gates(
+    request: Request,
+    run_id: str,
+    now: NowDep,
+    decision: gates.Decision = "all",
+    limit: Annotated[int, Query(ge=1, le=gates.MOST)] = gates.PAGE,
+    host: Annotated[str | None, Query(max_length=253)] = None,
+) -> HTMLResponse:
+    return await _run_panel(request, run_id, now, "gates", network=(decision, limit, host))
 
 
 @router.get("/runs/{run_id}/changes", response_class=HTMLResponse)

@@ -52,6 +52,10 @@
            href="/runs/{{ run.id }}/logs"
            hx-get="/runs/{{ run.id }}/logs"
            hx-target="#overlay">Logs &amp; Audit</a>
+        <a class="run__tab{{ " run__tab--active" if tab == "gates" }}"
+           href="/runs/{{ run.id }}/gates"
+           hx-get="/runs/{{ run.id }}/gates"
+           hx-target="#overlay">Gates</a>
         {% if diff %}
             <a class="run__tab{{ " run__tab--active" if tab == "changes" }}"
                href="/runs/{{ run.id }}/changes"
@@ -65,6 +69,8 @@
         {% include "partials/run_logs.html" %}
     {% elif tab == "changes" %}
         {% include "partials/run_changes.html" %}
+    {% elif tab == "gates" %}
+        {% include "partials/run_gates.html" %}
     {% else %}
         <div class="run__body">
             <div class="run__column">
