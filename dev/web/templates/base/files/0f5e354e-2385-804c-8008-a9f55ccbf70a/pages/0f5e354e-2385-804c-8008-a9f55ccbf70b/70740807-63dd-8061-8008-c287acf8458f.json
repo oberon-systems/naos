@@ -1,38 +1,38 @@
 {
-  "id": "70740807-63dd-8061-8008-c2804a435112",
+  "id": "70740807-63dd-8061-8008-c287acf8458f",
   "name": "Text",
   "type": "text",
-  "x": 11331.5,
-  "y": 29.50000000000001,
-  "width": 13,
-  "height": 16.000000000000004,
+  "x": 12311,
+  "y": 28,
+  "width": 35,
+  "height": 19,
   "rotation": 0,
   "selrect": {
-    "x": 11331.5,
-    "y": 29.50000000000001,
-    "width": 13,
-    "height": 16.000000000000004,
-    "x1": 11331.5,
-    "y1": 29.50000000000001,
-    "x2": 11344.5,
-    "y2": 45.500000000000014
+    "x": 12311,
+    "y": 28,
+    "width": 35,
+    "height": 19,
+    "x1": 12311,
+    "y1": 28,
+    "x2": 12346,
+    "y2": 47
   },
   "points": [
     {
-      "x": 11331.5,
-      "y": 29.500000000000007
+      "x": 12311,
+      "y": 28
     },
     {
-      "x": 11344.5,
-      "y": 29.500000000000007
+      "x": 12346,
+      "y": 28
     },
     {
-      "x": 11344.5,
-      "y": 45.500000000000014
+      "x": 12346,
+      "y": 47
     },
     {
-      "x": 11331.5,
-      "y": 45.500000000000014
+      "x": 12311,
+      "y": 47
     }
   ],
   "transform": {
@@ -51,8 +51,8 @@
     "e": 0.0,
     "f": 0.0
   },
-  "parentId": "70740807-63dd-8061-8008-c2804a435110",
-  "frameId": "70740807-63dd-8061-8008-c2804a435110",
+  "parentId": "70740807-63dd-8061-8008-c287acf81cd3",
+  "frameId": "70740807-63dd-8061-8008-c287acf81cd3",
   "flipX": null,
   "flipY": null,
   "growType": "auto-width",
@@ -63,11 +63,11 @@
         "type": "paragraph-set",
         "children": [
           {
-            "lineHeight": "1.2",
+            "lineHeight": "1.4",
             "fontStyle": "normal",
             "children": [
               {
-                "lineHeight": "1.2",
+                "lineHeight": "1.4",
                 "fontStyle": "normal",
                 "typographyRefId": null,
                 "textTransform": "none",
@@ -87,7 +87,7 @@
                   }
                 ],
                 "fontFamily": "Inter Tight",
-                "text": "\u2190"
+                "text": "Rerun"
               }
             ],
             "typographyRefId": null,
@@ -119,14 +119,14 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 11331.5,
-      "y": 44.699999988079085,
-      "width": 13,
-      "height": 16,
+      "x": 12311,
+      "y": 44.80000191926956,
+      "width": 34.625,
+      "height": 16.000001907348633,
       "x1": 0,
-      "y1": -0.800000011920929,
-      "x2": 13,
-      "y2": 15.199999988079071,
+      "y1": 0.800000011920929,
+      "x2": 34.625,
+      "y2": 16.80000191926956,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
@@ -141,7 +141,7 @@
       ],
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "text": "\u2190"
+      "text": "Rerun"
     }
   ]
 }

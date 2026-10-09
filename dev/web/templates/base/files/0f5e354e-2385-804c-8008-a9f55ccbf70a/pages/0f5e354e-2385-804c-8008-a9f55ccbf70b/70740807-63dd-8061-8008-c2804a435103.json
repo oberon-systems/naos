@@ -2,36 +2,36 @@
   "id": "70740807-63dd-8061-8008-c2804a435103",
   "name": "Text",
   "type": "text",
-  "x": 11489,
+  "x": 11477,
   "y": 66.5,
-  "width": 57,
+  "width": 61,
   "height": 17,
   "rotation": 0,
   "selrect": {
-    "x": 11489,
+    "x": 11477,
     "y": 66.5,
-    "width": 57,
+    "width": 61,
     "height": 17,
-    "x1": 11489,
+    "x1": 11477,
     "y1": 66.5,
-    "x2": 11546,
+    "x2": 11538,
     "y2": 83.5
   },
   "points": [
     {
-      "x": 11489,
+      "x": 11477,
       "y": 66.5
     },
     {
-      "x": 11546,
+      "x": 11538,
       "y": 66.5
     },
     {
-      "x": 11546,
+      "x": 11538,
       "y": 83.5
     },
     {
-      "x": 11489,
+      "x": 11477,
       "y": 83.5
     }
   ],
@@ -87,7 +87,7 @@
                   }
                 ],
                 "fontFamily": "Inter Tight",
-                "text": "any runner"
+                "text": "unassigned"
               }
             ],
             "typographyRefId": null,
@@ -120,13 +120,13 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 11489,
+      "x": 11477,
       "y": 82.49999982118607,
-      "width": 56.48749923706055,
+      "width": 60.962501525878906,
       "height": 15.199999809265137,
       "x1": 0,
       "y1": 0.800000011920929,
-      "x2": 56.48749923706055,
+      "x2": 60.962501525878906,
       "y2": 15.999999821186066,
       "fontStyle": "normal",
       "textTransform": "none",
@@ -142,7 +142,7 @@
       ],
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "text": "any runner"
+      "text": "unassigned"
     }
   ]
 }
