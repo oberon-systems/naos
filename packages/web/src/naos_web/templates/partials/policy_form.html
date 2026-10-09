@@ -13,11 +13,12 @@
         </span>
     </label>
 {%- endmacro %}
-{% macro choose(name, value, options, label="") -%}
+{% macro choose(name, value, options, label="", change="") -%}
     <label class="field">
         {% if label %}<span class="field__label">{{ label }}</span>{% endif %}
         <select class="field__box field__select"
                 name="{{ name }}"
+                {% if change %}hx-post="/policies/new" hx-trigger="change" hx-target="#overlay" hx-vals='{"step": "{{ change }}"}'{% endif %}
                 aria-label="{{ label or name }}">
             {% for option in options %}
                 <option value="{{ option }}" {% if option == value %}selected{% endif %}>{{ option }}</option>
@@ -143,9 +144,19 @@
                                 {{ input(at ~ "url", item.url, "URL", "https://api.example.com", mono=true) }}
                             </div>
                             <div class="dialog__grid">
-                                {{ choose(at ~ "api", item.api, dialects, "API") }}
+                                {{ choose(at ~ "api", item.api, dialects, "API", "dialect:providers:" ~ loop.index0) }}
                                 {{ input(at ~ "models", item.models, "Models", "alpha-large, alpha-mini", mono=true) }}
                             </div>
+                            {% set offered = form.suggested(item) %}
+                            {% set adding = "model:providers:" ~ loop.index0 ~ ":" %}
+                            {% if offered %}
+                                <div class="policy__suggest">
+                                    <span class="field__hint">add a model</span>
+                                    {% for model in offered %}
+                                        {{ step(adding ~ model, model, "policy__model") }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
                             <div class="policy__server-row policy__server-row--limits">
                                 {{ input(at ~ "credential", item.credential, "Credential", "alpha-key", mono=true) }}
                                 {{ input(at ~ "timeout", item.timeout, "Timeout, s") }}

@@ -125,6 +125,15 @@ def test_review_of_an_unedited_profile_saves_nothing(client: TestClient) -> None
     assert "The profile is unchanged" in body
 
 
+def test_review_marks_an_image_picked_automatically(client: TestClient) -> None:
+    auto = client.post("/runs/new/review", data=draft(DOCS), headers=HX).text
+    pinned = client.post("/runs/new/review", data=draft(DOCS, image="naos-agents"), headers=HX)
+
+    assert "naos-agents \u00b7 v1.4.2" in auto and 'class="dialog__auto">auto<' in auto
+    assert "naos-agents \u00b7 v1.4.2" in pinned.text
+    assert 'class="dialog__auto"' not in pinned.text
+
+
 def test_review_refuses_a_value_that_is_not_a_number(client: TestClient) -> None:
     body = client.post("/runs/new/review", data=draft(DOCS, cpu="many"), headers=HX).text
 

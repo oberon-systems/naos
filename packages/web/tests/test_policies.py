@@ -2,9 +2,12 @@ import re
 from collections.abc import Iterator
 from typing import Any
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from stub_api import MCPPOL, MNTPOL, MODELPOL, NETPOL, SHELLPOL, WRITES
+
+from naos_web.client import detail_of
 
 HX = {"HX-Request": "true"}
 ROW = '<tr class="runs-table__row"'
@@ -249,6 +252,63 @@ def test_the_model_form_adds_a_provider(client: TestClient) -> None:
     assert "PROVIDERS \u00b7 1" in added
     assert re.search(r'name="max_input"\s+value="2000000"', added)
     assert WRITES == []
+
+
+def test_a_new_model_form_starts_with_a_budget_and_a_url(client: TestClient) -> None:
+    body = client.get("/policies/new", params={"kind": "model"}, headers=HX).text
+
+    assert re.search(r'name="max_input"\s+value="2000000"', body)
+    assert re.search(r'name="max_output"\s+value="200000"', body)
+    assert re.search(r'name="providers.0.url"\s+value="https://api.openai.com"', body)
+
+
+def test_picking_a_dialect_sets_its_url_unless_one_was_typed(client: TestClient) -> None:
+    form = {
+        "kind": "model",
+        "providers.0.api": "anthropic",
+        "providers.0.url": "https://api.openai.com",
+        "providers.1.api": "anthropic",
+        "providers.1.url": "https://api.example.com",
+    }
+    picked = client.post("/policies/new", data=form | {"step": "dialect:providers:0"}, headers=HX)
+    typed = client.post("/policies/new", data=form | {"step": "dialect:providers:1"}, headers=HX)
+
+    assert re.search(r'name="providers.0.url"\s+value="https://api.anthropic.com"', picked.text)
+    assert re.search(r'name="providers.1.url"\s+value="https://api.example.com"', typed.text)
+    assert 'hx-vals=\'{"step": "dialect:providers:0"}\'' in picked.text
+    assert WRITES == []
+
+
+def test_a_suggested_model_is_added_once_beside_typed_ones(client: TestClient) -> None:
+    form = {
+        "kind": "model",
+        "providers.0.api": "anthropic",
+        "providers.0.models": "alpha-mini",
+        "step": "model:providers:0:claude-haiku-5-5",
+    }
+    added = client.post("/policies/new", data=form, headers=HX).text
+    again = client.post(
+        "/policies/new", data=form | {"providers.0.models": "claude-haiku-5-5"}, headers=HX
+    ).text
+
+    assert re.search(r'name="providers.0.models"\s+value="alpha-mini, claude-haiku-5-5"', added)
+    assert 'value="model:providers:0:claude-opus-5-5"' in added
+    assert 'value="model:providers:0:claude-haiku-5-5"' not in added
+    assert re.search(r'name="providers.0.models"\s+value="claude-haiku-5-5"', again)
+    assert WRITES == []
+
+
+def test_a_refused_document_names_the_field_but_not_its_value() -> None:
+    refused = {
+        "loc": ["body", "document", "providers", 0, "url"],
+        "msg": "String should have at least 1 character",
+        "input": "alpha-value",
+    }
+    response = httpx.Response(422, json={"detail": [refused]})
+
+    assert detail_of(response) == (
+        ": document.providers.0.url: String should have at least 1 character"
+    )
 
 
 def test_a_new_model_policy_sends_the_document(client: TestClient, writes: list[Any]) -> None:

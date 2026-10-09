@@ -46,6 +46,15 @@ CAPABILITIES: dict[str, str] = {
 PROTOCOLS = ("any", "http", "https")
 MODES = ("ro", "rw")
 DIALECTS = ("openai", "anthropic")
+# The gateway appends /v1/... to the URL, so each default is the vendor's bare origin.
+DIALECT_URLS = {"openai": "https://api.openai.com", "anthropic": "https://api.anthropic.com"}
+# Offered under the Models field of a provider; any other name can still be typed.
+MODEL_SUGGESTIONS = {
+    "openai": ("gpt-5", "gpt-5-mini"),
+    "anthropic": ("claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"),
+}
+MAX_INPUT = "2000000"
+MAX_OUTPUT = "200000"
 
 
 def _plural(count: int, word: str, words: str = "") -> str:
@@ -626,7 +635,7 @@ BLANK: dict[str, dict[str, str]] = {
     "providers": {
         "name": "",
         "api": "openai",
-        "url": "",
+        "url": DIALECT_URLS["openai"],
         "models": "",
         "credential": "",
         "timeout": "600",
@@ -665,9 +674,14 @@ class PolicyForm:
                 pairs += [(f"{name}.{index}.{key}", value) for key, value in item.items()]
         return pairs
 
+    def suggested(self, item: dict[str, str]) -> list[str]:
+        taken = set(_split(item["models"]))
+        return [model for model in MODEL_SUGGESTIONS.get(item["api"], ()) if model not in taken]
+
     def stepped(self, step: str) -> "PolicyForm":
         verb, _, rest = step.partition(":")
-        name, _, index = rest.partition(":")
+        name, _, tail = rest.partition(":")
+        index, _, model = tail.partition(":")
         if name not in LISTS[self.kind]:
             return self
         items = list(self.items(name))
@@ -675,6 +689,15 @@ class PolicyForm:
             items.append(dict(BLANK[name]))
         elif verb == "drop" and index.isdigit() and int(index) < len(items):
             del items[int(index)]
+        elif verb == "dialect" and index.isdigit() and int(index) < len(items):
+            item = items[int(index)]
+            if item["url"] in ("", *DIALECT_URLS.values()):
+                items[int(index)] = item | {"url": DIALECT_URLS.get(item["api"], "")}
+        elif verb == "model" and index.isdigit() and int(index) < len(items) and model:
+            item = items[int(index)]
+            models = _split(item["models"])
+            if model not in models:
+                items[int(index)] = item | {"models": ", ".join([*models, model])}
         return replace(self, lists={**self.lists, name: items})
 
     def document(self) -> Row:
@@ -765,7 +788,8 @@ def _provider(item: dict[str, str]) -> Row:
 def new_form(kind: str) -> PolicyForm:
     chosen = KIND_OF.get(kind, "mount")
     starts = {"network": ["allow"], "mcp": ["rules"], "model": ["providers"]}.get(chosen, [])
-    return PolicyForm(chosen, {name: [dict(BLANK[name])] for name in starts})
+    form = PolicyForm(chosen, {name: [dict(BLANK[name])] for name in starts})
+    return replace(form, max_input=MAX_INPUT, max_output=MAX_OUTPUT) if chosen == "model" else form
 
 
 def read_form(fields: dict[str, str]) -> PolicyForm:

@@ -343,6 +343,7 @@ def _review_step(
         saves=profile is None or bool(edited),
         changes=new_run.changes(draft, profile, choices.policies),
         image_label=new_run.image_label(image) if image else "no registered image",
+        image_auto=image is not None and draft.image == new_run.AUTO,
         runner_label=runner["name"] if runner else new_run.AUTO,
         profile_label=_profile_label(draft, profile),
         notice=notice,

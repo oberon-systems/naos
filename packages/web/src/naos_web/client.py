@@ -29,11 +29,20 @@ class ApiError(Exception):
 
 
 # A domain refusal carries a sentence meant for the operator; a validation error does not.
-def _detail(response: httpx.Response) -> str:
+def detail_of(response: httpx.Response) -> str:
     try:
         detail = response.json().get("detail")
     except ValueError:
         return ""
+    if isinstance(detail, list):
+        # A validation error: its location and message, never the input it refused.
+        found = [
+            ".".join(str(part) for part in item.get("loc", ()) if part != "body")
+            + f": {item.get('msg', '')}"
+            for item in detail
+            if isinstance(item, dict)
+        ]
+        return f": {'; '.join(found)}" if found else ""
     return f": {detail}" if isinstance(detail, str) else ""
 
 
@@ -131,7 +140,7 @@ class ApiClient:
         except httpx.HTTPStatusError as err:
             status = err.response.status_code
             raise ApiError(
-                f"the api answered {status} for {path}{_detail(err.response)}", status
+                f"the api answered {status} for {path}{detail_of(err.response)}", status
             ) from err
         except httpx.HTTPError as err:
             raise ApiError(f"the api did not answer {path}") from err

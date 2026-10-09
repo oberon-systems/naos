@@ -2832,6 +2832,31 @@ body {
   color: var(--blue-text);
 }
 
+.dialog__auto {
+  margin-left: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.policy__suggest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.policy__model {
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--grey-bg);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
 .policy__drop {
   font-size: 14px;
   color: var(--faint);
