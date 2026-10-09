@@ -1,0 +1,153 @@
+{% from "components.html" import closer, pill, scrim with context %}
+{{ scrim("/mcp") }}
+<section class="panel panel--run panel--runner"
+         role="dialog"
+         aria-label="MCP server {{ server.name }}">
+    <header class="panel__header run__header">
+        <div class="panel__title">
+            {{ closer("/mcp", label="←", klass="panel__close policy__back") }}
+            <span class="dot dot--lg tone-{{ server.tone }}"></span>
+            <h2 class="panel__name">{{ server.name }}</h2>
+            {{ pill(server.pill, server.pill_tone) }}
+            <span class="profile__tag">{{ "external" if server.external else "built-in" }}</span>
+            <span class="table__secondary">mcp server</span>
+            <div class="run__actions">
+                {% if server.external %}
+                    <a class="button button--outline"
+                       href="/mcp/{{ server.name }}/edit"
+                       hx-get="/mcp/{{ server.name }}/edit"
+                       hx-target="#overlay">Edit</a>
+                    {% if server.disabled %}
+                        <form method="post"
+                              action="/mcp/{{ server.name }}/enable"
+                              hx-post="/mcp/{{ server.name }}/enable"
+                              hx-target="#overlay">
+                            <button class="button button--outline" type="submit">Enable</button>
+                        </form>
+                    {% else %}
+                        <a class="button button--outline-danger"
+                           href="/mcp/{{ server.name }}/disable"
+                           hx-get="/mcp/{{ server.name }}/disable"
+                           hx-target="#overlay">Disable</a>
+                    {% endif %}
+                {% endif %}
+                {{ closer("/mcp") }}
+            </div>
+        </div>
+        <p class="panel__facts">
+            {% for part in server.meta %}
+                {% if not loop.first %}<span class="run__sep">·</span>{% endif %}
+                <span>{{ part }}</span>
+            {% endfor %}
+        </p>
+    </header>
+    <div class="run__body run__body--runner">
+        <div class="run__column">
+            <section class="card run__card">
+                <div class="run__card-header">
+                    <h3 class="run__card-title">ENTRY</h3>
+                </div>
+                <dl class="run__facts">
+                    {% for fact in server.entry %}
+                        <dt>{{ fact.label }}</dt>
+                        <dd class="{{ "run__mono" if fact.mono }}">
+                            {{ fact.value }}
+                        </dd>
+                        {% if loop.first and server.external %}
+                            <dt>Credential</dt>
+                            <dd>
+                                {% if server.credential %}
+                                    <a class="profile__tag"
+                                       href="/secrets/{{ server.credential }}"
+                                       hx-get="/secrets/{{ server.credential }}"
+                                       hx-target="#overlay">{{ server.credential }}</a>
+                                    <span class="table__secondary">{{ server.credential_note }}</span>
+                                {% else %}
+                                    none · calls go without a header
+                                {% endif %}
+                            </dd>
+                        {% endif %}
+                    {% endfor %}
+                </dl>
+                {% if server.external %}<p class="image__hint table__secondary">{{ entry_note }}</p>{% endif %}
+            </section>
+            <section class="card run__card">
+                <div class="run__card-header">
+                    <h3 class="run__card-title">POLICIES · {{ server.policies | length }}</h3>
+                </div>
+                <ul class="panel__list">
+                    {% for item in server.policies %}
+                        <li class="panel__run mcp__item"
+                            tabindex="0"
+                            hx-get="/policies/{{ item.id }}"
+                            hx-target="#overlay"
+                            hx-trigger="click, keyup[key=='Enter']">
+                            <div>
+                                <div class="run__strong run__mono">{{ item.label }}</div>
+                                <div class="table__id">{{ item.note }}</div>
+                            </div>
+                            <span class="table__secondary">{{ item.line }}</span>
+                        </li>
+                    {% else %}
+                        <li class="panel__run table__secondary">no mcp policy names {{ server.name }}</li>
+                    {% endfor %}
+                </ul>
+                <p class="image__hint table__secondary">{{ naming_note }}</p>
+            </section>
+        </div>
+        <div class="run__column">
+            <section class="card run__card">
+                <div class="run__card-header">
+                    <h3 class="run__card-title">RUNS · {{ server.runs | length }}</h3>
+                </div>
+                <ul class="panel__list">
+                    {% for run in server.runs %}
+                        <li class="panel__run mcp__item"
+                            tabindex="0"
+                            hx-get="/runs/{{ run.id }}"
+                            hx-target="#overlay"
+                            hx-trigger="click, keyup[key=='Enter']">
+                            <div>
+                                <span class="run__strong">#{{ run.seq }}</span>
+                                {{ pill(run.status, run.tone) }}
+                            </div>
+                            <span class="mcp__item-note">
+                                <span>{{ run.line }}</span>
+                                <span class="table__secondary">{{ run.note }}</span>
+                            </span>
+                        </li>
+                    {% else %}
+                        <li class="panel__run table__secondary">no open run holds {{ server.name }}</li>
+                    {% endfor %}
+                </ul>
+                <p class="image__hint table__secondary">{{ holding_note }}</p>
+            </section>
+            <section class="card run__card">
+                <div class="run__card-header">
+                    <h3 class="run__card-title">LAST CALLS</h3>
+                </div>
+                <dl class="run__facts">
+                    {% for fact in server.calls %}
+                        <dt>{{ fact.label }}</dt>
+                        <dd>
+                            {{ fact.value }}
+                        </dd>
+                    {% endfor %}
+                    <dt>Last failure</dt>
+                    <dd>
+                        {% if server.failure %}
+                            <span class="tag tone-red">{{ server.failure.category }}</span>
+                            <a class="card__link"
+                               href="/audit/{{ server.failure.id }}"
+                               hx-get="/audit/{{ server.failure.id }}"
+                               hx-target="#overlay">Open event</a>
+                        {% else %}
+                            none
+                        {% endif %}
+                    </dd>
+                </dl>
+                <p class="image__hint table__secondary">{{ calls_note }}</p>
+            </section>
+        </div>
+    </div>
+</section>

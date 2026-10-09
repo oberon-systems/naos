@@ -1,0 +1,119 @@
+{% macro step(value, label, klass="policy__add") -%}
+    <button class="{{ klass }}"
+            type="submit"
+            name="step"
+            value="{{ value }}"
+            formnovalidate>{{ label }}</button>
+{%- endmacro %}
+{% macro text(name, value, label, placeholder="", mono=false) -%}
+    <label class="field">
+        <span class="field__label">{{ label }}</span>
+        <span class="field__box">
+            <input class="field__input{{ " run__mono" if mono }}"
+                   type="text"
+                   name="{{ name }}"
+                   value="{{ value }}"
+                   placeholder="{{ placeholder }}"
+                   aria-label="{{ label }}">
+        </span>
+    </label>
+{%- endmacro %}
+{% macro choose(name, value, options, label) -%}
+    <label class="field">
+        <span class="field__label">{{ label }}</span>
+        <select class="field__box field__select"
+                name="{{ name }}"
+                aria-label="{{ label }}">
+            {% if value not in options %}<option value="{{ value }}"
+        selected>{{ value or "pick one" }}</option>{% endif %}
+            {% for option in options %}
+                <option value="{{ option }}" {% if option == value %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+        </select>
+    </label>
+{%- endmacro %}
+{% macro rule(item, at, number, servers, effects, fresh=false) -%}
+    <div class="policy__server-form">
+        <div class="policy__server-head">
+            <strong>Rule {{ number }}
+                {% if fresh %}<span class="tag tone-blue">new</span>{% endif %}
+            </strong>
+            {{ step("drop:rules:" ~ (number - 1), "Remove", "policy__remove") }}
+        </div>
+        <div class="mcp__grid">
+            {{ choose(at ~ "effect", item.effect, effects, "Effect") }}
+            {{ choose(at ~ "server", item.server, servers, "Server") }}
+            {{ text(at ~ "target", item.target, "Tool or resource prefix", "search, * or docs://alpha/", mono=true) }}
+        </div>
+        <div class="mcp__grid mcp__grid--wide">
+            {{ text(at ~ "arguments", item.arguments, "Arguments, JSON", "no constraint", mono=true) }}
+            {{ text(at ~ "per_minute", item.per_minute, "Calls / min", "—") }}
+            {{ text(at ~ "per_run", item.per_run, "Calls / Run", "—") }}
+        </div>
+    </div>
+{%- endmacro %}
+{% macro hidden_rule(item, at) -%}
+    {% for key, value in item.items() %} <input type="hidden" name="{{ at ~ key }}" value="{{ value }}"> {% endfor %}
+{%- endmacro %}
+{% macro rules(form, servers, effects, folded=0, fresh=0) -%}
+    {% set items = form.items("rules") %}
+    <h3 class="run__card-title profile__section mcp__label">
+        <span>RULES · {{ items | length }}</span>
+        {% if folded %}
+            <span class="table__secondary">{{ folded }} unchanged {{ "rule is" if folded == 1 else "rules are" }} folded · {{ step('unfold', 'Show all', 'card__link mcp__unfold') }}</span>
+        {% endif %}
+    </h3>
+    {% for item in items %}
+        {% if loop.index0 < folded %}
+            {{ hidden_rule(item, "rules." ~ loop.index0 ~ ".") }}
+        {% else %}
+            {{ rule(item, "rules." ~ loop.index0 ~ ".", loop.index, servers, effects, fresh and loop.index0 >= fresh) }}
+        {% endif %}
+    {% endfor %}
+    {% if not form.full("rules") %}{{ step('add:rules', '+ Add rule') }}{% endif %}
+{%- endmacro %}
+{% macro grants(form, secrets) -%}
+    {% set items = form.items("grants") %}
+    <div class="mcp__grants">
+        <h3 class="run__card-title profile__section mcp__label">
+            <span>SECRETS GRANTED TO AGENTS · {{ items | length }}</span>
+            <a class="card__link" href="/secrets">Manage secrets</a>
+        </h3>
+        {% for item in items %}
+            {% set at = "grants." ~ loop.index0 ~ "." %}
+            <div class="mcp__grant">
+                <select class="field__box field__select"
+                        name="{{ at }}name"
+                        aria-label="Secret">
+                    {% if item.name not in secrets %}<option value="{{ item.name }}"
+        selected>{{ item.name or "pick a secret" }}</option>{% endif %}
+                    {% for name, note in secrets.items() %}
+                        <option value="{{ name }}"
+                                {% if name == item.name %}selected{% endif %}>{{ name }} · {{ note }}</option>
+                    {% endfor %}
+                </select>
+                <span class="field__box">
+                    <input class="field__input"
+                           type="text"
+                           name="{{ at }}reads"
+                           value="{{ item.reads }}"
+                           placeholder="no read budget"
+                           aria-label="Reads per Run">
+                </span>
+                {{ step("drop:grants:" ~ loop.index0, "Remove", "policy__remove") }}
+            </div>
+        {% endfor %}
+        <div class="mcp__more">
+            {% if not form.full("grants") %}{{ step('add:grants', '+ Grant secret') }}{% endif %}
+            <label class="policy__capability">
+                <input type="checkbox"
+                       name="list_names"
+                       {% if form.listing %}checked{% endif %}>
+                <span>the agent may list the granted names</span>
+            </label>
+        </div>
+        <p class="mcp__warning">
+            A value the agent reads belongs to the agent from then on: it may reach the model provider, its own files and the console log. A secret is granted by its exact name, never by a pattern.
+        </p>
+    </div>
+{%- endmacro %}

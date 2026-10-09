@@ -258,6 +258,22 @@ class ApiClient:
         rows: list[Row] = await self._call("GET", "/mcp-servers")
         return rows
 
+    async def mcp_server(self, name: str) -> Row:
+        row: Row = await self._call("GET", f"/mcp-servers/{name}")
+        return row
+
+    async def register_server(self, body: Row) -> Row:
+        row: Row = await self._call("POST", "/mcp-servers", json=body)
+        return row
+
+    async def patch_server(self, name: str, body: Row) -> Row:
+        row: Row = await self._call("PATCH", f"/mcp-servers/{name}", json=body)
+        return row
+
+    async def switch_server(self, name: str, act: str) -> Row:
+        row: Row = await self._call("POST", f"/mcp-servers/{name}/{act}")
+        return row
+
     # An mcp policy names its servers only; what the registry holds for them rides beside it.
     async def _registered(self, policies: list[Row]) -> list[Row]:
         named = [policy for policy in policies if policy["kind"] == "mcp"]
@@ -275,6 +291,10 @@ class ApiClient:
         row: Row = await self._call(
             "POST", "/runs", json=spec, headers={"Idempotency-Key": idempotency_key}
         )
+        return row
+
+    async def change_policy(self, run_id: str, body: Row) -> Row:
+        row: Row = await self._call("POST", f"/runs/{run_id}/policies", json=body)
         return row
 
     async def stop_run(self, run_id: str) -> Row:
@@ -328,10 +348,11 @@ class ApiClient:
         return await self._registered(rows)
 
     # The api answers 201 for a new policy and 200 for the one an equivalent document holds.
-    async def create_policy(self, kind: str, document: Row) -> tuple[Row, bool]:
-        response = await self._request(
-            "POST", "/policies", json={"kind": kind, "document": document}
-        )
+    async def create_policy(
+        self, kind: str, document: Row, name: str | None = None
+    ) -> tuple[Row, bool]:
+        body = {"kind": kind, "document": document} | ({"name": name} if name else {})
+        response = await self._request("POST", "/policies", json=body)
         row: Row = response.json()
         return row, response.status_code == 201
 

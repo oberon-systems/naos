@@ -258,7 +258,8 @@ def test_an_unknown_run_answers_in_the_overlay(client: TestClient) -> None:
 def test_the_overlay_never_renders_a_secret(client: TestClient) -> None:
     body = client.get(f"/runs/{STARTED}", headers=HX).text
 
-    assert "alpha-token" not in body
+    # The MCP card names a server's credential by its secret's name, as the board draws it.
+    assert "alpha-token" not in re.sub(r'(/secrets/|>)alpha-token(?=["<])', "", body)
     assert "operator-token" not in body
     assert "Bearer" not in body
     assert "Authorization" not in body

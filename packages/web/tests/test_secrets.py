@@ -24,11 +24,11 @@ def flat(body: str) -> str:
     return re.sub(r"\s+", " ", body)
 
 
-def test_the_nav_places_secrets_between_policies_and_audit(client: TestClient) -> None:
+def test_the_nav_places_secrets_between_mcp_and_audit(client: TestClient) -> None:
     body = client.get("/secrets").text
 
     assert re.findall(r'class="nav__item[^"]*"\s+href="(/[a-z]+)"', body)[-3:] == [
-        "/policies",
+        "/mcp",
         "/secrets",
         "/audit",
     ]

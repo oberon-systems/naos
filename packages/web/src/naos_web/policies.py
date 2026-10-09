@@ -32,6 +32,8 @@ GUEST_HOME = "/home/naos/"
 MAX_RULES = 64
 MAX_HOME = 32
 MAX_MCP_RULES = 256
+MAX_GRANTS = 64
+RESOURCE = re.compile(r"^[a-z][a-z0-9+.-]*:")
 EFFECTS = ("allow", "deny")
 MAX_PROVIDERS = 16
 CAPABILITIES: dict[str, str] = {
@@ -74,7 +76,8 @@ def _secret_names(policies: list[Row]) -> list[str]:
 
 
 def secret_names(policy: Row) -> list[str]:
-    return _secret_names([policy])
+    named = _secret_names([policy])
+    return sorted({*named, *granted(policy["document"])}) if policy["kind"] == "mcp" else named
 
 
 def shelf(policies: list[Row]) -> Summary:
@@ -192,21 +195,28 @@ class Capability:
 
 
 @dataclass(frozen=True)
-class ServerRule:
+class McpRule:
     index: int
     effect: str
+    server: str
     target: str
-    constraints: str
     budget: str
+    note: str
 
 
 @dataclass(frozen=True)
 class Server:
     name: str
-    url: str
-    rules: list[ServerRule]
-    credential: str
-    limits: str
+    external: bool
+    rules: str
+    note: str
+
+
+@dataclass(frozen=True)
+class Grant:
+    name: str
+    state: str
+    rule: str
 
 
 @dataclass(frozen=True)
@@ -231,8 +241,10 @@ class PolicyDetail:
     tables: list[Table]
     workdir: str
     capabilities: list[Capability]
+    rules: list[McpRule]
     servers: list[Server]
-    granted: list[str]
+    grants: list[Grant]
+    listing: bool
     providers: list[Provider]
     budget: list[Fact]
     canonical: str
@@ -298,50 +310,111 @@ def _mount_tables(document: Row) -> list[Table]:
     ]
 
 
-def _server_rule(rule: Row) -> ServerRule:
-    limits = [
-        f"{rule[key]}{unit}"
-        for key, unit in (("max_calls_per_minute", "/min"), ("max_calls", "/run"))
-        if rule.get(key)
+def _budget_of(rule: Row) -> str:
+    limits = []
+    if rule.get("max_calls_per_minute"):
+        limits.append(f"{rule['max_calls_per_minute']} calls/min")
+    if rule.get("max_calls"):
+        limits.append(f"{rule['max_calls']} calls per Run")
+    return " \u00b7 ".join(limits)
+
+
+def _constraint(name: str, constraint: Row) -> str:
+    if "equals" in constraint:
+        value = constraint["equals"]
+        return f"{name} equals {value if isinstance(value, str) else json.dumps(value)}"
+    if "prefix" in constraint:
+        return f"{name} starts with {constraint['prefix']}"
+    if "regex" in constraint:
+        return f"{name} matches {constraint['regex']}"
+    enum = constraint["schema"].get("enum")
+    if isinstance(enum, list):
+        return f"{name} in {', '.join(str(item) for item in enum)}"
+    return f"{name} matches a schema"
+
+
+def _overlaps(rule: Row, other: Row) -> bool:
+    tools = (rule.get("tool"), other.get("tool"))
+    return None not in tools and (tools[0] == tools[1] or "*" in tools)
+
+
+def _rule_note(index: int, rule: Row, rules: list[Row]) -> str:
+    words = [_constraint(name, item) for name, item in (rule.get("arguments") or {}).items()]
+    if rule["effect"] == "deny":
+        won = [
+            str(at)
+            for at, other in enumerate(rules)
+            if at != index
+            and other["effect"] == "allow"
+            and other["server"] == rule["server"]
+            and _overlaps(rule, other)
+        ]
+        if won:
+            words.append(f"deny wins over rule {', '.join(won)}")
+    return " \u00b7 ".join(words)
+
+
+def mcp_rules(document: Row) -> list[McpRule]:
+    rules = document["rules"]
+    return [
+        McpRule(
+            index=index,
+            effect=rule["effect"],
+            server=rule["server"],
+            target=rule["tool"] if "tool" in rule else f"resource {rule['resource']}",
+            budget=_budget_of(rule),
+            note=_rule_note(index, rule, rules),
+        )
+        for index, rule in enumerate(rules)
     ]
-    return ServerRule(
-        index=rule["index"],
-        effect=rule["effect"],
-        target=f"tool {rule['tool']}" if "tool" in rule else f"resource {rule['resource']}",
-        constraints=json.dumps(rule["arguments"]) if rule.get("arguments") else "",
-        budget=" \u00b7 ".join(limits),
-    )
 
 
-def _limits(server: Row) -> str:
-    if server.get("kind") == "built-in":
-        return "built-in"
-    if server.get("timeout_seconds") is None:
-        return "not in the registry"
-    return f"{server['timeout_seconds']}s timeout \u00b7 {server['max_calls_per_minute']} calls/min"
+def granted(document: Row) -> list[str]:
+    return sorted({rule["arguments"]["name"]["equals"] for rule in _grants(document)})
 
 
-def _granted(document: Row) -> list[str]:
-    grants = [
+def _grants(document: Row) -> list[Row]:
+    return [
         rule
         for rule in document["rules"]
         if rule["server"] == "secrets" and rule["effect"] == "allow" and rule.get("tool") == "get"
     ]
-    return sorted({rule["arguments"]["name"]["equals"] for rule in grants})
 
 
-# The url, the credential and the limits are the registry's, as it holds them now.
+def _lists(rule: Row) -> bool:
+    return rule["server"] == "secrets" and rule["effect"] == "allow" and rule.get("tool") == "list"
+
+
+def listing(document: Row) -> bool:
+    return any(_lists(rule) for rule in document["rules"])
+
+
+# The limits are the catalog's, as it holds them now; a built-in server lists the tools it serves.
 def _servers(policy: Row) -> list[Server]:
-    return [
-        Server(
-            name=server["name"],
-            url=server.get("url") or format.DASH,
-            rules=[_server_rule(rule) for rule in server["rules"]],
-            credential=server.get("credential") or "",
-            limits=_limits(server),
+    servers = []
+    for server in holders(policy):
+        external = server.get("kind") != "built-in"
+        tools = dict.fromkeys(rule.get("tool") or rule["resource"] for rule in server["rules"])
+        note = " \u00b7 ".join(tools)
+        if external:
+            note = "not in the catalog"
+            if server.get("timeout_seconds") is not None:
+                note = f"{server['timeout_seconds']}s \u00b7 {server['max_calls_per_minute']}/min"
+        rules = _plural(len(server["rules"]), "rule")
+        servers.append(Server(server["name"], external, rules, note))
+    return servers
+
+
+def grants(document: Row, secrets: dict[str, Row | None], now: int) -> list[Grant]:
+    rules = document["rules"]
+    found = []
+    for rule in _grants(document):
+        reads = f"{rule['max_calls']} reads per Run" if rule.get("max_calls") else "no budget"
+        name = rule["arguments"]["name"]["equals"]
+        found.append(
+            Grant(name, _state(secrets.get(name), now), f"rule {rules.index(rule)} \u00b7 {reads}")
         )
-        for server in holders(policy)
-    ]
+    return found
 
 
 def _providers(document: Row) -> list[Provider]:
@@ -415,6 +488,11 @@ def _expiry(secret: Row | None, now: int) -> str:
     return f"expires in {format.coarse(secret['expires_at'] - now)}"
 
 
+def _state(secret: Row | None, now: int) -> str:
+    expiry = _expiry(secret, now)
+    return f"valid \u00b7 {expiry}" if secret and expiry != "expired" else expiry
+
+
 def _pill(policy: Row) -> tuple[str, Tone]:
     if policy["profiles"] or policy["runs_open"]:
         return "IN USE", "green"
@@ -466,8 +544,10 @@ def policy_detail(policy: Row, secrets: dict[str, Row | None], now: int) -> Poli
         ]
         if kind == "shell"
         else [],
+        rules=mcp_rules(document) if kind == "mcp" else [],
         servers=_servers(policy) if kind == "mcp" else [],
-        granted=_granted(document) if kind == "mcp" else [],
+        grants=grants(document, secrets, now) if kind == "mcp" else [],
+        listing=kind == "mcp" and listing(document),
         providers=_providers(document) if kind == "model" else [],
         budget=_budget(document) if kind == "model" else [],
         canonical=json.dumps(document, indent=2),
@@ -515,7 +595,8 @@ LISTS: dict[Kind, dict[str, tuple[str, ...]]] = {
     },
     "shell": {},
     "mcp": {
-        "rules": ("server", "tool", "resource", "effect", "arguments", "per_minute", "per_run"),
+        "rules": ("effect", "server", "target", "arguments", "per_minute", "per_run"),
+        "grants": ("name", "reads"),
     },
     "model": {
         "providers": ("name", "api", "url", "models", "credential", "timeout", "requests"),
@@ -526,6 +607,7 @@ LIMITS = {
     "allow": MAX_RULES,
     "deny": MAX_RULES,
     "rules": MAX_MCP_RULES,
+    "grants": MAX_GRANTS,
     "providers": MAX_PROVIDERS,
 }
 BLANK: dict[str, dict[str, str]] = {
@@ -533,14 +615,14 @@ BLANK: dict[str, dict[str, str]] = {
     "allow": {"protocol": "any", "host": "", "ip": ""},
     "deny": {"protocol": "any", "host": "", "ip": ""},
     "rules": {
-        "server": "",
-        "tool": "",
-        "resource": "",
         "effect": "allow",
+        "server": "",
+        "target": "",
         "arguments": "",
         "per_minute": "",
         "per_run": "",
     },
+    "grants": {"name": "", "reads": ""},
     "providers": {
         "name": "",
         "api": "openai",
@@ -563,6 +645,8 @@ class PolicyForm:
     allow: tuple[str, ...] = ()
     max_input: str = ""
     max_output: str = ""
+    name: str = ""
+    listing: bool = False
 
     def items(self, name: str) -> list[dict[str, str]]:
         return self.lists.get(name, [])
@@ -575,6 +659,7 @@ class PolicyForm:
         pairs += [("workspace_mode", self.workspace_mode)]
         pairs += [(f"cap.{name}", "on") for name in self.allow]
         pairs += [("max_input", self.max_input), ("max_output", self.max_output)]
+        pairs += [("name", self.name)] + ([("list_names", "on")] if self.listing else [])
         for name, items in self.lists.items():
             for index, item in enumerate(items):
                 pairs += [(f"{name}.{index}.{key}", value) for key, value in item.items()]
@@ -610,8 +695,12 @@ class PolicyForm:
                 "max_input_tokens": _whole(self.max_input, "max input tokens"),
                 "max_output_tokens": _whole(self.max_output, "max output tokens"),
             }
-        rules = [item for item in self.items("rules") if item["server"] or item["tool"]]
-        return {"rules": [_mcp_rule(item) for item in rules]}
+        items = [item for item in self.items("rules") if item["server"] or item["target"]]
+        rules = [_mcp_rule(item) for item in items]
+        rules += [_grant(item) for item in self.items("grants") if item["name"]]
+        if self.listing:
+            rules.append({"server": "secrets", "tool": "list", "effect": "allow"})
+        return {"rules": rules}
 
 
 # A row left at any protocol with no host and no ip is an empty row, not a rule.
@@ -634,12 +723,10 @@ def _whole(value: str, label: str) -> int:
     return int(value)
 
 
-# A row names a tool or a resource; the API refuses one that names both or neither.
+# A tool name never holds a colon, so a target with a scheme is a resource prefix.
 def _mcp_rule(item: dict[str, str]) -> Row:
     rule: Row = {"server": item["server"], "effect": item["effect"]}
-    for key in ("tool", "resource"):
-        if item[key]:
-            rule[key] = item[key]
+    rule["resource" if RESOURCE.match(item["target"]) else "tool"] = item["target"]
     if item["arguments"]:
         try:
             rule["arguments"] = json.loads(item["arguments"])
@@ -648,6 +735,18 @@ def _mcp_rule(item: dict[str, str]) -> Row:
     for key, name in (("per_minute", "max_calls_per_minute"), ("per_run", "max_calls")):
         if item[key]:
             rule[name] = _whole(item[key], "a call budget")
+    return rule
+
+
+def _grant(item: dict[str, str]) -> Row:
+    rule: Row = {
+        "server": "secrets",
+        "tool": "get",
+        "effect": "allow",
+        "arguments": {"name": {"equals": item["name"]}},
+    }
+    if item["reads"]:
+        rule["max_calls"] = _whole(item["reads"], "a read budget")
     return rule
 
 
@@ -691,6 +790,8 @@ def read_form(fields: dict[str, str]) -> PolicyForm:
         tuple(name for name in CAPABILITIES if fields.get(f"cap.{name}")),
         fields.get("max_input", "").strip(),
         fields.get("max_output", "").strip(),
+        fields.get("name", "").strip(),
+        bool(fields.get("list_names")),
     )
 
 
@@ -745,20 +846,30 @@ def from_document(policy: Row) -> PolicyForm:
             max_input=str(document["max_input_tokens"]),
             max_output=str(document["max_output_tokens"]),
         )
+    grants = _grants(document)
+    told = [rule for rule in document["rules"] if rule not in grants and not _lists(rule)]
     return PolicyForm(
         "mcp",
         {
             "rules": [
                 {
-                    "server": rule["server"],
-                    "tool": rule.get("tool", ""),
-                    "resource": rule.get("resource", ""),
                     "effect": rule["effect"],
+                    "server": rule["server"],
+                    "target": rule.get("tool") or rule.get("resource", ""),
                     "arguments": json.dumps(rule["arguments"]) if rule.get("arguments") else "",
                     "per_minute": str(rule.get("max_calls_per_minute") or ""),
                     "per_run": str(rule.get("max_calls") or ""),
                 }
-                for rule in document["rules"]
-            ]
+                for rule in told
+            ],
+            "grants": [
+                {
+                    "name": rule["arguments"]["name"]["equals"],
+                    "reads": str(rule.get("max_calls") or ""),
+                }
+                for rule in grants
+            ],
         },
+        name=policy.get("name") or "",
+        listing=listing(document),
     )

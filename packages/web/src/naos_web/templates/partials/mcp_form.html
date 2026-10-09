@@ -1,0 +1,114 @@
+{% from "components.html" import closer, scrim with context %}
+{% set back = "/mcp/" ~ form.name if editing else "/mcp" %}
+{% set action = back ~ "/edit" if editing else "/mcp/_new" %}
+{{ scrim(back, get=back if editing else "/overlay/close") }}
+<section class="panel panel--dialog panel--register"
+         role="dialog"
+         aria-label="{{ "Edit " ~ form.name if editing else "Register MCP server" }}">
+    <header class="panel__header">
+        <div class="panel__title">
+            <h2 class="panel__name">{{ "Edit " ~ form.name if editing else "Register MCP server" }}</h2>
+            {{ closer(back, get=back if editing else "/overlay/close") }}
+        </div>
+        <p class="panel__facts">{{ form_note }}</p>
+    </header>
+    <form class="dialog"
+          method="post"
+          action="{{ action }}"
+          hx-post="{{ action }}"
+          hx-target="#overlay"
+          autocomplete="off">
+        <div class="dialog__body">
+            <div class="dialog__fields">
+                <div class="dialog__grid">
+                    <label class="field">
+                        <span class="field__label">Name</span>
+                        <span class="field__box">
+                            <input class="field__input run__mono"
+                                   type="text"
+                                   name="name"
+                                   value="{{ form.name }}"
+                                   placeholder="alpha"
+                                   pattern="[a-z0-9][a-z0-9\-]{0,31}"
+                                   {% if editing %}readonly{% else %}required{% endif %}>
+                        </span>
+                        <span class="field__hint">a–z, 0–9 and dashes · up to 32{{ " · never changes" if editing }}</span>
+                    </label>
+                    <label class="field">
+                        <span class="field__label">URL</span>
+                        <span class="field__box">
+                            <input class="field__input run__mono"
+                                   type="text"
+                                   name="url"
+                                   value="{{ form.url }}"
+                                   placeholder="https://mcp.example.com/mcp"
+                                   required>
+                        </span>
+                        <span class="field__hint">https and a hostname · no userinfo, query or fragment</span>
+                    </label>
+                </div>
+                <label class="field">
+                    <span class="field__label mcp__label">
+                        Credential
+                        <a class="card__link"
+                           href="/secrets/_new"
+                           hx-get="/secrets/_new"
+                           hx-target="#overlay">New secret</a>
+                    </span>
+                    <select class="field__box field__select" name="credential">
+                        {% for item in credentials %}
+                            <option value="{{ item.name }}" {% if item.selected %}selected{% endif %}>
+                                {{ item.name ~ " · " ~ item.note if item.name else item.note }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <span class="field__hint">Pick a secret by name, or No credential. The value is typed under Secrets and never here.</span>
+                </label>
+                <div class="dialog__grid">
+                    <label class="field">
+                        <span class="field__label">Timeout, s</span>
+                        <span class="field__box">
+                            <input class="field__input"
+                                   type="number"
+                                   name="timeout"
+                                   value="{{ form.timeout }}"
+                                   min="1"
+                                   max="45"
+                                   required>
+                        </span>
+                        <span class="field__hint">1 to 45</span>
+                    </label>
+                    <label class="field">
+                        <span class="field__label">Calls / min</span>
+                        <span class="field__box">
+                            <input class="field__input"
+                                   type="number"
+                                   name="calls"
+                                   value="{{ form.calls }}"
+                                   min="1"
+                                   max="600"
+                                   required>
+                        </span>
+                        <span class="field__hint">1 to 600 · tools/call and resources/read</span>
+                    </label>
+                </div>
+                <div class="mcp__preview">
+                    <span class="run__card-title">HOW AGENTS SEE IT</span>
+                    <p>
+                        <code>{{ form.name or "alpha" }}__&lt;tool&gt;</code>
+                        <span class="table__secondary">through the one server naos, and only what a rule of the Run's mcp policy allows</span>
+                    </p>
+                </div>
+                <p class="mcp__warning">{{ credential_note }}</p>
+            </div>
+            {% if notice %}<p class="dialog__error">{{ notice }}</p>{% endif %}
+        </div>
+        <footer class="dialog__footer">
+            <span class="table__secondary">Recorded in the audit as {{ "mcp_server_updated" if editing else "mcp_server_registered" }}</span>
+            <div class="dialog__actions">
+                {{ closer(back, get=back if editing else "/overlay/close", label="Cancel", klass="button button--outline") }}
+                <button class="button" type="submit">{{ "Save server" if editing else "Register server" }}</button>
+            </div>
+        </footer>
+    </form>
+</section>

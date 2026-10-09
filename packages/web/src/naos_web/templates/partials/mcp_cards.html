@@ -1,0 +1,93 @@
+{% macro rule_list(rules) -%}
+    <ol class="mcp__rules">
+        {% for rule in rules %}
+            <li class="mcp__rule">
+                <span class="mcp__index">{{ rule.index }}</span>
+                <div class="mcp__rule-body">
+                    <div class="mcp__rule-top">
+                        <span class="tag tone-{{ "green" if rule.effect == "allow" else "red" }}">{{ rule.effect }}</span>
+                        <a class="run__strong run__fact-link"
+                           href="/mcp/{{ rule.server }}"
+                           hx-get="/mcp/{{ rule.server }}"
+                           hx-target="#overlay">{{ rule.server }}</a>
+                        <code>{{ rule.target }}</code>
+                        {% if rule.budget %}<span class="table__secondary mcp__budget">{{ rule.budget }}</span>{% endif %}
+                    </div>
+                    {% if rule.note %}<div class="table__secondary">{{ rule.note }}</div>{% endif %}
+                </div>
+            </li>
+        {% endfor %}
+    </ol>
+{%- endmacro %}
+{% macro rules_card(rules) -%}
+    <section class="card run__card">
+        <div class="run__card-header">
+            <h3 class="run__card-title">RULES · {{ rules | length }}</h3>
+        </div>
+        {{ rule_list(rules) }}
+        <p class="image__hint table__secondary">
+            A call needs a matching allow rule and no matching deny; what no rule names is denied. The number is the rule's place in the stored document, as tool errors and the audit name it.
+        </p>
+    </section>
+{%- endmacro %}
+{% macro servers_card(servers) -%}
+    <section class="card run__card">
+        <div class="run__card-header">
+            <h3 class="run__card-title">SERVERS · {{ servers | length }}</h3>
+        </div>
+        <ul class="panel__list">
+            {% for server in servers %}
+                <li class="panel__run mcp__item"
+                    tabindex="0"
+                    hx-get="/mcp/{{ server.name }}"
+                    hx-target="#overlay"
+                    hx-trigger="click, keyup[key=='Enter']">
+                    <div>
+                        <span class="run__strong">{{ server.name }}</span>
+                        <span class="profile__tag">{{ "external" if server.external else "built-in" }}</span>
+                    </div>
+                    <span class="mcp__item-note">
+                        <span>{{ server.rules }}</span>
+                        <span class="table__secondary run__mono">{{ server.note }}</span>
+                    </span>
+                </li>
+            {% endfor %}
+        </ul>
+        <p class="image__hint table__secondary">
+            Url, credential and limits live on the catalog entry, not here. A Run copies the entries when it is created.
+        </p>
+    </section>
+{%- endmacro %}
+{% macro grants_card(grants, listing) -%}
+    <section class="card run__card">
+        <div class="run__card-header">
+            <h3 class="run__card-title">SECRETS GRANTED TO AGENTS · {{ grants | length }}</h3>
+        </div>
+        <ul class="panel__list">
+            {% for grant in grants %}
+                <li class="panel__run mcp__item"
+                    tabindex="0"
+                    hx-get="/secrets/{{ grant.name }}"
+                    hx-target="#overlay"
+                    hx-trigger="click, keyup[key=='Enter']">
+                    <span class="profile__tag">{{ grant.name }}</span>
+                    <span class="mcp__item-note">
+                        <span>{{ grant.state }}</span>
+                        <span class="table__secondary">{{ grant.rule }}</span>
+                    </span>
+                </li>
+            {% else %}
+                <li class="panel__run table__secondary">no secret is granted to the agent</li>
+            {% endfor %}
+        </ul>
+        {% if listing %}
+            <p class="image__hint">
+                <code class="profile__tag">secrets__list</code>
+                <span class="table__secondary">answers {{ "this name" if grants | length == 1 else "these " ~ (grants | length) ~ " names" }}, never a value</span>
+            </p>
+        {% endif %}
+        <p class="mcp__warning mcp__warning--card">
+            A value the agent has read belongs to the agent: it may reach the model provider, its own files and the console log. naos never shows it. Create, rotate and delete under Secrets.
+        </p>
+    </section>
+{%- endmacro %}

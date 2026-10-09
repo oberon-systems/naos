@@ -1,0 +1,66 @@
+{% from "components.html" import closer, scrim with context %}
+{% set back = "/mcp/" ~ name %}
+{{ scrim(back, get=back) }}
+<section class="panel panel--dialog panel--delete"
+         role="dialog"
+         aria-label="Disable {{ name }}">
+    <header class="panel__header">
+        <div class="panel__title">
+            <h2 class="panel__name">Disable {{ name }}?</h2>
+            {{ closer(back, get=back) }}
+        </div>
+    </header>
+    <form class="dialog"
+          method="post"
+          action="{{ back }}/disable"
+          hx-post="{{ back }}/disable"
+          hx-target="#overlay">
+        <div class="dialog__body">
+            <section class="card run__card">
+                <div class="run__card-header">
+                    <h3 class="run__card-title">WHAT CHANGES</h3>
+                </div>
+                <dl class="run__facts">
+                    <dt>New Runs</dt>
+                    <dd>
+                        refused while a policy names {{ name }}
+                    </dd>
+                    {% for label, runs in (("Pending Runs", change.pending), ("Started Runs", change.started)) %}
+                        <dt>{{ label }}</dt>
+                        <dd>
+                            {% for run in runs %}
+                                <a class="run__fact-link run__strong"
+                                   href="/runs/{{ run.id }}"
+                                   hx-get="/runs/{{ run.id }}"
+                                   hx-target="#overlay">#{{ run.seq }}</a>
+                                <span class="table__secondary">{{ run.line }}</span>
+                            {% else %}
+                                none
+                            {% endfor %}
+                        </dd>
+                    {% endfor %}
+                    <dt>Policies</dt>
+                    <dd>
+                        {% for item in change.policies %}
+                            <a class="run__fact-link run__mono"
+                               href="/policies/{{ item.id }}"
+                               hx-get="/policies/{{ item.id }}"
+                               hx-target="#overlay"
+                               title="{{ item.id }}">{{ item.label }}</a>
+                        {% else %}
+                            none
+                        {% endfor %}
+                    </dd>
+                </dl>
+            </section>
+            <p class="confirm__note">{{ disable_note }}</p>
+        </div>
+        <footer class="dialog__footer">
+            <span class="table__secondary">Audited as operator</span>
+            <div class="dialog__actions">
+                {{ closer(back, get=back, label="Cancel", klass="button button--outline") }}
+                <button class="button button--danger" type="submit">Disable server</button>
+            </div>
+        </footer>
+    </form>
+</section>

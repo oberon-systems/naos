@@ -85,6 +85,9 @@
                 {% include "partials/run_runner_card.html" %}
                 {% include "partials/run_lifecycle_card.html" %}
             </div>
+            {% if mcp %}
+                {% include "partials/run_mcp_card.html" %}
+            {% endif %}
             {% if run.model %}
                 {% include "partials/run_model_card.html" %}
             {% endif %}

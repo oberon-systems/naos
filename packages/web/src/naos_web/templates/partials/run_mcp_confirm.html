@@ -1,0 +1,78 @@
+{% from "components.html" import closer, pill, scrim with context %}
+{% set back = "/runs/" ~ confirm.run_id %}
+{{ scrim(back, get=back) }}
+<section class="panel panel--dialog panel--delete"
+         role="dialog"
+         aria-label="Change the MCP policy of Run #{{ confirm.seq }}">
+    <header class="panel__header">
+        <div class="panel__title">
+            <h2 class="panel__name">Change the MCP policy of Run #{{ confirm.seq }}?</h2>
+            {{ closer(back, get=back) }}
+        </div>
+    </header>
+    <form class="dialog"
+          method="post"
+          action="{{ back }}/mcp/apply"
+          hx-post="{{ back }}/mcp/apply"
+          hx-target="#overlay">
+        {% for name, value in confirm.fields %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+        <div class="dialog__body">
+            <section class="card run__card">
+                <div class="run__card-header">
+                    <h3 class="run__card-title">WHAT CHANGES</h3>
+                </div>
+                <dl class="run__facts">
+                    <dt>Run</dt>
+                    <dd>
+                        #{{ confirm.seq }} {{ pill(confirm.status, confirm.tone) }}
+                    </dd>
+                    <dt>From</dt>
+                    <dd class="run__mono">
+                        {{ confirm.before }}
+                    </dd>
+                    <dt>To</dt>
+                    <dd>
+                        {% if confirm.after == "temporary" %}
+                            <span class="tag tone-amber">temporary</span>
+                        {% else %}
+                            <span class="run__mono">{{ confirm.after }}</span>
+                        {% endif %}
+                        <span class="table__secondary">{{ confirm.after_note }}</span>
+                    </dd>
+                    <dt>Server added</dt>
+                    <dd>
+                        {% for item in confirm.added %}
+                            <span class="run__strong">{{ item.name }}</span> <span class="table__secondary">{{ item.note }}</span>
+                        {% else %}
+                            none
+                        {% endfor %}
+                    </dd>
+                    <dt>Server removed</dt>
+                    <dd>
+                        {% for name in confirm.removed %}<span class="run__strong">{{ name }}</span>{% else %}none{% endfor %}
+                    </dd>
+                    <dt>Secret granted</dt>
+                    <dd>
+                        {% for item in confirm.grants %}
+                            <span class="profile__tag">{{ item.name }}</span> <span class="table__secondary">{{ item.note }}</span>
+                        {% else %}
+                            none
+                        {% endfor %}
+                    </dd>
+                </dl>
+            </section>
+            {% if confirm.warning %}<p class="mcp__warning">{{ confirm.warning }}</p>{% endif %}
+            <p class="confirm__note">
+                A call in flight ends under the old policy. The change is recorded as policy_changed with both policies.
+            </p>
+            {% if notice %}<p class="dialog__error">{{ notice }}</p>{% endif %}
+        </div>
+        <footer class="dialog__footer">
+            <span class="table__secondary">Audited as operator</span>
+            <div class="dialog__actions">
+                {{ closer(back, get=back, label="Cancel", klass="button button--outline") }}
+                <button class="button button--danger" type="submit">Change policy</button>
+            </div>
+        </footer>
+    </form>
+</section>

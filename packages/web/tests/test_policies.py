@@ -10,6 +10,10 @@ HX = {"HX-Request": "true"}
 ROW = '<tr class="runs-table__row"'
 
 
+def flat(body: str) -> str:
+    return re.sub(r"\s+", " ", body)
+
+
 @pytest.fixture(autouse=True)
 def writes() -> Iterator[list[Any]]:
     WRITES.clear()
@@ -17,12 +21,13 @@ def writes() -> Iterator[list[Any]]:
     WRITES.clear()
 
 
-def test_the_nav_places_policies_between_profiles_and_secrets(client: TestClient) -> None:
+def test_the_nav_places_policies_between_profiles_and_mcp(client: TestClient) -> None:
     body = client.get("/policies").text
 
-    assert re.findall(r'class="nav__item[^"]*"\s+href="(/[a-z]+)"', body)[-4:] == [
+    assert re.findall(r'class="nav__item[^"]*"\s+href="(/[a-z]+)"', body)[-5:] == [
         "/profiles",
         "/policies",
+        "/mcp",
         "/secrets",
         "/audit",
     ]
@@ -85,16 +90,66 @@ def test_the_mount_and_shell_documents(client: TestClient) -> None:
     assert "not granted" in shell and "git_diff" in shell
 
 
-def test_the_mcp_document_reads_secret_expiry_only(client: TestClient) -> None:
-    body = client.get(f"/policies/{MCPPOL}", headers=HX).text
+def test_the_mcp_document_shows_rules_servers_and_grants(client: TestClient) -> None:
+    body = flat(client.get(f"/policies/{MCPPOL}", headers=HX).text)
 
-    assert "SERVERS \u00b7 4" in body and "SECRETS \u00b7 1" in body
-    assert "Grants to the agent" in body and "agent-key" in body
-    assert "1 \u00b7 allow tool fetch" in body and "10/min \u00b7 100/run" in body
-    assert "0 \u00b7 deny tool *" in body and "built-in" in body
-    assert "3 \u00b7 allow tool get" in body and "5/run" in body
-    assert "expires in 12d" in body
+    assert "RULES \u00b7 5" in body and "SERVERS \u00b7 4" in body
+    assert "scope equals admin" in body
+    assert "10 calls/min \u00b7 100 calls per Run" in body
+    assert "resource docs://beta/" in body
+    assert "path starts with /workspace/" in body
+    assert "30s \u00b7 60/min" in body and "read_file" in body
+    assert "SECRETS GRANTED TO AGENTS \u00b7 1" in body
+    assert "rule 3 \u00b7 5 reads per Run" in body
+    assert 'hx-get="/secrets/agent-key"' in body and 'hx-get="/mcp/beta"' in body
+    assert "secrets__list" not in body
     assert "sec_alpha" not in body
+
+
+def test_the_mcp_form_turns_grants_into_rules(client: TestClient, writes: list[Any]) -> None:
+    form = client.get("/policies/new", params={"kind": "mcp"}, headers=HX).text
+    fields = {
+        "kind": "mcp",
+        "name": "alpha-search",
+        "rules.0.effect": "allow",
+        "rules.0.server": "alpha",
+        "rules.0.target": "*",
+        "rules.0.arguments": "",
+        "rules.0.per_minute": "",
+        "rules.0.per_run": "500",
+        "rules.1.effect": "allow",
+        "rules.1.server": "alpha",
+        "rules.1.target": "docs://alpha/",
+        "grants.0.name": "alpha-token",
+        "grants.0.reads": "5",
+        "list_names": "on",
+    }
+    client.post("/policies/new", data=fields, headers=HX)
+
+    assert 'value="alpha"' in form and 'value="gamma"' not in form
+    assert "SECRETS GRANTED TO AGENTS \u00b7 0" in form
+    assert writes[0][2]["name"] == "alpha-search"
+    assert writes[0][2]["document"]["rules"] == [
+        {"server": "alpha", "effect": "allow", "tool": "*", "max_calls": 500},
+        {"server": "alpha", "effect": "allow", "resource": "docs://alpha/"},
+        {
+            "server": "secrets",
+            "tool": "get",
+            "effect": "allow",
+            "arguments": {"name": {"equals": "alpha-token"}},
+            "max_calls": 5,
+        },
+        {"server": "secrets", "tool": "list", "effect": "allow"},
+    ]
+
+
+def test_new_from_this_maps_an_mcp_document_back(client: TestClient) -> None:
+    body = client.get(f"/policies/{MCPPOL}/new", headers=HX).text
+
+    assert "RULES \u00b7 4" in body
+    assert 'name="rules.2.target" value="docs://beta/"' in flat(body)
+    assert 'name="grants.0.reads" value="5"' in flat(body)
+    assert '<option value="agent-key" selected>agent-key</option>' in flat(body)
 
 
 def test_used_by_lists_profiles_and_runs(client: TestClient) -> None:

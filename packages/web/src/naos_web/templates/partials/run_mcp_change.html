@@ -1,0 +1,143 @@
+{% from "components.html" import closer, pill, scrim with context %}
+{% import "partials/mcp_fields.html" as fields %}
+{% set back = "/runs/" ~ run.id %}
+{% set action = back ~ "/mcp" %}
+{{ scrim(back, get=back) }}
+<section class="panel panel--dialog panel--register"
+         role="dialog"
+         aria-label="Change MCP policy">
+    <header class="panel__header">
+        <div class="panel__title">
+            <h2 class="panel__name">Change MCP policy</h2>
+            {{ closer(back, get=back) }}
+        </div>
+        <p class="panel__facts">
+            Run #{{ run.seq }} · {{ pill(run.status, tone) }} · holds <span class="run__mono">{{ held }}</span>. The Run keeps working; nothing restarts.
+        </p>
+    </header>
+    <form class="dialog"
+          method="post"
+          action="{{ action }}"
+          hx-post="{{ action }}"
+          hx-target="#overlay"
+          autocomplete="off">
+        <input type="hidden" name="source" value="{{ source }}">
+        <input type="hidden" name="held" value="{{ held_count }}">
+        {% if unfolded %}<input type="hidden" name="unfolded" value="on">{% endif %}
+        <div class="dialog__body">
+            <div class="dialog__fields">
+                <div class="field">
+                    <span class="field__label">Change to</span>
+                    <div class="filters">
+                        {% for key, label in (("edit", "An edit of what the Run holds"), ("stored", "A stored policy")) %}
+                            <a class="filter{{ " filter--active" if key == source }}"
+                               href="{{ action }}?source={{ key }}"
+                               hx-get="{{ action }}?source={{ key }}"
+                               hx-target="#overlay">{{ label }}</a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% if source == "stored" %}
+                    <input class="search"
+                           type="search"
+                           name="q"
+                           value="{{ query }}"
+                           placeholder="Search mcp policy by name, id or digest…"
+                           aria-label="Search mcp policies"
+                           hx-post="{{ action }}"
+                           hx-target="#overlay"
+                           hx-trigger="input changed delay:300ms">
+                    <ul class="panel__list mcp__choices">
+                        {% for choice in choices %}
+                            <li class="panel__run mcp__item">
+                                <label class="mcp__choice">
+                                    <input type="radio"
+                                           name="policy_id"
+                                           value="{{ choice.id }}"
+                                           {% if choice.picked %}checked{% endif %}
+                                           hx-post="{{ action }}"
+                                           hx-target="#overlay"
+                                           hx-trigger="change">
+                                    <span>
+                                        <span class="run__strong">{{ choice.label }}</span>
+                                        <span class="table__id">{{ choice.id }}</span>
+                                    </span>
+                                </label>
+                                <span class="mcp__item-note">
+                                    <span class="table__secondary">{{ choice.note }}</span>
+                                    <a class="card__link"
+                                       href="/policies/{{ choice.id }}"
+                                       hx-get="/policies/{{ choice.id }}"
+                                       hx-target="#overlay">Open</a>
+                                </span>
+                            </li>
+                        {% else %}
+                            <li class="panel__run table__secondary">no mcp policy matches</li>
+                        {% endfor %}
+                    </ul>
+                    {% if gets %}
+                        <section class="card run__card">
+                            <div class="run__card-header">
+                                <h3 class="run__card-title">WHAT THE RUN GETS</h3>
+                            </div>
+                            <dl class="run__facts">
+                                <dt>Servers</dt>
+                                <dd>
+                                    {% for name in gets.servers %}<span class="profile__tag">{{ name }}</span>{% else %}none{% endfor %}
+                                </dd>
+                                <dt>Taken away</dt>
+                                <dd>
+                                    {% for name in gets.taken %}<span class="profile__tag">{{ name }}</span>{% else %}none{% endfor %}
+                                </dd>
+                                <dt>Secrets granted</dt>
+                                <dd>
+                                    {% for name in gets.grants %}<span class="profile__tag">{{ name }}</span>{% else %}none{% endfor %}
+                                    {% if gets.dropped %}<span class="table__secondary">· {{ gets.dropped | join(" and ") }} {{ "is" if gets.dropped | length == 1 else "are" }} dropped</span>{% endif %}
+                                </dd>
+                            </dl>
+                            <p class="image__hint table__secondary">
+                                The catalog is read again now, so the Run takes the entries as they are today. A policy naming an unknown or disabled server is refused.
+                            </p>
+                        </section>
+                    {% endif %}
+                {% else %}
+                    {{ fields.rules(form, servers, effects, folded, held_count | int) }}
+                    {{ fields.grants(form, secrets) }}
+                    <div class="field">
+                        <span class="field__label">KEEP IT AS</span>
+                        <label class="mcp__choice">
+                            <input type="radio"
+                                   name="keep"
+                                   value="temporary"
+                                   {% if keep == "temporary" %}checked{% endif %}>
+                            <span>
+                                <span class="run__strong">Temporary</span>
+                                <span class="table__secondary">Belongs to this Run alone and has no id. It is gone when the Run ends.</span>
+                            </span>
+                        </label>
+                        <label class="mcp__choice">
+                            <input type="radio"
+                                   name="keep"
+                                   value="save"
+                                   {% if keep == "save" %}checked{% endif %}>
+                            <span>
+                                <span class="run__strong">Save as a new policy</span>
+                                <span class="table__secondary">Stored under a new id and name, and this Run holds it. Profiles and other Runs can pick it later.</span>
+                            </span>
+                        </label>
+                        {{ fields.text("save_name", save_name, "Name", "alpha-search-beta", mono=true) }}
+                    </div>
+                    <span class="field__hint">{{ held }} itself is never overwritten: it stays as the profiles and the other Runs use it.</span>
+                {% endif %}
+            </div>
+            {% if notice %}<p class="dialog__error">{{ notice }}</p>{% endif %}
+        </div>
+        <footer class="dialog__footer">
+            <span class="table__secondary">Asks to confirm before anything is sent</span>
+            <div class="dialog__actions">
+                {{ closer(back, get=back, label="Cancel", klass="button button--outline") }}
+                <button class="button" type="submit" name="step" value="review">Review change</button>
+            </div>
+        </footer>
+    </form>
+</section>

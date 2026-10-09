@@ -49,6 +49,7 @@ def run(
         "profile_id": None,
         "lease_id": None,
         "mcp_document": None,
+        "policy_history": [],
         "workspace": workspace,
         "runner": runner,
         "merge": merge,
@@ -73,6 +74,28 @@ PREFIXES = {
     "model": "modelpol",
 }
 ALPHA = {"id": "rnr_8c1f42aa", "name": "alpha"}
+HELD_MCP: Row = {
+    "servers": [
+        {
+            "name": "alpha",
+            "url": "https://alpha.example.com/mcp",
+            "credential": "alpha-token",
+            "timeout_seconds": 30,
+            "max_calls_per_minute": 60,
+        }
+    ],
+    "rules": [
+        {"server": "alpha", "tool": "delete", "effect": "deny", "arguments": {}},
+        {"server": "alpha", "tool": "search", "effect": "allow", "arguments": {}},
+        {
+            "server": "secrets",
+            "tool": "get",
+            "effect": "allow",
+            "arguments": {"name": {"equals": "agent-key"}},
+            "max_calls": 5,
+        },
+    ],
+}
 BETA = {"id": "rnr_4ad907bb", "name": "beta"}
 GAMMA = {"id": "rnr_2e77b0cc", "name": "gamma"}
 
@@ -92,18 +115,17 @@ RUNS: list[Row] = [
         extra={
             "profile_id": "prof_7a1c30",
             "lease_id": "lease_5d2a91",
-            "mcp_document": {
-                "servers": [
-                    {
-                        "name": "alpha",
-                        "url": "https://alpha.example.com/mcp",
-                        "credential": "alpha-token",
-                        "timeout_seconds": 30,
-                        "max_calls_per_minute": 60,
-                    }
-                ],
-                "rules": [{"server": "alpha", "tool": "search", "effect": "allow"}],
-            },
+            "mcp_document": HELD_MCP,
+            "policy_history": [
+                {
+                    "seq": 1,
+                    "kind": "mcp",
+                    "policy_id": None,
+                    "previous_id": MCPPOL,
+                    "document": HELD_MCP,
+                    "created_at": NOW - 60,
+                }
+            ],
         },
     ),
     run(127, "run_7c08ab", "COLLECTING", runner=BETA, started=NOW - 348, created=NOW - 360),
@@ -1013,7 +1035,7 @@ def run_from_profile(pid: str, body: Row, idempotency_key: str = Header()) -> Ro
     return RUNS[0]
 
 
-def _server(name: str, credential: str | None, timeout: int, calls: int) -> Row:
+def _server(name: str, credential: str | None, timeout: int, calls: int, **extra: Any) -> Row:
     return {
         "name": name,
         "kind": "external",
@@ -1026,14 +1048,77 @@ def _server(name: str, credential: str | None, timeout: int, calls: int) -> Row:
         "created_at": NOW - 9000,
         "updated_at": NOW - 9000,
         "policies": [MCPPOL],
-    }
+        "runs": [],
+        "calls": None,
+    } | extra
+
+
+HELD = {"run_id": "run_9f21c4", "seq": 128, "status": "STARTED", "current": True}
+PENDING = {"run_id": "run_3a90f8", "seq": 124, "status": "PENDING", "current": False}
+
+
+def _servers() -> list[Row]:
+    built_in = [
+        {
+            "name": name,
+            "kind": "built-in",
+            "url": None,
+            "policies": [MCPPOL] if name != "network" else [],
+            "runs": [HELD] if name != "network" else [],
+            "calls": None,
+        }
+        for name in ("shell", "network", "secrets")
+    ]
+    return [
+        _server("alpha", "alpha-token", 30, 60, runs=[HELD, PENDING], updated_at=NOW - 600),
+        _server("beta", None, 15, 120),
+        _server("gamma", None, 30, 60, policies=[], disabled_at=NOW - 7200),
+        *built_in,
+    ]
+
+
+SERVER_CALLS = {
+    "today": 212,
+    "denied_today": 4,
+    "last": {"at": NOW - 30, "tool": "search", "resource": "", "decision": "allow"},
+    "last_failure": {"id": "ev_mcp_fail", "at": NOW - 90, "category": "credential"},
+}
 
 
 @stub.get("/api/v1/mcp-servers")
 def list_mcp_servers() -> list[Row]:
-    names = ("shell", "network", "secrets")
-    built_in = [{"name": name, "kind": "built-in", "url": None} for name in names]
-    return [_server("alpha", "alpha-token", 30, 60), _server("beta", None, 15, 120), *built_in]
+    return _servers()
+
+
+@stub.get("/api/v1/mcp-servers/{name}", response_model=None)
+def get_mcp_server(name: str) -> Row | JSONResponse:
+    found = next((row for row in _servers() if row["name"] == name), None)
+    return found | {"calls": SERVER_CALLS} if found else _missing(f"mcp server {name}")
+
+
+@stub.post("/api/v1/mcp-servers", response_model=None)
+def register_mcp_server(body: Row) -> JSONResponse:
+    WRITES.append(("POST", "/mcp-servers", body, None))
+    if any(row["name"] == body["name"] for row in _servers()):
+        return _refused(f"mcp server {body['name']} already exists", 409)
+    if not body["url"].startswith("https://"):
+        return _refused("server url must be https", 422)
+    created = _server(body["name"], body["credential"], 30, 60, policies=[])
+    return JSONResponse(created | body, 201)
+
+
+@stub.patch("/api/v1/mcp-servers/{name}", response_model=None)
+def patch_mcp_server(name: str, body: Row) -> Row | JSONResponse:
+    WRITES.append(("PATCH", f"/mcp-servers/{name}", body, None))
+    found = next((row for row in _servers() if row["name"] == name), None)
+    return found | body if found else _missing(f"mcp server {name}")
+
+
+@stub.post("/api/v1/mcp-servers/{name}/{act}", response_model=None)
+def switch_mcp_server(name: str, act: str) -> Row | JSONResponse:
+    WRITES.append(("POST", f"/mcp-servers/{name}/{act}", {}, None))
+    found = next((row for row in _servers() if row["name"] == name), None)
+    return found if found else _missing(f"mcp server {name}")
 
 
 @stub.get("/api/v1/policies")
@@ -1461,6 +1546,30 @@ QUIET_NETWORK: Row = {
     "hosts_total": 0,
     "hosts": [],
 }
+
+
+MCP_GATE: Row = {
+    "policy_id": None,
+    "document": HELD_MCP,
+    "configured_at": NOW - 56,
+    "calls": 212,
+    "denied": 4,
+    "secret_reads": [{"name": "agent-key", "reads": 2}],
+}
+
+
+@stub.get("/api/v1/runs/{run_id}/gates/mcp")
+def mcp_gate(run_id: str) -> Row:
+    return MCP_GATE
+
+
+# A stored policy the api does not hold is refused, as the api refuses it.
+@stub.post("/api/v1/runs/{run_id}/policies", response_model=None)
+def change_policy(run_id: str, body: Row) -> Row | JSONResponse:
+    WRITES.append(("POST", f"/runs/{run_id}/policies", body, None))
+    if body.get("policy_id") and all(row["id"] != body["policy_id"] for row in POLICIES):
+        return _refused(f"mcp policy {body['policy_id']} does not exist", 422)
+    return next(row for row in RUNS if row["id"] == run_id)
 
 
 @stub.get("/api/v1/runs/{run_id}/gates/network")

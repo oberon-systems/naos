@@ -1,0 +1,144 @@
+{% from "partials/mcp_cards.html" import rule_list %}
+<section class="card run__card mcp__card">
+    <div class="run__card-header">
+        <h3 class="run__card-title">MCP</h3>
+        <span class="mcp__actions">
+            {% if mcp.policy_id %}
+                <a class="card__link"
+                   href="/policies/{{ mcp.policy_id }}"
+                   hx-get="/policies/{{ mcp.policy_id }}"
+                   hx-target="#overlay">Open policy</a>
+            {% endif %}
+            {% if mcp.changeable %}
+                <a class="button button--outline"
+                   href="/runs/{{ run.id }}/mcp"
+                   hx-get="/runs/{{ run.id }}/mcp"
+                   hx-target="#overlay">Change MCP policy</a>
+            {% endif %}
+        </span>
+    </div>
+    <div class="mcp__split">
+        <dl class="run__facts">
+            <dt>Policy</dt>
+            <dd>
+                {% if mcp.policy_id %}
+                    <a class="run__fact-link run__mono"
+                       href="/policies/{{ mcp.policy_id }}"
+                       hx-get="/policies/{{ mcp.policy_id }}"
+                       hx-target="#overlay">{{ mcp.policy }}</a>
+                {% else %}
+                    <span class="tag tone-amber">temporary</span>
+                    <span class="table__secondary">this Run only{% if mcp.edited_from %} · edited from {{ mcp.edited_from }}{% endif %}</span>
+                {% endif %}
+            </dd>
+            <dt>Created with</dt>
+            <dd class="run__mono">
+                {% if mcp.created_id %}
+                    <a class="run__fact-link"
+                       href="/policies/{{ mcp.created_id }}"
+                       hx-get="/policies/{{ mcp.created_id }}"
+                       hx-target="#overlay">{{ mcp.created }}</a>
+                {% else %}
+                    {{ mcp.created }}
+                {% endif %}
+            </dd>
+            <dt>Rules</dt>
+            <dd>
+                {{ mcp.rules_line }}
+            </dd>
+            <dt>Calls</dt>
+            <dd>
+                {{ mcp.calls }}
+            </dd>
+            <dt>Secrets granted</dt>
+            <dd>
+                {% for name in mcp.grants %}
+                    <a class="profile__tag"
+                       href="/secrets/{{ name }}"
+                       hx-get="/secrets/{{ name }}"
+                       hx-target="#overlay">{{ name }}</a>
+                {% else %}
+                    none
+                {% endfor %}
+            </dd>
+            <dt>Secret reads</dt>
+            <dd>
+                {{ mcp.reads }}
+            </dd>
+            <dt>Applied by the runner</dt>
+            <dd>
+                {{ mcp.applied }}
+            </dd>
+        </dl>
+        <div class="mcp__held">
+            <h4 class="run__card-title mcp__label">
+                <span>SERVERS HELD NOW · {{ mcp.servers | length }}</span>
+                <span class="table__secondary">the Run's own copy of the catalog</span>
+            </h4>
+            <ul class="panel__list">
+                {% for server in mcp.servers %}
+                    <li class="panel__run mcp__item"
+                        tabindex="0"
+                        hx-get="/mcp/{{ server.name }}"
+                        hx-target="#overlay"
+                        hx-trigger="click[!event.target.closest('a')], keyup[key=='Enter']">
+                        <div>
+                            <span class="run__strong">{{ server.name }}</span>
+                            <span class="profile__tag">{{ "external" if server.external else "built-in" }}</span>
+                            {% if server.added %}<span class="tag tone-blue">added {{ server.added }}</span>{% endif %}
+                            <div class="table__secondary run__mono">{{ server.url }}</div>
+                        </div>
+                        <span class="mcp__item-note">
+                            {% if server.credential %}
+                                <a class="profile__tag"
+                                   href="/secrets/{{ server.credential }}"
+                                   hx-get="/secrets/{{ server.credential }}"
+                                   hx-target="#overlay">{{ server.credential }}</a>
+                            {% endif %}
+                            <span class="table__secondary">{{ server.limits }}</span>
+                        </span>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    <details class="mcp__details">
+        <summary class="card__link">Show rules</summary>
+        {{ rule_list(mcp.rules) }}
+    </details>
+    <h4 class="run__card-title mcp__section">POLICY HISTORY · {{ mcp.history | length }} {{ "CHANGE" if mcp.history | length == 1 else "CHANGES" }}</h4>
+    <ul class="panel__list">
+        {% for change in mcp.history %}
+            <li class="panel__run mcp__item">
+                <div class="mcp__change">
+                    <span class="table__id">{{ change.seq }}</span>
+                    <span class="run__mono table__secondary">{{ change.time }}</span>
+                    <span class="run__mono">{{ change.before }}</span>
+                    <span>→</span>
+                    {% if change.after_id %}
+                        <a class="run__fact-link run__mono"
+                           href="/policies/{{ change.after_id }}"
+                           hx-get="/policies/{{ change.after_id }}"
+                           hx-target="#overlay">{{ change.after }}</a>
+                    {% else %}
+                        <span class="tag tone-amber">temporary</span>
+                    {% endif %}
+                    <span class="table__secondary">{{ change.note }}</span>
+                    {% if change.now %}<span class="tag tone-green">holds now</span>{% endif %}
+                </div>
+                <span class="profile__tag">operator</span>
+            </li>
+        {% endfor %}
+        <li class="panel__run mcp__item">
+            <div class="mcp__change">
+                <span class="table__id">start</span>
+                <span class="run__mono table__secondary">{{ mcp.start }}</span>
+                <span class="run__mono">{{ mcp.created }}</span>
+                <span class="table__secondary">the policy the Run was created with; spec.mcp keeps it</span>
+            </div>
+        </li>
+    </ul>
+    <p class="image__hint table__secondary">
+        A change is swapped in between two calls: a call in flight ends under the policy it started with, and the agent is told to list its tools again. A server taken away loses its credential on the runner with the same pass.
+    </p>
+</section>

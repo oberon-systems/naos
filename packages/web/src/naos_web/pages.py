@@ -35,6 +35,7 @@ class ListPage:
     action: Action | None = None
     chip: Chip | None = None
     header: bool = True
+    heading: str = ""
 
 
 NAV: tuple[ListPage, ...] = (
@@ -102,6 +103,20 @@ NAV: tuple[ListPage, ...] = (
         ),
         action=Action("New policy", "/policies/new", overlay=True),
         chip=Chip("immutable \u00b7 a new document is a new id", "blue"),
+    ),
+    ListPage(
+        key="mcp",
+        title="MCP",
+        href="/mcp",
+        tiles=(
+            Tile("servers", "Servers", "blue"),
+            Tile("enabled", "Enabled", "green"),
+            Tile("named", "Named by policies", "amber"),
+            Tile("held", "Held by Runs", "grey"),
+        ),
+        action=Action("Register server", "/mcp/_new", overlay=True),
+        chip=Chip("credentials by name only", "blue"),
+        heading="MCP servers",
     ),
     ListPage(
         key="secrets",
@@ -251,6 +266,45 @@ SECRET_FILTERS: tuple[SearchFilter, ...] = (
     SearchFilter("used", "Used", "/secrets"),
     SearchFilter("unused", "Unused", "/secrets"),
 )
+SERVER_FILTERS: tuple[SearchFilter, ...] = (
+    SearchFilter("all", "All", "/mcp"),
+    SearchFilter("external", "External", "/mcp"),
+    SearchFilter("built-in", "Built-in", "/mcp"),
+    SearchFilter("disabled", "Disabled", "/mcp"),
+    SearchFilter("unused", "Unused", "/mcp"),
+)
+SERVER_COLUMNS = ("SERVER", "KIND", "URL", "CREDENTIAL", "LIMITS", "POLICIES", "RUNS", "")
+SERVERS_NOTE = (
+    "A policy names a server by its name. A Run copies the entry when it is created, so a later "
+    "edit reaches new Runs only. Disable takes the server out of every Run that has not started."
+)
+REGISTER_NOTE = (
+    "An external server joins the catalog once. Policies name it, and each Run copies the entry "
+    "it starts with."
+)
+EDIT_NOTE = "Only what changed is sent. A Run keeps the entry it was created with."
+CREDENTIAL_NOTE = (
+    "The credential is naos's access to the server. The broker sends it as a Bearer header from "
+    "the host; an agent never lists or receives it. A secret an agent may read is granted in an "
+    "mcp policy instead."
+)
+ENTRY_NOTE = (
+    "The credential is naos's own access to this server. The broker adds it as a Bearer header on "
+    "the host; no agent lists or receives it, and its value is never shown here."
+)
+NAMING_NOTE = (
+    "The mcp policies with a rule that names {name}. A policy cannot name a server the catalog "
+    "does not hold."
+)
+HOLDING_NOTE = (
+    "A Run holds the entry it was created with. Edit reaches new Runs only. Disable also takes "
+    "{name} out of a Run that has not started, and never out of one that has."
+)
+CALLS_NOTE = "Counted from the mcp_call events of the runners. Arguments are never logged."
+DISABLE_NOTE = (
+    "The rules stay as they are, so a call to {name} from a pending Run is denied on the host. "
+    "Enable brings the server back for Runs created afterwards."
+)
 SECRET_COLUMNS = ("SECRET", "STATE", "EXPIRES", "USED BY", "ROTATED", "HELD BY", "")
 TYPED_ONCE_NOTE = (
     "A value is typed once and never shown again. Rotate keeps the name; the next issue to a "
@@ -311,8 +365,8 @@ POLICY_FORM_HINTS = {
     "a trailing dot; an address goes in ip, never in host; localhost is refused.",
     "shell": "At least one capability. The gate serves only the paths the Run's mount policy "
     "names, whatever this list grants.",
-    "mcp": "A rule names a tool, or * for every tool of the server, or a resource prefix. "
-    "A call no rule allows is denied and a matching deny wins; shell and network are servers too.",
+    "mcp": "Deny wins over allow, and what no rule names is denied. A server is picked from the "
+    "MCP catalog; a rule that can never match is refused.",
     "model": "Credential is the name of a secret, never its value. A model belongs to one "
     "provider. The budget is for one whole Run.",
 }

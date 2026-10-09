@@ -1,0 +1,110 @@
+{% from "components.html" import column_header, footer_note, pill %}
+<div class="card__header">
+    <input type="hidden" id="server-state" name="state" value="{{ state }}">
+    <input class="search"
+           id="server-search"
+           type="search"
+           name="q"
+           value="{{ query }}"
+           placeholder="Search server, url, secret or policy…"
+           aria-label="Search servers"
+           hx-get="/mcp"
+           hx-include="#server-state"
+           hx-target="#servers"
+           hx-swap="outerHTML"
+           hx-trigger="input changed delay:300ms"
+           hx-push-url="true"
+           hx-preserve="true">
+    <div class="filters">
+        {% for item in server_filters %}
+            <a class="filter{{ " filter--active" if item.key == state }}"
+               href="{{ item.href(query) }}"
+               hx-get="{{ item.href(query) }}"
+               hx-target="#servers"
+               hx-swap="outerHTML"
+               hx-push-url="true">{{ item.label }}</a>
+        {% endfor %}
+    </div>
+</div>
+<table class="table mcp-table">
+    {{ column_header(server_columns) }}
+    <tbody>
+        {% for server in servers %}
+            <tr class="runs-table__row"
+                tabindex="0"
+                hx-get="/mcp/{{ server.name }}"
+                hx-target="#overlay"
+                hx-trigger="click[!event.target.closest('.action')], keyup[key=='Enter'&&!event.target.closest('.action')]">
+                <td>
+                    <div class="runners-table__name">
+                        <span class="dot tone-{{ server.tone }}"></span>
+                        <span>{{ server.name }}</span>
+                    </div>
+                    <div class="table__id">{{ server.id }}</div>
+                </td>
+                <td>
+                    {{ pill(server.pill, server.pill_tone) }}
+                    <div class="table__secondary">{{ server.kind_note }}</div>
+                </td>
+                <td>
+                    <div class="run__mono">{{ server.url }}</div>
+                    <div class="table__secondary">{{ server.url_note }}</div>
+                </td>
+                <td>
+                    {% if server.credential %}
+                        <a class="profile__tag action"
+                           href="/secrets/{{ server.credential }}"
+                           hx-get="/secrets/{{ server.credential }}"
+                           hx-target="#overlay">{{ server.credential }}</a>
+                    {% elif server.external %}
+                        <div>no credential</div>
+                    {% else %}
+                        <div>—</div>
+                    {% endif %}
+                    <div class="table__secondary">{{ server.credential_note }}</div>
+                </td>
+                <td>
+                    <div class="run__mono">{{ server.limits }}</div>
+                    <div class="table__secondary">{{ server.limits_note }}</div>
+                </td>
+                <td>
+                    <div class="mcp__refs">
+                        {% for item in server.policies %}
+                            <a class="run__mono action"
+                               href="/policies/{{ item.id }}"
+                               hx-get="/policies/{{ item.id }}"
+                               hx-target="#overlay"
+                               title="{{ item.id }}">{{ item.label }}</a>
+                        {% endfor %}
+                        {% if server.more %}<span class="table__secondary">+{{ server.more }}</span>{% endif %}
+                    </div>
+                    <div class="table__secondary">{{ server.policies_note }}</div>
+                </td>
+                <td>
+                    <div class="mcp__refs">
+                        {% for run in server.runs %}
+                            <a class="run__strong action"
+                               href="/runs/{{ run.id }}"
+                               hx-get="/runs/{{ run.id }}"
+                               hx-target="#overlay">#{{ run.seq }}</a>
+                        {% else %}
+                            <span>no runs</span>
+                        {% endfor %}
+                    </div>
+                    <div class="table__secondary">{{ server.runs_note }}</div>
+                </td>
+                <td>
+                    <a class="action"
+                       href="/mcp/{{ server.name }}"
+                       hx-get="/mcp/{{ server.name }}"
+                       hx-target="#overlay">Open</a>
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td class="table__secondary" colspan="{{ server_columns | length }}">no server matches</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{{ footer_note(server_note) }}

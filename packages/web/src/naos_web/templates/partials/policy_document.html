@@ -1,3 +1,4 @@
+{% from "partials/mcp_cards.html" import grants_card, rules_card, servers_card %}
 {% macro facts(items) -%}
     <dl class="run__facts">
         {% for fact in items %}
@@ -74,49 +75,7 @@
                 </p>
             </section>
         {% elif policy.kind == "mcp" %}
-            <section class="card run__card">
-                <div class="run__card-header">
-                    <h3 class="run__card-title">SERVERS · {{ policy.servers | length }}</h3>
-                </div>
-                <ul class="policy__servers">
-                    {% for server in policy.servers %}
-                        <li class="policy__server">
-                            <div>
-                                <strong class="run__mono">{{ server.name }}</strong>
-                                <span class="run__mono table__secondary">{{ server.url }}</span>
-                            </div>
-                            {% for rule in server.rules %}
-                                <div class="run__mono">
-                                    {{ rule.index }} · {{ rule.effect }} {{ rule.target }}
-                                    {% if rule.constraints %}{{ rule.constraints }}{% endif %}
-                                    {% if rule.budget %}· {{ rule.budget }}{% endif %}
-                                </div>
-                            {% endfor %}
-                            <div class="table__secondary">
-                                credential
-                                {% if server.credential %}
-                                    <code class="profile__tag">{{ server.credential }}</code>
-                                {% else %}
-                                    none
-                                {% endif %}
-                                {{ server.limits }}
-                            </div>
-                        </li>
-                    {% endfor %}
-                </ul>
-                {% if policy.granted %}
-                    <p class="image__hint">
-                        Grants to the agent:
-                        {% for name in policy.granted %}<code class="profile__tag">{{ name }}</code>{% endfor %}
-                    </p>
-                    <p class="image__hint table__secondary">
-                        A value the agent reads is the agent's from then on: it may reach the model provider, the agent's files and the upper disk.
-                    </p>
-                {% endif %}
-                <p class="image__hint table__secondary">
-                    A call no rule allows is denied, and a matching deny wins. The number is the rule's place in the document, as the audit names it. The url, the credential and the limits are the registry's; a secret appears by name only.
-                </p>
-            </section>
+            {{ rules_card(policy.rules) }}
         {% elif policy.kind == "model" %}
             <section class="card run__card">
                 <div class="run__card-header">
@@ -172,7 +131,10 @@
                 <p class="image__hint table__secondary">{{ budget_note }}</p>
             </section>
         {% endif %}
-        {% if policy.kind in ("mcp", "model") %}
+        {% if policy.kind == "mcp" %}
+            {{ servers_card(policy.servers) }}
+            {{ grants_card(policy.grants, policy.listing) }}
+        {% elif policy.kind == "model" %}
             <section class="card run__card">
                 <div class="run__card-header">
                     <h3 class="run__card-title">SECRETS · {{ policy.secrets | length }}</h3>

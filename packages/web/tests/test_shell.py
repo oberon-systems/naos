@@ -5,7 +5,7 @@ from naos_web.pages import NAV
 
 PATHS = [page.href for page in NAV]
 # The pages not built yet are still the bare shell 10a built; those tiles stay empty.
-BUILT = {"runs", "runners", "images", "profiles", "policies", "secrets", "audit"}
+BUILT = {"runs", "runners", "images", "profiles", "policies", "mcp", "secrets", "audit"}
 UNFILLED = [page.href for page in NAV if page.key not in BUILT]
 
 
@@ -52,7 +52,7 @@ def test_page_header_follows_the_board(client: TestClient, page) -> None:  # typ
     if not page.header:
         assert "page-header" not in body
         return
-    assert f'<h1 class="page-header__title">{page.title}</h1>' in body
+    assert f'<h1 class="page-header__title">{page.heading or page.title}</h1>' in body
     assert page.chip is not None
     assert page.chip.label in body
     assert page.action is not None

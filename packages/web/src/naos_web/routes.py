@@ -1,6 +1,6 @@
 import asyncio
 import json
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from http import HTTPStatus
 from typing import Annotated, Literal
 from urllib.parse import parse_qsl, urlsplit
@@ -11,15 +11,31 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from naos_web import audit as trail
-from naos_web import changes, confirm, events, gates, new_run, profiles, register, terminal
+from naos_web import (
+    changes,
+    confirm,
+    events,
+    gates,
+    new_run,
+    profiles,
+    register,
+    run_mcp,
+    terminal,
+)
 from naos_web import policies as documents
 from naos_web import secrets as vault
+from naos_web import servers as mcp_servers
 from naos_web.client import ApiClient, ApiError, Choices, Dashboard, Row, RunDetail
 from naos_web.clock import NowDep
 from naos_web.format import ago
 from naos_web.pages import (
     BUDGET_NOTE,
+    CALLS_NOTE,
     COPY_NOTE,
+    CREDENTIAL_NOTE,
+    DISABLE_NOTE,
+    EDIT_NOTE,
+    ENTRY_NOTE,
     ERASED_NOTE,
     EXISTS_NOTE,
     EXITS,
@@ -28,6 +44,7 @@ from naos_web.pages import (
     FORM_NOTE,
     GATES_NOTE,
     HELD_NOTE,
+    HOLDING_NOTE,
     IDENTITY_NOTE,
     IMAGE_COLUMNS,
     IMAGE_FILTERS,
@@ -36,6 +53,7 @@ from naos_web.pages import (
     LEASE_NOTE,
     LIFECYCLE,
     NAMED_NOTE,
+    NAMING_NOTE,
     NAV,
     NEVER_NOTE,
     OPEN_NOTE,
@@ -49,6 +67,7 @@ from naos_web.pages import (
     PROFILE_COLUMNS,
     PROFILE_FILTERS,
     PROFILE_NOTE,
+    REGISTER_NOTE,
     ROTATE_NOTE,
     RUN_COLUMNS,
     RUN_FILTERS,
@@ -59,6 +78,9 @@ from naos_web.pages import (
     SECRET_FILTERS,
     SECRETS_NOTE,
     SENT_ONCE_NOTE,
+    SERVER_COLUMNS,
+    SERVER_FILTERS,
+    SERVERS_NOTE,
     SOURCE_NOTE,
     STATUS_TONE,
     TYPED_ONCE_NOTE,
@@ -481,6 +503,8 @@ async def _run_panel(
     try:
         detail = await api.run_detail(run_id)
         view = await _network(api, detail.run, network) if tab == "gates" else None
+        held = tab == "overview" and detail.run["mcp_document"] is not None
+        mcp = await _mcp_card(api, detail.run) if held else None
     except ApiError as err:
         return failed_overlay(request, PAGES["runs"], err)
     diff = _changes(detail, now, shown, entry, ask, error)
@@ -505,7 +529,13 @@ async def _run_panel(
         log_kind=kind,
         log_rows=events.log_rows(detail.events, detail.runners, kind),
         network=view,
+        mcp=mcp,
     )
+
+
+async def _mcp_card(api: ApiClient, run: Row) -> run_mcp.McpCard:
+    gate, policies = await asyncio.gather(api.run_gate(run["id"], "mcp"), api.policies("mcp"))
+    return run_mcp.card(run, gate, {policy["id"]: policy for policy in policies})
 
 
 async def _network(api: ApiClient, run: Row, network: Network) -> gates.Network:
@@ -733,6 +763,139 @@ async def _confirm(request: Request, run_id: str, now: int, ask: str) -> HTMLRes
         run=row,
         confirm=asked,
     )
+
+
+McpSource = Annotated[run_mcp.Source, Query()]
+
+
+def _mcp_dialog(request: Request, partial: str, **context: object) -> HTMLResponse:
+    return render(
+        request,
+        PAGES["runs"],
+        None,
+        template="run_mcp_overlay.html" if wants_fragment(request) else "run_mcp_page.html",
+        partial=f"partials/{partial}",
+        **context,
+    )
+
+
+async def _change_mcp(
+    request: Request,
+    run_id: str,
+    now: int,
+    source: run_mcp.Source,
+    fields: dict[str, str] | None = None,
+    notice: str = "",
+) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        run, policies, choices = await asyncio.gather(
+            api.run(run_id), api.policies("mcp"), _mcp_choices(api, now)
+        )
+    except ApiError as err:
+        return failed_overlay(request, PAGES["runs"], err)
+    held = run_mcp.held_id(run)
+    names = {policy["id"]: policy.get("name") or "" for policy in policies}
+    held_rules = (run["mcp_document"] or {"rules": []})["rules"]
+    if fields is None:
+        form = run_mcp.edit_form(run["mcp_document"] or {"rules": []})
+        folded, keep, save_name = len(form.items("rules")), "temporary", ""
+        fields = {"held": str(folded)}
+    else:
+        form, folded, keep, save_name = run_mcp.read_dialog(fields)
+        if fields.get("step", "").partition(":")[0] in ("add", "drop"):
+            form = form.stepped(fields["step"])
+    picked = fields.get("policy_id") or held or ""
+    query = fields.get("q", "")
+    stored = {policy["id"]: policy for policy in policies}
+    gets = None
+    if source == "stored" and picked in stored:
+        gets = run_mcp.gets(held_rules, stored[picked]["document"]["rules"])
+    return _mcp_dialog(
+        request,
+        "run_mcp_change.html",
+        run=run,
+        tone=STATUS_TONE[run["status"]],
+        held=run_mcp.label(held, names),
+        held_id=held,
+        source=source,
+        form=form,
+        folded=folded,
+        unfolded=folded == 0,
+        held_count=fields.get("held", "0"),
+        keep=keep,
+        save_name=save_name,
+        query=query,
+        choices=run_mcp.stored_choices(policies, held, picked, query),
+        gets=gets,
+        effects=documents.EFFECTS,
+        notice=notice,
+        **choices,
+    )
+
+
+@router.get("/runs/{run_id}/mcp", response_class=HTMLResponse)
+async def change_mcp_dialog(
+    request: Request, run_id: str, now: NowDep, source: McpSource = "edit"
+) -> HTMLResponse:
+    return await _change_mcp(request, run_id, now, source)
+
+
+# A step or a pick redraws the dialog; Review change answers with the confirm, nothing is sent.
+@router.post("/runs/{run_id}/mcp", response_class=HTMLResponse)
+async def change_mcp_step(request: Request, run_id: str, now: NowDep) -> HTMLResponse:
+    fields = await _form(request)
+    source: run_mcp.Source = "stored" if fields.get("source") == "stored" else "edit"
+    if fields.get("step") != "review":
+        return await _change_mcp(request, run_id, now, source, fields)
+    return await _confirm_mcp(request, run_id, now, fields)
+
+
+async def _confirm_mcp(
+    request: Request, run_id: str, now: int, fields: dict[str, str], notice: str = ""
+) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    source: run_mcp.Source = "stored" if fields.get("source") == "stored" else "edit"
+    try:
+        run, policies = await asyncio.gather(api.run(run_id), api.policies("mcp"))
+    except ApiError as err:
+        return failed_overlay(request, PAGES["runs"], err)
+    names = {policy["id"]: policy.get("name") or "" for policy in policies}
+    stored = {policy["id"]: policy for policy in policies}
+    held_rules = (run["mcp_document"] or {"rules": []})["rules"]
+    try:
+        body = run_mcp.change_body(fields)
+        if source == "stored" and body["policy_id"] not in stored:
+            raise new_run.FormError("pick a stored mcp policy")
+    except new_run.FormError as err:
+        return await _change_mcp(request, run_id, now, source, fields, str(err))
+    if source == "stored":
+        picked = body["policy_id"]
+        rules, after, after_note = stored[picked]["document"]["rules"], "", "stored policy"
+        after = run_mcp.label(picked, names)
+    else:
+        rules, after, after_note = body["document"]["rules"], "temporary", "this Run only"
+        if body.get("save"):
+            after, after_note = body.get("name") or "a new policy", "saved as a new policy"
+    before = run_mcp.label(run_mcp.held_id(run), names)
+    kept = [(name, value) for name, value in fields.items() if name != "step"]
+    return _mcp_dialog(
+        request,
+        "run_mcp_confirm.html",
+        confirm=run_mcp.confirm(run, held_rules, rules, before, after, after_note, kept),
+        notice=notice,
+    )
+
+
+@router.post("/runs/{run_id}/mcp/apply", response_class=HTMLResponse)
+async def change_mcp(request: Request, run_id: str, now: NowDep) -> Response:
+    api: ApiClient = request.app.state.api
+    fields = await _form(request)
+    try:
+        await api.change_policy(run_id, run_mcp.change_body(fields))
+    except (ApiError, new_run.FormError) as err:
+        return await _confirm_mcp(request, run_id, now, fields, str(err))
+    return _moved(request, f"/runs/{run_id}")
 
 
 @router.get("/runs/{run_id}/stop", response_class=HTMLResponse)
@@ -1336,9 +1499,24 @@ async def _policy_overlay(
     )
 
 
+# What an mcp rule may name and a grant may pick: the catalog as it is now, secrets by name.
+async def _mcp_choices(api: ApiClient, now: int) -> dict[str, object]:
+    servers, secrets = await asyncio.gather(api.mcp_servers(), api.secrets())
+    return {
+        "servers": [row["name"] for row in servers if not row.get("disabled_at")],
+        "secrets": {row["name"]: mcp_servers.secret_state(row, now) for row in secrets},
+    }
+
+
 async def _policy_form(
     request: Request, now: int, form: documents.PolicyForm, notice: str = ""
 ) -> HTMLResponse:
+    choices: dict[str, object] = {}
+    if form.kind == "mcp":
+        try:
+            choices = await _mcp_choices(request.app.state.api, now)
+        except ApiError as err:
+            return failed_overlay(request, PAGES["policies"], err)
     return await _policy_overlay(
         request,
         now,
@@ -1356,6 +1534,7 @@ async def _policy_form(
         form_hint=POLICY_FORM_HINTS[form.kind],
         workspace_hint=WORKSPACE_HINT,
         notice=notice,
+        **choices,
     )
 
 
@@ -1374,7 +1553,7 @@ async def create_policy(request: Request, now: NowDep) -> Response:
     if fields.get("step"):
         return await _policy_form(request, now, form.stepped(fields["step"]))
     try:
-        created, fresh = await api.create_policy(form.kind, form.document())
+        created, fresh = await api.create_policy(form.kind, form.document(), form.name or None)
     except (ApiError, new_run.FormError) as err:
         return await _policy_form(request, now, form, str(err))
     if fresh:
@@ -1696,6 +1875,205 @@ async def delete_secret(request: Request, name: SecretName, now: NowDep) -> Resp
             request, name, now, "secret_delete.html", delete_note="", refusal=str(err)
         )
     return _moved(request, "/secrets")
+
+
+ServerName = Annotated[str, Path(pattern=r"^[a-z0-9][a-z0-9-]{0,31}$")]
+ServerQuery = Annotated[mcp_servers.State, Query()]
+ServerAct = Literal["disable", "enable"]
+# A server may be named "new", so the dialog lives at a path no name can take.
+SERVER_NEW = "/mcp/_new"
+
+
+@dataclass(frozen=True)
+class Registry:
+    servers: list[Row]
+    policies: dict[str, Row]
+    secrets: dict[str, Row]
+
+
+async def _registry(api: ApiClient) -> Registry:
+    servers, policies, secrets = await asyncio.gather(
+        api.mcp_servers(), api.policies("mcp"), api.secrets()
+    )
+    return Registry(
+        servers,
+        {policy["id"]: policy for policy in policies},
+        {secret["name"]: secret for secret in secrets},
+    )
+
+
+def _server_list(
+    registry: Registry, now: int, state: mcp_servers.State = "all", query: str = ""
+) -> dict[str, object]:
+    names = {key: policy.get("name") or "" for key, policy in registry.policies.items()}
+    shown = mcp_servers.pick(registry.servers, state, query, names)
+    return {
+        "servers": mcp_servers.server_rows(shown, registry.policies, registry.secrets, now),
+        "server_filters": SERVER_FILTERS,
+        "server_columns": SERVER_COLUMNS,
+        "server_note": SERVERS_NOTE,
+        "state": state,
+        "query": query,
+    }
+
+
+# Search and filters narrow the table here; the api answers every server in one list.
+@router.get("/mcp", response_class=HTMLResponse)
+async def server_shelf(
+    request: Request, now: NowDep, state: ServerQuery = "all", q: SearchQuery = ""
+) -> HTMLResponse:
+    try:
+        registry = await _registry(request.app.state.api)
+    except ApiError as err:
+        return failed(request, PAGES["mcp"], err)
+    return render(
+        request,
+        PAGES["mcp"],
+        mcp_servers.shelf(registry.servers),
+        template="partials/mcp_body.html" if wants_fragment(request) else "mcp.html",
+        **_server_list(registry, now, state, q),
+    )
+
+
+def _server_overlay(
+    request: Request, registry: Registry, now: int, partial: str, **context: object
+) -> HTMLResponse:
+    return render(
+        request,
+        PAGES["mcp"],
+        mcp_servers.shelf(registry.servers),
+        template="mcp_overlay.html" if wants_fragment(request) else "mcp_overlay_page.html",
+        **_server_list(registry, now),
+        partial=f"partials/{partial}",
+        **context,
+    )
+
+
+async def _server_form(
+    request: Request,
+    now: int,
+    form: mcp_servers.ServerForm,
+    editing: bool,
+    notice: str = "",
+) -> HTMLResponse:
+    try:
+        registry = await _registry(request.app.state.api)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["mcp"], err)
+    secrets = list(registry.secrets.values())
+    return _server_overlay(
+        request,
+        registry,
+        now,
+        "mcp_form.html",
+        form=form,
+        editing=editing,
+        credentials=mcp_servers.credentials(secrets, form.credential, now),
+        form_note=EDIT_NOTE if editing else REGISTER_NOTE,
+        credential_note=CREDENTIAL_NOTE,
+        notice=notice,
+    )
+
+
+@router.get(SERVER_NEW, response_class=HTMLResponse)
+async def new_server(request: Request, now: NowDep) -> HTMLResponse:
+    return await _server_form(request, now, mcp_servers.ServerForm(), editing=False)
+
+
+@router.post(SERVER_NEW, response_class=HTMLResponse)
+async def register_server(request: Request, now: NowDep) -> Response:
+    api: ApiClient = request.app.state.api
+    form = mcp_servers.read_form(await _form(request))
+    try:
+        created = await api.register_server(form.body())
+    except (ApiError, new_run.FormError) as err:
+        return await _server_form(request, now, form, editing=False, notice=str(err))
+    return _moved(request, f"/mcp/{created['name']}")
+
+
+async def _changed(api: ApiClient, name: str) -> Row | None:
+    params = {"event": "mcp_server_updated", "limit": 100, "order": "desc"}
+    rows = await api.trail(params)
+    return next((row for row in rows if row["data"].get("name") == name), None)
+
+
+@router.get("/mcp/{name}", response_class=HTMLResponse)
+async def server(request: Request, name: ServerName, now: NowDep) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        registry, found, changed = await asyncio.gather(
+            _registry(api), api.mcp_server(name), _changed(api, name)
+        )
+    except ApiError as err:
+        return failed_overlay(request, PAGES["mcp"], err)
+    return _server_overlay(
+        request,
+        registry,
+        now,
+        "mcp_panel.html",
+        server=mcp_servers.server_detail(found, registry.policies, registry.secrets, changed, now),
+        entry_note=ENTRY_NOTE,
+        naming_note=NAMING_NOTE.format(name=name),
+        holding_note=HOLDING_NOTE.format(name=name),
+        calls_note=CALLS_NOTE,
+    )
+
+
+async def _external_server(api: ApiClient, name: str) -> Row:
+    found = await api.mcp_server(name)
+    if not mcp_servers.external(found):
+        raise ApiError(f"mcp server {name} is built-in and cannot change", HTTPStatus.CONFLICT)
+    return found
+
+
+@router.get("/mcp/{name}/edit", response_class=HTMLResponse)
+async def edit_server(request: Request, name: ServerName, now: NowDep) -> HTMLResponse:
+    try:
+        found = await _external_server(request.app.state.api, name)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["mcp"], err)
+    return await _server_form(request, now, mcp_servers.from_server(found), editing=True)
+
+
+@router.post("/mcp/{name}/edit", response_class=HTMLResponse)
+async def update_server(request: Request, name: ServerName, now: NowDep) -> Response:
+    api: ApiClient = request.app.state.api
+    form = replace(mcp_servers.read_form(await _form(request)), name=name)
+    try:
+        changed = form.patch(await _external_server(api, name))
+        if changed:
+            await api.patch_server(name, changed)
+    except (ApiError, new_run.FormError) as err:
+        return await _server_form(request, now, form, editing=True, notice=str(err))
+    return _moved(request, f"/mcp/{name}")
+
+
+@router.get("/mcp/{name}/disable", response_class=HTMLResponse)
+async def disable_confirm(request: Request, name: ServerName, now: NowDep) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        registry, found = await asyncio.gather(_registry(api), _external_server(api, name))
+    except ApiError as err:
+        return failed_overlay(request, PAGES["mcp"], err)
+    return _server_overlay(
+        request,
+        registry,
+        now,
+        "mcp_disable.html",
+        name=name,
+        change=mcp_servers.disable(found, registry.policies),
+        disable_note=DISABLE_NOTE.format(name=name),
+    )
+
+
+# The api decides and audits; Enable asks nothing, it only brings the server back for new Runs.
+@router.post("/mcp/{name}/{act}", response_class=HTMLResponse)
+async def switch_server(request: Request, name: ServerName, act: ServerAct) -> Response:
+    try:
+        await request.app.state.api.switch_server(name, act)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["mcp"], err)
+    return _moved(request, f"/mcp/{name}")
 
 
 AuditQuery = Annotated[trail.Category, Query()]

@@ -216,8 +216,7 @@ class SecretDetail:
 
 def _named(usage: Row, policies: dict[str, Row]) -> NamedBy:
     policy = policies.get(usage["id"])
-    # A registry server has no screen of its own yet, so it is named without a link.
-    kind, href = "mcp registry", ""
+    kind, href = "mcp registry", f"/mcp/{usage['server']}"
     if usage["kind"] != "reg":
         kind, href = f"{KIND[usage['kind']]} policy", f"/policies/{usage['id']}"
     if usage["kind"] == "grant":
