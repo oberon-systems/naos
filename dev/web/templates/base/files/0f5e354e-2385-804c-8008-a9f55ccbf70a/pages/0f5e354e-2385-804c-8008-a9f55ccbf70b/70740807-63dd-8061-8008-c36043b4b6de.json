@@ -1,0 +1,108 @@
+{
+  "id": "70740807-63dd-8061-8008-c36043b4b6de",
+  "name": "Tile Denied",
+  "type": "frame",
+  "x": 13284,
+  "y": 207,
+  "width": 168,
+  "height": 191,
+  "rotation": 0,
+  "selrect": {
+    "x": 13284,
+    "y": 207,
+    "width": 168,
+    "height": 191,
+    "x1": 13284,
+    "y1": 207,
+    "x2": 13452,
+    "y2": 398
+  },
+  "points": [
+    {
+      "x": 13284,
+      "y": 207
+    },
+    {
+      "x": 13452,
+      "y": 207
+    },
+    {
+      "x": 13452,
+      "y": 398
+    },
+    {
+      "x": 13284,
+      "y": 398
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "70740807-63dd-8061-8008-c36043b4b600",
+  "frameId": "70740807-63dd-8061-8008-c36043b4b600",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 14,
+    "p2": 16,
+    "p3": 14,
+    "p4": 16
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 10,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 6,
+    "columnGap": 6
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "fill",
+  "r3": 10,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 10,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [
+    {
+      "strokeColor": "#e4e7ec",
+      "strokeOpacity": 1,
+      "strokeAlignment": "inner",
+      "strokeWidth": 1
+    }
+  ],
+  "proportion": 1,
+  "r4": 10,
+  "fills": [
+    {
+      "fillColor": "#ffffff",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "70740807-63dd-8061-8008-c36043b4b6e5",
+    "70740807-63dd-8061-8008-c36043b4b6e6",
+    "70740807-63dd-8061-8008-c36043b4b6e7"
+  ]
+}

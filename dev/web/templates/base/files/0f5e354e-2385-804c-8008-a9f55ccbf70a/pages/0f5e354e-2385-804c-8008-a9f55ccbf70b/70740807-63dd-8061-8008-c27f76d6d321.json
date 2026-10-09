@@ -80,6 +80,18 @@
   "r3": 6,
   "layoutJustifyContent": "start",
   "constraintsV": "top",
+  "interactions": [
+    {
+      "eventType": "click",
+      "actionType": "open-overlay",
+      "destination": "70740807-63dd-8061-8008-c36043b46e44",
+      "positionRelativeTo": null,
+      "preserveScroll": false,
+      "overlayPosType": "center",
+      "closeClickOutside": true,
+      "backgroundOverlay": true
+    }
+  ],
   "constraintsH": "left",
   "r1": 6,
   "layoutFlexDir": "row",
