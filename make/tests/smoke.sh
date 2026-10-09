@@ -459,6 +459,14 @@ check_live_models() {
         fail "the stored model policy given back did not keep the spent budget"
 }
 
+# The Gates tab lists the host the Run was denied, with the reason the gate gave.
+check_gates_tab() {
+    curl -fsS "$web/runs/$run/gates?decision=denied" >"$TEMP_DIR/run-gates.html"
+    for text in "NETWORK POLICY" "www.wikipedia.org" "no matching allow rule" "Denied ·"; do
+        grep -qF -- "$text" "$TEMP_DIR/run-gates.html" || fail "the gates tab misses: $text"
+    done
+}
+
 # A capability taken away from the started Run is denied, and answers again once it is given back.
 check_live_shell() {
     grep -q NAOS-SMOKE-REGRANTED "$TEMP_DIR/console.log" || fail "the guest did not call the gate again"
@@ -1462,6 +1470,7 @@ guest "${calls[@]}" "echo NAOS-SMOKE-MODELS-BACK"
 check_live_policy
 check_live_models
 check_live_network
+check_gates_tab
 check_live_shell
 echo "reading the console through the api and the terminal tab..."
 wait_for 30 console_shipped
