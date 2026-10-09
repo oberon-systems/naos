@@ -25,7 +25,7 @@ Views:
 - merge approval;
 - profiles;
 - policies, immutable: find by id or digest, read the resolved document and who uses it, create one of each kind;
-- models: the `model` policy kind with its providers, credential names and token budget, picked in the new-run dialog and the profile form; the Run overview shows calls and tokens spent against the budget and the last refusals;
+- models: the `model` policy kind with its providers, credential names and token budget (a new form starts at 2000000 input and 200000 output tokens, picking a provider's API fills its URL unless one was typed, and the models of that API are offered beside any typed name), picked in the new-run dialog and the profile form; the Run overview shows calls and tokens spent against the budget and the last refusals;
 - MCP: the `MCP` page lists the built-in and external servers with their
   url, credential name, limits, the policies that name them and the Runs that
   hold them; a server opens a popup with its entry, its policies and Runs and
