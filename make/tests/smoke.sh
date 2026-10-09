@@ -403,6 +403,95 @@ change_policy() {
     wait_for 60 policy_applied "$1"
 }
 
+# The edit dialog is posted as a browser posts it: every field it renders, checked boxes and
+# picked options included, plus the extra fields given as name=value arguments.
+mcp_dialog_fields() {
+    curl -fsS "$web/runs/$run/mcp" | "$VENV/bin/python" -c '
+import html.parser, sys, urllib.parse
+
+
+class Form(html.parser.HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.fields, self.select, self.options = [], None, []
+
+    def handle_starttag(self, tag, attrs):
+        found = dict(attrs)
+        if tag == "input" and found.get("name"):
+            kind = found.get("type", "text")
+            if kind in ("radio", "checkbox"):
+                if "checked" in found:
+                    self.fields.append((found["name"], found.get("value") or "on"))
+            elif kind != "search":
+                self.fields.append((found["name"], found.get("value") or ""))
+        elif tag == "select":
+            self.select, self.options = found["name"], []
+        elif tag == "option" and self.select:
+            self.options.append((found.get("value") or "", "selected" in found))
+
+    def handle_endtag(self, tag):
+        if tag == "select" and self.select:
+            picked = [value for value, chosen in self.options if chosen] or [self.options[0][0]]
+            self.fields.append((self.select, picked[0]))
+            self.select = None
+
+
+form = Form()
+form.feed(sys.stdin.read())
+extra = [tuple(arg.split("=", 1)) for arg in sys.argv[1:]]
+print(urllib.parse.urlencode(form.fields + extra))
+' "$@"
+}
+
+# The Run's mcp policy is changed through the web: the dialog, its confirm, then apply.
+web_change_mcp() {
+    local fields="$1" ask="$2"
+    configured="$(events mcp_policy_configured)"
+    curl -fsS "$web/runs/$run/mcp" --data "$fields&step=review" | grep -qF -- "$ask" ||
+        fail "the mcp change confirm does not say: $ask"
+    [ "$(curl -fsS -o /dev/null -w '%{redirect_url}' "$web/runs/$run/mcp/apply" --data "$fields")" = \
+        "$web/runs/$run" ] || fail "the mcp change did not return to the run"
+    wait_for 60 policy_applied mcp
+}
+
+# A server is registered through the MCP page; its popup and the Run's card name what the Run holds.
+check_mcp_page() {
+    [ "$(curl -fsS -o /dev/null -w '%{redirect_url}' "$web/mcp/_new" \
+        --data-urlencode "name=epsilon" --data-urlencode "url=https://example.com/epsilon" \
+        --data-urlencode "credential=" --data-urlencode "timeout=20" --data-urlencode "calls=30")" = \
+        "$web/mcp/epsilon" ] || fail "registering a server through the web did not open it"
+    curl -fsS "${auth[@]}" "$api/api/v1/mcp-servers/epsilon" | "$VENV/bin/python" -c '
+import json, sys
+row = json.load(sys.stdin)
+if (row["url"], row["timeout_seconds"], row["max_calls_per_minute"]) != ("https://example.com/epsilon", 20, 30):
+    sys.exit(f"the web registered another entry: {row}")
+'
+    curl -fsS "$web/mcp" >"$TEMP_DIR/mcp-list.html"
+    curl -fsS "$web/mcp/delta" >"$TEMP_DIR/mcp-delta.html"
+    curl -fsS "$web/mcp/alpha" >"$TEMP_DIR/mcp-alpha.html"
+    curl -fsS "$web/mcp/epsilon/disable" >"$TEMP_DIR/mcp-disable.html"
+    curl -fsS "$web/runs/$run" >"$TEMP_DIR/mcp-run.html"
+    "$VENV/bin/python" - "$TEMP_DIR" "$run" "$secret" "$agent_secret" "$operator" <<'PY' || fail "the mcp screens are wrong"
+import sys
+temp, run, *secrets = sys.argv[1:]
+wanted = {
+    "list": ["MCP servers", "/mcp/epsilon", "https://example.com/delta", "alpha-token", "built-in"],
+    "delta": [f"/runs/{run}", "current entry", "tools appear as delta__"],
+    "alpha": ["Calls today", "LAST CALLS", "alpha-token"],
+    "disable": ["Disable epsilon?", "Disable server"],
+    "run": ["SERVERS HELD NOW", "delta", "temporary", "POLICY HISTORY", "Change MCP policy"],
+}
+for name, texts in wanted.items():
+    body = open(f"{temp}/mcp-{name}.html").read()
+    missing = [text for text in texts if text not in body]
+    if missing:
+        sys.exit(f"mcp {name} is missing {missing}")
+    # The entry note names the Bearer header itself, so only the values are looked for.
+    if any(value in body for value in secrets):
+        sys.exit(f"mcp {name} carries a credential")
+PY
+}
+
 # The server added to the started Run was routed to, and is unknown once it was taken away.
 check_live_policy() {
     grep -q NAOS-SMOKE-DETACHED "$TEMP_DIR/console.log" || fail "the guest did not call the removed server"
@@ -1363,9 +1452,12 @@ echo "creating, rotating and deleting a secret through the web..."
 check_secrets_page
 check_run_detail STARTED
 check_confirms
-echo "editing the mcp policy of the started run: one more server..."
-delta_rule='{"server": "delta", "tool": "search", "effect": "allow"}'
-change_policy mcp "{\"kind\": \"mcp\", \"document\": {\"rules\": [$mcp_rules, $delta_rule]}}"
+echo "editing the mcp policy of the started run through the web: one more server..."
+held_rules="$(mcp_dialog_fields | tr '&' '\n' | sed -n 's/^rules\.\([0-9]*\)\.server=.*/\1/p' | wc -l)"
+web_change_mcp "$(mcp_dialog_fields "rules.$held_rules.effect=allow" \
+    "rules.$held_rules.server=delta" "rules.$held_rules.target=search")" "The agent can call delta"
+echo "registering a server and reading the mcp screens through the web..."
+check_mcp_page
 echo "editing the workspace and calling the gates from the console..."
 # shellcheck disable=SC2016  # the guest shell expands these, not this one
 guest \
@@ -1420,8 +1512,8 @@ guest \
 check_gates
 check_models
 check_model_card
-echo "giving the started run its stored mcp policy back: the server is gone..."
-change_policy mcp "{\"kind\": \"mcp\", \"policy_id\": \"$mcp_policy\"}"
+echo "giving the started run its stored mcp policy back through the web: the server is gone..."
+web_change_mcp "source=stored&policy_id=$mcp_policy" "stored policy"
 echo "editing the network policy of the started run: one more host..."
 wider='{"allow": [{"protocol": "https", "host": "www.google.com"}, {"protocol": "https", "host": "www.wikipedia.org"}]}'
 change_policy network "{\"kind\": \"network\", \"document\": $wider}"
