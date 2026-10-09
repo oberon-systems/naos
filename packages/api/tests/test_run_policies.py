@@ -76,6 +76,7 @@ def test_a_started_run_takes_another_mcp_policy(
     [held] = read["policy_history"]
     assert (held["seq"], held["kind"]) == (1, "mcp")
     assert (held["previous_id"], held["policy_id"]) == (first, second)
+    assert held["document"] == read["mcp_document"]
     assert changed.json()["policy_history"] == read["policy_history"]
     [event] = client.get("/api/v1/audit", params={"event": "policy_changed"}).json()
     assert (event["actor"], event["run_id"]) == ("operator", run_id)

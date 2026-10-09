@@ -25,8 +25,8 @@ def list_servers(session: SessionDep) -> list[ServerView]:
 
 
 @router.get("/mcp-servers/{name}")
-def get_server(name: str, session: SessionDep) -> ServerView:
-    return mcp_servers.get_server(session, name)
+def get_server(name: str, session: SessionDep, now: NowDep) -> ServerView:
+    return mcp_servers.get_server(session, name, now)
 
 
 @router.patch("/mcp-servers/{name}")

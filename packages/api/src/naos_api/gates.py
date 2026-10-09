@@ -127,3 +127,39 @@ def network(session: Session, run: Run) -> NetworkGate:
             for row in rows
         ],
     )
+
+
+class SecretReads(BaseModel):
+    name: str
+    reads: int
+
+
+class McpGate(BaseModel):
+    policy_id: str | None
+    document: dict[str, Any] | None
+    configured_at: int | None
+    calls: int
+    denied: int
+    secret_reads: list[SecretReads]
+
+
+def mcp(session: Session, run: Run) -> McpGate:
+    data = col(AuditEvent.data)
+    event = col(AuditEvent.event)
+    mine = col(AuditEvent.run_id) == run.id
+    count = select(func.count()).select_from(AuditEvent)
+    calls = (mine, event == "mcp_call")
+    name = data["name"].as_string()
+    read = (mine, event == "secret_read", data["decision"].as_string() == "allow")
+    reads = session.exec(select(name, func.count()).where(*read).group_by(name).order_by(name))
+    configured = session.exec(
+        select(func.max(AuditEvent.at)).where(mine, event == "mcp_policy_configured")
+    ).one()
+    return McpGate(
+        policy_id=run.mcp_policy_id,
+        document=run.mcp_document,
+        configured_at=configured,
+        calls=session.exec(count.where(*calls)).one(),
+        denied=session.exec(count.where(*calls, data["decision"].as_string() == "deny")).one(),
+        secret_reads=[SecretReads(name=row[0], reads=row[1]) for row in reads.all()],
+    )

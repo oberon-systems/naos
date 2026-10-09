@@ -3,11 +3,11 @@ from typing import Annotated, Any, Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, StrictInt
-from sqlmodel import Session, col, select, update
+from sqlmodel import Session, col, func, select, update
 
 from naos_api import audit
 from naos_api.errors import NotFoundError, PolicyError, ServerConflictError
-from naos_api.lifecycle import RunStatus
+from naos_api.lifecycle import TERMINAL, RunStatus
 from naos_api.mcp import (
     BUILT_IN,
     RawUrl,
@@ -16,12 +16,14 @@ from naos_api.mcp import (
     granted_secrets,
     https_url,
 )
-from naos_api.models import McpServer, Policy, Run
+from naos_api.models import AuditEvent, McpServer, Policy, Run
 from naos_api.secrets import SecretName
 from naos_api.spec import PolicyKind, StrictModel
 
 Timeout = Annotated[StrictInt, Field(ge=1, le=45)]
 Calls = Annotated[StrictInt, Field(ge=1, le=600)]
+DAY = 86_400
+ENTRY = ("url", "credential", "timeout_seconds", "max_calls_per_minute")
 
 
 class ServerCreate(StrictModel):
@@ -39,6 +41,33 @@ class ServerPatch(StrictModel):
     max_calls_per_minute: Calls | None = None
 
 
+class ServerRun(BaseModel):
+    run_id: str
+    seq: int
+    status: RunStatus
+    current: bool
+
+
+class LastCall(BaseModel):
+    at: int
+    tool: str
+    resource: str
+    decision: str
+
+
+class LastFailure(BaseModel):
+    id: str
+    at: int
+    category: str
+
+
+class ServerCalls(BaseModel):
+    today: int
+    denied_today: int
+    last: LastCall | None
+    last_failure: LastFailure | None
+
+
 class ServerView(BaseModel):
     name: str
     kind: Literal["built-in", "external"]
@@ -51,6 +80,8 @@ class ServerView(BaseModel):
     created_at: int | None = None
     updated_at: int | None = None
     policies: list[str] = []
+    runs: list[ServerRun] = []
+    calls: ServerCalls | None = None
 
 
 def _find(session: Session, name: str) -> McpServer | None:
@@ -76,32 +107,104 @@ def _naming(session: Session) -> dict[str, list[str]]:
     return naming
 
 
-def view_servers(session: Session, servers: Sequence[McpServer]) -> list[ServerView]:
-    naming = _naming(session) if servers else {}
+# A Run holds an external server its copy lists, and a built-in one a rule allows.
+def _holding(session: Session) -> dict[str, list[ServerRun]]:
+    entries = {server.name: server for server in session.exec(select(McpServer)).all()}
+    statement = select(Run).where(
+        col(Run.status).not_in(TERMINAL), col(Run.mcp_document).is_not(None)
+    )
+    holding: dict[str, list[ServerRun]] = {}
+    for run in session.exec(statement.order_by(col(Run.seq))).all():
+        document = run.mcp_document or {}
+        for held in document["servers"]:
+            entry = entries.get(held["name"])
+            current = entry is not None and all(held[key] == getattr(entry, key) for key in ENTRY)
+            holder = ServerRun(run_id=run.id, seq=run.seq, status=run.status, current=current)
+            holding.setdefault(held["name"], []).append(holder)
+        allowed = {rule["server"] for rule in document["rules"] if rule["effect"] == "allow"}
+        for name in BUILT_IN:
+            if name in allowed:
+                holder = ServerRun(run_id=run.id, seq=run.seq, status=run.status, current=True)
+                holding.setdefault(name, []).append(holder)
+    return holding
+
+
+def _views(
+    servers: Sequence[McpServer],
+    naming: dict[str, list[str]],
+    holding: dict[str, list[ServerRun]],
+) -> list[ServerView]:
     return [
-        ServerView(kind="external", policies=naming.get(server.name, []), **server.model_dump())
+        ServerView(
+            kind="external",
+            policies=naming.get(server.name, []),
+            runs=holding.get(server.name, []),
+            **server.model_dump(),
+        )
         for server in servers
     ]
+
+
+def _built_in(
+    name: str, naming: dict[str, list[str]], holding: dict[str, list[ServerRun]]
+) -> ServerView:
+    return ServerView(
+        name=name, kind="built-in", policies=naming.get(name, []), runs=holding.get(name, [])
+    )
+
+
+def view_servers(session: Session, servers: Sequence[McpServer]) -> list[ServerView]:
+    if not servers:
+        return []
+    return _views(servers, _naming(session), _holding(session))
 
 
 def list_servers(session: Session) -> list[ServerView]:
     statement = select(McpServer).order_by(
         col(McpServer.created_at).desc(), col(McpServer.name).desc()
     )
-    external = view_servers(session, session.exec(statement).all())
-    naming = _naming(session)
-    return external + [
-        ServerView(name=name, kind="built-in", policies=naming.get(name, [])) for name in BUILT_IN
-    ]
+    naming, holding = _naming(session), _holding(session)
+    external = _views(session.exec(statement).all(), naming, holding)
+    return external + [_built_in(name, naming, holding) for name in BUILT_IN]
 
 
-def get_server(session: Session, name: str) -> ServerView:
+# Counted from the mcp_call events since midnight UTC; a denial by a rule is not a failure.
+def _calls(session: Session, name: str, now: int) -> ServerCalls:
+    data = col(AuditEvent.data)
+    calls = (col(AuditEvent.event) == "mcp_call", data["server"].as_string() == name)
+    today = (*calls, col(AuditEvent.at) >= now - now % DAY)
+    denied = data["decision"].as_string() == "deny"
+    failed = (*calls, denied, data["category"].as_string() != "denied")
+    newest = col(AuditEvent.seq).desc()
+    count = select(func.count()).select_from(AuditEvent)
+    last = session.exec(select(AuditEvent).where(*calls).order_by(newest).limit(1)).first()
+    failure = session.exec(select(AuditEvent).where(*failed).order_by(newest).limit(1)).first()
+    return ServerCalls(
+        today=session.exec(count.where(*today)).one(),
+        denied_today=session.exec(count.where(*today, denied)).one(),
+        last=None
+        if last is None
+        else LastCall(
+            at=last.at,
+            tool=last.data["tool"],
+            resource=last.data["resource"],
+            decision=last.data["decision"],
+        ),
+        last_failure=None
+        if failure is None
+        else LastFailure(id=failure.id, at=failure.at, category=failure.data["category"]),
+    )
+
+
+def get_server(session: Session, name: str, now: int) -> ServerView:
     if name in BUILT_IN:
-        return ServerView(name=name, kind="built-in", policies=_naming(session).get(name, []))
-    server = _find(session, name)
-    if server is None:
-        raise NotFoundError(f"mcp server {name} does not exist")
-    return view_servers(session, [server])[0]
+        view = _built_in(name, _naming(session), _holding(session))
+    else:
+        server = _find(session, name)
+        if server is None:
+            raise NotFoundError(f"mcp server {name} does not exist")
+        view = view_servers(session, [server])[0]
+    return view.model_copy(update={"calls": _calls(session, name, now)})
 
 
 def register_server(session: Session, body: ServerCreate) -> McpServer:

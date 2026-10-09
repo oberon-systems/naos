@@ -173,3 +173,47 @@ def test_hosts_are_grouped_with_the_denied_ones_first(
         ("registry.example.com", "allow[1]", 1, 0, 13),
     ]
     assert {h["protocol"] for h in gate["hosts"]} == {"https"}
+
+
+def _event(session: Session, run_id: str, at: int, event: str, **data: Any) -> None:
+    session.add(
+        AuditEvent(
+            id=f"evt_{uuid4().hex}",
+            at=at,
+            received_at=at,
+            source="runner",
+            event=event,
+            actor="runner",
+            run_id=run_id,
+            data=data,
+        )
+    )
+    session.commit()
+
+
+def test_the_mcp_gate_counts_calls_and_secret_reads(
+    client: TestClient, session: Session, spec_body: dict[str, Any], mcp_body: dict[str, Any]
+) -> None:
+    policy = client.post("/api/v1/policies", json={"kind": "mcp", "document": mcp_body})
+    spec_body["mcp"] = {"policy": policy.json()["id"]}
+    run = client.post("/api/v1/runs", json=spec_body, headers={"Idempotency-Key": "key-1"}).json()
+    other = client.post("/api/v1/runs", json=spec_body, headers={"Idempotency-Key": "key-2"})
+    for at, decision in ((10, "allow"), (11, "deny"), (12, "allow")):
+        _event(session, run["id"], at, "mcp_call", server="alpha", decision=decision)
+    _event(session, other.json()["id"], 13, "mcp_call", server="alpha", decision="deny")
+    for at, name in ((14, "beta-key"), (15, "alpha-key"), (16, "alpha-key")):
+        _event(session, run["id"], at, "secret_read", name=name, decision="allow")
+    _event(session, run["id"], 17, "secret_read", name="beta-key", decision="deny")
+    _event(session, run["id"], 18, "mcp_policy_configured")
+
+    response = client.get(f"/api/v1/runs/{run['id']}/gates/mcp")
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "policy_id": policy.json()["id"],
+        "document": run["mcp_document"],
+        "configured_at": 18,
+        "calls": 3,
+        "denied": 1,
+        "secret_reads": [{"name": "alpha-key", "reads": 2}, {"name": "beta-key", "reads": 1}],
+    }

@@ -1,11 +1,12 @@
 from collections.abc import Callable
 from typing import Any
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, col, update
 
-from naos_api.models import McpServer
+from naos_api.models import AuditEvent, McpServer
 
 VALUE = "secret-alpha-value"
 URL = "https://mcp.example.com/mcp"
@@ -59,7 +60,7 @@ def test_a_registered_server_is_read_back_without_a_value(client: TestClient) ->
     assert created["credential"] == "alpha-token"
     assert (created["timeout_seconds"], created["max_calls_per_minute"]) == (30, 60)
     assert created["disabled_at"] is None
-    assert fetched.json() == created
+    assert fetched.json() | {"calls": None} == created
     assert VALUE not in fetched.text
     assert client.get("/api/v1/mcp-servers/beta").status_code == 404
     assert client.post("/api/v1/mcp-servers", json={"name": "alpha", "url": URL}).status_code == 409
@@ -219,6 +220,76 @@ def test_disable_takes_the_server_out_of_runs_that_have_not_started(
     assert second["credentials"] == {}
     [event] = client.get("/api/v1/audit", params={"event": "mcp_server_disabled"}).json()
     assert event["data"] == {"name": "alpha", "runs": 1}
+
+
+def test_a_server_lists_the_open_runs_holding_it(
+    client: TestClient, spec_body: dict[str, Any]
+) -> None:
+    _server(client)
+    policy_id = _policy(client, "alpha", "shell")
+    first = _run(client, spec_body, policy_id).json()
+    client.patch("/api/v1/mcp-servers/alpha", json={"timeout_seconds": 5})
+    second = _run(client, spec_body, policy_id, "key-2").json()
+    stopped = _run(client, spec_body, policy_id, "key-3").json()
+    assert client.post(f"/api/v1/runs/{stopped['id']}/stop").status_code == 200
+
+    rows = {row["name"]: row for row in client.get("/api/v1/mcp-servers").json()}
+    alpha = client.get("/api/v1/mcp-servers/alpha").json()
+
+    held = [(run["run_id"], run["status"], run["current"]) for run in alpha["runs"]]
+    assert held == [(first["id"], "PENDING", False), (second["id"], "PENDING", True)]
+    assert rows["alpha"]["runs"] == alpha["runs"]
+    assert [run["seq"] for run in rows["shell"]["runs"]] == [first["seq"], second["seq"]]
+    assert rows["network"]["runs"] == []
+
+
+def _called(session: Session, at: int, server: str = "alpha", **fields: str) -> str:
+    data = {
+        "server": server,
+        "tool": "search",
+        "resource": "",
+        "decision": "allow",
+        "duration_ms": 5,
+        "category": "none",
+        "rule": "0",
+    }
+    event = AuditEvent(
+        id=f"evt_{uuid4().hex}",
+        at=at,
+        received_at=at,
+        source="runner",
+        event="mcp_call",
+        actor="runner",
+        run_id="run_alpha",
+        data=data | fields,
+    )
+    session.add(event)
+    session.commit()
+    return event.id
+
+
+def test_a_server_counts_the_calls_of_today(client: TestClient, session: Session) -> None:
+    _server(client)
+    today = client.get("/api/v1/mcp-servers/alpha").json()["calls"]
+    midnight = 1767225600
+    _called(session, midnight - 1, decision="deny", category="timeout")
+    failed = _called(session, midnight + 1, decision="deny", category="credential")
+    _called(session, midnight + 2, decision="deny", category="denied", tool="delete")
+    _called(session, midnight + 3)
+    _called(session, midnight + 4, server="beta")
+
+    calls = client.get("/api/v1/mcp-servers/alpha").json()["calls"]
+
+    assert today == {"today": 0, "denied_today": 0, "last": None, "last_failure": None}
+    assert (calls["today"], calls["denied_today"]) == (3, 2)
+    assert calls["last"] == {
+        "at": midnight + 3,
+        "tool": "search",
+        "resource": "",
+        "decision": "allow",
+    }
+    assert calls["last_failure"] == {"id": failed, "at": midnight + 1, "category": "credential"}
+    assert client.get("/api/v1/mcp-servers").json()[0]["calls"] is None
 
 
 def test_every_registry_write_is_audited_without_a_value(client: TestClient) -> None:
