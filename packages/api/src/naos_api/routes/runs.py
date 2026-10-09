@@ -227,8 +227,12 @@ def reject_merge(run_id: str, session: SessionDep, now: NowDep) -> MergeRead:
 
 
 @router.get("/runs/{run_id}/gates/{gate}")
-def gate_summary(run_id: str, gate: Literal["model"], session: SessionDep) -> gates.ModelGate:
-    runs.get_run(session, run_id)
+def gate_summary(
+    run_id: str, gate: Literal["model", "network"], session: SessionDep
+) -> gates.ModelGate | gates.NetworkGate:
+    run = runs.get_run(session, run_id)
+    if gate == "network":
+        return gates.network(session, run)
     return gates.model(session, run_id)
 
 
