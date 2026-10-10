@@ -43,7 +43,7 @@ const POLL_INTERVAL: Duration = Duration::from_millis(100);
 const GIB: u64 = 1024 * 1024 * 1024;
 const ARCHIVE_DIR: &str = "archive";
 const PRIVATE_MODE: u32 = 0o600;
-const DEFAULT_AGENT: &str = "claude";
+const DEFAULT_AGENT: &str = "goose";
 const IMAGE_DIR: &str = "images";
 const VIRTIOFSD_MIN: (u64, u64) = (1, 13);
 // The uid and gid of `naos`, the first user setup-alpine creates in the image.
@@ -495,10 +495,13 @@ impl QemuRuntime {
             &paths.meta(),
             &serde_json::to_vec(&meta).map_err(runtime_error)?,
         )?;
+        let model = first_model(run);
         let session = json!({
             "run_id": run.id,
             "vm_id": vm_id,
             "agent": DEFAULT_AGENT,
+            "model_api": model.as_ref().map(|(api, _)| api),
+            "model": model.as_ref().map(|(_, name)| name),
             "workspace": workspace.map(|workspace| workspace.guest.as_str()),
             "workspace_mode": workspace.map(|workspace| mode_name(workspace.mode)),
             "model_port": model_cid,
@@ -980,6 +983,20 @@ fn workspace_of(run: &DesiredRun) -> Result<Option<Workspace>, AgentError> {
             host.display()
         ))),
     }
+}
+
+/// The dialect and the model the agent starts on: the first of the Run's model policy.
+fn first_model(run: &DesiredRun) -> Option<(String, String)> {
+    let provider = run
+        .policies
+        .get("model")?
+        .as_ref()?
+        .get("providers")?
+        .get(0)?;
+    Some((
+        provider.get("api")?.as_str()?.to_owned(),
+        provider.get("models")?.get(0)?.as_str()?.to_owned(),
+    ))
 }
 
 fn mode_name(mode: WorkspaceMode) -> &'static str {
