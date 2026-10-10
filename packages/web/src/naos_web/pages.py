@@ -343,7 +343,8 @@ ERASED_NOTE = (
     "none of them ever carried the value."
 )
 IDENTITY_NOTE = (
-    "A policy is never edited or deleted. A different document is a new policy with its own id."
+    "A policy is never edited: a different document is a new policy with its own id. One that "
+    "no profile names and no run took can be deleted."
 )
 SECRETS_NOTE = "Names only. Credentials are issued to the runner per Run and never shown here."
 BUDGET_NOTE = (

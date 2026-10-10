@@ -1583,7 +1583,7 @@ async def _policy_form(
     request: Request, now: int, form: documents.PolicyForm, notice: str = ""
 ) -> HTMLResponse:
     choices: dict[str, object] = {}
-    if form.kind == "mcp":
+    if form.kind in ("mcp", "model"):
         try:
             choices = await _mcp_choices(request.app.state.api, now)
         except ApiError as err:
@@ -1624,7 +1624,10 @@ async def create_policy(request: Request, now: NowDep) -> Response:
     if fields.get("step"):
         return await _policy_form(request, now, form.stepped(fields["step"]))
     try:
-        created, fresh = await api.create_policy(form.kind, form.document(), form.name or None)
+        document = form.document()
+        if form.kind == "model":
+            documents.check_credentials(document, {row["name"] for row in await api.secrets()})
+        created, fresh = await api.create_policy(form.kind, document, form.name or None)
     except (ApiError, new_run.FormError) as err:
         return await _policy_form(request, now, form, str(err))
     if fresh:
@@ -1690,6 +1693,46 @@ async def policy_from(request: Request, policy_id: str, now: NowDep) -> HTMLResp
     except ApiError as err:
         return failed_overlay(request, PAGES["policies"], err)
     return await _policy_form(request, now, documents.from_document(found))
+
+
+async def _policy_delete_dialog(
+    request: Request, now: int, found: Row, refusal: str
+) -> HTMLResponse:
+    return await _policy_overlay(
+        request,
+        now,
+        "policy_delete_overlay.html",
+        "policy_delete_page.html",
+        policy=found,
+        refusal=refusal,
+    )
+
+
+# A policy something names is refused up front; the api decides again on the write.
+@router.get("/policies/{policy_id}/delete", response_class=HTMLResponse)
+async def policy_delete_confirm(request: Request, policy_id: str, now: NowDep) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        found = await api.policy(policy_id)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["policies"], err)
+    return await _policy_delete_dialog(request, now, found, documents.busy_note(found))
+
+
+@router.post("/policies/{policy_id}/delete", response_class=HTMLResponse)
+async def delete_policy(request: Request, policy_id: str, now: NowDep) -> Response:
+    api: ApiClient = request.app.state.api
+    try:
+        found = await api.policy(policy_id)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["policies"], err)
+    try:
+        await api.delete_policy(policy_id)
+    except ApiError as err:
+        if err.status != 409:
+            return failed_overlay(request, PAGES["policies"], err)
+        return await _policy_delete_dialog(request, now, found, str(err))
+    return _moved(request, "/policies")
 
 
 SecretName = Annotated[str, Path(pattern=r"^[a-z0-9][a-z0-9._-]{0,63}$")]

@@ -1028,6 +1028,7 @@ form:has(:user-invalid) .dialog__invalid {
 }
 
 .field__box:has(:user-invalid),
+.field__select:user-invalid,
 .secret__input:user-invalid {
   border-color: var(--red-dot);
 }

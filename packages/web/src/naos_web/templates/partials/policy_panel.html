@@ -19,6 +19,10 @@
                 <button class="button button--outline"
                         type="button"
                         data-copy="{{ policy.id }}">Copy id</button>
+                <a class="button button--outline-danger"
+                   href="/policies/{{ policy.id }}/delete"
+                   hx-get="/policies/{{ policy.id }}/delete"
+                   hx-target="#overlay">Delete</a>
                 {{ closer("/policies") }}
             </div>
         </div>

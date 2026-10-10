@@ -34,7 +34,7 @@ MESSAGES = [
     ("GET", "/policies/new?kind=mount", {}, "required · a host directory under an allowed root"),
     ("POST", "/policies/new", MCP, "required · a tool or a resource prefix"),
     ("POST", "/policies/new", MODEL, "required · at least one model"),
-    ("POST", "/policies/new", MODEL, "required · the name of a secret"),
+    ("POST", "/policies/new", MODEL, "required · a secret from the list"),
     ("POST", f"{RUN}/mcp", RUN_MCP, "required · a tool or a resource prefix"),
     ("POST", "/runs/new/configure", CONFIGURE, "required · seconds"),
 ]
@@ -46,7 +46,7 @@ def _body(client: TestClient, method: str, path: str, data: dict[str, str]) -> s
 
 
 def _required(body: str) -> set[str]:
-    tags = re.findall(r"<(?:input|textarea)\b[^>]*>", body)
+    tags = re.findall(r"<(?:input|textarea|select)\b[^>]*>", body)
     return {
         found.group(1)
         for tag in tags

@@ -215,3 +215,14 @@ def test_a_plain_submit_redirects_to_the_runs(client: TestClient) -> None:
 
     assert response.status_code == 303
     assert response.headers["location"] == "/runs"
+
+
+def test_only_a_new_profile_marks_its_name_required(client: TestClient) -> None:
+    name = r'<input[^>]*name="name"[^>]*>'
+    [fresh] = re.findall(name, client.post("/runs/new/review", data=draft(""), headers=HX).text)
+    [kept] = re.findall(
+        name, client.post("/runs/new/review", data=draft(DOCS, cpu="4"), headers=HX).text
+    )
+
+    assert re.search(r"\srequired\b", fresh)
+    assert not re.search(r"\srequired\b", kept)

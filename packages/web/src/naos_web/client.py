@@ -332,6 +332,9 @@ class ApiClient:
     async def delete_image(self, image_id: str) -> None:
         await self._request("DELETE", f"/images/{image_id}")
 
+    async def delete_policy(self, policy_id: str) -> None:
+        await self._request("DELETE", f"/policies/{policy_id}")
+
     async def delete_profile(self, profile_id: str) -> None:
         await self._request("DELETE", f"/profiles/{profile_id}")
 

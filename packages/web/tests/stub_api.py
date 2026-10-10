@@ -1682,6 +1682,15 @@ def get_policy(policy_id: str) -> Row | JSONResponse:
     return found if found else _missing(f"policy {policy_id}")
 
 
+@stub.delete("/api/v1/policies/{policy_id}", response_model=None)
+def delete_policy(policy_id: str) -> Response:
+    WRITES.append(("DELETE", f"/policies/{policy_id}", {}, None))
+    found = next(row for row in POLICIES if row["id"] == policy_id)
+    if found["profiles"] or found["runs_total"]:
+        return JSONResponse({"detail": f"policy {policy_id} is named by 1 profile: alpha"}, 409)
+    return Response(status_code=204)
+
+
 @stub.post("/api/v1/runs")
 def create_run(body: Row, idempotency_key: str = Header()) -> Row:
     WRITES.append(("POST", "/runs", body, idempotency_key))

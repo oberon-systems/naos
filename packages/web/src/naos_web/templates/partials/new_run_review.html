@@ -37,8 +37,10 @@
                                name="name"
                                value="{{ draft.name }}"
                                maxlength="64"
-                               pattern="[A-Za-z0-9][A-Za-z0-9._\-]*">
+                               pattern="[A-Za-z0-9][A-Za-z0-9._\-]*"
+                               {% if lock or not profile %}required{% endif %}>
                     </span>
+                    <span class="field__error">required · a unique profile name</span>
                     <span class="field__hint">unique; an existing name is updated only when no run on it is active</span>
                 </label>
                 {% if lock %}<p class="dialog__lock">{{ lock }}</p>{% endif %}

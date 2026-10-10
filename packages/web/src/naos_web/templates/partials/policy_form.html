@@ -28,6 +28,23 @@
         </select>
     </label>
 {%- endmacro %}
+{% macro credential(name, value) -%}
+    <label class="field">
+        <span class="field__label">Credential</span>
+        <select class="field__box field__select"
+                name="{{ name }}"
+                aria-label="Credential"
+                required>
+            {% if value not in secrets %}<option value="" selected>{{ "pick a secret" if secrets else "no secrets yet" }}</option>{% endif %}
+            {% for secret, note in secrets.items() %}
+                <option value="{{ secret }}"
+                        {% if secret == value %}selected{% endif %}>{{ secret }} · {{ note }}</option>
+            {% endfor %}
+        </select>
+        <span class="field__error">required · a secret from the list</span>
+        {% if not secrets %}<a class="card__link" href="/secrets">Add a secret</a>{% endif %}
+    </label>
+{%- endmacro %}
 {% macro step(value, label, klass="policy__add") -%}
     <button class="{{ klass }}"
             type="submit"
@@ -161,7 +178,7 @@
                                 </div>
                             {% endif %}
                             <div class="policy__server-row policy__server-row--limits">
-                                {{ input(at ~ "credential", item.credential, "Credential", "alpha-key", mono=true, error="required · the name of a secret") }}
+                                {{ credential(at ~ "credential", item.credential) }}
                                 {{ input(at ~ "timeout", item.timeout, "Timeout, s") }}
                                 {{ input(at ~ "requests", item.requests, "Requests / min") }}
                             </div>

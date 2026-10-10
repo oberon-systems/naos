@@ -801,6 +801,27 @@ def _named(value: str, pattern: re.Pattern[str], message: str) -> str:
     return value
 
 
+def busy_note(policy: Row) -> str:
+    parts = []
+    if policy["profiles"]:
+        parts.append(f"named by {_plural(len(policy['profiles']), 'profile')}")
+    if policy["runs_total"]:
+        parts.append(f"kept by the record of {_plural(policy['runs_total'], 'run')}")
+    if not parts:
+        return ""
+    label = policy.get("name") or policy["id"]
+    return f"{label} is {' and '.join(parts)}. It stays while they name it."
+
+
+def check_credentials(document: Row, known: set[str]) -> None:
+    for provider in document["providers"]:
+        if provider["credential"] not in known:
+            raise FormError(
+                f"provider {provider['name']} names {provider['credential']}, which is not a "
+                "secret: pick one from the list"
+            )
+
+
 def _provider(item: dict[str, str]) -> Row:
     return {
         "name": _named(item["name"], PROVIDER_NAME, PROVIDER_RULE),

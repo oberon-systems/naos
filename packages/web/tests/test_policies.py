@@ -80,7 +80,7 @@ def test_the_network_document_shows_rules_identity_and_json(client: TestClient) 
     assert "immutable" in body and "CANONICAL DOCUMENT" in body
     assert f'data-copy="{NETPOL}"' in body
     assert ">New from this</a>" in body
-    assert ">Edit<" not in body and ">Delete<" not in body
+    assert ">Edit<" not in body and ">Delete</a>" in body
 
 
 def test_the_mount_and_shell_documents(client: TestClient) -> None:
@@ -261,7 +261,10 @@ def test_a_new_model_form_starts_with_a_budget_and_a_url(client: TestClient) -> 
     assert re.search(r'name="max_output"\s+value="200000"', body)
     assert re.search(r'name="providers.0.url"\s+value="https://api.openai.com"', body)
     assert re.search(r'name="providers.0.name"\s+value="openai"', body)
-    assert re.search(r'name="providers.0.credential"\s+value="openai-key"', body)
+    assert re.search(r'<select[^>]*name="providers.0.credential"[^>]*required', body)
+    assert re.search(r'<option value=""\s+selected>pick a secret</option>', body)
+    assert re.search(r'<option value="alpha-key"\s*>alpha-key', body)
+    assert "openai-key" not in body
 
 
 def test_picking_a_dialect_sets_its_url_unless_one_was_typed(client: TestClient) -> None:
@@ -277,7 +280,6 @@ def test_picking_a_dialect_sets_its_url_unless_one_was_typed(client: TestClient)
 
     assert re.search(r'name="providers.0.url"\s+value="https://api.anthropic.com"', picked.text)
     assert re.search(r'name="providers.0.name"\s+value="anthropic"', picked.text)
-    assert re.search(r'name="providers.0.credential"\s+value="anthropic-key"', picked.text)
     assert re.search(r'name="providers.1.url"\s+value="https://api.example.com"', typed.text)
     assert 'hx-vals=\'{"step": "dialect:providers:0"}\'' in picked.text
     assert WRITES == []
@@ -326,6 +328,25 @@ def test_a_bad_provider_name_or_credential_is_explained(
 
     assert "a provider name is 1-32 lowercase letters" in named
     assert "a credential is the name of a secret" in keyed
+    assert writes == []
+
+
+def test_a_credential_outside_the_secrets_is_refused(client: TestClient, writes: list[Any]) -> None:
+    form = {
+        "kind": "model",
+        "max_input": "2000000",
+        "max_output": "200000",
+        "providers.0.name": "alpha",
+        "providers.0.api": "openai",
+        "providers.0.url": "https://api.example.com",
+        "providers.0.models": "alpha-mini",
+        "providers.0.credential": "delta-key",
+        "providers.0.timeout": "600",
+        "providers.0.requests": "60",
+    }
+    body = client.post("/policies/new", data=form, headers=HX).text
+
+    assert "provider alpha names delta-key, which is not a secret" in body
     assert writes == []
 
 
@@ -392,3 +413,42 @@ def test_new_from_this_maps_a_model_document_back(client: TestClient) -> None:
     assert re.search(r'name="max_input"\s+value="100000"', body)
     assert re.search(r'name="providers.0.models"\s+value="alpha-mini"', body)
     assert re.search(r'<option value="openai"\s+selected>', body)
+
+
+def test_delete_asks_yes_or_no_for_a_policy_nothing_names(client: TestClient) -> None:
+    panel = client.get(f"/policies/{MNTPOL}", headers=HX).text
+    body = client.get(f"/policies/{MNTPOL}/delete", headers=HX).text
+
+    assert f'href="/policies/{MNTPOL}/delete"' in panel
+    assert f"Delete {MNTPOL}?" in body
+    assert 'class="button button--danger" type="submit">Yes<' in body
+    assert ">No</a>" in body
+
+
+def test_delete_is_refused_up_front_for_a_policy_in_use(
+    client: TestClient, writes: list[Any]
+) -> None:
+    named = client.get(f"/policies/{NETPOL}/delete", headers=HX).text
+    taken = client.get(f"/policies/{SHELLPOL}/delete", headers=HX).text
+
+    assert "cannot be deleted" in named
+    assert "is named by 3 profiles and kept by the record of 28 runs" in named
+    assert "is kept by the record of 3 runs" in taken
+    assert ">Yes<" not in named and ">OK</a>" in named
+    assert writes == []
+
+
+def test_a_refusal_from_the_api_reopens_the_policy_dialog(client: TestClient) -> None:
+    body = client.post(f"/policies/{NETPOL}/delete", headers=HX).text
+
+    assert "cannot be deleted" in body
+    assert "the api answered 409" in body
+
+
+def test_a_confirmed_policy_delete_goes_back_to_the_list(
+    client: TestClient, writes: list[Any]
+) -> None:
+    response = client.post(f"/policies/{MNTPOL}/delete", headers=HX)
+
+    assert response.headers["HX-Redirect"] == "/policies"
+    assert writes[0][:2] == ("DELETE", f"/policies/{MNTPOL}")
