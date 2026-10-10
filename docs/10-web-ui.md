@@ -24,8 +24,8 @@ Views:
 - filesystem diff;
 - merge approval;
 - profiles;
-- policies, immutable: find by id or digest, read the resolved document and who uses it, create one of each kind;
-- models: the `model` policy kind with its providers, credential names and token budget (a new form starts at 2000000 input and 200000 output tokens, a provider starts as openai with its URL and the credential name openai-key, picking another API changes the three unless one was typed, a bad name or credential is explained in words, and the models of that API are offered beside any typed name), picked in the new-run dialog and the profile form; the Run overview shows calls and tokens spent against the budget and the last refusals;
+- policies, immutable: find by id or digest, read the resolved document and who uses it, create one of each kind, and delete one that no profile names and no Run took, after a confirm; a policy in use opens a refusal instead;
+- models: the `model` policy kind with its providers, credential names and token budget (a new form starts at 2000000 input and 200000 output tokens, a provider starts as openai with its URL, picking another API changes the name and the URL unless one was typed, the credential is picked from the existing secrets and nothing else is accepted, a bad name is explained in words, and the models of that API are offered beside any typed name), picked in the new-run dialog and the profile form; the Run overview shows calls and tokens spent against the budget and the last refusals;
 - MCP: the `MCP` page lists the built-in and external servers with their
   url, credential name, limits, the policies that name them and the Runs that
   hold them; a server opens a popup with its entry, its policies and Runs and

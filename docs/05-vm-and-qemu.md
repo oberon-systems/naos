@@ -114,8 +114,9 @@ keys. The probe fails when the vsock device and `model_port` do not come
 together.
 
 The guest reads `/sys/firmware/qemu_fw_cfg/by_name/opt/naos/session/raw` for
-its per-Run parameters: `run_id`, `vm_id`, `agent`, which selects `claude`
-or `gemini`, `workspace` with `workspace_mode` when there is one, and
+its per-Run parameters: `run_id`, `vm_id`, `agent`, which selects `goose`,
+`claude` or `gemini`, `model_api` and `model` with the dialect and the first
+model of the Run's model policy, `workspace` with `workspace_mode` when there is one, and
 `model_port` when the Run has a model policy. fw_cfg is read-only for the guest and needs no disk or host path.
 
 ## Guest user and instructions

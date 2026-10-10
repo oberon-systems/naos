@@ -123,6 +123,7 @@ POST /api/v1/runs/{run_id}/merge/reject
 POST /api/v1/policies
 GET /api/v1/policies
 GET /api/v1/policies/{policy_id}
+DELETE /api/v1/policies/{policy_id}
 GET /api/v1/profiles
 POST /api/v1/profiles
 GET /api/v1/profiles/{profile_id}
@@ -367,6 +368,12 @@ case. Each policy, here and in `GET /policies/{policy_id}`, carries
 `runs_total`, the Runs that hold it now, not terminal and ever.
 `GET /profiles?policy=` and `GET /runs?policy=` list those profiles and Runs.
 The web form reads the list to offer a policy per kind.
+
+`DELETE /policies/{policy_id}` answers 204 and records `policy_deleted`. It
+answers 409 while a profile names the policy or the record of any Run, ended
+or not, keeps its id: the detail names the profiles and counts the Runs. A
+`model` policy is stored only when every provider's `credential` is the name
+of an existing secret; another name answers 422.
 
 ## Changing a policy of a started Run
 
