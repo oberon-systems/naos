@@ -28,6 +28,13 @@ their hashes and `NAOS_TAG=local`, builds the two images and `naos-runner`,
 starts compose with `NAOS_DATABASE_AUTO_MIGRATE=true`, so the api brings the
 empty database to its schema, waits for `/healthz` and starts the runner in
 the background.
+
+A stand whose catalog is empty and never held an image gets the project's
+newest one: kickstart reads the newest `image-<version>` release of the
+repository on GitHub and registers `naos-agents-<version>.qcow2` through
+`POST /api/v1/images`, with the url of the asset and the sha256 from
+`SHA256SUMS`. After that the catalog is the operator's: an image deleted
+there is not added back by a later kickstart.
 Every later run reuses the same tokens and skips whatever is already up.
 
 Every run builds all three from this tree, before anything starts. Docker caches
@@ -89,8 +96,9 @@ leaves nothing behind for the next `kickstart` to reuse.
 | `local/agent.log`, `agent.pid`    | Output and pid of the background runner     |
 | `docker/.env`                     | Compose settings, written once, mode 0600   |
 
-The image cache and the VM directories are not set, so the runner uses its XDG
-defaults, `~/.local/share/naos/vms` and `~/.local/state/naos/runs`.
+The VM directory is not set, so the runner uses its XDG default,
+`~/.local/state/naos/runs`, and keeps the images it downloads in `images/`
+under it.
 
 ## See the agent
 

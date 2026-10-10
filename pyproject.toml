@@ -24,5 +24,5 @@ mypy_path = "packages/common/src:packages/api/src:packages/web/src"
 explicit_package_bases = true
 
 [tool.pytest.ini_options]
-testpaths = ["packages"]
+testpaths = ["packages", "dev/stack"]
 addopts = "--import-mode=importlib"

@@ -99,6 +99,35 @@ settings() {
     name="${NAOS_AGENT_NAME:-alpha}"
 }
 
+count() {
+    curl -fsS -H "Authorization: Bearer $(cat "$LOCAL/operator")" "$api/api/v1/$1" |
+        "$python" -c "import json, sys; print(len(json.load(sys.stdin)))"
+}
+
+# A new stand starts with the project's newest image, registered through the api like any
+# other. A catalog that ever held an image is the operator's and is left as it is.
+register_image() {
+    if [ "$(count images)" != 0 ] || [ "$(count 'audit?event=image_registered&limit=1')" != 0 ]; then
+        return
+    fi
+    local repo version release image sum
+    repo="$(git -C "$ROOT" remote get-url origin |
+        sed -E 's#^(git@github\.com:|https://github\.com/)##; s#\.git$##')"
+    # The repository tags runners and packages as well, so the newest image- tag is taken.
+    version="$(curl -fsSL "https://api.github.com/repos/$repo/releases?per_page=100" |
+        sed -n 's/.*"tag_name": *"image-\([^"]*\)".*/\1/p' | head -n 1)"
+    [ -n "$version" ] || fail "no image release in $repo"
+    release="https://github.com/$repo/releases/download/image-$version"
+    image="naos-agents-$version.qcow2"
+    sum="$(curl -fsSL "$release/SHA256SUMS" | awk -v name="$image" '$2 == name { print $1 }')"
+    [ -n "$sum" ] || fail "$image is not listed in $release/SHA256SUMS"
+    curl -fsS -o /dev/null -H "Authorization: Bearer $(cat "$LOCAL/operator")" \
+        -H "Content-Type: application/json" "$api/api/v1/images" -d @- <<EOF
+{"id": "naos-agents", "version": "$version", "digest": "sha256:$sum", "url": "$release/$image"}
+EOF
+    echo "registered $image from $release"
+}
+
 agent_pid() {
     [ -f "$LOCAL/agent.pid" ] || return 1
     local pid
@@ -150,6 +179,7 @@ kickstart() {
         (cd "$compose" && docker compose logs --tail 20 api) >&2
         fail "the api did not answer at $api/healthz"
     fi
+    register_image
     if pid="$(agent_pid)"; then
         echo "the runner is already up, pid $pid"
     else
@@ -204,7 +234,8 @@ clean() {
 case "${1:-kickstart}" in
 kickstart) kickstart ;;
 runner) foreground ;;
+image) settings && register_image ;;
 down) down ;;
 clean) clean ;;
-*) fail "usage: kickstart.sh [kickstart|runner|down|clean]" ;;
+*) fail "usage: kickstart.sh [kickstart|runner|image|down|clean]" ;;
 esac
