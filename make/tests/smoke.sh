@@ -1148,6 +1148,22 @@ EOF
         fail "deleting an image left no audit entry"
 }
 
+# A policy nothing names goes; one a run took stays, and the audit says which went.
+check_policy_delete() {
+    local spare
+    spare="$(curl -fsS "${auth[@]}" "$api/api/v1/policies" \
+        -d '{"kind": "shell", "document": {"allow": ["list_dir"]}}' | field id)"
+    [ "$(image_status -X DELETE "$api/api/v1/policies/$model_policy")" = 409 ] ||
+        fail "a policy a run took was deleted"
+    curl -fsS "$web/policies/$spare/delete" | grep -q 'button--danger' ||
+        fail "the web does not ask before deleting a policy"
+    [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$web/policies/$spare/delete")" = 303 ] ||
+        fail "the web did not delete an unused policy"
+    [ "$(image_status "$api/api/v1/policies/$spare")" = 404 ] || fail "a deleted policy is still listed"
+    curl -fsS "${auth[@]}" "$api/api/v1/audit?event=policy_deleted" | grep -q "\"policy_id\": *\"$spare\"" ||
+        fail "deleting a policy left no audit entry"
+}
+
 start_agent() {
     NAOS_AGENT_API_URL="$api" \
         NAOS_AGENT_NAME=alpha \
@@ -1454,6 +1470,7 @@ for event in network_policy_configured shell_policy_configured mcp_policy_config
 done
 check_image_source
 check_image_delete
+check_policy_delete
 credentials="$(first_line mcp_credentials_updated)"
 if [ -z "$credentials" ] || [ "$credentials" -gt "$(first_line vm_created)" ]; then
     echo "the vm started before its mcp gate held the credentials" >&2
