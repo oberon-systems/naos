@@ -260,6 +260,8 @@ def test_a_new_model_form_starts_with_a_budget_and_a_url(client: TestClient) -> 
     assert re.search(r'name="max_input"\s+value="2000000"', body)
     assert re.search(r'name="max_output"\s+value="200000"', body)
     assert re.search(r'name="providers.0.url"\s+value="https://api.openai.com"', body)
+    assert re.search(r'name="providers.0.name"\s+value="openai"', body)
+    assert re.search(r'name="providers.0.credential"\s+value="openai-key"', body)
 
 
 def test_picking_a_dialect_sets_its_url_unless_one_was_typed(client: TestClient) -> None:
@@ -274,6 +276,8 @@ def test_picking_a_dialect_sets_its_url_unless_one_was_typed(client: TestClient)
     typed = client.post("/policies/new", data=form | {"step": "dialect:providers:1"}, headers=HX)
 
     assert re.search(r'name="providers.0.url"\s+value="https://api.anthropic.com"', picked.text)
+    assert re.search(r'name="providers.0.name"\s+value="anthropic"', picked.text)
+    assert re.search(r'name="providers.0.credential"\s+value="anthropic-key"', picked.text)
     assert re.search(r'name="providers.1.url"\s+value="https://api.example.com"', typed.text)
     assert 'hx-vals=\'{"step": "dialect:providers:0"}\'' in picked.text
     assert WRITES == []
@@ -296,6 +300,33 @@ def test_a_suggested_model_is_added_once_beside_typed_ones(client: TestClient) -
     assert 'value="model:providers:0:claude-haiku-5-5"' not in added
     assert re.search(r'name="providers.0.models"\s+value="claude-haiku-5-5"', again)
     assert WRITES == []
+
+
+def test_a_bad_provider_name_or_credential_is_explained(
+    client: TestClient, writes: list[Any]
+) -> None:
+    form = {
+        "kind": "model",
+        "max_input": "2000000",
+        "max_output": "200000",
+        "providers.0.name": "Alpha",
+        "providers.0.api": "openai",
+        "providers.0.url": "https://api.example.com",
+        "providers.0.models": "alpha-mini",
+        "providers.0.credential": "alpha-key",
+        "providers.0.timeout": "600",
+        "providers.0.requests": "60",
+    }
+    named = client.post("/policies/new", data=form, headers=HX).text
+    keyed = client.post(
+        "/policies/new",
+        data=form | {"providers.0.name": "alpha", "providers.0.credential": ""},
+        headers=HX,
+    ).text
+
+    assert "a provider name is 1-32 lowercase letters" in named
+    assert "a credential is the name of a secret" in keyed
+    assert writes == []
 
 
 def test_a_refused_document_names_the_field_but_not_its_value() -> None:

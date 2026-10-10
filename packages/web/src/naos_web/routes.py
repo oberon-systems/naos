@@ -25,7 +25,7 @@ from naos_web import (
 from naos_web import policies as documents
 from naos_web import secrets as vault
 from naos_web import servers as mcp_servers
-from naos_web.client import ApiClient, ApiError, Choices, Dashboard, Row, RunDetail
+from naos_web.client import ApiClient, ApiError, Choices, Dashboard, ImageDetail, Row, RunDetail
 from naos_web.clock import NowDep
 from naos_web.format import ago
 from naos_web.pages import (
@@ -95,6 +95,7 @@ from naos_web.rows import (
     RunDetailRow,
     catalog,
     fleet,
+    image_busy_note,
     image_detail,
     image_rows,
     pick,
@@ -1226,6 +1227,50 @@ async def image_audit(
     request: Request, image_id: str, now: NowDep, scope: events.ImageScope = "all"
 ) -> HTMLResponse:
     return await _image_panel(request, image_id, now, "audit", scope)
+
+
+def _image_delete_dialog(
+    request: Request, detail: ImageDetail, now: int, refusal: str = ""
+) -> HTMLResponse:
+    return render(
+        request,
+        PAGES["images"],
+        catalog(detail.catalog),
+        template="image_delete_overlay.html"
+        if wants_fragment(request)
+        else "image_delete_page.html",
+        **_catalog(detail.catalog, now),
+        image=detail.image,
+        refusal=refusal,
+    )
+
+
+# An image a run still boots is refused up front; the api decides again on the write.
+@router.get("/images/{image_id}/delete", response_class=HTMLResponse)
+async def image_delete_confirm(request: Request, image_id: str, now: NowDep) -> HTMLResponse:
+    api: ApiClient = request.app.state.api
+    try:
+        detail = await api.image(image_id)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["images"], err)
+    refusal = image_busy_note(detail.image, detail.runs) if detail.image["runs_open"] else ""
+    return _image_delete_dialog(request, detail, now, refusal)
+
+
+@router.post("/images/{image_id}/delete", response_class=HTMLResponse)
+async def delete_image(request: Request, image_id: str, now: NowDep) -> Response:
+    api: ApiClient = request.app.state.api
+    try:
+        detail = await api.image(image_id)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["images"], err)
+    try:
+        await api.delete_image(image_id)
+    except ApiError as err:
+        if err.status != 409:
+            return failed_overlay(request, PAGES["images"], err)
+        return _image_delete_dialog(request, detail, now, str(err))
+    return _moved(request, "/images")
 
 
 @router.get("/images/{image_id}/audit/export")

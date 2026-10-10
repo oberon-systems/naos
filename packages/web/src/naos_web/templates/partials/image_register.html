@@ -1,5 +1,5 @@
 {% from "components.html" import closer, scrim with context %}
-{% macro text(name, label, value, hint="", placeholder="", required=true) -%}
+{% macro text(name, label, value, hint="", placeholder="", required=true, error="required", pattern="") -%}
     <label class="field">
         <span class="field__label">{{ label }}</span>
         <span class="field__box">
@@ -8,8 +8,10 @@
                    name="{{ name }}"
                    value="{{ value }}"
                    placeholder="{{ placeholder }}"
+                   {% if pattern %}pattern="{{ pattern }}"{% endif %}
                    {% if required %}required{% endif %}>
         </span>
+        {% if required %}<span class="field__error">{{ error }}</span>{% endif %}
         {% if hint %}<span class="field__hint">{{ hint }}</span>{% endif %}
     </label>
 {%- endmacro %}
@@ -22,9 +24,7 @@
             <h2 class="panel__name">Register image</h2>
             {{ closer("/images") }}
         </div>
-        <p class="panel__facts">
-            A catalog row is immutable — a new build is a new version, and nothing here is ever edited or deleted.
-        </p>
+        <p class="panel__facts">A catalog row is immutable — a new build is a new version, and nothing here is ever edited.</p>
     </header>
     <form class="dialog"
           method="post"
@@ -36,7 +36,7 @@
                 {{ text("id", "Image id", entry.id, "letters, digits, _ and -; the id is never reused", "image_epsilon") }}
                 {{ text("name", "Name · optional", entry.name, placeholder="epsilon", required=false) }}
                 {{ text("version", "Version", entry.version, placeholder="2026.09.2") }}
-                {{ text("digest", "Digest", entry.digest, "the runner refuses a downloaded file with any other digest", "sha256:…") }}
+                {{ text("digest", "Digest", entry.digest, "the runner refuses a downloaded file with any other digest", "sha256:…", error="required · sha256 of the qcow2", pattern="sha256:[0-9a-f]{64}") }}
                 {{ text("url", "Source url", entry.url, "https only, no credentials — the API stores it and never fetches it", "https://") }}
                 <div class="dialog__grid">
                     {{ text("size", "Size · optional", entry.size, placeholder="4.2 GiB", required=false) }}

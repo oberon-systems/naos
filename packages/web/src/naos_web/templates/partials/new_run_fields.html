@@ -1,7 +1,7 @@
 {% macro field_hint(field) -%}
     {% if field.hint %}<span class="field__hint">{{ field.hint }}</span>{% endif %}
 {%- endmacro %}
-{% macro number(field, low, high) -%}
+{% macro number(field, low, high, error="required") -%}
     <label class="field{{ " field--edited" if field.edited }}">
         <span class="field__label">{{ field.label }}</span>
         <span class="field__box">
@@ -14,6 +14,7 @@
                    required>
             <span class="field__unit">{{ field.unit }}</span>
         </span>
+        <span class="field__error">{{ error }}</span>
         {{ field_hint(field) }}
     </label>
 {%- endmacro %}

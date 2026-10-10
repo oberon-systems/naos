@@ -12,6 +12,7 @@
                    required>
             <span class="field__unit">{{ unit }}</span>
         </span>
+        <span class="field__error">required</span>
     </label>
 {%- endmacro %}
 {% macro select(name, label, options) -%}
@@ -55,6 +56,7 @@
                                placeholder="build-medium"
                                {% if form.mode == "edit" %}readonly{% else %}required{% endif %}>
                     </span>
+                    <span class="field__error">required · a unique profile name</span>
                     <span class="field__hint">
                         {% if form.mode == "edit" %}
                             the name stays; only the spec changes

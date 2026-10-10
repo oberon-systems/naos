@@ -759,10 +759,18 @@ def catalog(images: list[Row]) -> Summary:
         values={
             "registered": TileValue(str(len(images)), "in the catalog"),
             "in_use": TileValue(str(len(in_use)), f"booting {booting} runs"),
-            "unused": TileValue(str(len(images) - len(in_use)), "kept, never deleted"),
+            "unused": TileValue(str(len(images) - len(in_use)), "no run boots them"),
             "catalog_size": TileValue(total, stated if sized else "no size stated"),
         },
     )
+
+
+def image_busy_note(image: Row, runs: list[Row]) -> str:
+    named = " and ".join(
+        f"#{run['seq']} {run['status']}" for run in runs if run["status"] not in FINISHED
+    )
+    used = named or "an active run"
+    return f"image {image['id']} is used by {used}. Delete it once they end."
 
 
 # Runs still booting the image come first, the rest follow newest first.

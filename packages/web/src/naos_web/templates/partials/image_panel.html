@@ -13,6 +13,10 @@
                 <button class="button button--outline"
                         type="button"
                         data-copy="{{ image.url }}">Copy url</button>
+                <a class="button button--outline-danger"
+                   href="/images/{{ image.id }}/delete"
+                   hx-get="/images/{{ image.id }}/delete"
+                   hx-target="#overlay">Delete</a>
                 {{ closer("/images") }}
             </div>
         </div>

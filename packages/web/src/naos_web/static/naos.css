@@ -1013,6 +1013,37 @@ body {
   color: var(--soft);
 }
 
+/* Red only once the browser refused the field: after a submit, or after it was edited. */
+.field__error,
+.dialog__invalid {
+  display: none;
+  font-size: 11px;
+  color: var(--red-text);
+}
+
+.field:has(:user-invalid) .field__error,
+.policy__workspace:has(:user-invalid) + .field__error,
+form:has(:user-invalid) .dialog__invalid {
+  display: block;
+}
+
+.field__box:has(:user-invalid),
+.secret__input:user-invalid {
+  border-color: var(--red-dot);
+}
+
+form {
+  counter-reset: invalid;
+}
+
+:user-invalid {
+  counter-increment: invalid;
+}
+
+.dialog__invalid::before {
+  content: counter(invalid) " to fix \00b7 nothing was sent";
+}
+
 .field--edited .field__box {
   border-color: var(--amber-dot);
   background: var(--amber-bg);

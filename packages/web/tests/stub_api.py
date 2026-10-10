@@ -1230,6 +1230,16 @@ def list_images() -> list[Row]:
     return IMAGES
 
 
+@stub.delete("/api/v1/images/{image_id}", response_model=None)
+def delete_image(image_id: str) -> Response:
+    WRITES.append(("DELETE", f"/images/{image_id}", {}, None))
+    found = next(row for row in IMAGES if row["id"] == image_id)
+    if found["runs_open"]:
+        detail = f"image {image_id} is used by #128 STARTED. Delete it once they end."
+        return JSONResponse({"detail": detail}, 409)
+    return Response(status_code=204)
+
+
 @stub.post("/api/v1/images", response_model=None)
 def register_image(body: Row) -> Row | JSONResponse:
     WRITES.append(("POST", "/images", body, None))

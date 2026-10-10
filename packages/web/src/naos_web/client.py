@@ -329,6 +329,9 @@ class ApiClient:
         row: Row = await self._call("PUT", f"/profiles/{profile_id}", json={"spec": spec})
         return row
 
+    async def delete_image(self, image_id: str) -> None:
+        await self._request("DELETE", f"/images/{image_id}")
+
     async def delete_profile(self, profile_id: str) -> None:
         await self._request("DELETE", f"/profiles/{profile_id}")
 

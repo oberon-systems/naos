@@ -5,7 +5,7 @@
             value="{{ value }}"
             formnovalidate>{{ label }}</button>
 {%- endmacro %}
-{% macro text(name, value, label, placeholder="", mono=false) -%}
+{% macro text(name, value, label, placeholder="", mono=false, error="") -%}
     <label class="field">
         <span class="field__label">{{ label }}</span>
         <span class="field__box">
@@ -14,8 +14,10 @@
                    name="{{ name }}"
                    value="{{ value }}"
                    placeholder="{{ placeholder }}"
-                   aria-label="{{ label }}">
+                   aria-label="{{ label }}"
+                   {% if error %}required{% endif %}>
         </span>
+        {% if error %}<span class="field__error">{{ error }}</span>{% endif %}
     </label>
 {%- endmacro %}
 {% macro choose(name, value, options, label) -%}
@@ -43,7 +45,7 @@
         <div class="mcp__grid">
             {{ choose(at ~ "effect", item.effect, effects, "Effect") }}
             {{ choose(at ~ "server", item.server, servers, "Server") }}
-            {{ text(at ~ "target", item.target, "Tool or resource prefix", "search, * or docs://alpha/", mono=true) }}
+            {{ text(at ~ "target", item.target, "Tool or resource prefix", "search, * or docs://alpha/", mono=true, error="required · a tool or a resource prefix") }}
         </div>
         <div class="mcp__grid mcp__grid--wide">
             {{ text(at ~ "arguments", item.arguments, "Arguments, JSON", "no constraint", mono=true) }}

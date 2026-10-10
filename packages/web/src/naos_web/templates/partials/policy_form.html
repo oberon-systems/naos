@@ -1,6 +1,6 @@
 {% import "partials/mcp_fields.html" as mcp %}
 {% from "components.html" import closer, scrim with context %}
-{% macro input(name, value, label="", placeholder="", mono=false) -%}
+{% macro input(name, value, label="", placeholder="", mono=false, error="", inline=true) -%}
     <label class="field">
         {% if label %}<span class="field__label">{{ label }}</span>{% endif %}
         <span class="field__box">
@@ -9,8 +9,10 @@
                    name="{{ name }}"
                    value="{{ value }}"
                    placeholder="{{ placeholder }}"
-                   aria-label="{{ label or name }}">
+                   aria-label="{{ label or name }}"
+                   {% if error %}required{% endif %}>
         </span>
+        {% if error and inline %}<span class="field__error">{{ error }}</span>{% endif %}
     </label>
 {%- endmacro %}
 {% macro choose(name, value, options, label="", change="") -%}
@@ -86,9 +88,10 @@
                 {% if form.kind == "mount" %}
                     <h3 class="run__card-title profile__section">WORKSPACE</h3>
                     <div class="policy__workspace">
-                        {{ input("workspace", form.workspace, "Host path", "/srv/alpha", mono=true) }}
+                        {{ input("workspace", form.workspace, "Host path", "/srv/alpha", mono=true, error="required", inline=false) }}
                         {{ choose("workspace_mode", form.workspace_mode, modes, "Mode") }}
                     </div>
+                    <span class="field__error">required · a host directory under an allowed root</span>
                     <span class="field__hint">{{ workspace_hint }}</span>
                     {% set items = form.items("home") %}
                     <h3 class="run__card-title profile__section">HOME · {{ items | length }} OF {{ limits.home }}</h3>
@@ -140,12 +143,12 @@
                                 {{ step("drop:providers:" ~ loop.index0, "Remove", "policy__remove") }}
                             </div>
                             <div class="policy__server-row policy__server-row--name">
-                                {{ input(at ~ "name", item.name, "Name", "alpha", mono=true) }}
-                                {{ input(at ~ "url", item.url, "URL", "https://api.example.com", mono=true) }}
+                                {{ input(at ~ "name", item.name, "Name", "alpha", mono=true, error="required") }}
+                                {{ input(at ~ "url", item.url, "URL", "https://api.example.com", mono=true, error="required") }}
                             </div>
                             <div class="dialog__grid">
                                 {{ choose(at ~ "api", item.api, dialects, "API", "dialect:providers:" ~ loop.index0) }}
-                                {{ input(at ~ "models", item.models, "Models", "alpha-large, alpha-mini", mono=true) }}
+                                {{ input(at ~ "models", item.models, "Models", "alpha-large, alpha-mini", mono=true, error="required · at least one model") }}
                             </div>
                             {% set offered = form.suggested(item) %}
                             {% set adding = "model:providers:" ~ loop.index0 ~ ":" %}
@@ -158,7 +161,7 @@
                                 </div>
                             {% endif %}
                             <div class="policy__server-row policy__server-row--limits">
-                                {{ input(at ~ "credential", item.credential, "Credential", "alpha-key", mono=true) }}
+                                {{ input(at ~ "credential", item.credential, "Credential", "alpha-key", mono=true, error="required · the name of a secret") }}
                                 {{ input(at ~ "timeout", item.timeout, "Timeout, s") }}
                                 {{ input(at ~ "requests", item.requests, "Requests / min") }}
                             </div>
@@ -172,6 +175,7 @@
                     {{ mcp.grants(form, secrets) }}
                 {% endif %}
                 <span class="field__hint">{{ form_hint }}</span>
+                <span class="dialog__invalid"></span>
             </div>
             {% if notice %}<p class="dialog__error">{{ notice }}</p>{% endif %}
         </div>

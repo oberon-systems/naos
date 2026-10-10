@@ -1,0 +1,49 @@
+{% from "components.html" import closer, scrim with context %}
+{% set back = "/images/" ~ image.id %}
+{% set opened = image.runs_open %}
+{% set label = image.name or image.id %}
+{{ scrim(back, get=back) }}
+<section class="panel panel--dialog panel--delete"
+         role="dialog"
+         aria-label="Delete {{ label }}">
+    <header class="panel__header">
+        <div class="panel__title">
+            <h2 class="panel__name">
+                {% if refusal %}
+                    {{ label }} cannot be deleted
+                {% else %}
+                    Delete {{ label }}?
+                {% endif %}
+            </h2>
+            {{ closer(back, get=back) }}
+        </div>
+        <p class="panel__facts">
+            Image {{ image.id }} · {{ image.version }} · {{ image.runs_total }} {{ "run" if image.runs_total == 1 else "runs" }} · {{ opened ~ " open" if opened else "none open" }}
+        </p>
+    </header>
+    <form class="dialog"
+          method="post"
+          action="{{ back }}/delete"
+          hx-post="{{ back }}/delete"
+          hx-target="#overlay">
+        <div class="dialog__body">
+            {% if refusal %}
+                <p class="dialog__error">{{ refusal }}</p>
+            {% else %}
+                <p class="confirm__question">
+                    The image leaves the catalog and cannot be picked for a new Run. Runs that ended on it keep the digest they booted. A restart of the stand never adds it back.
+                </p>
+            {% endif %}
+        </div>
+        <footer class="dialog__footer dialog__footer--end">
+            <div class="dialog__actions">
+                {% if refusal %}
+                    {{ closer(back, get=back, label="OK", klass="button") }}
+                {% else %}
+                    {{ closer(back, get=back, label="No", klass="button button--outline") }}
+                    <button class="button button--danger" type="submit">Yes</button>
+                {% endif %}
+            </div>
+        </footer>
+    </form>
+</section>

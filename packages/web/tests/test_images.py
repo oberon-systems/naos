@@ -67,12 +67,61 @@ def test_filters_and_search_narrow_the_table(client: TestClient) -> None:
     assert "no image matches" in client.get("/images", params={"q": "missing"}).text
 
 
-def test_no_view_offers_to_rewrite_or_delete(client: TestClient) -> None:
+def test_no_view_offers_to_rewrite(client: TestClient) -> None:
     pages = [client.get(path, headers=HX).text for path in ("/images", f"/images/{AGENTS}")]
     for body in pages:
-        assert "Delete" not in body
         assert "Edit" not in body
+        assert "never rewritten or deleted" not in body and "append-only" not in body
         assert "hx-delete" not in body and "hx-put" not in body
+
+
+def test_the_popup_offers_delete_on_every_tab(client: TestClient) -> None:
+    for tab in ("", "/runs", "/audit"):
+        body = client.get(f"/images/{AGENTS}{tab}", headers=HX).text
+        assert f'hx-get="/images/{AGENTS}/delete"' in body
+
+
+def test_delete_asks_yes_or_no_for_an_unused_image(client: TestClient, writes: list[Any]) -> None:
+    body = client.get(f"/images/{OLD}/delete", headers=HX).text
+
+    assert f"Delete {OLD}?" in body
+    assert f"Image {OLD} \u00b7 1.3.0 \u00b7 0 runs \u00b7 none open" in body
+    assert 'class="button button--danger" type="submit">Yes<' in body
+    assert ">No</a>" in body
+    assert writes == []
+
+
+def test_delete_is_refused_up_front_while_a_run_has_not_ended(
+    client: TestClient, writes: list[Any]
+) -> None:
+    body = client.get(f"/images/{AGENTS}/delete", headers=HX).text
+
+    assert "agents cannot be deleted" in body
+    assert f"image {AGENTS} is used by #" in body
+    assert "Delete it once they end." in body
+    assert ">Yes<" not in body and ">OK</a>" in body
+    assert writes == []
+
+
+def test_a_delete_refused_by_the_api_opens_the_same_popup(client: TestClient) -> None:
+    body = client.post(f"/images/{AGENTS}/delete", headers=HX).text
+
+    assert "agents cannot be deleted" in body
+    assert "the api answered 409" in body
+
+
+def test_a_confirmed_delete_goes_back_to_the_list(client: TestClient, writes: list[Any]) -> None:
+    response = client.post(f"/images/{OLD}/delete", headers=HX)
+
+    assert response.headers["HX-Redirect"] == "/images"
+    assert writes == [("DELETE", f"/images/{OLD}", {}, None)]
+
+
+def test_the_catalog_lists_registered_images_only(client: TestClient) -> None:
+    body = client.get("/images").text
+
+    assert body.count('hx-get="/images/naos') == 2
+    assert "auto" not in body.lower().replace("autocomplete", "")
 
 
 def test_the_popup_has_three_tabs_and_copies_the_url(client: TestClient) -> None:

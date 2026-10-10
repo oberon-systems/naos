@@ -53,6 +53,13 @@ MODEL_SUGGESTIONS = {
     "openai": ("gpt-5", "gpt-5-mini"),
     "anthropic": ("claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"),
 }
+PROVIDER_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
+PROVIDER_RULE = "a provider name is 1-32 lowercase letters, digits and dashes, no leading dash"
+SECRET_NAME = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
+CREDENTIAL_RULE = (
+    "a credential is the name of a secret: 1-64 lowercase letters, digits, dots, dashes "
+    "and underscores"
+)
 MAX_INPUT = "2000000"
 MAX_OUTPUT = "200000"
 
@@ -633,11 +640,11 @@ BLANK: dict[str, dict[str, str]] = {
     },
     "grants": {"name": "", "reads": ""},
     "providers": {
-        "name": "",
+        "name": "openai",
         "api": "openai",
         "url": DIALECT_URLS["openai"],
         "models": "",
-        "credential": "",
+        "credential": "openai-key",
         "timeout": "600",
         "requests": "60",
     },
@@ -690,9 +697,7 @@ class PolicyForm:
         elif verb == "drop" and index.isdigit() and int(index) < len(items):
             del items[int(index)]
         elif verb == "dialect" and index.isdigit() and int(index) < len(items):
-            item = items[int(index)]
-            if item["url"] in ("", *DIALECT_URLS.values()):
-                items[int(index)] = item | {"url": DIALECT_URLS.get(item["api"], "")}
+            items[int(index)] = _dialect_defaults(items[int(index)])
         elif verb == "model" and index.isdigit() and int(index) < len(items) and model:
             item = items[int(index)]
             models = _split(item["models"])
@@ -773,12 +778,35 @@ def _grant(item: dict[str, str]) -> Row:
     return rule
 
 
+# Only a value still at another API's default follows the switch; a typed one stays.
+def _dialect_defaults(item: dict[str, str]) -> dict[str, str]:
+    api = item["api"]
+    if api not in DIALECT_URLS:
+        return item
+    defaults = {
+        "name": (set(DIALECT_URLS), api),
+        "url": (set(DIALECT_URLS.values()), DIALECT_URLS[api]),
+        "credential": ({f"{name}-key" for name in DIALECT_URLS}, f"{api}-key"),
+    }
+    changed = dict(item)
+    for key, (known, value) in defaults.items():
+        if item[key] in ("", *known):
+            changed[key] = value
+    return changed
+
+
+def _named(value: str, pattern: re.Pattern[str], message: str) -> str:
+    if not pattern.match(value):
+        raise FormError(message)
+    return value
+
+
 def _provider(item: dict[str, str]) -> Row:
     return {
-        "name": item["name"],
+        "name": _named(item["name"], PROVIDER_NAME, PROVIDER_RULE),
         "api": item["api"],
         "url": item["url"],
-        "credential": item["credential"],
+        "credential": _named(item["credential"], SECRET_NAME, CREDENTIAL_RULE),
         "models": _split(item["models"]),
         "timeout_seconds": _whole(item["timeout"], "timeout"),
         "max_requests_per_minute": _whole(item["requests"], "requests per minute"),

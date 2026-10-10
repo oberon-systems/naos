@@ -32,6 +32,7 @@
                                    pattern="[a-z0-9][a-z0-9\-]{0,31}"
                                    {% if editing %}readonly{% else %}required{% endif %}>
                         </span>
+                        <span class="field__error">required</span>
                         <span class="field__hint">a–z, 0–9 and dashes · up to 32{{ " · never changes" if editing }}</span>
                     </label>
                     <label class="field">
@@ -44,6 +45,7 @@
                                    placeholder="https://mcp.example.com/mcp"
                                    required>
                         </span>
+                        <span class="field__error">required</span>
                         <span class="field__hint">https and a hostname · no userinfo, query or fragment</span>
                     </label>
                 </div>
@@ -76,6 +78,7 @@
                                    max="45"
                                    required>
                         </span>
+                        <span class="field__error">required</span>
                         <span class="field__hint">1 to 45</span>
                     </label>
                     <label class="field">
@@ -89,6 +92,7 @@
                                    max="600"
                                    required>
                         </span>
+                        <span class="field__error">required</span>
                         <span class="field__hint">1 to 600 · tools/call and resources/read</span>
                     </label>
                 </div>

@@ -30,7 +30,7 @@
                 {{ number(fields.memory_mib, 256, 262144) }}
                 {{ number(fields.disk_gib, 1, 2048) }}
             </div>
-            {{ number(fields.timeout, 60, 86400) }}
+            {{ number(fields.timeout, 60, 86400, "required · seconds") }}
         </div>
     </section>
     <section class="card">

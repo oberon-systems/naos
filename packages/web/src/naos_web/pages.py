@@ -75,7 +75,7 @@ NAV: tuple[ListPage, ...] = (
             Tile("catalog_size", "Catalog size", "grey"),
         ),
         action=Action("Register image", "/images/register", overlay=True),
-        chip=Chip("catalog is append-only", "grey"),
+        chip=Chip("rows are immutable", "grey"),
     ),
     ListPage(
         key="profiles",
@@ -227,7 +227,7 @@ IMAGE_FILTERS: tuple[SearchFilter, ...] = (
 )
 IMAGE_COLUMNS = ("IMAGE", "VERSION", "DIGEST", "SOURCE", "REGISTERED", "USAGE")
 IMAGE_NOTE = (
-    "An image row is never rewritten or deleted \u2014 a new build is a new version, "
+    "An image row is never rewritten \u2014 a new build is a new version, "
     "and a Run pins the digest it booted."
 )
 SOURCE_NOTE = (
