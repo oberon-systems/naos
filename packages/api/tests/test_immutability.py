@@ -8,7 +8,7 @@ KEY = {"Idempotency-Key": "key-1"}
 CreateRun = Callable[[str], str]
 
 
-@pytest.mark.parametrize("method", ["PUT", "PATCH", "DELETE"])
+@pytest.mark.parametrize("method", ["PUT", "PATCH"])
 def test_policy_has_no_mutation_endpoints(
     client: TestClient, mount_body: dict[str, Any], method: str
 ) -> None:

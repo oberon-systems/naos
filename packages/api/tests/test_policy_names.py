@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Any
 
 from fastapi.testclient import TestClient
@@ -47,3 +48,46 @@ def test_an_unnamed_policy_takes_a_name_once(client: TestClient) -> None:
     assert unnamed["name"] is None
     assert (named.status_code, named.json()["id"]) == (200, unnamed["id"])
     assert named.json()["name"] == "alpha"
+
+
+def test_a_policy_nothing_names_is_deleted_and_audited(client: TestClient) -> None:
+    created = _create(client, SHELL, "alpha").json()
+    path = f"/api/v1/policies/{created['id']}"
+
+    assert client.delete(path).status_code == 204
+
+    assert client.get(path).status_code == 404
+    assert client.delete(path).status_code == 404
+    [event] = client.get("/api/v1/audit", params={"event": "policy_deleted"}).json()
+    assert event["data"] == {"policy_id": created["id"], "kind": "shell", "name": "alpha"}
+
+
+def test_a_policy_a_profile_names_stays(client: TestClient) -> None:
+    created = _create(client, SHELL).json()
+    spec = {
+        "runtime": {"cpu": 2, "memory_mib": 4096, "disk_gib": 20},
+        "merge": {"policy": "ask"},
+        "timeout": 3600,
+        "shell": {"policy": created["id"]},
+    }
+    assert client.post("/api/v1/profiles", json={"name": "alpha", "spec": spec}).status_code == 201
+
+    refused = client.delete(f"/api/v1/policies/{created['id']}")
+
+    assert refused.status_code == 409
+    assert "named by 1 profile: alpha" in refused.json()["detail"]
+    assert client.get("/api/v1/audit", params={"event": "policy_deleted"}).json() == []
+
+
+def test_a_policy_a_run_took_stays_after_the_run_ended(
+    client: TestClient, spec_body: dict[str, Any], create_run: Callable[[str], str]
+) -> None:
+    run_id = create_run("key-1")
+    client.post(f"/api/v1/runs/{run_id}/stop")
+    path = f"/api/v1/policies/{spec_body['model']['policy']}"
+
+    refused = client.delete(path)
+
+    assert refused.status_code == 409
+    assert "kept by the record of 1 run" in refused.json()["detail"]
+    assert client.get(path).status_code == 200

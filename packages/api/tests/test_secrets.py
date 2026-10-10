@@ -162,6 +162,7 @@ def test_delete_is_refused_while_named(client: TestClient, mcp_body: dict[str, A
 def test_a_model_provider_names_its_credential(
     client: TestClient, model_body: dict[str, Any]
 ) -> None:
+    _secret(client, "alpha-key")
     _secret(client, "beta-key")
     created = client.post("/api/v1/policies", json={"kind": "model", "document": model_body})
     policy_id = created.json()["id"]

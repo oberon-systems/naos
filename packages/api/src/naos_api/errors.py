@@ -58,6 +58,10 @@ class ProfileBusyError(DomainError):
     """The profile cannot change while a Run copied from it is active."""
 
 
+class PolicyBusyError(DomainError):
+    """The policy cannot be deleted while a profile or the record of a Run names it."""
+
+
 class ConsoleFullError(DomainError):
     """The run's console log reached its size limit."""
 

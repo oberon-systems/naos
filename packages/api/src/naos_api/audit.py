@@ -40,6 +40,7 @@ API_EVENTS: dict[str, frozenset[str]] = {
     ),
     "policy_created": frozenset({"policy_id", "kind"}),
     "policy_named": frozenset({"policy_id", "kind", "name"}),
+    "policy_deleted": frozenset({"policy_id", "kind", "name"}),
     "policy_changed": frozenset({"kind", "from", "to", "digest"}),
     "image_registered": frozenset({"image_id", "version", "digest"}),
     "image_deleted": frozenset({"image_id", "version", "digest"}),

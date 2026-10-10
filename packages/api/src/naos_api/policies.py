@@ -4,14 +4,14 @@ from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import ColumnElement
-from sqlmodel import Session, case, col, func, or_, select
+from sqlmodel import Session, case, col, delete, func, or_, select
 
 from naos_api import audit, mcp_servers
-from naos_api.errors import NotFoundError, PolicyError, PolicyNameError
+from naos_api.errors import NotFoundError, PolicyBusyError, PolicyError, PolicyNameError
 from naos_api.lifecycle import TERMINAL
 from naos_api.mcp import McpPolicyIn, external_servers, resolve_mcp_policy
 from naos_api.model import ModelPolicyIn, resolve_model_policy
-from naos_api.models import Policy, Profile, Run, RunPolicy
+from naos_api.models import Policy, Profile, Run, RunPolicy, Secret
 from naos_api.mounts import MountPolicyIn, resolve_mount_policy
 from naos_api.network import NetworkPolicyIn, resolve_network_policy
 from naos_api.shell import ShellPolicyIn, resolve_shell_policy
@@ -111,6 +111,14 @@ def create_model_policy(
     session: Session, policy: ModelPolicyIn, name: str | None = None
 ) -> tuple[Policy, bool]:
     resolved = resolve_model_policy(policy)
+    named = {provider.credential for provider in resolved.providers}
+    known = set(session.exec(select(Secret.name).where(col(Secret.name).in_(named))).all())
+    for provider in resolved.providers:
+        if provider.credential not in known:
+            raise PolicyError(
+                f"provider {provider.name} names credential {provider.credential}, "
+                "which is not a secret"
+            )
     return _store(session, PolicyKind.MODEL, resolved.model_dump(mode="json"), name)
 
 
@@ -210,6 +218,38 @@ def view_policies(session: Session, policies: Sequence[Policy]) -> list[PolicyVi
         )
         for policy in policies
     ]
+
+
+def _plural(count: int, noun: str) -> str:
+    return f"{count} {noun}" if count == 1 else f"{count} {noun}s"
+
+
+# A Run keeps the id of its policy for good, so a policy any Run took stays with that record.
+def delete_policy(session: Session, policy_id: str) -> None:
+    policy = get_policy(session, policy_id)
+    view = view_policies(session, [policy])[0]
+    parts = []
+    if view.profiles:
+        names = ", ".join(profile.name for profile in profiles_naming(session, policy_id))
+        parts.append(f"named by {_plural(len(view.profiles), 'profile')}: {names}")
+    if view.runs_total:
+        parts.append(f"kept by the record of {_plural(view.runs_total, 'run')}")
+    if parts:
+        raise PolicyBusyError(f"policy {policy_id} is {' and '.join(parts)}")
+    taken = select(Run.id).where(names_policy(policy_id))
+    result = session.exec(delete(Policy).where(col(Policy.id) == policy_id, ~taken.exists()))
+    if result.rowcount == 1:
+        audit.record(
+            session,
+            "policy_deleted",
+            actor="operator",
+            policy_id=policy_id,
+            kind=str(policy.kind),
+            name=policy.name,
+        )
+    session.commit()
+    if result.rowcount != 1:
+        raise PolicyBusyError(f"policy {policy_id} was taken by a run")
 
 
 def check_refs(session: Session, spec: ProfileSpec) -> None:

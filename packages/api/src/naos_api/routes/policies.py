@@ -120,3 +120,8 @@ def list_policies(
 @router.get("/policies/{policy_id}")
 def get_policy(policy_id: str, session: SessionDep) -> PolicyRead:
     return _read(session, policies.get_policy(session, policy_id))
+
+
+@router.delete("/policies/{policy_id}", status_code=204)
+def delete_policy(policy_id: str, session: SessionDep) -> None:
+    policies.delete_policy(session, policy_id)

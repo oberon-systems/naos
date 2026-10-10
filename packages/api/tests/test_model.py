@@ -7,6 +7,7 @@ from sqlmodel import Session
 from naos_api.errors import PolicyError
 from naos_api.model import ModelPolicyIn, resolve_model_policy
 from naos_api.policies import create_model_policy
+from naos_api.secrets import create_secret
 from naos_api.spec import PolicyKind
 
 
@@ -43,6 +44,7 @@ def test_providers_are_canonical() -> None:
 
 
 def test_equivalent_documents_share_one_digest(session: Session) -> None:
+    create_secret(session, "alpha-key", "secret-alpha-value", None)
     first, created = create_model_policy(session, _policy(_provider(models=["a", "b"])))
     again, created_again = create_model_policy(session, _policy(_provider(models=["b", "a"])))
 
@@ -108,6 +110,8 @@ def test_the_run_budget_is_required(values: dict[str, Any]) -> None:
 def test_the_api_creates_and_names_a_model_policy(
     client: TestClient, model_body: dict[str, Any]
 ) -> None:
+    for name in ("alpha-key", "beta-key"):
+        client.post("/api/v1/secrets", json={"name": name, "value": f"secret-{name}"})
     created = client.post("/api/v1/policies", json={"kind": "model", "document": model_body})
     listed = client.get("/api/v1/policies", params={"kind": "model"})
 
@@ -124,3 +128,15 @@ def test_the_api_refuses_a_model_on_two_providers(
     response = client.post("/api/v1/policies", json={"kind": "model", "document": model_body})
 
     assert response.status_code == 422, response.text
+
+
+def test_a_credential_that_is_not_a_secret_is_refused(
+    client: TestClient, model_body: dict[str, Any]
+) -> None:
+    client.post("/api/v1/secrets", json={"name": "alpha-key", "value": "secret-alpha-key"})
+
+    refused = client.post("/api/v1/policies", json={"kind": "model", "document": model_body})
+
+    assert refused.status_code == 422
+    assert "provider beta names credential beta-key, which is not a secret" in refused.text
+    assert client.get("/api/v1/policies", params={"kind": "model"}).json() == []
