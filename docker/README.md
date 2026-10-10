@@ -122,9 +122,9 @@ export NAOS_AGENT_ENROLLMENT_TOKEN_FILE="$HOME/.config/naos/enrollment"
 runner
 ```
 
-Leave `NAOS_AGENT_IMAGE_DIR` and `NAOS_AGENT_VM_DIR` alone unless you want them
-elsewhere: they default to `~/.local/share/naos/vms` and
-`~/.local/state/naos/runs`.
+Leave `NAOS_AGENT_VM_DIR` alone unless you want it elsewhere: it defaults to
+`~/.local/state/naos/runs`. The images the runner downloads live in `images/`
+under it.
 
 A registered runner shows up in three places: its own log, the
 `credentials.json` the api issued it in the state directory, and a

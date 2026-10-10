@@ -59,8 +59,7 @@ without them.
 | `NAOS_AGENT_STATE_DIR` | Holds `credentials.json` and the audit spool `audit.jsonl`, mode 0600 |
 | `NAOS_AGENT_ENROLLMENT_TOKEN_FILE` | Enrollment token, mode 0600 |
 | `NAOS_AGENT_ENV_FILE` | Optional `.env` file loaded before the variables above |
-| `NAOS_AGENT_IMAGE_DIR` | Image cache; default `$XDG_DATA_HOME/naos/vms`, else `~/.local/share/naos/vms` |
-| `NAOS_AGENT_VM_DIR` | One directory per VM; default `$XDG_STATE_HOME/naos/runs`, else `~/.local/state/naos/runs` |
+| `NAOS_AGENT_VM_DIR` | One directory per VM, and `images/` for what the agent downloaded; default `$XDG_STATE_HOME/naos/runs`, else `~/.local/state/naos/runs` |
 | `NAOS_AGENT_QEMU_BINARY` | QEMU system emulator, default `/usr/bin/qemu-system-x86_64` |
 | `NAOS_AGENT_QEMU_IMG` | `qemu-img`, default `/usr/bin/qemu-img` |
 | `NAOS_AGENT_GIT_BINARY` | `git` for the shell gate, default `/usr/bin/git` |
@@ -141,8 +140,11 @@ registered for the Run:
    ([06](06-network-gate.md#live-changes),
    [07](07-shell-gate.md#live-changes),
    [13](13-model-gateway.md#live-changes));
-2. download the image from the `image_url` the API returned into the cache
-   unless a file already has its name: the agent follows at most five
+2. download the image from the `image_url` the API returned into
+   `images/` under the VM directory, unless this process already downloaded
+   that digest. Nothing else is an image: the directory is emptied when the
+   agent starts, a file found under the name is dropped, and no setting names
+   an image or a place to look for one. The agent follows at most five
    redirects and never sends its runner token there, the download goes to a
    0600 temporary file, is hashed while it streams, and is renamed to
    `sha256-<hex>.qcow2` with mode 0444 only when the digest matches;

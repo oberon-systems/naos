@@ -132,6 +132,7 @@ POST /api/v1/profiles/{profile_id}/runs
 POST /api/v1/images
 GET /api/v1/images
 GET /api/v1/images/{image_id}
+DELETE /api/v1/images/{image_id}
 POST /api/v1/secrets
 GET /api/v1/secrets
 GET /api/v1/secrets/{name}
@@ -561,12 +562,19 @@ from anyone.
   The API checks their shape only; nothing measures or verifies them.
 - The url must use https and must not carry credentials; any other url gets
   422.
-- Every field is immutable and image rows are never deleted: no endpoint or
-  service writes them, like the Run spec. The same `id` or `digest` with any
-  other value gets 409.
+- Every field is immutable: no endpoint or service rewrites a row, like the
+  Run spec. The same `id` or `digest` with any other value gets 409.
+- `DELETE /images/{image_id}` removes the row and answers 204. While a Run
+  that has not ended boots the image it answers 409 and names those Runs.
+  A delete writes the audit event `image_deleted`; Runs that ended keep the
+  `id` and `digest` in their spec.
+- The API registers nothing on its own. `make kickstart` registers the
+  project's newest release on a stand whose catalog is empty and never held
+  an image, see [dev/stack/README.md](../dev/stack/README.md).
 - `GET /images` adds `runs_open` and `runs_total`, the Runs that boot the
   image now and ever. `GET /runs?image=` lists those Runs, and
-  `GET /audit?image_id=` returns the registration and every event of them.
+  `GET /audit?image_id=` returns the registration, the delete and every event
+  of them.
 - `POST /runs` requires a registered image with the same `id` and `digest`,
   otherwise it returns 422.
 

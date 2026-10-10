@@ -19,8 +19,8 @@ hand-over.
 image-<version> tag -> GitHub release
   -> POST /api/v1/images (id, version, digest, url; the API keeps the entry)
   -> Run spec names image id and digest (image must be registered)
-  -> runner downloads from the url (checks sha256, caches read-only)
-  -> every VM start hashes the cached file through the descriptor QEMU opens
+  -> runner downloads from the url (checks sha256, keeps it read-only)
+  -> every VM start hashes the kept file through the descriptor QEMU opens
   -> read-only base + disposable qcow2 overlay
 ```
 
@@ -28,8 +28,12 @@ image-<version> tag -> GitHub release
   [packer/README.md](../packer/README.md).
 - The API side, the image catalog, is in
   [03 - API Design](03-api-design.md#images).
-- The runner side, the cache and the start sequence, is in
+- The runner side, the download and the start sequence, is in
   [04 - Runner Design](04-runner-design.md#runtime).
+
+The API is the only way an image reaches a runner. A runner has no configured
+or default image, reads no local file and keeps nothing a former process
+downloaded, so an image the API did not hand over never starts a VM.
 
 The runner refuses an image whose qcow2 header names a backing file. Such an
 image would make QEMU open a host path chosen by whoever built it.

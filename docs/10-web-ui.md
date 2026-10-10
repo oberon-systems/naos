@@ -25,7 +25,7 @@ Views:
 - merge approval;
 - profiles;
 - policies, immutable: find by id or digest, read the resolved document and who uses it, create one of each kind;
-- models: the `model` policy kind with its providers, credential names and token budget (a new form starts at 2000000 input and 200000 output tokens, picking a provider's API fills its URL unless one was typed, and the models of that API are offered beside any typed name), picked in the new-run dialog and the profile form; the Run overview shows calls and tokens spent against the budget and the last refusals;
+- models: the `model` policy kind with its providers, credential names and token budget (a new form starts at 2000000 input and 200000 output tokens, a provider starts as openai with its URL and the credential name openai-key, picking another API changes the three unless one was typed, a bad name or credential is explained in words, and the models of that API are offered beside any typed name), picked in the new-run dialog and the profile form; the Run overview shows calls and tokens spent against the budget and the last refusals;
 - MCP: the `MCP` page lists the built-in and external servers with their
   url, credential name, limits, the policies that name them and the Runs that
   hold them; a server opens a popup with its entry, its policies and Runs and
@@ -41,7 +41,9 @@ Views:
   temporary or saved as a new policy, or picks a stored policy, and asks to
   confirm with the servers and secrets the agent gains or loses;
 - secrets, write-only: see state, expiry, who names and which Runs hold each one, create, rotate, re-date and delete; a value is typed once and never rendered;
-- images.
+- images: the catalog, registering one, and deleting one from its popup after a confirm; an image a Run that has not ended still boots is refused with the Runs named.
+
+Every form checks its required fields in the browser (`required`, `pattern`, `:user-invalid`): a field left empty turns red with a short message under it once the operator submits, nothing is red before that and nothing is sent. The API check stays and names the field. Buttons that only add or drop a row skip the check.
 
 Run creation should make image, host directory, mount mode, network/shell/MCP/model policy, merge policy, timeout, and runtime settings explicit.
 
