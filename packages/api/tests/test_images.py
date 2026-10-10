@@ -153,3 +153,42 @@ def test_run_needs_a_registered_image(
     spec_body["image"] = image
 
     assert client.post("/api/v1/runs", json=spec_body, headers=KEY).status_code == 422
+
+
+def test_a_delete_is_refused_while_a_run_has_not_ended(
+    client: TestClient, create_run: Callable[[str], str]
+) -> None:
+    run = client.get(f"/api/v1/runs/{create_run('key-1')}").json()
+
+    refused = client.delete("/api/v1/images/image_alpha")
+
+    assert refused.status_code == 409
+    assert f"#{run['seq']} PENDING" in refused.json()["detail"]
+    assert client.get("/api/v1/images/image_alpha").status_code == 200
+    events = client.get("/api/v1/audit", params={"event": "image_deleted"}).json()
+    assert events == []
+
+
+def test_a_delete_removes_the_image_and_is_audited(
+    client: TestClient, create_run: Callable[[str], str]
+) -> None:
+    run_id = create_run("key-1")
+    client.post(f"/api/v1/runs/{run_id}/stop")
+    digest = client.get("/api/v1/images/image_alpha").json()["digest"]
+
+    assert client.delete("/api/v1/images/image_alpha").status_code == 204
+
+    assert client.get("/api/v1/images/image_alpha").status_code == 404
+    assert client.delete("/api/v1/images/image_alpha").status_code == 404
+    assert client.get(f"/api/v1/runs/{run_id}").json()["spec"]["image"]["digest"] == digest
+    trail = client.get("/api/v1/audit", params={"image_id": "image_alpha"}).json()
+    assert trail[-1]["event"] == "image_deleted"
+    assert trail[-1]["data"] == {"image_id": "image_alpha", "version": "1.0.0", "digest": digest}
+
+
+def test_a_deleted_image_boots_no_new_run(client: TestClient, spec_body: dict[str, Any]) -> None:
+    client.delete("/api/v1/images/image_alpha")
+
+    refused = client.post("/api/v1/runs", json=spec_body, headers=KEY)
+
+    assert refused.status_code == 422

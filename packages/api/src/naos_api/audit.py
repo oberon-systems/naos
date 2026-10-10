@@ -42,6 +42,7 @@ API_EVENTS: dict[str, frozenset[str]] = {
     "policy_named": frozenset({"policy_id", "kind", "name"}),
     "policy_changed": frozenset({"kind", "from", "to", "digest"}),
     "image_registered": frozenset({"image_id", "version", "digest"}),
+    "image_deleted": frozenset({"image_id", "version", "digest"}),
     "secret_created": frozenset({"name"}),
     "secret_rotated": frozenset({"name"}),
     "secret_expiry_changed": frozenset({"name", "from", "to"}),
@@ -298,11 +299,11 @@ def search(
         statement = statement.where(col(AuditEvent.runner_id) == runner_id)
     if image_id is not None:
         booting = select(Run.id).where(col(Run.spec)[("image", "id")].as_string() == image_id)
-        registered = and_(
-            col(AuditEvent.event) == "image_registered",
+        catalog = and_(
+            col(AuditEvent.event).in_(("image_registered", "image_deleted")),
             col(AuditEvent.data)["image_id"].as_string() == image_id,
         )
-        statement = statement.where(or_(registered, col(AuditEvent.run_id).in_(booting)))
+        statement = statement.where(or_(catalog, col(AuditEvent.run_id).in_(booting)))
     if profile_id is not None:
         copied = select(Run.id).where(col(Run.profile_id) == profile_id)
         own = and_(

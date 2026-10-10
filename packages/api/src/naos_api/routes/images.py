@@ -83,3 +83,8 @@ def list_images(session: SessionDep) -> list[ImageRead]:
 def get_image(image_id: str, session: SessionDep) -> ImageRead:
     image = images.get_image(session, image_id)
     return ImageRead.of(image, images.usage(session).get(image.id, images.Usage()))
+
+
+@router.delete("/images/{image_id}", status_code=204)
+def delete_image(image_id: str, session: SessionDep) -> None:
+    images.delete_image(session, image_id)

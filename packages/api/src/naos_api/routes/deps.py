@@ -8,6 +8,7 @@ from naos_api.db import get_session
 from naos_api.errors import (
     ConsoleFullError,
     IdempotencyConflictError,
+    ImageBusyError,
     ImageConflictError,
     InvalidTransitionError,
     LeaseError,
@@ -57,6 +58,7 @@ _ERROR_STATUS: dict[type[Exception], int] = {
     InvalidTransitionError: 409,
     IdempotencyConflictError: 409,
     LeaseError: 409,
+    ImageBusyError: 409,
     ImageConflictError: 409,
     SecretConflictError: 409,
     SecretBusyError: 409,

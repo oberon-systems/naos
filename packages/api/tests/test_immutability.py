@@ -21,7 +21,7 @@ def test_policy_has_no_mutation_endpoints(
     assert client.get(path).json() == created
 
 
-@pytest.mark.parametrize("method", ["PUT", "PATCH", "DELETE"])
+@pytest.mark.parametrize("method", ["PUT", "PATCH"])
 def test_image_has_no_mutation_endpoints(
     client: TestClient, spec_body: dict[str, Any], method: str
 ) -> None:

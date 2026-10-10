@@ -30,6 +30,10 @@ class ImageConflictError(DomainError):
     """The image id or digest is already registered with other values."""
 
 
+class ImageBusyError(DomainError):
+    """The image cannot be deleted while a Run that has not ended boots it."""
+
+
 class SecretConflictError(DomainError):
     """A secret with this name already exists."""
 

@@ -3,11 +3,11 @@ from dataclasses import dataclass
 from typing import cast
 
 from sqlalchemy import ColumnElement
-from sqlmodel import Session, case, col, func, select
+from sqlmodel import Session, case, col, delete, func, select
 
 from naos_api import audit
-from naos_api.errors import ImageConflictError, NotFoundError, PolicyError
-from naos_api.lifecycle import TERMINAL
+from naos_api.errors import ImageBusyError, ImageConflictError, NotFoundError, PolicyError
+from naos_api.lifecycle import TERMINAL, RunStatus
 from naos_api.models import Image, Run
 from naos_api.spec import ImageRef
 
@@ -84,6 +84,34 @@ def usage(session: Session) -> dict[str, Usage]:
         str(found): Usage(open=int(opened or 0), total=int(total))
         for found, total, opened in session.exec(statement).all()
     }
+
+
+def _busy_detail(session: Session, image: Image) -> str:
+    active = session.exec(
+        select(Run.seq, Run.status)
+        .where(booted_image() == image.id, col(Run.status).not_in(TERMINAL))
+        .order_by(col(Run.seq).desc())
+    ).all()
+    named = " and ".join(f"#{seq} {RunStatus(status)}" for seq, status in active)
+    return f"image {image.id} is used by {named or 'an active run'}. Delete it once they end."
+
+
+def delete_image(session: Session, image_id: str) -> None:
+    image = get_image(session, image_id)
+    busy = select(Run.id).where(booted_image() == image_id, col(Run.status).not_in(TERMINAL))
+    result = session.exec(delete(Image).where(col(Image.id) == image_id, ~busy.exists()))
+    if result.rowcount == 1:
+        audit.record(
+            session,
+            "image_deleted",
+            actor="operator",
+            image_id=image.id,
+            version=image.version,
+            digest=image.digest,
+        )
+    session.commit()
+    if result.rowcount != 1:
+        raise ImageBusyError(_busy_detail(session, image))
 
 
 def check_image(session: Session, ref: ImageRef) -> Image:
