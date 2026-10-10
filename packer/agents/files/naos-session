@@ -3,7 +3,7 @@
 # shellcheck disable=SC2034  # openrc reads $description itself
 #
 # Starts the agent of this Run inside tmux as naos. The runner passes the agent
-# name through fw_cfg; anything it does not recognise falls back to claude.
+# name through fw_cfg; anything it does not recognise falls back to goose.
 
 description="Start the agent session of this Run"
 
@@ -20,9 +20,20 @@ agent_command() {
         agent=$(sed -n 's/.*"agent": *"\([a-z]*\)".*/\1/p' "$session_config")
     fi
     case "$agent" in
+        claude) echo claude ;;
         gemini) echo gemini ;;
-        *) echo claude ;;
+        *) echo "goose session" ;;
     esac
+}
+
+# Goose takes its provider and model from the environment: the first of the Run's model policy.
+share_model() {
+    api=$(sed -n 's/.*"model_api": *"\([a-z]*\)".*/\1/p' "$session_config" 2> /dev/null)
+    model=$(sed -n 's/.*"model": *"\([A-Za-z0-9._:\/@-]*\)".*/\1/p' "$session_config" 2> /dev/null)
+    install -d -m 0755 /run/naos
+    : > /run/naos/agent.env
+    [ -n "$api" ] && [ -n "$model" ] || return 0
+    printf "export GOOSE_PROVIDER='%s'\nexport GOOSE_MODEL='%s'\n" "$api" "$model" > /run/naos/agent.env
 }
 
 # The gate port is root-owned when it appears; naos gets it under a stable name for naos-mcp.
@@ -43,6 +54,7 @@ share_mcp_port() {
 start() {
     ebegin "Starting the agent session"
     share_mcp_port || ewarn "no naos.mcp port, the agent starts without gates"
+    share_model
     command=$(agent_command)
     workspace=$(sed -n 's/.*"workspace": *"\([^"]*\)".*/\1/p' "$session_config" 2> /dev/null)
     su -l naos -s /bin/sh -c "tmux new-session -d -s agent -c '${workspace:-/home/naos}' '$command; exec bash -l'"

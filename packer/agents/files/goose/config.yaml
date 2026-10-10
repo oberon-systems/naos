@@ -1,0 +1,18 @@
+GOOSE_MODE: auto
+GOOSE_TELEMETRY_ENABLED: false
+extensions:
+  developer:
+    type: builtin
+    name: developer
+    enabled: true
+    bundled: true
+    timeout: 300
+  naos:
+    type: stdio
+    name: naos
+    enabled: true
+    cmd: /usr/local/bin/naos-mcp
+    args: []
+    env_keys: []
+    envs: {}
+    timeout: 300

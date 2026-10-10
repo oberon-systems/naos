@@ -13,6 +13,15 @@ npm install -g \
 claude --version
 gemini --version
 
+# The musl build is the one that runs on Alpine; the archive holds the binary alone.
+goose=/tmp/goose
+install -d "$goose"
+wget -qO- "https://github.com/block/goose/releases/download/v${GOOSE_VERSION}/goose-x86_64-unknown-linux-musl.tar.gz" |
+    tar -xz -C "$goose"
+install -m 0755 "$(find "$goose" -type f -name goose | head -n 1)" /usr/local/bin/goose
+rm -rf "$goose"
+goose --version
+
 install -d -m 0755 /etc/claude-code
 install -m 0644 "$files/claude/managed-settings.json" /etc/claude-code/managed-settings.json
 install -m 0644 "$files/claude/managed-mcp.json" /etc/claude-code/managed-mcp.json
@@ -42,6 +51,11 @@ for agent in .claude .gemini; do
         "$home/$agent/skills/naos-environment/SKILL.md"
 done
 ln -sf /etc/naos/AGENTS.md "$home/.gemini/GEMINI.md"
+
+# Goose rewrites its own config, so the file is naos-owned; the instructions stay root's.
+install -d -o naos -g naos -m 0700 "$home/.config" "$home/.config/goose"
+install -o naos -g naos -m 0600 "$files/goose/config.yaml" "$home/.config/goose/config.yaml"
+ln -sf /etc/naos/AGENTS.md "$home/.config/goose/.goosehints"
 
 # Claude Code asks before it uses a key from the environment; the placeholder is approved here.
 install -o naos -g naos -m 0600 "$files/claude/claude.json" "$home/.claude.json"

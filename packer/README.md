@@ -124,8 +124,8 @@ A Run then names the image by `id` and `digest` in its spec; [05 - VM and QEMU](
 | Derives from | `build/base/naos-base-<version>.qcow2` |
 | Disk | 2G |
 | Packages | `bash`, `git`, `libgcc`, `libstdc++`, `nodejs`, `npm`, `ripgrep`, `tmux` |
-| Agents | [Claude Code](https://code.claude.com/docs) 2.1.269 and [Gemini CLI](https://github.com/google-gemini/gemini-cli) 0.59.0, `PKR_VAR_claude_code_version` and `PKR_VAR_gemini_cli_version` in `packer/.env` |
-| Session | `naos-session` starts tmux session `agent` as `naos`, running the agent named in fw_cfg `opt/naos/session`, `claude` by default |
+| Agents | [Goose](https://github.com/block/goose) 1.54.0, the musl build, `goose_version` in `packer/agents/naos-agents.pkr.hcl`; [Claude Code](https://code.claude.com/docs) 2.1.269 and [Gemini CLI](https://github.com/google-gemini/gemini-cli) 0.59.0, `PKR_VAR_claude_code_version` and `PKR_VAR_gemini_cli_version` in `packer/.env` |
+| Session | `naos-session` starts tmux session `agent` as `naos`, running the agent named in fw_cfg `opt/naos/session`, `goose` by default; `GOOSE_PROVIDER` and `GOOSE_MODEL` come from `model_api` and `model` of the same entry |
 | Console | a login on `ttyS0` attaches to the `agent` session |
 | Sealed | sshd removed from the runlevels, host keys deleted, `root` and `naos` locked, only `lo` configured |
 
@@ -134,6 +134,8 @@ Every agent gets default instructions that describe the environment: no direct n
 | File | Owner | Purpose |
 |---|---|---|
 | `/etc/naos/AGENTS.md` | root | the default instructions, one file for every agent |
+| `/home/naos/.config/goose/config.yaml` | naos | Goose settings: the `developer` extension and the `naos` MCP server |
+| `/home/naos/.config/goose/.goosehints` | root | symlink to `/etc/naos/AGENTS.md`: global instructions Goose loads alongside a repository's own |
 | `/etc/claude-code/CLAUDE.md` | root | symlink to `/etc/naos/AGENTS.md`: managed instructions Claude Code loads alongside a repository's own |
 | `/etc/claude-code/managed-settings.json` | root | `USE_BUILTIN_RIPGREP=0` for musl, `DISABLE_AUTOUPDATER=1` |
 | `/home/naos/.claude/skills/naos-environment/SKILL.md` | root | the environment skill for Claude Code |

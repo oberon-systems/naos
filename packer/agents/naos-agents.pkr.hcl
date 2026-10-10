@@ -26,6 +26,11 @@ variable "gemini_cli_version" {
   type = string
 }
 
+variable "goose_version" {
+  type    = string
+  default = "1.54.0"
+}
+
 variable "disk_size" {
   type    = string
   default = "2G"
@@ -94,6 +99,7 @@ build {
     environment_vars = [
       "CLAUDE_CODE_VERSION=${var.claude_code_version}",
       "GEMINI_CLI_VERSION=${var.gemini_cli_version}",
+      "GOOSE_VERSION=${var.goose_version}",
     ]
     script = "${path.root}/files/install.sh"
   }
