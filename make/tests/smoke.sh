@@ -162,7 +162,7 @@ guest() {
             sleep 1
         done
         sleep 25
-    } | NAOS_AGENT_IMAGE_DIR="$TEMP_DIR/vms" NAOS_AGENT_VM_DIR="$TEMP_DIR/runs" \
+    } | NAOS_AGENT_VM_DIR="$TEMP_DIR/runs" \
         cargo run -q -p naos-runner --features smoke-stubs -- console "$run" >>"${console_log:-$TEMP_DIR/console.log}" 2>&1
 }
 
@@ -1120,13 +1120,40 @@ share_gone() {
     ! pgrep -f -- "--socket-path=$TEMP_DIR/runs" >/dev/null
 }
 
+# The runner keeps one file: the one it downloaded from the url the api handed over.
+check_image_source() {
+    local store="$TEMP_DIR/runs/images" name="sha256-${digest#sha256:}.qcow2"
+    [ "$(events image_cached)" -ge 1 ] || fail "the runner booted an image it did not download"
+    [ "$(ls -A "$store")" = "$name" ] || fail "the runner holds an image the api did not hand over"
+    [ "sha256:$(sha256sum "$store/$name" | cut -d' ' -f1)" = "$digest" ] ||
+        fail "the downloaded image does not match the digest of the api"
+}
+
+image_status() {
+    curl -s -o /dev/null -w '%{http_code}' "${auth[@]}" "$@"
+}
+
+# An image a run still boots stays; one nothing boots goes, and the audit says so.
+check_image_delete() {
+    local spare="$api/api/v1/images/naos-spare"
+    [ "$(image_status -X DELETE "$api/api/v1/images/naos-agents")" = 409 ] ||
+        fail "an image in use was deleted"
+    curl -fsS "${auth[@]}" "$api/api/v1/images" -o /dev/null -d @- <<EOF
+{"id": "naos-spare", "version": "0.0.0", "digest": "sha256:$(printf 'spare' | sha256sum | cut -d' ' -f1)",
+ "url": "https://images.example.com/naos-spare.qcow2"}
+EOF
+    [ "$(image_status -X DELETE "$spare")" = 204 ] || fail "an unused image was not deleted"
+    [ "$(image_status "$spare")" = 404 ] || fail "a deleted image is still in the catalog"
+    curl -fsS "${auth[@]}" "$api/api/v1/audit?event=image_deleted" | grep -q '"image_id": *"naos-spare"' ||
+        fail "deleting an image left no audit entry"
+}
+
 start_agent() {
     NAOS_AGENT_API_URL="$api" \
         NAOS_AGENT_NAME=alpha \
         NAOS_AGENT_CAPACITY=3 \
         NAOS_AGENT_STATE_DIR="$TEMP_DIR/state" \
         NAOS_AGENT_ENROLLMENT_TOKEN_FILE="$TEMP_DIR/enrollment" \
-        NAOS_AGENT_IMAGE_DIR="$TEMP_DIR/vms" \
         NAOS_AGENT_VM_DIR="$TEMP_DIR/runs" \
         NAOS_AGENT_SMOKE_CA_FILE="$TEMP_DIR/ca.crt" \
         setsid cargo run -q -p naos-runner --features smoke-stubs >>"$TEMP_DIR/agent.log" 2>&1 &
@@ -1425,6 +1452,8 @@ for event in network_policy_configured shell_policy_configured mcp_policy_config
         exit 1
     }
 done
+check_image_source
+check_image_delete
 credentials="$(first_line mcp_credentials_updated)"
 if [ -z "$credentials" ] || [ "$credentials" -gt "$(first_line vm_created)" ]; then
     echo "the vm started before its mcp gate held the credentials" >&2
