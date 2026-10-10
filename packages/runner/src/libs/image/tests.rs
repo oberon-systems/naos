@@ -51,6 +51,36 @@ async fn fetch_stores_a_verified_read_only_image() {
 }
 
 #[tokio::test]
+async fn a_file_the_cache_did_not_download_is_replaced() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let cache = cache(&dir, 1024);
+    let digest = digest_of(IMAGE);
+    let path = cache.path(&digest).expect("path");
+    fs::write(&path, IMAGE).expect("plant");
+    let source = FakeSource::new(IMAGE);
+
+    cache.fetch(&source, URL, &digest).await.expect("fetched");
+
+    assert_eq!(source.calls(), 1);
+    assert_eq!(fs::metadata(&path).expect("meta").mode() & 0o777, 0o444);
+}
+
+#[tokio::test]
+async fn clear_forgets_every_download() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let cache = cache(&dir, 1024);
+    let digest = digest_of(IMAGE);
+    let source = FakeSource::new(IMAGE);
+    cache.fetch(&source, URL, &digest).await.expect("fetched");
+
+    cache.clear().expect("cleared");
+
+    assert!(entries(&dir).is_empty());
+    cache.fetch(&source, URL, &digest).await.expect("fetched");
+    assert_eq!(source.calls(), 2);
+}
+
+#[tokio::test]
 async fn mismatched_download_is_discarded() {
     let dir = tempfile::tempdir().expect("tempdir");
     let cache = cache(&dir, 1024);

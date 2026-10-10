@@ -1,9 +1,11 @@
+use std::collections::HashSet;
 use std::fs::{self, File, OpenOptions};
 use std::future::Future;
 use std::io::{self, Read, Write};
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
 use reqwest::{redirect, Client};
@@ -98,6 +100,8 @@ impl ImageSource for HttpImages {
 pub struct ImageCache {
     dir: PathBuf,
     max_bytes: u64,
+    // The digests this process downloaded from a url the API handed over; no other file is used.
+    fetched: Arc<Mutex<HashSet<String>>>,
 }
 
 struct HashingWriter {
@@ -119,7 +123,29 @@ impl Write for HashingWriter {
 
 impl ImageCache {
     pub fn new(dir: PathBuf, max_bytes: u64) -> Self {
-        Self { dir, max_bytes }
+        Self {
+            dir,
+            max_bytes,
+            fetched: Arc::default(),
+        }
+    }
+
+    /// Empties the directory: whatever a former process or anybody else left is not an image.
+    pub fn clear(&self) -> Result<(), AgentError> {
+        for entry in fs::read_dir(&self.dir)? {
+            let path = entry?.path();
+            if fs::symlink_metadata(&path)?.is_dir() {
+                fs::remove_dir_all(&path)?;
+            } else {
+                fs::remove_file(&path)?;
+            }
+        }
+        self.known().clear();
+        Ok(())
+    }
+
+    fn known(&self) -> MutexGuard<'_, HashSet<String>> {
+        self.fetched.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
     pub fn path(&self, digest: &str) -> Result<PathBuf, AgentError> {
@@ -130,7 +156,7 @@ impl ImageCache {
         Ok(self.dir.join(format!("sha256-{hex}.qcow2")))
     }
 
-    /// Downloads the image unless a file already sits under its name; `open_verified` judges it.
+    /// Downloads the image unless this process already did; a file found under its name is dropped.
     pub async fn fetch(
         &self,
         source: &dyn ImageSource,
@@ -138,8 +164,12 @@ impl ImageCache {
         digest: &str,
     ) -> Result<(), AgentError> {
         let target = self.path(digest)?;
-        if fs::symlink_metadata(&target).is_ok() {
+        let found = fs::symlink_metadata(&target).is_ok();
+        if found && self.known().contains(digest) {
             return Ok(());
+        }
+        if found {
+            fs::remove_file(&target)?;
         }
         let partial = self.dir.join(format!(".fetch-{}.part", random_hex(8)?));
         let file = OpenOptions::new()
@@ -155,8 +185,13 @@ impl ImageCache {
             .fetch(url, &mut writer, self.max_bytes)
             .await
             .and_then(|_| finish(writer, &partial, &target, digest));
-        if outcome.is_err() {
-            let _ = fs::remove_file(&partial);
+        match outcome {
+            Ok(()) => {
+                self.known().insert(digest.to_owned());
+            }
+            Err(_) => {
+                let _ = fs::remove_file(&partial);
+            }
         }
         outcome
     }

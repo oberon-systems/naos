@@ -24,7 +24,6 @@ fn setup(runtime: FakeRuntime) -> (TempDir, Agent<FakeApi, FakeRuntime>) {
         state_dir: dir.path().to_path_buf(),
         enrollment_token_file: enrollment,
         runtime: RuntimeConfig {
-            image_dir: dir.path().join("images"),
             vm_dir: dir.path().join("runs"),
             qemu_binary: "/bin/false".into(),
             qemu_img: "/bin/false".into(),

@@ -17,7 +17,6 @@ esac\n";
 
 fn config(dir: &TempDir, qemu_binary: &str, qemu_img: PathBuf) -> RuntimeConfig {
     RuntimeConfig {
-        image_dir: dir.path().join("images"),
         vm_dir: dir.path().join("runs"),
         qemu_binary: qemu_binary.into(),
         qemu_img,
@@ -74,6 +73,7 @@ fn run_of(bytes: &[u8]) -> DesiredRun {
     run
 }
 
+// Everything in the VM directory but the image store the runtime keeps beside the VMs.
 fn vm_dirs(dir: &TempDir) -> Vec<String> {
     fs::read_dir(dir.path().join("runs"))
         .expect("read dir")
@@ -84,6 +84,7 @@ fn vm_dirs(dir: &TempDir) -> Vec<String> {
                 .to_string_lossy()
                 .into_owned()
         })
+        .filter(|name| name != IMAGE_DIR)
         .collect()
 }
 
@@ -517,7 +518,7 @@ async fn a_workspace_reached_through_a_symlink_is_refused() {
 }
 
 #[tokio::test]
-async fn corrupted_cache_is_refused_and_removed() {
+async fn a_planted_image_never_boots() {
     let dir = tempfile::tempdir().expect("tempdir");
     let runtime =
         QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
@@ -525,12 +526,28 @@ async fn corrupted_cache_is_refused_and_removed() {
     let cached = runtime.images.path(&run.spec.image.digest).expect("path");
     fs::write(&cached, b"qcow2-beta").expect("plant");
     fs::set_permissions(&cached, fs::Permissions::from_mode(0o444)).expect("chmod");
+    let source = FakeSource::new(IMAGE);
 
-    let outcome = runtime.ensure(&run, &FakeSource::new(IMAGE)).await;
+    let _ = runtime.ensure(&run, &source).await;
 
-    assert!(matches!(outcome, Err(AgentError::Image(_))));
-    assert!(!cached.exists());
-    assert!(vm_dirs(&dir).is_empty());
+    assert_eq!(source.calls(), 1);
+    assert_eq!(fs::read(&cached).expect("read"), IMAGE);
+}
+
+#[test]
+fn a_new_runtime_keeps_no_image_of_a_former_one() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let settings = config(&dir, "/bin/false", fake_qemu_img(&dir));
+    let former = QemuRuntime::new(&settings).expect("runtime");
+    let left = former
+        .images
+        .path(&run_of(IMAGE).spec.image.digest)
+        .expect("path");
+    fs::write(&left, IMAGE).expect("plant");
+
+    QemuRuntime::new(&settings).expect("runtime");
+
+    assert!(!left.exists());
 }
 
 #[tokio::test]
@@ -709,14 +726,14 @@ async fn unsafe_vm_ids_are_refused() {
     let runtime =
         QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
     let forged = LocalVm {
-        vm_id: "../../images".into(),
+        vm_id: "images".into(),
         run_id: "run_a".into(),
         running: false,
     };
 
     assert!(runtime.destroy(&forged).await.is_err());
     assert!(runtime.stop(&forged).await.is_err());
-    assert!(dir.path().join("images").exists());
+    assert!(dir.path().join("runs/images").exists());
 }
 
 #[tokio::test]

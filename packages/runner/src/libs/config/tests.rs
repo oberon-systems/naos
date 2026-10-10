@@ -25,7 +25,6 @@ fn raw() -> RawConfig {
 
 fn config_with(state_dir: &Path) -> Config {
     let runtime = RawRuntimeConfig {
-        image_dir: Some("/srv/naos/vms".into()),
         vm_dir: Some("/srv/naos/runs".into()),
         ..RawRuntimeConfig::default()
     };
@@ -76,16 +75,11 @@ fn full_config_parses_with_default_capacity() {
 fn runtime_dirs_default_to_xdg_locations() {
     let dirs = UserDirs {
         home: Some("/home/alpha".into()),
-        data_home: None,
         state_home: Some("/srv/state/alpha".into()),
     };
 
     let config = RuntimeConfig::resolve(RawRuntimeConfig::default(), &dirs).expect("resolved");
 
-    assert_eq!(
-        config.image_dir,
-        PathBuf::from("/home/alpha/.local/share/naos/vms")
-    );
     assert_eq!(config.vm_dir, PathBuf::from("/srv/state/alpha/naos/runs"));
     assert_eq!(config.qemu_binary, PathBuf::from(DEFAULT_QEMU_BINARY));
     assert_eq!(config.git_binary, PathBuf::from(DEFAULT_GIT_BINARY));
@@ -101,7 +95,6 @@ fn runtime_dirs_need_a_home_or_an_explicit_path() {
     assert!(RuntimeConfig::resolve(RawRuntimeConfig::default(), &UserDirs::default()).is_err());
 
     let explicit = RawRuntimeConfig {
-        image_dir: Some("/srv/naos/vms".into()),
         vm_dir: Some("/srv/naos/runs".into()),
         ..RawRuntimeConfig::default()
     };
@@ -127,7 +120,6 @@ fn paths_that_would_break_qemu_options_are_refused() {
     }
     let zero = RawRuntimeConfig {
         image_max_bytes: Some(0),
-        image_dir: Some("/srv/naos/vms".into()),
         vm_dir: Some("/srv/naos/runs".into()),
         ..RawRuntimeConfig::default()
     };

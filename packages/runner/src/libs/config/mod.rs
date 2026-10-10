@@ -37,7 +37,6 @@ pub struct Config {
 
 #[derive(Debug, Clone)]
 pub struct RuntimeConfig {
-    pub image_dir: PathBuf,
     pub vm_dir: PathBuf,
     pub qemu_binary: PathBuf,
     pub qemu_img: PathBuf,
@@ -60,7 +59,6 @@ pub struct RawConfig {
 
 #[derive(Debug, Default, Deserialize)]
 pub struct RawRuntimeConfig {
-    pub image_dir: Option<PathBuf>,
     pub vm_dir: Option<PathBuf>,
     pub qemu_binary: Option<PathBuf>,
     pub qemu_img: Option<PathBuf>,
@@ -72,7 +70,6 @@ pub struct RawRuntimeConfig {
 #[derive(Debug, Default)]
 pub struct UserDirs {
     pub home: Option<PathBuf>,
-    pub data_home: Option<PathBuf>,
     pub state_home: Option<PathBuf>,
 }
 
@@ -85,7 +82,6 @@ impl UserDirs {
         };
         Self {
             home: var("HOME"),
-            data_home: var("XDG_DATA_HOME"),
             state_home: var("XDG_STATE_HOME"),
         }
     }
@@ -112,7 +108,7 @@ impl Config {
         })
     }
 
-    // The runtime prepares the image and vm directories; the state one is nobody else's.
+    // The runtime prepares the vm directory; the state one is nobody else's.
     pub fn prepare(&self) -> Result<(), AgentError> {
         prepare_private_dir(&self.state_dir)
     }
@@ -120,15 +116,6 @@ impl Config {
 
 impl RuntimeConfig {
     pub fn resolve(raw: RawRuntimeConfig, dirs: &UserDirs) -> Result<Self, AgentError> {
-        let image_dir = match raw.image_dir {
-            Some(dir) => dir,
-            None => default_dir(
-                dirs.data_home.as_deref(),
-                dirs.home.as_deref(),
-                ".local/share",
-            )?
-            .join("naos/vms"),
-        };
         let vm_dir = match raw.vm_dir {
             Some(dir) => dir,
             None => default_dir(
@@ -145,7 +132,6 @@ impl RuntimeConfig {
             ));
         }
         Ok(Self {
-            image_dir: checked_path("NAOS_AGENT_IMAGE_DIR", image_dir)?,
             vm_dir: checked_path("NAOS_AGENT_VM_DIR", vm_dir)?,
             qemu_binary: checked_path(
                 "NAOS_AGENT_QEMU_BINARY",
@@ -211,9 +197,7 @@ fn default_dir(
     xdg.map(Path::to_path_buf)
         .or_else(|| home.map(|home| home.join(fallback)))
         .ok_or_else(|| {
-            AgentError::Config(
-                "HOME is not set, so the default image and VM directories are unknown".into(),
-            )
+            AgentError::Config("HOME is not set, so the default VM directory is unknown".into())
         })
 }
 

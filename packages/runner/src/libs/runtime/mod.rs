@@ -44,6 +44,7 @@ const GIB: u64 = 1024 * 1024 * 1024;
 const ARCHIVE_DIR: &str = "archive";
 const PRIVATE_MODE: u32 = 0o600;
 const DEFAULT_AGENT: &str = "claude";
+const IMAGE_DIR: &str = "images";
 const VIRTIOFSD_MIN: (u64, u64) = (1, 13);
 // The uid and gid of `naos`, the first user setup-alpine creates in the image.
 const GUEST_ID: u32 = 1000;
@@ -156,11 +157,15 @@ pub struct QemuRuntime {
 
 impl QemuRuntime {
     pub fn new(config: &RuntimeConfig) -> Result<Self, AgentError> {
-        prepare_private_dir(&config.image_dir)?;
         prepare_private_dir(&config.vm_dir)?;
+        // Not a VM id, so `scan` passes it by; nothing but this process puts an image there.
+        let image_dir = config.vm_dir.join(IMAGE_DIR);
+        prepare_private_dir(&image_dir)?;
+        let images = ImageCache::new(image_dir, config.image_max_bytes);
+        images.clear()?;
         Ok(Self {
             vm_dir: config.vm_dir.clone(),
-            images: ImageCache::new(config.image_dir.clone(), config.image_max_bytes),
+            images,
             qemu_binary: config.qemu_binary.clone(),
             qemu_img: config.qemu_img.clone(),
             git_binary: config.git_binary.clone(),
