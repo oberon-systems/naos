@@ -3,36 +3,36 @@
   "name": "Tabs",
   "type": "frame",
   "x": 3680,
-  "y": 103,
+  "y": 99,
   "width": 940,
   "height": 44,
   "rotation": 0,
   "selrect": {
     "x": 3680,
-    "y": 103,
+    "y": 99,
     "width": 940,
     "height": 44,
     "x1": 3680,
-    "y1": 103,
+    "y1": 99,
     "x2": 4620,
-    "y2": 147
+    "y2": 143
   },
   "points": [
     {
       "x": 3680,
-      "y": 103
+      "y": 99
     },
     {
       "x": 4620,
-      "y": 103
+      "y": 99
     },
     {
       "x": 4620,
-      "y": 147
+      "y": 143
     },
     {
       "x": 3680,
-      "y": 147
+      "y": 143
     }
   ],
   "transform": {
@@ -71,7 +71,7 @@
   "r2": 0,
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 0,
+    "rowGap": -1,
     "columnGap": 24
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

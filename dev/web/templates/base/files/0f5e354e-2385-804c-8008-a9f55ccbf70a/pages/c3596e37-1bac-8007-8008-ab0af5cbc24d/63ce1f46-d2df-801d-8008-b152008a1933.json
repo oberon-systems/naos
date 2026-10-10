@@ -3,36 +3,36 @@
   "name": "Page header",
   "type": "frame",
   "x": 24,
-  "y": 80,
+  "y": 79,
   "width": 1392,
   "height": 52,
   "rotation": 0,
   "selrect": {
     "x": 24,
-    "y": 80,
+    "y": 79,
     "width": 1392,
     "height": 52,
     "x1": 24,
-    "y1": 80,
+    "y1": 79,
     "x2": 1416,
-    "y2": 132
+    "y2": 131
   },
   "points": [
     {
       "x": 24,
-      "y": 80
+      "y": 79
     },
     {
       "x": 1416,
-      "y": 80
+      "y": 79
     },
     {
       "x": 1416,
-      "y": 132
+      "y": 131
     },
     {
       "x": 24,
-      "y": 132
+      "y": 131
     }
   ],
   "transform": {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "fix",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 0,
+    "rowGap": -1,
     "columnGap": 0
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

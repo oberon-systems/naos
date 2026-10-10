@@ -3,36 +3,36 @@
   "name": "value",
   "type": "text",
   "x": 4776,
-  "y": 480.5,
+  "y": 466.5,
   "width": 568,
   "height": 17,
   "rotation": 0,
   "selrect": {
     "x": 4776,
-    "y": 480.5,
+    "y": 466.5,
     "width": 568,
     "height": 17,
     "x1": 4776,
-    "y1": 480.5,
+    "y1": 466.5,
     "x2": 5344,
-    "y2": 497.5
+    "y2": 483.5
   },
   "points": [
     {
       "x": 4776,
-      "y": 480.5
+      "y": 466.5
     },
     {
       "x": 5344,
-      "y": 480.5
+      "y": 466.5
     },
     {
       "x": 5344,
-      "y": 497.5
+      "y": 483.5
     },
     {
       "x": 4776,
-      "y": 497.5
+      "y": 483.5
     }
   ],
   "transform": {
@@ -121,28 +121,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 496.5,
+      "x": 4776,
+      "y": 482.5,
+      "width": 388.8125,
+      "height": 16,
+      "x1": 0,
+      "y1": 0,
+      "x2": 388.8125,
+      "y2": 16,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "500",
-      "y1": 0,
-      "width": 388.80682373046875,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 4776,
-      "x1": 0,
-      "y2": 16,
       "fills": [
         {
           "fillColor": "#101828",
           "fillOpacity": 1
         }
       ],
-      "x2": 388.80682373046875,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
-      "height": 16,
       "text": "https://mirror.example.net/pub/epsilon-2026.09.2.qcow2"
     }
   ]

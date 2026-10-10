@@ -3,36 +3,36 @@
   "name": "pill WAITING_MERGE",
   "type": "frame",
   "x": 2355,
-  "y": 243,
+  "y": 236,
   "width": 105,
   "height": 22,
   "rotation": 0,
   "selrect": {
     "x": 2355,
-    "y": 243,
+    "y": 236,
     "width": 105,
     "height": 22,
     "x1": 2355,
-    "y1": 243,
+    "y1": 236,
     "x2": 2460,
-    "y2": 265
+    "y2": 258
   },
   "points": [
     {
       "x": 2355,
-      "y": 243
+      "y": 236
     },
     {
       "x": 2460,
-      "y": 243
+      "y": 236
     },
     {
       "x": 2460,
-      "y": 265
+      "y": 258
     },
     {
       "x": 2355,
-      "y": 265
+      "y": 258
     }
   ],
   "transform": {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "auto",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 0,
+    "rowGap": -1,
     "columnGap": 0
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

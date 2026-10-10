@@ -3,36 +3,36 @@
   "name": "Text",
   "type": "text",
   "x": 1314,
-  "y": 96.5,
+  "y": 95.5,
   "width": 88,
   "height": 19,
   "rotation": 0,
   "selrect": {
     "x": 1314,
-    "y": 96.5,
+    "y": 95.5,
     "width": 88,
     "height": 19,
     "x1": 1314,
-    "y1": 96.5,
+    "y1": 95.5,
     "x2": 1402,
-    "y2": 115.5
+    "y2": 114.5
   },
   "points": [
     {
       "x": 1314,
-      "y": 96.5
+      "y": 95.5
     },
     {
       "x": 1402,
-      "y": 96.5
+      "y": 95.5
     },
     {
       "x": 1402,
-      "y": 115.5
+      "y": 114.5
     },
     {
       "x": 1314,
-      "y": 115.5
+      "y": 114.5
     }
   ],
   "transform": {
@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 113.22727346420288,
+      "x": 1314,
+      "y": 112.30000191926956,
+      "width": 87.1875,
+      "height": 16.000001907348633,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 87.1875,
+      "y2": 16.80000191926956,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "600",
-      "y1": 1.454545497894287,
-      "width": 87.1136474609375,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 1314,
-      "x1": 0,
-      "y2": 16.72727346420288,
       "fills": [
         {
           "fillColor": "#ffffff",
           "fillOpacity": 1
         }
       ],
-      "x2": 87.1136474609375,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "height": 15.272727966308594,
       "text": "Register image"
     }
   ]

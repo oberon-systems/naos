@@ -1,0 +1,147 @@
+{
+  "id": "cb3052cd-3363-8058-8008-c3e3d0d07e99",
+  "name": "Text",
+  "type": "text",
+  "x": 5524,
+  "y": 24.5,
+  "width": 124,
+  "height": 26,
+  "rotation": 0,
+  "selrect": {
+    "x": 5524,
+    "y": 24.5,
+    "width": 124,
+    "height": 26,
+    "x1": 5524,
+    "y1": 24.5,
+    "x2": 5648,
+    "y2": 50.5
+  },
+  "points": [
+    {
+      "x": 5524,
+      "y": 24.5
+    },
+    {
+      "x": 5648,
+      "y": 24.5
+    },
+    {
+      "x": 5648,
+      "y": 50.5
+    },
+    {
+      "x": 5524,
+      "y": 50.5
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "cb3052cd-3363-8058-8008-c3e3d0d07e96",
+  "frameId": "cb3052cd-3363-8058-8008-c3e3d0d07e96",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-width",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "18",
+                "fontWeight": "700",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "700",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#101828",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "Register image"
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "18",
+            "fontWeight": "700",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "700",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#101828",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "y": 47.772727489471436,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "18px",
+      "fontWeight": "700",
+      "y1": 1.454545497894287,
+      "width": 123.6477279663086,
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "x": 5524,
+      "x1": 0,
+      "y2": 23.272727489471436,
+      "fills": [
+        {
+          "fillColor": "#101828",
+          "fillOpacity": 1
+        }
+      ],
+      "x2": 123.6477279663086,
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "height": 21.81818199157715,
+      "text": "Register image"
+    }
+  ]
+}

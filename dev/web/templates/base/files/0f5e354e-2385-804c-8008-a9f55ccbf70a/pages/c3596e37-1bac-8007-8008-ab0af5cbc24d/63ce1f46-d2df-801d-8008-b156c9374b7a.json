@@ -3,36 +3,36 @@
   "name": "Filters",
   "type": "frame",
   "x": 3704,
-  "y": 167,
+  "y": 162,
   "width": 892,
   "height": 30,
   "rotation": 0,
   "selrect": {
     "x": 3704,
-    "y": 167,
+    "y": 162,
     "width": 892,
     "height": 30,
     "x1": 3704,
-    "y1": 167,
+    "y1": 162,
     "x2": 4596,
-    "y2": 197
+    "y2": 192
   },
   "points": [
     {
       "x": 3704,
-      "y": 167
+      "y": 162
     },
     {
       "x": 4596,
-      "y": 167
+      "y": 162
     },
     {
       "x": 4596,
-      "y": 197
+      "y": 192
     },
     {
       "x": 3704,
-      "y": 197
+      "y": 192
     }
   ],
   "transform": {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "fix",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 0,
+    "rowGap": -1,
     "columnGap": 0
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

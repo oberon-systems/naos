@@ -2,37 +2,37 @@
   "id": "63ce1f46-d2df-801d-8008-b152008a4331",
   "name": "Text",
   "type": "text",
-  "x": 1169,
-  "y": 98,
-  "width": 111,
+  "x": 1185,
+  "y": 97,
+  "width": 95,
   "height": 16,
   "rotation": 0,
   "selrect": {
-    "x": 1169,
-    "y": 98,
-    "width": 111,
+    "x": 1185,
+    "y": 97,
+    "width": 95,
     "height": 16,
-    "x1": 1169,
-    "y1": 98,
+    "x1": 1185,
+    "y1": 97,
     "x2": 1280,
-    "y2": 114
+    "y2": 113
   },
   "points": [
     {
-      "x": 1169,
-      "y": 98
+      "x": 1185,
+      "y": 97
     },
     {
       "x": 1280,
-      "y": 98
+      "y": 97
     },
     {
       "x": 1280,
-      "y": 114
+      "y": 113
     },
     {
-      "x": 1169,
-      "y": 114
+      "x": 1185,
+      "y": 113
     }
   ],
   "transform": {
@@ -87,7 +87,7 @@
                   }
                 ],
                 "fontFamily": "Inter Tight",
-                "text": "catalog is append-only"
+                "text": "rows are immutable"
               }
             ],
             "typographyRefId": null,
@@ -119,29 +119,29 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 112.54545474052429,
+      "x": 1185,
+      "y": 110.60000020265579,
+      "width": 94.7125015258789,
+      "height": 12.800000190734863,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 94.7125015258789,
+      "y2": 13.600000202655792,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "500",
-      "y1": 0.7272727489471436,
-      "width": 110.11363983154297,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 1169,
-      "x1": 0,
-      "y2": 14.545454740524292,
       "fills": [
         {
           "fillColor": "#667085",
           "fillOpacity": 1
         }
       ],
-      "x2": 110.11363983154297,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "height": 13.818181991577148,
-      "text": "catalog is append-only"
+      "text": "rows are immutable"
     }
   ]
 }

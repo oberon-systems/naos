@@ -3,36 +3,36 @@
   "name": "button Register",
   "type": "frame",
   "x": 5279,
-  "y": 731,
+  "y": 711,
   "width": 77,
   "height": 35,
   "rotation": 0,
   "selrect": {
     "x": 5279,
-    "y": 731,
+    "y": 711,
     "width": 77,
     "height": 35,
     "x1": 5279,
-    "y1": 731,
+    "y1": 711,
     "x2": 5356,
-    "y2": 766
+    "y2": 746
   },
   "points": [
     {
       "x": 5279,
-      "y": 731
+      "y": 711
     },
     {
       "x": 5356,
-      "y": 731
+      "y": 711
     },
     {
       "x": 5356,
-      "y": 766
+      "y": 746
     },
     {
       "x": 5279,
-      "y": 766
+      "y": 746
     }
   ],
   "transform": {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "auto",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 0,
+    "rowGap": -1,
     "columnGap": 0
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

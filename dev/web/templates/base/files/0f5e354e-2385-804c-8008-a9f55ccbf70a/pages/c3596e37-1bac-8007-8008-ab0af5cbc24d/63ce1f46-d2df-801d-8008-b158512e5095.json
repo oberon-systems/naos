@@ -3,36 +3,36 @@
   "name": "runner",
   "type": "frame",
   "x": 2930,
-  "y": 470,
+  "y": 454,
   "width": 120,
   "height": 20,
   "rotation": 0,
   "selrect": {
     "x": 2930,
-    "y": 470,
+    "y": 454,
     "width": 120,
     "height": 20,
     "x1": 2930,
-    "y1": 470,
+    "y1": 454,
     "x2": 3050,
-    "y2": 490
+    "y2": 474
   },
   "points": [
     {
       "x": 2930,
-      "y": 470
+      "y": 454
     },
     {
       "x": 3050,
-      "y": 470
+      "y": 454
     },
     {
       "x": 3050,
-      "y": 490
+      "y": 474
     },
     {
       "x": 2930,
-      "y": 490
+      "y": 474
     }
   ],
   "transform": {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "fix",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 0,
+    "rowGap": -1,
     "columnGap": 0
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

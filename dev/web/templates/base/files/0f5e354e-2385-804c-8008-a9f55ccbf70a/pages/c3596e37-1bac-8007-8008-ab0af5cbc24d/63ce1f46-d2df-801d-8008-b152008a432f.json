@@ -2,37 +2,37 @@
   "id": "63ce1f46-d2df-801d-8008-b152008a432f",
   "name": "chip",
   "type": "frame",
-  "x": 1147,
-  "y": 94,
-  "width": 143,
+  "x": 1163,
+  "y": 93,
+  "width": 127,
   "height": 24,
   "rotation": 0,
   "selrect": {
-    "x": 1147,
-    "y": 94,
-    "width": 143,
+    "x": 1163,
+    "y": 93,
+    "width": 127,
     "height": 24,
-    "x1": 1147,
-    "y1": 94,
+    "x1": 1163,
+    "y1": 93,
     "x2": 1290,
-    "y2": 118
+    "y2": 117
   },
   "points": [
     {
-      "x": 1147,
-      "y": 94
+      "x": 1163,
+      "y": 93
     },
     {
       "x": 1290,
-      "y": 94
+      "y": 93
     },
     {
       "x": 1290,
-      "y": 118
+      "y": 117
     },
     {
-      "x": 1147,
-      "y": 118
+      "x": 1163,
+      "y": 117
     }
   ],
   "transform": {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "auto",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 6,
+    "rowGap": 5,
     "columnGap": 6
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

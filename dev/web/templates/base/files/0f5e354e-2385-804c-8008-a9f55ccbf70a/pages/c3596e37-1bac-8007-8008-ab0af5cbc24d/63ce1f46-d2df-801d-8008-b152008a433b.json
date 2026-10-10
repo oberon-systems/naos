@@ -4,17 +4,17 @@
   "type": "frame",
   "x": 87,
   "y": 18.5,
-  "width": 329,
+  "width": 393,
   "height": 19,
   "rotation": 0,
   "selrect": {
     "x": 87,
     "y": 18.5,
-    "width": 329,
+    "width": 393,
     "height": 19,
     "x1": 87,
     "y1": 18.5,
-    "x2": 416,
+    "x2": 480,
     "y2": 37.5
   },
   "points": [
@@ -23,11 +23,11 @@
       "y": 18.5
     },
     {
-      "x": 416,
+      "x": 480,
       "y": 18.5
     },
     {
-      "x": 416,
+      "x": 480,
       "y": 37.5
     },
     {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "auto",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 20,
+    "rowGap": 19,
     "columnGap": 20
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

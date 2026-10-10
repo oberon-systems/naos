@@ -3,36 +3,36 @@
   "name": "Body",
   "type": "frame",
   "x": 4740,
-  "y": 102,
+  "y": 99,
   "width": 640,
-  "height": 688,
+  "height": 671,
   "rotation": 0,
   "selrect": {
     "x": 4740,
-    "y": 102,
+    "y": 99,
     "width": 640,
-    "height": 688,
+    "height": 671,
     "x1": 4740,
-    "y1": 102,
+    "y1": 99,
     "x2": 5380,
-    "y2": 790
+    "y2": 770
   },
   "points": [
     {
       "x": 4740,
-      "y": 102
+      "y": 98.99999999999999
     },
     {
       "x": 5380,
-      "y": 102
+      "y": 98.99999999999999
     },
     {
       "x": 5380,
-      "y": 790
+      "y": 770
     },
     {
       "x": 4740,
-      "y": 790
+      "y": 770
     }
   ],
   "transform": {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "fill",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 16,
+    "rowGap": 15,
     "columnGap": 16
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

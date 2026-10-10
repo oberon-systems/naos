@@ -3,36 +3,36 @@
   "name": "Text",
   "type": "text",
   "x": 2210,
-  "y": 278,
-  "width": 66,
+  "y": 270,
+  "width": 67,
   "height": 16,
   "rotation": 0,
   "selrect": {
     "x": 2210,
-    "y": 278,
-    "width": 66,
+    "y": 270,
+    "width": 67,
     "height": 16,
     "x1": 2210,
-    "y1": 278,
-    "x2": 2276,
-    "y2": 294
+    "y1": 270,
+    "x2": 2277,
+    "y2": 286
   },
   "points": [
     {
       "x": 2210,
-      "y": 278
+      "y": 270
     },
     {
-      "x": 2276,
-      "y": 278
+      "x": 2277,
+      "y": 270
     },
     {
-      "x": 2276,
-      "y": 294
+      "x": 2277,
+      "y": 286
     },
     {
       "x": 2210,
-      "y": 294
+      "y": 286
     }
   ],
   "transform": {
@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 292.54545497894287,
+      "x": 2210,
+      "y": 284.4000005722046,
+      "width": 66.01250457763672,
+      "height": 14.40000057220459,
+      "x1": 0,
+      "y1": 0,
+      "x2": 66.01250457763672,
+      "y2": 14.40000057220459,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
-      "y1": 0,
-      "width": 65.93182373046875,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 2210,
-      "x1": 0,
-      "y2": 14.545454978942871,
       "fills": [
         {
           "fillColor": "#667085",
           "fillOpacity": 1
         }
       ],
-      "x2": 65.93182373046875,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
-      "height": 14.545454978942871,
       "text": "cargo test"
     }
   ]

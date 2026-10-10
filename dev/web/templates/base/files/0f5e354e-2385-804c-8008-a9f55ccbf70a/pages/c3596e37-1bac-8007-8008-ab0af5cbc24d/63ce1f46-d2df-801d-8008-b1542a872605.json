@@ -3,36 +3,36 @@
   "name": "card header",
   "type": "frame",
   "x": 1584,
-  "y": 167,
+  "y": 162,
   "width": 520,
   "height": 40,
   "rotation": 0,
   "selrect": {
     "x": 1584,
-    "y": 167,
+    "y": 162,
     "width": 520,
     "height": 40,
     "x1": 1584,
-    "y1": 167,
+    "y1": 162,
     "x2": 2104,
-    "y2": 207
+    "y2": 202
   },
   "points": [
     {
       "x": 1584,
-      "y": 167
+      "y": 162
     },
     {
       "x": 2104,
-      "y": 167
+      "y": 162
     },
     {
       "x": 2104,
-      "y": 207
+      "y": 202
     },
     {
       "x": 1584,
-      "y": 207
+      "y": 202
     }
   ],
   "transform": {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "fix",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 0,
+    "rowGap": -1,
     "columnGap": 0
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

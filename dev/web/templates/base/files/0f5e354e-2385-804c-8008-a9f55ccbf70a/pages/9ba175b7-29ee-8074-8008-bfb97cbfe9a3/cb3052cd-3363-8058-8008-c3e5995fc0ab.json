@@ -1,0 +1,147 @@
+{
+  "id": "cb3052cd-3363-8058-8008-c3e5995fc0ab",
+  "name": "Text",
+  "type": "text",
+  "x": 2656,
+  "y": 1142.5,
+  "width": 37,
+  "height": 17,
+  "rotation": 0,
+  "selrect": {
+    "x": 2656,
+    "y": 1142.5,
+    "width": 37,
+    "height": 17,
+    "x1": 2656,
+    "y1": 1142.5,
+    "x2": 2693,
+    "y2": 1159.5
+  },
+  "points": [
+    {
+      "x": 2656,
+      "y": 1142.5
+    },
+    {
+      "x": 2693,
+      "y": 1142.5
+    },
+    {
+      "x": 2693,
+      "y": 1159.5
+    },
+    {
+      "x": 2656,
+      "y": 1159.5
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "cb3052cd-3363-8058-8008-c3e5995fc0a9",
+  "frameId": "cb3052cd-3363-8058-8008-c3e5995fc0a9",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-width",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-jetbrains-mono",
+                "fontSize": "12",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#101828",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "JetBrains Mono",
+                "text": "alpha"
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-jetbrains-mono",
+            "fontSize": "12",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#101828",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "JetBrains Mono"
+          }
+        ]
+      }
+    ]
+  },
+  "pageId": "9ba175b7-29ee-8074-8008-bfb97cbfe9a3",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 2656,
+      "y": 1158.5,
+      "width": 36.01250076293945,
+      "height": 16,
+      "x1": 0,
+      "y1": 0,
+      "x2": 36.01250076293945,
+      "y2": 16,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#101828",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"JetBrains Mono\"",
+      "text": "alpha"
+    }
+  ]
+}

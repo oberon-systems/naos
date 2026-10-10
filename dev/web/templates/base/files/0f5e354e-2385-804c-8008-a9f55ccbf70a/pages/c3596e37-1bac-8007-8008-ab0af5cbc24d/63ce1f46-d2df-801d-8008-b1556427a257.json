@@ -3,36 +3,36 @@
   "name": "l",
   "type": "frame",
   "x": 2136,
-  "y": 277.5,
-  "width": 140,
+  "y": 269.5,
+  "width": 141,
   "height": 17,
   "rotation": 0,
   "selrect": {
     "x": 2136,
-    "y": 277.5,
-    "width": 140,
+    "y": 269.5,
+    "width": 141,
     "height": 17,
     "x1": 2136,
-    "y1": 277.5,
-    "x2": 2276,
-    "y2": 294.5
+    "y1": 269.5,
+    "x2": 2277,
+    "y2": 286.5
   },
   "points": [
     {
       "x": 2136,
-      "y": 277.5
+      "y": 269.5
     },
     {
-      "x": 2276,
-      "y": 277.5
+      "x": 2277,
+      "y": 269.5
     },
     {
-      "x": 2276,
-      "y": 294.5
+      "x": 2277,
+      "y": 286.5
     },
     {
       "x": 2136,
-      "y": 294.5
+      "y": 286.5
     }
   ],
   "transform": {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "auto",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 7,
+    "rowGap": 6,
     "columnGap": 7
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

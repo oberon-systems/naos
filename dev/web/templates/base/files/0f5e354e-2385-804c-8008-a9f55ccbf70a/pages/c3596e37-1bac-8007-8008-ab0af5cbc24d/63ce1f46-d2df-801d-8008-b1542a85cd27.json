@@ -3,36 +3,36 @@
   "name": "fact Registered",
   "type": "frame",
   "x": 1600,
-  "y": 525,
+  "y": 510,
   "width": 488,
   "height": 26,
   "rotation": 0,
   "selrect": {
     "x": 1600,
-    "y": 525,
+    "y": 510,
     "width": 488,
     "height": 26,
     "x1": 1600,
-    "y1": 525,
+    "y1": 510,
     "x2": 2088,
-    "y2": 551
+    "y2": 536
   },
   "points": [
     {
       "x": 1600,
-      "y": 525
+      "y": 510
     },
     {
       "x": 2088,
-      "y": 525
+      "y": 510
     },
     {
       "x": 2088,
-      "y": 551
+      "y": 536
     },
     {
       "x": 1600,
-      "y": 551
+      "y": 536
     }
   ],
   "transform": {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "fix",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 0,
+    "rowGap": -1,
     "columnGap": 0
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

@@ -1,0 +1,172 @@
+{
+  "id": "cb3052cd-3363-8058-8008-c3e3d0d07e77",
+  "name": "error text",
+  "type": "text",
+  "x": 5536,
+  "y": 691.0000000000001,
+  "width": 452.0000000000073,
+  "height": 34,
+  "rotation": 0,
+  "selrect": {
+    "x": 5536,
+    "y": 691.0000000000001,
+    "width": 452.0000000000073,
+    "height": 34,
+    "x1": 5536,
+    "y1": 691.0000000000001,
+    "x2": 5988.000000000007,
+    "y2": 725.0000000000001
+  },
+  "points": [
+    {
+      "x": 5536,
+      "y": 691.0000000000001
+    },
+    {
+      "x": 5988.000000000007,
+      "y": 691.0000000000001
+    },
+    {
+      "x": 5988.000000000007,
+      "y": 725.0000000000001
+    },
+    {
+      "x": 5536,
+      "y": 725.0000000000001
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "cb3052cd-3363-8058-8008-c3e3d0d07e6b",
+  "frameId": "cb3052cd-3363-8058-8008-c3e3d0d07e6b",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-height",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "12",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#b42318",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "the api answered 409 for /images: image image_epsilon is already registered with another version, digest, url or facts"
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "12",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#b42318",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 5536,
+      "y": 706.9999998211862,
+      "width": 418.9375,
+      "height": 15.199999809265137,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 418.9375,
+      "y2": 15.999999821186066,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#b42318",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "the api answered 409 for /images: image image_epsilon is already registered with "
+    },
+    {
+      "x": 5536,
+      "y": 723.7999992370607,
+      "width": 177.5,
+      "height": 15.19999885559082,
+      "x1": 0,
+      "y1": 17.600000381469727,
+      "x2": 177.5,
+      "y2": 32.79999923706055,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#b42318",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "another version, digest, url or facts"
+    }
+  ]
+}

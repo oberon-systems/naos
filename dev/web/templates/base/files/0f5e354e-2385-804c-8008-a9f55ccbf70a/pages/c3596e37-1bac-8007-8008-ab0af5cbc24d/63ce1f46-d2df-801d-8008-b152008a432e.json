@@ -3,36 +3,36 @@
   "name": "Register image button",
   "type": "frame",
   "x": 1300,
-  "y": 88.5,
+  "y": 87.5,
   "width": 116,
   "height": 35,
   "rotation": 0,
   "selrect": {
     "x": 1300,
-    "y": 88.5,
+    "y": 87.5,
     "width": 116,
     "height": 35,
     "x1": 1300,
-    "y1": 88.5,
+    "y1": 87.5,
     "x2": 1416,
-    "y2": 123.5
+    "y2": 122.5
   },
   "points": [
     {
       "x": 1300,
-      "y": 88.5
+      "y": 87.5
     },
     {
       "x": 1416,
-      "y": 88.5
+      "y": 87.5
     },
     {
       "x": 1416,
-      "y": 123.5
+      "y": 122.5
     },
     {
       "x": 1300,
-      "y": 123.5
+      "y": 122.5
     }
   ],
   "transform": {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "auto",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 0,
+    "rowGap": -1,
     "columnGap": 0
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

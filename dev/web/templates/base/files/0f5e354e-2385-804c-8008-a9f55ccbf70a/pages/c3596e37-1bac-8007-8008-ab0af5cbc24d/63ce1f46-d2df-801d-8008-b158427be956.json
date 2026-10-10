@@ -2,36 +2,36 @@
   "id": "63ce1f46-d2df-801d-8008-b158427be956",
   "name": "button Copy url",
   "type": "frame",
-  "x": 3423,
+  "x": 3349,
   "y": 20,
   "width": 77,
   "height": 35,
   "rotation": 0,
   "selrect": {
-    "x": 3423,
+    "x": 3349,
     "y": 20,
     "width": 77,
     "height": 35,
-    "x1": 3423,
+    "x1": 3349,
     "y1": 20,
-    "x2": 3500,
+    "x2": 3426,
     "y2": 55
   },
   "points": [
     {
-      "x": 3423,
+      "x": 3349,
       "y": 20
     },
     {
-      "x": 3500,
+      "x": 3426,
       "y": 20
     },
     {
-      "x": 3500,
+      "x": 3426,
       "y": 55
     },
     {
-      "x": 3423,
+      "x": 3349,
       "y": 55
     }
   ],
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "auto",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 0,
+    "rowGap": -1,
     "columnGap": 0
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

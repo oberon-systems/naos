@@ -3,36 +3,36 @@
   "name": "chip Registered",
   "type": "frame",
   "x": 3745,
-  "y": 171,
+  "y": 166,
   "width": 72,
   "height": 22,
   "rotation": 0,
   "selrect": {
     "x": 3745,
-    "y": 171,
+    "y": 166,
     "width": 72,
     "height": 22,
     "x1": 3745,
-    "y1": 171,
+    "y1": 166,
     "x2": 3817,
-    "y2": 193
+    "y2": 188
   },
   "points": [
     {
       "x": 3745,
-      "y": 171
+      "y": 166
     },
     {
       "x": 3817,
-      "y": 171
+      "y": 166
     },
     {
       "x": 3817,
-      "y": 193
+      "y": 188
     },
     {
       "x": 3745,
-      "y": 193
+      "y": 188
     }
   ],
   "transform": {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "auto",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 0,
+    "rowGap": -1,
     "columnGap": 0
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

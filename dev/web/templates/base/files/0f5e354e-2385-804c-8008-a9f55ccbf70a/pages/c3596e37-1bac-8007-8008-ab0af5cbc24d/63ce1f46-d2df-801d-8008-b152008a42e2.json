@@ -3,36 +3,36 @@
   "name": "Text",
   "type": "text",
   "x": 40,
-  "y": 487,
-  "width": 66,
+  "y": 484,
+  "width": 67,
   "height": 16,
   "rotation": 0,
   "selrect": {
     "x": 40,
-    "y": 487,
-    "width": 66,
+    "y": 484,
+    "width": 67,
     "height": 16,
     "x1": 40,
-    "y1": 487,
-    "x2": 106,
-    "y2": 503
+    "y1": 484,
+    "x2": 107,
+    "y2": 500
   },
   "points": [
     {
       "x": 40,
-      "y": 487
+      "y": 484
     },
     {
-      "x": 106,
-      "y": 487
+      "x": 107,
+      "y": 484
     },
     {
-      "x": 106,
-      "y": 503
+      "x": 107,
+      "y": 500
     },
     {
       "x": 40,
-      "y": 503
+      "y": 500
     }
   ],
   "transform": {
@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 501.54545497894287,
+      "x": 40,
+      "y": 498.4000005722046,
+      "width": 66.01250457763672,
+      "height": 14.40000057220459,
+      "x1": 0,
+      "y1": 0,
+      "x2": 66.01250457763672,
+      "y2": 14.40000057220459,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
-      "y1": 0,
-      "width": 65.93182373046875,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 40,
-      "x1": 0,
-      "y2": 14.545454978942871,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
-      "x2": 65.93182373046875,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
-      "height": 14.545454978942871,
       "text": "image_beta"
     }
   ]

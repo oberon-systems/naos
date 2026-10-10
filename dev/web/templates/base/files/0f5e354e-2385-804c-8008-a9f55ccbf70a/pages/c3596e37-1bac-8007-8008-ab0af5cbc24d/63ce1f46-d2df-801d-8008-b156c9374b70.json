@@ -3,36 +3,36 @@
   "name": "h4",
   "type": "frame",
   "x": 4160,
-  "y": 222,
+  "y": 216,
   "width": 420,
   "height": 16,
   "rotation": 0,
   "selrect": {
     "x": 4160,
-    "y": 222,
+    "y": 216,
     "width": 420,
     "height": 16,
     "x1": 4160,
-    "y1": 222,
+    "y1": 216,
     "x2": 4580,
-    "y2": 238
+    "y2": 232
   },
   "points": [
     {
       "x": 4160,
-      "y": 222
+      "y": 216
     },
     {
       "x": 4580,
-      "y": 222
+      "y": 216
     },
     {
       "x": 4580,
-      "y": 238
+      "y": 232
     },
     {
       "x": 4160,
-      "y": 238
+      "y": 232
     }
   ],
   "transform": {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "fix",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 0,
+    "rowGap": -1,
     "columnGap": 0
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

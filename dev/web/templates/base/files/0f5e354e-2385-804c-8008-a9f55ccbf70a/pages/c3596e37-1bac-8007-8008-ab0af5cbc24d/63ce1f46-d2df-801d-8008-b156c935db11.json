@@ -3,36 +3,36 @@
   "name": "c3",
   "type": "frame",
   "x": 4070,
-  "y": 442,
+  "y": 424,
   "width": 90,
   "height": 18,
   "rotation": 0,
   "selrect": {
     "x": 4070,
-    "y": 442,
+    "y": 424,
     "width": 90,
     "height": 18,
     "x1": 4070,
-    "y1": 442,
+    "y1": 424,
     "x2": 4160,
-    "y2": 460
+    "y2": 442
   },
   "points": [
     {
       "x": 4070,
-      "y": 442
+      "y": 424
+    },
+    {
+      "x": 4160,
+      "y": 424
     },
     {
       "x": 4160,
       "y": 442
-    },
-    {
-      "x": 4160,
-      "y": 460
     },
     {
       "x": 4070,
-      "y": 460
+      "y": 442
     }
   ],
   "transform": {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "fix",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 0,
+    "rowGap": -1,
     "columnGap": 0
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

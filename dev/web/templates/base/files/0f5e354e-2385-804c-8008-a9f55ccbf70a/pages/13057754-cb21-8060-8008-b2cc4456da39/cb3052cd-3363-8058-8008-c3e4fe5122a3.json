@@ -1,0 +1,98 @@
+{
+  "id": "cb3052cd-3363-8058-8008-c3e4fe5122a3",
+  "name": "secrets",
+  "type": "frame",
+  "x": 9464,
+  "y": 1998.9999999999993,
+  "width": 592,
+  "height": 180.99999999999795,
+  "rotation": 0,
+  "selrect": {
+    "x": 9464,
+    "y": 1998.9999999999993,
+    "width": 592,
+    "height": 180.99999999999795,
+    "x1": 9464,
+    "y1": 1998.9999999999993,
+    "x2": 10056,
+    "y2": 2179.9999999999973
+  },
+  "points": [
+    {
+      "x": 9464,
+      "y": 1998.9999999999993
+    },
+    {
+      "x": 10056,
+      "y": 1998.9999999999993
+    },
+    {
+      "x": 10056,
+      "y": 2179.9999999999973
+    },
+    {
+      "x": 9464,
+      "y": 2179.9999999999973
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "cb3052cd-3363-8058-8008-c3e4fe51229e",
+  "frameId": "cb3052cd-3363-8058-8008-c3e4fe51229e",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 8,
+    "columnGap": 8
+  },
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
+  "layoutItemVSizing": "auto",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": [],
+  "shapes": [
+    "cb3052cd-3363-8058-8008-c3e4fe5122ac",
+    "cb3052cd-3363-8058-8008-c3e4fe5122ad",
+    "cb3052cd-3363-8058-8008-c3e4fe5148b9",
+    "cb3052cd-3363-8058-8008-c3e4fe5148ba",
+    "cb3052cd-3363-8058-8008-c3e4fe5148bb"
+  ]
+}

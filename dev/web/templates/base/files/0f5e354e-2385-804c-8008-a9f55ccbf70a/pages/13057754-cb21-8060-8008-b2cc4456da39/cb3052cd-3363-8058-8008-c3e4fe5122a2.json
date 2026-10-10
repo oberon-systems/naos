@@ -1,0 +1,173 @@
+{
+  "id": "cb3052cd-3363-8058-8008-c3e4fe5122a2",
+  "name": "hint",
+  "type": "text",
+  "x": 9464,
+  "y": 2195.9999999999973,
+  "width": 592,
+  "height": 31,
+  "rotation": 0,
+  "selrect": {
+    "x": 9464,
+    "y": 2195.9999999999973,
+    "width": 592,
+    "height": 31,
+    "x1": 9464,
+    "y1": 2195.9999999999973,
+    "x2": 10056,
+    "y2": 2226.9999999999973
+  },
+  "points": [
+    {
+      "x": 9464,
+      "y": 2195.9999999999973
+    },
+    {
+      "x": 10056,
+      "y": 2195.9999999999973
+    },
+    {
+      "x": 10056,
+      "y": 2226.9999999999973
+    },
+    {
+      "x": 9464,
+      "y": 2226.9999999999973
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "cb3052cd-3363-8058-8008-c3e4fe51229e",
+  "frameId": "cb3052cd-3363-8058-8008-c3e4fe51229e",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-height",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "11",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#98a2b3",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "Deny wins over allow, and what no rule names is denied. A server is picked from the MCP catalog; a rule that can never match is refused."
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "11",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#98a2b3",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "layoutItemHSizing": "fill",
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 9464,
+      "y": 2209.600000202653,
+      "width": 590.9125366210938,
+      "height": 12.800000190734863,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 590.9125366210938,
+      "y2": 13.600000202655792,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#98a2b3",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "Deny wins over allow, and what no rule names is denied. A server is picked from the MCP catalog; a rule that can never match "
+    },
+    {
+      "x": 9464,
+      "y": 2224.9999999999973,
+      "width": 48.375,
+      "height": 12.799999237060547,
+      "x1": 0,
+      "y1": 16.200000762939453,
+      "x2": 48.375,
+      "y2": 29,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#98a2b3",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "is refused."
+    }
+  ]
+}

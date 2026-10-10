@@ -1,0 +1,109 @@
+{
+  "id": "cb3052cd-3363-8058-8008-c3e4fe51229e",
+  "name": "Body",
+  "type": "frame",
+  "x": 9440,
+  "y": 1202,
+  "width": 640,
+  "height": 1099.9999999999973,
+  "rotation": 0,
+  "selrect": {
+    "x": 9440,
+    "y": 1202,
+    "width": 640,
+    "height": 1099.9999999999973,
+    "x1": 9440,
+    "y1": 1202,
+    "x2": 10080,
+    "y2": 2301.9999999999973
+  },
+  "points": [
+    {
+      "x": 9440,
+      "y": 1202
+    },
+    {
+      "x": 10080,
+      "y": 1202
+    },
+    {
+      "x": 10080,
+      "y": 2301.9999999999973
+    },
+    {
+      "x": 9440,
+      "y": 2301.9999999999973
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "cb3052cd-3363-8058-8008-c3e4fe51229d",
+  "frameId": "cb3052cd-3363-8058-8008-c3e4fe51229d",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutItemAbsolute": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 20,
+    "p2": 24,
+    "p3": 24,
+    "p4": 24
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "showContent": false,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 16,
+    "columnGap": 16
+  },
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
+  "layoutItemVSizing": "auto",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "shadow": [],
+  "r4": 0,
+  "layoutItemMargin": {
+    "m1": 0,
+    "m2": 0,
+    "m3": 0,
+    "m4": 0
+  },
+  "fills": [],
+  "layoutItemZIndex": 0,
+  "shapes": [
+    "cb3052cd-3363-8058-8008-c3e4fe5122a1",
+    "cb3052cd-3363-8058-8008-c3e4fe5122a2",
+    "cb3052cd-3363-8058-8008-c3e4fe5122a3",
+    "cb3052cd-3363-8058-8008-c3e4fe5122a4",
+    "cb3052cd-3363-8058-8008-c3e4fe5122a5",
+    "cb3052cd-3363-8058-8008-c3e4fe5122a6"
+  ]
+}

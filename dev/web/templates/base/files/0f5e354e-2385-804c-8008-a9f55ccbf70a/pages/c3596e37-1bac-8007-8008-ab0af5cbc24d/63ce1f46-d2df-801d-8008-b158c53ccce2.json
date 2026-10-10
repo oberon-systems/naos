@@ -3,36 +3,36 @@
   "name": "field Image id",
   "type": "frame",
   "x": 4764,
-  "y": 122,
+  "y": 119,
   "width": 592,
-  "height": 77,
+  "height": 75,
   "rotation": 0,
   "selrect": {
     "x": 4764,
-    "y": 122,
+    "y": 119,
     "width": 592,
-    "height": 77,
+    "height": 75,
     "x1": 4764,
-    "y1": 122,
+    "y1": 119,
     "x2": 5356,
-    "y2": 199
+    "y2": 194
   },
   "points": [
     {
       "x": 4764,
-      "y": 122
+      "y": 119
     },
     {
       "x": 5356,
-      "y": 122
+      "y": 119
     },
     {
       "x": 5356,
-      "y": 199
+      "y": 194
     },
     {
       "x": 4764,
-      "y": 199
+      "y": 194
     }
   ],
   "transform": {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "fill",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 6,
+    "rowGap": 5,
     "columnGap": 0
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

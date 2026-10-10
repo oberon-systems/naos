@@ -3,36 +3,36 @@
   "name": "pill COMPLETED",
   "type": "frame",
   "x": 2780,
-  "y": 417,
+  "y": 403,
   "width": 83,
   "height": 20,
   "rotation": 0,
   "selrect": {
     "x": 2780,
-    "y": 417,
+    "y": 403,
     "width": 83,
     "height": 20,
     "x1": 2780,
-    "y1": 417,
+    "y1": 403,
     "x2": 2863,
-    "y2": 437
+    "y2": 423
   },
   "points": [
     {
       "x": 2780,
-      "y": 417
+      "y": 403
     },
     {
       "x": 2863,
-      "y": 417
+      "y": 403
     },
     {
       "x": 2863,
-      "y": 437
+      "y": 423
     },
     {
       "x": 2780,
-      "y": 437
+      "y": 423
     }
   ],
   "transform": {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "auto",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 0,
+    "rowGap": -1,
     "columnGap": 0
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

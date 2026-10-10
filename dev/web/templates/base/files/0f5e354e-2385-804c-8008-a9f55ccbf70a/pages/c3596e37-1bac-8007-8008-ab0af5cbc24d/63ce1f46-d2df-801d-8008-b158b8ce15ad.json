@@ -5,17 +5,17 @@
   "x": 4740,
   "y": 0,
   "width": 640,
-  "height": 790,
+  "height": 770,
   "rotation": 0,
   "selrect": {
     "x": 4740,
     "y": 0,
     "width": 640,
-    "height": 790,
+    "height": 770,
     "x1": 4740,
     "y1": 0,
     "x2": 5380,
-    "y2": 790
+    "y2": 770
   },
   "points": [
     {
@@ -28,11 +28,11 @@
     },
     {
       "x": 5380,
-      "y": 790
+      "y": 770
     },
     {
       "x": 4740,
-      "y": 790
+      "y": 770
     }
   ],
   "transform": {
@@ -71,7 +71,7 @@
   "layoutItemHSizing": "fix",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 0,
+    "rowGap": -1,
     "columnGap": 0
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

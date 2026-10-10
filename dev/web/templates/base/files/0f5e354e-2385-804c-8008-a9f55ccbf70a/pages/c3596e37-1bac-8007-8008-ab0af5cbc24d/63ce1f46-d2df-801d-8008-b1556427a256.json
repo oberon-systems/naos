@@ -3,36 +3,36 @@
   "name": "pill STARTING",
   "type": "frame",
   "x": 2390,
-  "y": 275,
+  "y": 267,
   "width": 70,
   "height": 22,
   "rotation": 0,
   "selrect": {
     "x": 2390,
-    "y": 275,
+    "y": 267,
     "width": 70,
     "height": 22,
     "x1": 2390,
-    "y1": 275,
+    "y1": 267,
     "x2": 2460,
-    "y2": 297
+    "y2": 289
   },
   "points": [
     {
       "x": 2390,
-      "y": 275
+      "y": 267
     },
     {
       "x": 2460,
-      "y": 275
+      "y": 267
     },
     {
       "x": 2460,
-      "y": 297
+      "y": 289
     },
     {
       "x": 2390,
-      "y": 297
+      "y": 289
     }
   ],
   "transform": {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "auto",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 0,
+    "rowGap": -1,
     "columnGap": 0
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

@@ -3,36 +3,36 @@
   "name": "Timeline",
   "type": "frame",
   "x": 3704,
-  "y": 213,
+  "y": 207,
   "width": 892,
-  "height": 293,
+  "height": 279,
   "rotation": 0,
   "selrect": {
     "x": 3704,
-    "y": 213,
+    "y": 207,
     "width": 892,
-    "height": 293,
+    "height": 279,
     "x1": 3704,
-    "y1": 213,
+    "y1": 207,
     "x2": 4596,
-    "y2": 506
+    "y2": 486
   },
   "points": [
     {
       "x": 3704,
-      "y": 213
+      "y": 207
     },
     {
       "x": 4596,
-      "y": 213
+      "y": 207
     },
     {
       "x": 4596,
-      "y": 506
+      "y": 486
     },
     {
       "x": 3704,
-      "y": 506
+      "y": 486
     }
   ],
   "transform": {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "fix",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 0,
+    "rowGap": -1,
     "columnGap": 0
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

@@ -3,36 +3,36 @@
   "name": "run",
   "type": "frame",
   "x": 2660,
-  "y": 356,
+  "y": 344,
   "width": 120,
   "height": 36,
   "rotation": 0,
   "selrect": {
     "x": 2660,
-    "y": 356,
+    "y": 344,
     "width": 120,
     "height": 36,
     "x1": 2660,
-    "y1": 356,
+    "y1": 344,
     "x2": 2780,
-    "y2": 392
+    "y2": 380
   },
   "points": [
     {
       "x": 2660,
-      "y": 356
+      "y": 344
     },
     {
       "x": 2780,
-      "y": 356
+      "y": 344
     },
     {
       "x": 2780,
-      "y": 392
+      "y": 380
     },
     {
       "x": 2660,
-      "y": 392
+      "y": 380
     }
   ],
   "transform": {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "fix",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 3,
+    "rowGap": 2,
     "columnGap": 3
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",

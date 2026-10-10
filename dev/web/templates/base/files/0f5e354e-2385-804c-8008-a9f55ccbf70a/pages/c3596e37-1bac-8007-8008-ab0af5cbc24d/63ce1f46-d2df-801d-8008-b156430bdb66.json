@@ -3,36 +3,36 @@
   "name": "pill FAILED",
   "type": "frame",
   "x": 2780,
-  "y": 470,
+  "y": 454,
   "width": 53,
   "height": 20,
   "rotation": 0,
   "selrect": {
     "x": 2780,
-    "y": 470,
+    "y": 454,
     "width": 53,
     "height": 20,
     "x1": 2780,
-    "y1": 470,
+    "y1": 454,
     "x2": 2833,
-    "y2": 490
+    "y2": 474
   },
   "points": [
     {
       "x": 2780,
-      "y": 470
+      "y": 454
     },
     {
       "x": 2833,
-      "y": 470
+      "y": 454
     },
     {
       "x": 2833,
-      "y": 490
+      "y": 474
     },
     {
       "x": 2780,
-      "y": 490
+      "y": 474
     }
   ],
   "transform": {
@@ -72,7 +72,7 @@
   "layoutItemHSizing": "auto",
   "proportionLock": false,
   "layoutGap": {
-    "rowGap": 0,
+    "rowGap": -1,
     "columnGap": 0
   },
   "pageId": "c3596e37-1bac-8007-8008-ab0af5cbc24d",
