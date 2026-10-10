@@ -1,0 +1,107 @@
+{
+  "id": "cb3052cd-3363-8058-8008-c4e60da7b623",
+  "name": "update lock",
+  "type": "frame",
+  "x": 15900,
+  "y": 1237.9999999999998,
+  "width": 640,
+  "height": 31,
+  "rotation": 0,
+  "selrect": {
+    "x": 15900,
+    "y": 1237.9999999999998,
+    "width": 640,
+    "height": 31,
+    "x1": 15900,
+    "y1": 1237.9999999999998,
+    "x2": 16540,
+    "y2": 1268.9999999999998
+  },
+  "points": [
+    {
+      "x": 15900,
+      "y": 1237.9999999999998
+    },
+    {
+      "x": 16540,
+      "y": 1237.9999999999998
+    },
+    {
+      "x": 16540,
+      "y": 1268.9999999999998
+    },
+    {
+      "x": 15900,
+      "y": 1268.9999999999998
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "cb3052cd-3363-8058-8008-c4e60da7b621",
+  "frameId": "cb3052cd-3363-8058-8008-c4e60da7b621",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 8,
+    "p2": 12,
+    "p3": 8,
+    "p4": 12
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 6,
+  "showContent": true,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 8,
+    "columnGap": 8
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "auto",
+  "r3": 6,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 6,
+  "layoutFlexDir": "row",
+  "layoutAlignContent": "stretch",
+  "strokes": [
+    {
+      "strokeColor": "#e4e7ec",
+      "strokeOpacity": 1,
+      "strokeAlignment": "inner",
+      "strokeWidth": 1
+    }
+  ],
+  "proportion": 1,
+  "r4": 6,
+  "fills": [
+    {
+      "fillColor": "#f9fafb",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "cb3052cd-3363-8058-8008-c4e60da7b626"
+  ]
+}

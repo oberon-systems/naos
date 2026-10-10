@@ -1,0 +1,184 @@
+{
+  "id": "cb3052cd-3363-8058-8008-c4e4a0916f5f",
+  "name": "message",
+  "type": "text",
+  "x": 7944,
+  "y": 122,
+  "width": 432,
+  "height": 37,
+  "rotation": 0,
+  "selrect": {
+    "x": 7944,
+    "y": 122,
+    "width": 432,
+    "height": 37,
+    "x1": 7944,
+    "y1": 122,
+    "x2": 8376,
+    "y2": 159
+  },
+  "points": [
+    {
+      "x": 7944,
+      "y": 122
+    },
+    {
+      "x": 8376,
+      "y": 122
+    },
+    {
+      "x": 8376,
+      "y": 159
+    },
+    {
+      "x": 7944,
+      "y": 159
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "cb3052cd-3363-8058-8008-c4e4a0916f5b",
+  "frameId": "cb3052cd-3363-8058-8008-c4e4a0916f5b",
+  "flipX": null,
+  "flipY": null,
+  "layoutItemAbsolute": false,
+  "growType": "auto-height",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "13",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#344054",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "The policy leaves the list and cannot be picked for a profile or a Run. No profile names it and no run took it, so nothing else changes."
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "13",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#344054",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "layoutItemHSizing": "fill",
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
+  "layoutItemVSizing": "fix",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 7944,
+      "y": 138.80000191926956,
+      "width": 398.1750183105469,
+      "height": 16.000001907348633,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 398.1750183105469,
+      "y2": 16.80000191926956,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#344054",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "The policy leaves the list and cannot be picked for a profile or a Run. No "
+    },
+    {
+      "x": 7944,
+      "y": 157,
+      "width": 329.2749938964844,
+      "height": 16,
+      "x1": 0,
+      "y1": 19,
+      "x2": 329.2749938964844,
+      "y2": 35,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#344054",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "profile names it and no run took it, so nothing else changes."
+    }
+  ],
+  "strokes": [],
+  "shadow": [],
+  "layoutItemMargin": {
+    "m1": 0,
+    "m2": 0,
+    "m3": 0,
+    "m4": 0
+  },
+  "layoutItemZIndex": 0
+}

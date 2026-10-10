@@ -78,7 +78,7 @@
   "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
   "layoutItemVSizing": "fix",
   "r3": 6,
-  "layoutJustifyContent": "start",
+  "layoutJustifyContent": "space-between",
   "constraintsV": "top",
   "constraintsH": "left",
   "r1": 6,
@@ -102,6 +102,7 @@
     }
   ],
   "shapes": [
+    "cb3052cd-3363-8058-8008-c4e56339ed4d",
     "cb3052cd-3363-8058-8008-c3e2133ff2d9"
   ]
 }

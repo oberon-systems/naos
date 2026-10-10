@@ -4,17 +4,17 @@
   "type": "text",
   "x": 3688,
   "y": 1644.5000000000005,
-  "width": 65,
+  "width": 123,
   "height": 17,
   "rotation": 0,
   "selrect": {
     "x": 3688,
     "y": 1644.5000000000005,
-    "width": 65,
+    "width": 123,
     "height": 17,
     "x1": 3688,
     "y1": 1644.5000000000005,
-    "x2": 3753,
+    "x2": 3811,
     "y2": 1661.5000000000005
   },
   "points": [
@@ -23,11 +23,11 @@
       "y": 1644.5000000000005
     },
     {
-      "x": 3753,
+      "x": 3811,
       "y": 1644.5000000000005
     },
     {
-      "x": 3753,
+      "x": 3811,
       "y": 1661.5000000000005
     },
     {
@@ -87,7 +87,7 @@
                   }
                 ],
                 "fontFamily": "JetBrains Mono",
-                "text": "alpha-key"
+                "text": "alpha-key \u00b7 valid"
               }
             ],
             "typographyRefId": null,
@@ -121,11 +121,11 @@
     {
       "x": 3688,
       "y": 1660.5000000000005,
-      "width": 64.8125,
+      "width": 122.4124984741211,
       "height": 16,
       "x1": 0,
       "y1": 0,
-      "x2": 64.8125,
+      "x2": 122.4124984741211,
       "y2": 16,
       "fontStyle": "normal",
       "textTransform": "none",
@@ -141,7 +141,7 @@
       ],
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
-      "text": "alpha-key"
+      "text": "alpha-key \u00b7 valid"
     }
   ]
 }

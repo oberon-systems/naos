@@ -4,17 +4,17 @@
   "type": "text",
   "x": 7968,
   "y": 1666.4999999999993,
-  "width": 73,
+  "width": 94,
   "height": 17,
   "rotation": 0,
   "selrect": {
     "x": 7968,
     "y": 1666.4999999999993,
-    "width": 73,
+    "width": 94,
     "height": 17,
     "x1": 7968,
     "y1": 1666.4999999999993,
-    "x2": 8041,
+    "x2": 8062,
     "y2": 1683.4999999999993
   },
   "points": [
@@ -23,11 +23,11 @@
       "y": 1666.4999999999993
     },
     {
-      "x": 8041,
+      "x": 8062,
       "y": 1666.4999999999993
     },
     {
-      "x": 8041,
+      "x": 8062,
       "y": 1683.4999999999993
     },
     {
@@ -87,7 +87,7 @@
                   }
                 ],
                 "fontFamily": "JetBrains Mono",
-                "text": "openai-key"
+                "text": "pick a secret"
               }
             ],
             "typographyRefId": null,
@@ -121,11 +121,11 @@
     {
       "x": 7968,
       "y": 1682.4999999999993,
-      "width": 72.01250457763672,
+      "width": 93.61250305175781,
       "height": 16,
       "x1": 0,
       "y1": 0,
-      "x2": 72.01250457763672,
+      "x2": 93.61250305175781,
       "y2": 16,
       "fontStyle": "normal",
       "textTransform": "none",
@@ -141,7 +141,7 @@
       ],
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
-      "text": "openai-key"
+      "text": "pick a secret"
     }
   ]
 }

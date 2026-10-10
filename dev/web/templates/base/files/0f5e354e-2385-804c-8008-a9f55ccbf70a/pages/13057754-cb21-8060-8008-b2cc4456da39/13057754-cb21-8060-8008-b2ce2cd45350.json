@@ -2,24 +2,24 @@
   "id": "13057754-cb21-8060-8008-b2ce2cd45350",
   "name": "Text",
   "type": "text",
-  "x": 5561,
+  "x": 5568,
   "y": 28,
-  "width": 45,
+  "width": 38,
   "height": 19,
   "rotation": 0,
   "selrect": {
-    "x": 5561,
+    "x": 5568,
     "y": 28,
-    "width": 45,
+    "width": 38,
     "height": 19,
-    "x1": 5561,
+    "x1": 5568,
     "y1": 28,
     "x2": 5606,
     "y2": 47
   },
   "points": [
     {
-      "x": 5561,
+      "x": 5568,
       "y": 28
     },
     {
@@ -31,7 +31,7 @@
       "y": 47
     },
     {
-      "x": 5561,
+      "x": 5568,
       "y": 47
     }
   ],
@@ -83,12 +83,12 @@
                 "letterSpacing": "0",
                 "fills": [
                   {
-                    "fillColor": "#344054",
+                    "fillColor": "#b42318",
                     "fillOpacity": 1
                   }
                 ],
                 "fontFamily": "Inter Tight",
-                "text": "Copy id"
+                "text": "Delete"
               }
             ],
             "typographyRefId": null,
@@ -105,7 +105,7 @@
             "letterSpacing": "0",
             "fills": [
               {
-                "fillColor": "#344054",
+                "fillColor": "#b42318",
                 "fillOpacity": 1
               }
             ],
@@ -122,29 +122,29 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 44.72727346420288,
+      "x": 5568,
+      "y": 44.80000191926956,
+      "width": 37.79999923706055,
+      "height": 16.000001907348633,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 37.79999923706055,
+      "y2": 16.80000191926956,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "600",
-      "y1": 1.454545497894287,
-      "width": 44.20454788208008,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 5561,
-      "x1": 0,
-      "y2": 16.72727346420288,
       "fills": [
         {
-          "fillColor": "#344054",
+          "fillColor": "#b42318",
           "fillOpacity": 1
         }
       ],
-      "x2": 44.20454788208008,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "height": 15.272727966308594,
-      "text": "Copy id"
+      "text": "Delete"
     }
   ],
   "strokes": [],

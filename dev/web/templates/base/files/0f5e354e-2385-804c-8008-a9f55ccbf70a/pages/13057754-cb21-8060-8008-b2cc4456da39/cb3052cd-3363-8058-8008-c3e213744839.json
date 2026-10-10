@@ -4,17 +4,17 @@
   "type": "text",
   "x": 7956,
   "y": 1696.9999999999993,
-  "width": 144,
+  "width": 143,
   "height": 16,
   "rotation": 0,
   "selrect": {
     "x": 7956,
     "y": 1696.9999999999993,
-    "width": 144,
+    "width": 143,
     "height": 16,
     "x1": 7956,
     "y1": 1696.9999999999993,
-    "x2": 8100,
+    "x2": 8099,
     "y2": 1712.9999999999993
   },
   "points": [
@@ -23,11 +23,11 @@
       "y": 1696.9999999999993
     },
     {
-      "x": 8100,
+      "x": 8099,
       "y": 1696.9999999999993
     },
     {
-      "x": 8100,
+      "x": 8099,
       "y": 1712.9999999999993
     },
     {
@@ -87,7 +87,7 @@
                   }
                 ],
                 "fontFamily": "Inter Tight",
-                "text": "required \u00b7 the name of a secret"
+                "text": "required \u00b7 a secret from the list"
               }
             ],
             "typographyRefId": null,
@@ -121,11 +121,11 @@
     {
       "x": 7956,
       "y": 1710.600000202655,
-      "width": 143.625,
+      "width": 142.4375,
       "height": 12.800000190734863,
       "x1": 0,
       "y1": 0.800000011920929,
-      "x2": 143.625,
+      "x2": 142.4375,
       "y2": 13.600000202655792,
       "fontStyle": "normal",
       "textTransform": "none",
@@ -141,7 +141,7 @@
       ],
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "text": "required \u00b7 the name of a secret"
+      "text": "required \u00b7 a secret from the list"
     }
   ]
 }
