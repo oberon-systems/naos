@@ -7,20 +7,20 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import Engine, inspect
-from sqlmodel import SQLModel
+from sqlmodel import SQLModel, inspect
 
 from naos_api import schema
 from naos_api.app import create_app
 from naos_api.cli import main
 from naos_api.db import Database
+from naos_api.schema import Engine
 from naos_api.settings import Settings
 
 Configure = Callable[..., Settings]
 
 PROBE_REVISION = """
-import sqlalchemy as sa
 from alembic import op
+from sqlmodel import Column, Integer
 
 revision = "0002"
 down_revision = "0001"
@@ -29,7 +29,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("images", sa.Column("probe", sa.Integer(), nullable=True))
+    op.add_column("images", Column("probe", Integer(), nullable=True))
 
 
 def downgrade() -> None:

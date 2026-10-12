@@ -1,8 +1,8 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import ColumnElement
 from sqlmodel import Session, case, col, delete, func, or_, select, update
 
 from naos_api import audit
@@ -39,7 +39,7 @@ class ProfileView:
     usage: Usage
 
 
-def _open() -> ColumnElement[bool]:
+def _open() -> Any:
     return col(Run.status).not_in(TERMINAL)
 
 

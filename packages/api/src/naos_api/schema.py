@@ -5,14 +5,16 @@ from alembic import command
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import Connection, Engine, create_engine, inspect
-from sqlmodel import SQLModel
+from sqlmodel import SQLModel, create_engine, inspect
 
 import naos_api.models  # noqa: F401  registers the tables on SQLModel.metadata
 
 MIGRATIONS = Path(__file__).with_name("migrations")
 FIRST = "0001"
 VERSION_TABLE = "alembic_version"
+# SQLModel names neither an engine nor a connection, so both are untyped here.
+Engine = Any
+Connection = Any
 
 
 class SchemaError(RuntimeError):

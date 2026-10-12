@@ -8,7 +8,10 @@ target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "S", "SIM"]
+select = ["E", "F", "I", "B", "UP", "S", "SIM", "TID251"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"sqlalchemy".msg = "no SQLAlchemy imports: take the name from sqlmodel"
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S101"]

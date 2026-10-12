@@ -3,7 +3,6 @@ from typing import Annotated, Any, Literal, Self
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, create_model, model_validator
-from sqlalchemy import ColumnElement
 from sqlmodel import Session, and_, col, func, or_, select
 
 from naos_api.clock import now_ts
@@ -274,8 +273,8 @@ def timeline(session: Session, run_id: str, limit: int) -> Sequence[AuditEvent]:
     return session.exec(statement).all()
 
 
-def names_secret(name: str) -> ColumnElement[bool]:
-    names: ColumnElement[str] = col(AuditEvent.data)["names"].as_string()
+def names_secret(name: str) -> Any:
+    names: Any = col(AuditEvent.data)["names"].as_string()
     return names.contains(f'"{name}"', autoescape=True)
 
 

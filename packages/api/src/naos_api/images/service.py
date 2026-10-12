@@ -1,8 +1,7 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import cast
+from typing import Any
 
-from sqlalchemy import ColumnElement
 from sqlmodel import Session, case, col, delete, func, select
 
 from naos_api import audit
@@ -71,8 +70,8 @@ def get_image(session: Session, image_id: str) -> Image:
 
 
 # The image a Run boots lives in its spec, so SQLite and PostgreSQL read it by JSON path.
-def booted_image() -> ColumnElement[str]:
-    return cast(ColumnElement[str], col(Run.spec)[("image", "id")].as_string())
+def booted_image() -> Any:
+    return col(Run.spec)[("image", "id")].as_string()
 
 
 # One grouped read for the whole catalog, whatever its length.

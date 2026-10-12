@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import ColumnElement
 from sqlmodel import Session, case, col, delete, func, or_, select
 
 from naos_api import audit, mcp_servers
@@ -175,7 +174,7 @@ class PolicyView:
     runs_total: int
 
 
-def names_policy(policy_id: str) -> ColumnElement[bool]:
+def names_policy(policy_id: str) -> Any:
     return or_(*(col(column) == policy_id for column in RUN_COLUMNS.values()))
 
 
