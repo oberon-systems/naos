@@ -5,6 +5,14 @@ set -eu
 files=/tmp/naos-files
 home=/home/naos
 
+# The base filesystem is as large as the base disk; it is grown to the disk of this image.
+root=$(awk '$2 == "/" { print $1 }' /proc/mounts)
+disk=${root%"${root##*[!0-9]}"}
+apk add --no-cache --virtual .grow cloud-utils-growpart e2fsprogs-extra
+growpart "$disk" "${root#"$disk"}"
+resize2fs "$root"
+apk del .grow
+
 apk add --no-cache bash git libgcc libstdc++ nodejs npm ripgrep socat tmux
 
 npm install -g \
@@ -18,7 +26,9 @@ goose=/tmp/goose
 install -d "$goose"
 wget -qO- "https://github.com/block/goose/releases/download/v${GOOSE_VERSION}/goose-x86_64-unknown-linux-musl.tar.gz" |
     tar -xz -C "$goose"
-install -m 0755 "$(find "$goose" -type f -name goose | head -n 1)" /usr/local/bin/goose
+mv "$(find "$goose" -type f -name goose | head -n 1)" /usr/local/bin/goose
+chown root:root /usr/local/bin/goose
+chmod 0755 /usr/local/bin/goose
 rm -rf "$goose"
 goose --version
 

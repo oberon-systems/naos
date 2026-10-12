@@ -122,7 +122,7 @@ A Run then names the image by `id` and `digest` in its spec; [05 - VM and QEMU](
 | Template | `agents/naos-agents.pkr.hcl` |
 | Artifact | `build/agents/naos-agents-<version>.qcow2`, compressed |
 | Derives from | `build/base/naos-base-<version>.qcow2` |
-| Disk | 2G |
+| Disk | 3G; the build grows the root filesystem of the base to it |
 | Packages | `bash`, `git`, `libgcc`, `libstdc++`, `nodejs`, `npm`, `ripgrep`, `tmux` |
 | Agents | [Goose](https://github.com/block/goose) 1.54.0, the musl build, `goose_version` in `packer/agents/naos-agents.pkr.hcl`; [Claude Code](https://code.claude.com/docs) 2.1.269 and [Gemini CLI](https://github.com/google-gemini/gemini-cli) 0.59.0, `PKR_VAR_claude_code_version` and `PKR_VAR_gemini_cli_version` in `packer/.env` |
 | Session | `naos-session` starts tmux session `agent` as `naos`, running the agent named in fw_cfg `opt/naos/session`, `goose` by default; `GOOSE_PROVIDER` and `GOOSE_MODEL` come from `model_api` and `model` of the same entry |

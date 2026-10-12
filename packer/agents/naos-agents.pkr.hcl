@@ -33,7 +33,7 @@ variable "goose_version" {
 
 variable "disk_size" {
   type    = string
-  default = "2G"
+  default = "3G"
 }
 
 variable "memory" {
