@@ -45,13 +45,31 @@ CAPABILITIES: dict[str, str] = {
 }
 PROTOCOLS = ("any", "http", "https")
 MODES = ("ro", "rw")
-DIALECTS = ("openai", "anthropic")
+DIALECTS = ("openai", "anthropic", "gemini")
 # The gateway appends /v1/... to the URL, so each default is the vendor's bare origin.
-DIALECT_URLS = {"openai": "https://api.openai.com", "anthropic": "https://api.anthropic.com"}
+DIALECT_URLS = {
+    "openai": "https://api.openai.com",
+    "anthropic": "https://api.anthropic.com",
+    "gemini": "https://generativelanguage.googleapis.com/v1beta/openai",
+}
 # Offered under the Models field of a provider; any other name can still be typed.
 MODEL_SUGGESTIONS = {
-    "openai": ("gpt-5", "gpt-5-mini"),
-    "anthropic": ("claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"),
+    "openai": ("gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.6-astra"),
+    "anthropic": (
+        "claude-opus-5-5",
+        "claude-sonnet-5-5",
+        "claude-fable-5-1",
+        "claude-haiku-5-5",
+    ),
+    "gemini": (
+        "gemini-3.1-flash-lite",
+        "gemini-3.1-pro-preview",
+        "gemini-3-flash-preview",
+        "gemini-3.5-flash",
+        "gemini-2.5-pro",
+        "gemma-4-31b-it",
+        "gemma-4-26b-a4b-it",
+    ),
 }
 PROVIDER_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
 PROVIDER_RULE = "a provider name is 1-32 lowercase letters, digits and dashes, no leading dash"
@@ -693,7 +711,7 @@ class PolicyForm:
             return self
         items = list(self.items(name))
         if verb == "add" and not self.full(name):
-            items.append(dict(BLANK[name]))
+            items.append(_blank(name, items))
         elif verb == "drop" and index.isdigit() and int(index) < len(items):
             del items[int(index)]
         elif verb == "dialect" and index.isdigit() and int(index) < len(items):
@@ -776,6 +794,16 @@ def _grant(item: dict[str, str]) -> Row:
     if item["reads"]:
         rule["max_calls"] = _whole(item["reads"], "a read budget")
     return rule
+
+
+# A new provider starts at the first API the form does not hold yet, with its real URL.
+def _blank(name: str, items: list[dict[str, str]]) -> dict[str, str]:
+    blank = dict(BLANK[name])
+    if name != "providers":
+        return blank
+    taken = {item["api"] for item in items}
+    api = next((api for api in DIALECTS if api not in taken), DIALECTS[0])
+    return _dialect_defaults({**blank, "api": api})
 
 
 # Only a value still at another API's default follows the switch; a typed one stays.

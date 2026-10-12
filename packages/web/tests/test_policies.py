@@ -285,6 +285,25 @@ def test_picking_a_dialect_sets_its_url_unless_one_was_typed(client: TestClient)
     assert WRITES == []
 
 
+def test_gemini_comes_with_its_url_and_models(client: TestClient) -> None:
+    form = {"kind": "model", "providers.0.api": "gemini", "step": "dialect:providers:0"}
+    body = client.post("/policies/new", data=form, headers=HX).text
+
+    url = "https://generativelanguage.googleapis.com/v1beta/openai"
+    assert re.search(rf'name="providers.0.url"\s+value="{url}"', body)
+    assert re.search(r'name="providers.0.name"\s+value="gemini"', body)
+    assert "gemini-3.1-flash-lite" in body
+
+
+def test_an_added_provider_starts_at_the_next_api(client: TestClient) -> None:
+    form = {"kind": "model", "providers.0.api": "openai", "step": "add:providers"}
+    body = client.post("/policies/new", data=form, headers=HX).text
+
+    assert re.search(r'name="providers.1.url"\s+value="https://api.anthropic.com"', body)
+    assert re.search(r'name="providers.1.name"\s+value="anthropic"', body)
+    assert WRITES == []
+
+
 def test_a_suggested_model_is_added_once_beside_typed_ones(client: TestClient) -> None:
     form = {
         "kind": "model",
