@@ -48,6 +48,7 @@ LABELS = {
     "mcp": "MCP",
     "model": "Model",
 }
+REQUIRED = {"model": "required · a run needs a model policy"}
 
 
 class FormError(ValueError):
@@ -86,6 +87,12 @@ def spec_of(values: Mapping[str, str]) -> Row:
         "merge": {"policy": values["merge"]},
         "timeout": _number(values, "timeout"),
     }
+
+
+def run_spec_of(values: Mapping[str, str]) -> Row:
+    if not values["model"]:
+        raise FormError("a run needs a model policy")
+    return spec_of(values)
 
 
 @dataclass(frozen=True)
@@ -209,6 +216,7 @@ class Field:
     edited: bool = False
     hint: str = ""
     options: list[Option] = field(default_factory=list)
+    error: str = ""
 
 
 def _profile_hint(name: str, base: Mapping[str, str] | None, labels: Mapping[str, str]) -> str:
@@ -249,6 +257,7 @@ def configure_fields(draft: Draft, profile: Row | None, choices: Choices) -> dic
             edited=name in edited,
             hint=_profile_hint(name, base, labels) if name in edited else short(chosen),
             options=options,
+            error=REQUIRED.get(name, ""),
         )
     fields["merge"] = Field(
         name="merge",

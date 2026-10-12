@@ -642,7 +642,15 @@ def stop(run_id: str) -> Row:
     return RUNS[0]
 
 
-def profile(pid: str, name: str, cpu: int, memory: int, active: Row | None, used: bool) -> Row:
+def profile(
+    pid: str,
+    name: str,
+    cpu: int,
+    memory: int,
+    active: Row | None,
+    used: bool,
+    model: str | None = None,
+) -> Row:
     return {
         "id": pid,
         "name": name,
@@ -652,7 +660,7 @@ def profile(pid: str, name: str, cpu: int, memory: int, active: Row | None, used
             "network": {"policy": NETPOL},
             "shell": {"policy": None},
             "mcp": {"policy": None},
-            "model": {"policy": None},
+            "model": {"policy": model},
             "merge": {"policy": "ask"},
             "timeout": 3600,
         },
@@ -675,7 +683,7 @@ PROFILES: list[Row] = [
         {"id": "run_9f21c4", "seq": 128, "status": "STARTED"},
         True,
     ),
-    profile("prof_a93e07", "docs", 1, 2048, None, True),
+    profile("prof_a93e07", "docs", 1, 2048, None, True, MODELPOL),
     profile("prof_91ba35", "sandbox", 4, 8192, None, False),
 ]
 POLICIES: list[Row] = [

@@ -9,6 +9,7 @@ from stub_api import MODELPOL, WRITES
 HX = {"HX-Request": "true"}
 BUILD_SMALL = "prof_7a1c30"
 DOCS = "prof_a93e07"
+SANDBOX = "prof_91ba35"
 NETWORK = "netpol_9a07" + "0" * 28
 KEY = "dialog-alpha"
 
@@ -33,6 +34,7 @@ def draft(profile: str, **values: str) -> dict[str, str]:
         "network": NETWORK,
         "shell": "",
         "mcp": "",
+        "model": MODELPOL,
         "image": "auto",
         "runner": "auto",
     }
@@ -98,7 +100,7 @@ def test_configure_copies_the_picked_profile(client: TestClient) -> None:
 
 
 def test_configure_marks_edited_fields_with_the_profile_value(client: TestClient) -> None:
-    form = draft(BUILD_SMALL, cpu="4", memory_mib="8192")
+    form = draft(BUILD_SMALL, cpu="4", memory_mib="8192", model="")
     body = client.post("/runs/new/configure", data=form, headers=HX).text
 
     assert "edited · 2 fields" in body
@@ -166,12 +168,36 @@ def test_an_edited_profile_is_updated_then_run(client: TestClient, writes: list[
 
 
 def test_a_picked_model_policy_reaches_the_profile(client: TestClient, writes: list[Any]) -> None:
-    form = draft(DOCS, model=MODELPOL, mode="update")
+    form = draft(SANDBOX, model=MODELPOL, mode="update")
     review = client.post("/runs/new/review", data=form, headers=HX).text
     client.post("/runs/new", data=form, headers=HX)
 
     assert "none \u2192 1 provider · 1 model" in review
     assert writes[0][2]["spec"]["model"] == {"policy": MODELPOL}
+
+
+def test_configure_marks_a_missing_model_and_shuts_next(client: TestClient) -> None:
+    body = client.post(
+        "/runs/new/configure", data={"key": KEY, "profile": BUILD_SMALL}, headers=HX
+    ).text
+
+    assert re.search(r'<select[^>]*name="model"\s+required>', body)
+    assert '<span class="field__error">required · a run needs a model policy</span>' in body
+    assert '<button class="button dialog__next" type="submit">' in body
+
+
+def test_review_refuses_a_run_without_a_model(client: TestClient) -> None:
+    body = client.post("/runs/new/review", data=draft(DOCS, model=""), headers=HX).text
+
+    assert "a run needs a model policy" in body
+    assert "Next: save &amp; run" in body
+
+
+def test_a_run_without_a_model_is_never_created(client: TestClient, writes: list[Any]) -> None:
+    body = client.post("/runs/new", data=draft(DOCS, model=""), headers=HX).text
+
+    assert "a run needs a model policy" in body
+    assert writes == []
 
 
 def test_save_as_new_creates_a_profile_under_its_name(

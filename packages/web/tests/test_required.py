@@ -26,7 +26,12 @@ FORMS = [
         {"providers.0." + key for key in ("name", "url", "models", "credential")},
     ),
     ("POST", f"{RUN}/mcp", RUN_MCP, {"rules.0.target"}),
-    ("POST", "/runs/new/configure", CONFIGURE, {"cpu", "memory_mib", "disk_gib", "timeout"}),
+    (
+        "POST",
+        "/runs/new/configure",
+        CONFIGURE,
+        {"cpu", "memory_mib", "disk_gib", "timeout", "model"},
+    ),
 ]
 MESSAGES = [
     ("GET", "/images/register", {}, "required · sha256 of the qcow2"),
@@ -37,6 +42,7 @@ MESSAGES = [
     ("POST", "/policies/new", MODEL, "required · a secret from the list"),
     ("POST", f"{RUN}/mcp", RUN_MCP, "required · a tool or a resource prefix"),
     ("POST", "/runs/new/configure", CONFIGURE, "required · seconds"),
+    ("POST", "/runs/new/configure", CONFIGURE, "required · a run needs a model policy"),
 ]
 
 
@@ -95,4 +101,15 @@ def test_nothing_is_red_before_the_browser_refuses_a_field() -> None:
     assert re.search(r"\.field__error,\s*\.dialog__invalid \{\s*display: none;", css)
     assert ".field:has(:user-invalid) .field__error" in css
     assert ".field__box:has(:user-invalid)" in css
-    assert ":invalid " not in css.replace(":user-invalid", "")
+    assert ":invalid " not in css.replace(":user-invalid", "").replace(":required:invalid", "")
+
+
+def test_a_required_policy_is_red_at_once_and_shuts_next() -> None:
+    css = CSS.read_text()
+
+    assert ".field:has(.field__select:required:invalid) .field__error" in css
+    assert ".field__select:required:invalid {" in css
+    assert re.search(
+        r"form:has\(\.field__select:required:invalid\) \.dialog__next \{[^}]*pointer-events: none;",
+        css,
+    )

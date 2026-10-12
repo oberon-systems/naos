@@ -401,14 +401,14 @@ async def new_run_review(request: Request) -> HTMLResponse:
     except ApiError as err:
         return failed_overlay(request, PAGES["runs"], err)
     try:
-        new_run.spec_of(draft.values)
+        new_run.run_spec_of(draft.values)
     except new_run.FormError as err:
         return _configure_step(request, draft, profile, choices, notice=str(err))
     return _review_step(request, draft, profile, choices)
 
 
 async def _save(api: ApiClient, draft: new_run.Draft, profile: Row | None) -> str:
-    spec = new_run.spec_of(draft.values)
+    spec = new_run.run_spec_of(draft.values)
     if profile is not None and not draft.edited(profile):
         return str(profile["id"])
     if profile is not None and draft.mode == "update":

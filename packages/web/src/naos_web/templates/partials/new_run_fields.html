@@ -21,12 +21,15 @@
 {% macro select(field) -%}
     <label class="field{{ " field--edited" if field.edited }}">
         <span class="field__label">{{ field.label }}</span>
-        <select class="field__box field__select" name="{{ field.name }}">
+        <select class="field__box field__select"
+                name="{{ field.name }}"
+                {% if field.error %}required{% endif %}>
             {% for option in field.options %}
                 <option value="{{ option.value }}"
                         {% if option.selected %}selected{% endif %}>{{ option.label }}</option>
             {% endfor %}
         </select>
+        {% if field.error %}<span class="field__error">{{ field.error }}</span>{% endif %}
         {{ field_hint(field) }}
     </label>
 {%- endmacro %}
