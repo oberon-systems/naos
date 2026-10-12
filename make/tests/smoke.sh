@@ -157,6 +157,9 @@ guest() {
         sleep 2
         printf '\002c'
         sleep 3
+        # The agent holds the gate port through its own naos-mcp; a second reader would lose answers.
+        printf '%s\r' "pkill -x goose; sleep 1"
+        sleep 2
         for line in "$@"; do
             printf '%s\r' "$line"
             sleep 1
