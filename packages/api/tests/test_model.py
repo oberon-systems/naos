@@ -86,7 +86,7 @@ def test_unusable_policies_are_refused(providers: list[dict[str, Any]]) -> None:
     "provider",
     [
         _provider(name="Alpha"),
-        _provider(api="gemini"),
+        _provider(api="mistral"),
         _provider(credential=None),
         _provider(credential="Bad Name"),
         _provider(models=[]),
