@@ -993,8 +993,13 @@ fn first_model(run: &DesiredRun) -> Option<(String, String)> {
         .as_ref()?
         .get("providers")?
         .get(0)?;
+    // The gateway serves a gemini provider in the OpenAI format, so the agent is told openai.
+    let api = match provider.get("api")?.as_str()? {
+        "gemini" => "openai",
+        other => other,
+    };
     Some((
-        provider.get("api")?.as_str()?.to_owned(),
+        api.to_owned(),
         provider.get("models")?.get(0)?.as_str()?.to_owned(),
     ))
 }

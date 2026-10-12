@@ -40,6 +40,24 @@ const MESSAGES: &str = "/v1/messages";
 pub enum Dialect {
     Openai,
     Anthropic,
+    Gemini,
+}
+
+impl Dialect {
+    /// Gemini is spoken to in the OpenAI format, under a base that carries its own version.
+    fn wire(self) -> Dialect {
+        match self {
+            Dialect::Gemini => Dialect::Openai,
+            other => other,
+        }
+    }
+
+    fn upstream_path(self, path: &str) -> &str {
+        match self {
+            Dialect::Gemini => path.strip_prefix("/v1").unwrap_or(path),
+            _ => path,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -163,7 +181,7 @@ impl Relay {
         let body = error_body(self.call.dialect, 502, message);
         Some(match self.call.dialect {
             Dialect::Anthropic => format!("event: error\ndata: {body}\n\n").into_bytes(),
-            Dialect::Openai => format!("data: {body}\n\n").into_bytes(),
+            _ => format!("data: {body}\n\n").into_bytes(),
         })
     }
 }
@@ -444,7 +462,7 @@ impl ModelGate {
             .policy()
             .providers
             .iter()
-            .filter(|provider| provider.api == Dialect::Openai)
+            .filter(|provider| provider.api.wire() == Dialect::Openai)
             .flat_map(|provider| {
                 provider.models.iter().map(|model| {
                     json!({ "id": model, "object": "model", "created": 0, "owned_by": provider.name })
@@ -471,7 +489,7 @@ impl ModelGate {
         let provider = policy
             .providers
             .iter()
-            .find(|provider| provider.api == dialect && provider.models.contains(&model))
+            .find(|provider| provider.api.wire() == dialect && provider.models.contains(&model))
             .ok_or_else(|| Refusal {
                 status: 404,
                 message: format!("model {named} is not served here"),
@@ -534,15 +552,19 @@ impl ModelGate {
             .entry(CONTENT_TYPE)
             .or_insert(HeaderValue::from_static("application/json"));
         let (key, value) = match dialect {
-            Dialect::Openai => (AUTHORIZATION, format!("Bearer {secret}")),
             Dialect::Anthropic => (HeaderName::from_static("x-api-key"), secret.clone()),
+            _ => (AUTHORIZATION, format!("Bearer {secret}")),
         };
         let mut value = HeaderValue::from_str(&value)
             .map_err(|_| refuse(502, "credential is malformed", "credential"))?;
         value.set_sensitive(true);
         headers.insert(key, value);
 
-        let mut url = format!("{}{}", provider.url, request.path);
+        let mut url = format!(
+            "{}{}",
+            provider.url,
+            provider.api.upstream_path(&request.path)
+        );
         if let Some(query) = &request.query {
             url = format!("{url}?{query}");
         }
@@ -720,15 +742,15 @@ pub fn error_body(dialect: Dialect, status: u16, message: &str) -> String {
         (Dialect::Anthropic, 429) => "rate_limit_error",
         (Dialect::Anthropic, 400..=499) => "invalid_request_error",
         (Dialect::Anthropic, _) => "api_error",
-        (Dialect::Openai, 429) => "rate_limit_exceeded",
-        (Dialect::Openai, 400..=499) => "invalid_request_error",
-        (Dialect::Openai, _) => "server_error",
+        (_, 429) => "rate_limit_exceeded",
+        (_, 400..=499) => "invalid_request_error",
+        _ => "server_error",
     };
     match dialect {
         Dialect::Anthropic => {
             json!({ "type": "error", "error": { "type": kind, "message": message } }).to_string()
         }
-        Dialect::Openai => {
+        _ => {
             let code = if status == 404 {
                 json!("model_not_found")
             } else {

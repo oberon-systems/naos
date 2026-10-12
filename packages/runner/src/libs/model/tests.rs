@@ -647,6 +647,27 @@ async fn a_client_that_leaves_during_a_stream_ends_the_relay() {
     .await;
 }
 
+#[tokio::test]
+async fn a_gemini_provider_is_called_in_the_openai_format_under_its_own_base() {
+    let server = MockServer::start().await;
+    Mock::given(path("/chat/completions"))
+        .and(header(
+            "authorization",
+            format!("Bearer {OPENAI_KEY}").as_str(),
+        ))
+        .respond_with(openai_answer(3, 1))
+        .mount(&server)
+        .await;
+    let address = *server.address();
+    let mut document = document(address, (1_000, 1_000), 60);
+    document["providers"][0]["api"] = json!("gemini");
+    let gate = ModelGate::local(&document, vec![address.ip()]).expect("policy");
+    grant(&gate, u64::MAX);
+
+    assert_eq!(answer(&gate, chat("alpha-mini")).await.0, 200);
+    assert_eq!(gate.served(), ["alpha-mini", "beta-large"]);
+}
+
 fn changed(address: SocketAddr) -> Value {
     let mut document = document(address, (1_000, 1_000), 1);
     document["providers"][1] = json!({
