@@ -668,6 +668,184 @@ async fn a_gemini_provider_is_called_in_the_openai_format_under_its_own_base() {
     assert_eq!(gate.served(), ["alpha-mini", "beta-large"]);
 }
 
+#[tokio::test]
+async fn a_responses_call_reaches_the_openai_provider_and_books_its_usage() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path(RESPONSES))
+        .and(header(
+            "authorization",
+            format!("Bearer {OPENAI_KEY}").as_str(),
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "object": "response",
+            "usage": {
+                "input_tokens": 6,
+                "input_tokens_details": { "cached_tokens": 2 },
+                "output_tokens": 3,
+            },
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let gate = gate(&server);
+
+    let (status, _) = answer(
+        &gate,
+        request(RESPONSES, json!({"model": "alpha-mini", "input": "alpha"})),
+    )
+    .await;
+
+    assert_eq!(status, 200);
+    assert_eq!(
+        gate.spent(),
+        Usage {
+            input: 6,
+            output: 3
+        }
+    );
+}
+
+#[tokio::test]
+async fn usage_is_read_from_a_responses_event_stream() {
+    let server = MockServer::start().await;
+    let events = "event: response.created\n\
+                  data: {\"type\":\"response.created\",\"response\":{\"usage\":null}}\n\n\
+                  event: response.output_text.delta\n\
+                  data: {\"type\":\"response.output_text.delta\",\"delta\":\"a\"}\n\n\
+                  event: response.completed\n\
+                  data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":7,\"output_tokens\":2}}}\n\n";
+    Mock::given(path(RESPONSES))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(events, "text/event-stream"))
+        .mount(&server)
+        .await;
+    let gate = gate(&server);
+
+    raw(
+        &gate,
+        request(RESPONSES, json!({"model": "alpha-mini", "stream": true})),
+    )
+    .await;
+
+    assert_eq!(
+        gate.spent(),
+        Usage {
+            input: 7,
+            output: 2
+        }
+    );
+    let sent: Value =
+        serde_json::from_slice(&server.received_requests().await.expect("requests")[0].body)
+            .expect("json");
+    assert!(sent.get("stream_options").is_none());
+}
+
+#[tokio::test]
+async fn a_gemini_model_is_not_served_over_responses() {
+    let server = MockServer::start().await;
+    let address = *server.address();
+    let mut document = document(address, (1_000, 1_000), 60);
+    document["providers"][0]["api"] = json!("gemini");
+    let gate = ModelGate::local(&document, vec![address.ip()]).expect("policy");
+    grant(&gate, u64::MAX);
+
+    let (status, body) = answer(
+        &gate,
+        request(RESPONSES, json!({"model": "alpha-mini", "input": "alpha"})),
+    )
+    .await;
+
+    assert_eq!(status, 404);
+    assert_eq!(body["error"]["code"], "model_not_found");
+    assert!(server
+        .received_requests()
+        .await
+        .expect("requests")
+        .is_empty());
+}
+
+/// A provider that starts an event stream, sends `event` and drops the connection.
+async fn cutting_provider(event: &'static str) -> SocketAddr {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind");
+    let address = listener.local_addr().expect("address");
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            let mut head = Vec::new();
+            let mut byte = [0u8; 1];
+            while !head.ends_with(b"\r\n\r\n") {
+                if socket.read_exact(&mut byte).await.is_err() {
+                    return;
+                }
+                head.push(byte[0]);
+            }
+            let length = String::from_utf8_lossy(&head)
+                .to_ascii_lowercase()
+                .lines()
+                .find_map(|line| line.strip_prefix("content-length: ").map(str::to_owned))
+                .and_then(|value| value.trim().parse::<usize>().ok())
+                .unwrap_or(0);
+            let mut body = vec![0; length];
+            let _ = socket.read_exact(&mut body).await;
+            let answer = format!(
+                "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ncontent-length: {}\r\n\r\n{event}",
+                event.len() + 1024
+            );
+            let _ = socket.write_all(answer.as_bytes()).await;
+        }
+    });
+    address
+}
+
+#[tokio::test]
+async fn a_cut_stream_ends_with_an_error_event_in_each_dialect() {
+    for (line, model, event, error_line) in [
+        (
+            "POST /v1/chat/completions HTTP/1.1",
+            "alpha-mini",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"alpha\"}}]}\n\n",
+            "data: ",
+        ),
+        (
+            "POST /v1/messages HTTP/1.1",
+            "beta-large",
+            "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{}}\n\n",
+            "event: error\ndata: ",
+        ),
+        (
+            "POST /v1/responses HTTP/1.1",
+            "alpha-mini",
+            "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{}}\n\n",
+            "event: error\ndata: ",
+        ),
+    ] {
+        let address = cutting_provider(event).await;
+        let gate = ModelGate::local(&document(address, (1_000, 1_000), 60), vec![address.ip()])
+            .expect("policy");
+        grant(&gate, u64::MAX);
+
+        connect(&gate, |mut guest| async move {
+            let body = json!({"model": model, "stream": true, "messages": []}).to_string();
+            guest.write_all(&wire(line, &body)).await.expect("request");
+            let (status, answer) = read_answer(&mut guest).await;
+            assert_eq!(status, 200);
+            assert!(answer.starts_with(event), "{answer}");
+            let (_, last) = answer.trim_end().rsplit_once("\n\n").expect("events");
+            let data = last.strip_prefix(error_line).expect(last);
+            let error: Value = serde_json::from_str(data).expect(data);
+            let message = error
+                .pointer("/error/message")
+                .or_else(|| error.get("message"));
+            assert_eq!(message, Some(&json!("provider answer failed")), "{line}");
+            if line.contains("responses") || line.contains("messages") {
+                assert_eq!(error["type"], "error", "{line}");
+            }
+        })
+        .await;
+    }
+}
+
 fn changed(address: SocketAddr) -> Value {
     let mut document = document(address, (1_000, 1_000), 1);
     document["providers"][1] = json!({

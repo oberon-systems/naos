@@ -34,6 +34,7 @@ const RETURNED: &[&str] = &["content-type", "request-id", "x-request-id"];
 const CHAT: &str = "/v1/chat/completions";
 const MODELS: &str = "/v1/models";
 const MESSAGES: &str = "/v1/messages";
+const RESPONSES: &str = "/v1/responses";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -148,6 +149,7 @@ struct Call {
     provider: String,
     model: String,
     dialect: Dialect,
+    responses: bool,
     started: Instant,
 }
 
@@ -174,15 +176,23 @@ impl Relay {
     }
 
     /// An error in the dialect's stream shape, so a client reading events sees why the stream ended.
-    pub fn stream_error(&self, message: &str) -> Option<Vec<u8>> {
+    pub fn stream_error(&mut self, message: &str) -> Option<Vec<u8>> {
         if !self.event_stream {
             return None;
         }
+        // What the redactor still holds goes out first, and a cut inside an event is closed.
+        let mut bytes = self.redactor.finish();
+        bytes.extend_from_slice(b"\n\n");
         let body = error_body(self.call.dialect, 502, message);
-        Some(match self.call.dialect {
-            Dialect::Anthropic => format!("event: error\ndata: {body}\n\n").into_bytes(),
+        bytes.extend_from_slice(&match (self.call.dialect, self.call.responses) {
+            (Dialect::Anthropic, _) => format!("event: error\ndata: {body}\n\n").into_bytes(),
+            (_, true) => {
+                let event = json!({ "type": "error", "code": "server_error", "message": message });
+                format!("event: error\ndata: {event}\n\n").into_bytes()
+            }
             _ => format!("data: {body}\n\n").into_bytes(),
-        })
+        });
+        Some(bytes)
     }
 }
 
@@ -370,8 +380,8 @@ impl ModelGate {
             Dialect::Openai
         };
         let listing = request.method == "GET" && request.path == MODELS;
-        let forwarded =
-            request.method == "POST" && matches!(request.path.as_str(), CHAT | MESSAGES);
+        let forwarded = request.method == "POST"
+            && matches!(request.path.as_str(), CHAT | MESSAGES | RESPONSES);
         match (listing, forwarded) {
             (true, _) => {
                 self.audit(GATEWAY, "none", Usage::default(), started, "allow", "none");
@@ -485,11 +495,20 @@ impl ModelGate {
             .ok_or_else(|| Refusal::invalid(400, "body has no model"))?
             .to_owned();
         let named = model_name(&model);
+        let responses = request.path == RESPONSES;
         let policy = self.policy();
+        // Gemini speaks the openai wire but has no Responses API, so that path wants openai.
         let provider = policy
             .providers
             .iter()
-            .find(|provider| provider.api.wire() == dialect && provider.models.contains(&model))
+            .find(|provider| {
+                let api = if responses {
+                    provider.api
+                } else {
+                    provider.api.wire()
+                };
+                api == dialect && provider.models.contains(&model)
+            })
             .ok_or_else(|| Refusal {
                 status: 404,
                 message: format!("model {named} is not served here"),
@@ -526,7 +545,7 @@ impl ModelGate {
 
         let stream = body.get("stream") == Some(&Value::Bool(true));
         // Without it an OpenAI stream carries no usage, and the budget could not be booked.
-        let forwarded = if dialect == Dialect::Openai && stream {
+        let forwarded = if request.path == CHAT && stream {
             if !body.get("stream_options").is_some_and(Value::is_object) {
                 body["stream_options"] = json!({});
             }
@@ -617,6 +636,7 @@ impl ModelGate {
                 provider: provider.name.clone(),
                 model,
                 dialect,
+                responses,
                 started,
             },
             event_stream,
@@ -890,11 +910,13 @@ impl Meter {
     }
 }
 
-// Anthropic reports usage on the answer or on message_start's message; cache tokens are input too.
+// Usage sits on the answer, on Anthropic's message_start message or on a Responses event's
+// response; Anthropic's cache tokens are input too.
 fn usage_of(value: &Value) -> Option<Usage> {
     let usage = value
         .get("usage")
         .or_else(|| value.pointer("/message/usage"))
+        .or_else(|| value.pointer("/response/usage"))
         .filter(|usage| usage.is_object())?;
     let count = |key: &str| usage.get(key).and_then(Value::as_u64).unwrap_or(0);
     Some(Usage {
