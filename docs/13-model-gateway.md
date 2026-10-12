@@ -47,6 +47,7 @@ close and the next open.
 | Request | Dialect | Answer |
 |---|---|---|
 | `POST /v1/chat/completions` | openai | the provider's answer |
+| `POST /v1/responses` | openai | the provider's answer; `gemini` providers have no such API and are not reached |
 | `GET /v1/models` | openai | the models of the openai providers, built from the policy |
 | `POST /v1/messages` | anthropic | the provider's answer |
 | anything else | - | 404 |
@@ -111,10 +112,11 @@ nothing else ([06](06-network-gate.md)).
 ## Budget and rate
 
 Usage comes from the provider's answer: `usage` of a JSON answer, the final
-chunk of an openai stream and `message_start` and `message_delta` of an
-anthropic stream. Anthropic cache tokens count as input. The gateway sets
-`stream_options.include_usage` on every openai stream, since without it the
-stream reports no usage.
+chunk of an openai stream, `response.completed` of a responses stream and
+`message_start` and `message_delta` of an anthropic stream. Anthropic cache
+tokens count as input. The gateway sets `stream_options.include_usage` on
+every `/v1/chat/completions` stream, since without it the stream reports no
+usage; a responses stream always reports it.
 
 Each Run books its usage against its own budget, so one Run never spends
 another's. A call is refused once the input or output budget is spent. A
@@ -163,7 +165,7 @@ Every refusal is in the error shape of the dialect of the path: openai
 | provider unreachable or refused by its network gate | 502 |
 | provider slower than `timeout_seconds` | 504 |
 | provider error status | passed on, redacted |
-| stream that breaks midway | an `error` event in the dialect's stream shape, then the end of the body |
+| stream that breaks midway | what was already received, a blank line closing a cut event, an `error` event in the dialect's stream shape, then the end of the body |
 
 A failure is never retried and never sent to another provider.
 
@@ -207,6 +209,11 @@ The tests in `packages/runner/src/libs/model/tests.rs` verify that:
 - a provider error is passed on once, a slow provider times out, and an
   echoed key is redacted, also across chunks;
 - usage is read from both event streams;
+- `/v1/responses` reaches an openai provider and books its usage from the
+  answer and from its event stream, and a gemini model on it is 404 without
+  reaching a provider;
+- a stream the provider cuts ends with an `error` event the client can read,
+  in each dialect;
 - over a connection, a request is answered and the connection ends,
   connections are served side by side, malformed requests are refused, and a
   client that leaves before or during the answer ends the call;
