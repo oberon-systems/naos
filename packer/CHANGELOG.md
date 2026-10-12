@@ -1,3 +1,13 @@
+## image-0.5.0 (2026-10-12)
+
+### Features
+
+- **image**: install goose as the default agent
+
+### Bug Fixes
+
+- **image**: grow the root filesystem to the image disk
+
 ## image-0.4.1 (2026-09-30)
 
 ### Bug Fixes
