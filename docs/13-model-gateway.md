@@ -84,7 +84,7 @@ like the others ([03](03-api-design.md#policies)):
 | Field | Rule |
 |---|---|
 | `name` | `^[a-z0-9][a-z0-9-]{0,31}$`, unique |
-| `api` | `openai` or `anthropic` |
+| `api` | `openai`, `anthropic` or `gemini`; `gemini` is called in the openai format, with `/v1` dropped from the path, so its `url` is `https://generativelanguage.googleapis.com/v1beta/openai` |
 | `url` | the rules of [08](08-mcp-gate.md#external-servers); the request path is appended to it |
 | `credential` | the name of a secret, required |
 | `models` | 1 to 64 exact names; one model belongs to one provider |
@@ -102,7 +102,7 @@ nothing else ([06](06-network-gate.md)).
   returns them.
 - The gateway forwards only `content-type`, `accept`, `anthropic-version` and
   `anthropic-beta`, so every auth header the agent sent is dropped. It sets
-  `Authorization: Bearer` for openai and `x-api-key` for anthropic.
+  `Authorization: Bearer` for openai and gemini, and `x-api-key` for anthropic.
 - A missing or expired credential refuses the call before anything leaves
   the host.
 - Every byte of an answer passes a redactor that replaces the key with
