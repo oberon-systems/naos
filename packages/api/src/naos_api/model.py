@@ -13,7 +13,7 @@ MAX_TOKENS = 10_000_000_000
 
 ProviderName = Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9-]{0,31}$")]
 ModelName = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}$")]
-Dialect = Literal["openai", "anthropic"]
+Dialect = Literal["openai", "anthropic", "gemini"]
 Tokens = Annotated[StrictInt, Field(ge=1, le=MAX_TOKENS)]
 
 

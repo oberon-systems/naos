@@ -26,6 +26,14 @@ def _policy(*providers: dict[str, Any], **values: Any) -> ModelPolicyIn:
     return ModelPolicyIn.model_validate(document | values)
 
 
+def test_a_gemini_provider_keeps_the_path_of_its_base() -> None:
+    url = "https://generativelanguage.example.com/v1beta/openai/"
+    resolved = resolve_model_policy(_policy(_provider(api="gemini", url=url)))
+
+    assert resolved.providers[0].api == "gemini"
+    assert resolved.providers[0].url == "https://generativelanguage.example.com/v1beta/openai"
+
+
 def test_providers_are_canonical() -> None:
     resolved = resolve_model_policy(
         _policy(
