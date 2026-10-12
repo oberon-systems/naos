@@ -21,6 +21,10 @@
       fontSize: design,
       theme: THEME,
     });
+    // xterm.js answers tmux's device attribute queries through onData, and the answer
+    // reached the agent as typed text; tmux does without it
+    term.parser.registerCsiHandler({ final: "c" }, () => true);
+    term.parser.registerCsiHandler({ prefix: ">", final: "c" }, () => true);
     const fit = new FitAddon.FitAddon();
     term.loadAddon(fit);
     const surface = document.createElement("div");

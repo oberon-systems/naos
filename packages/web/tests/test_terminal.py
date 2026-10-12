@@ -1,6 +1,7 @@
 import asyncio
 import re
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,6 +13,7 @@ from naos_web.client import ApiError
 STARTED = "run_9f21c4"
 PENDING = "run_3a90f8"
 HX = {"HX-Request": "true"}
+SCRIPT = Path(__file__).parents[1] / "src/naos_web/static/terminal.js"
 
 
 def test_the_terminal_tab_attaches_through_the_web(client: TestClient) -> None:
@@ -147,3 +149,10 @@ def test_a_socket_from_another_origin_is_refused(client: TestClient) -> None:
         pass
 
     assert refused.value.code == 1008
+
+
+def test_the_terminal_never_answers_device_attribute_queries() -> None:
+    script = SCRIPT.read_text()
+
+    assert 'registerCsiHandler({ final: "c" }, () => true)' in script
+    assert 'registerCsiHandler({ prefix: ">", final: "c" }, () => true)' in script
