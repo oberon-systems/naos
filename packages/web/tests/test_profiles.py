@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 import stub_api
 from fastapi.testclient import TestClient
-from stub_api import MCPPOL, MODELPOL, NETPOL, PROFILES, WRITES
+from stub_api import MCPPOL, MODELPOL, NETPOL, PROFILES, WRITES, policy_row
 
 BUSY = "prof_7a1c30"
 IDLE = "prof_a93e07"
@@ -195,3 +195,13 @@ def test_a_run_whose_profile_is_gone_still_opens(
 
     assert response.status_code == 200
     assert "Edit profile" not in response.text
+
+
+def test_the_overview_names_each_policy(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(policy_row(NETPOL), "name", "network_alpha")
+    body = client.get("/profiles/prof_7a1c30", headers=HX).text
+
+    assert '<span class="profile__policy-id">network_alpha</span>' in body
+    assert NETPOL not in re.sub(r'"[^"]*"', "", body)

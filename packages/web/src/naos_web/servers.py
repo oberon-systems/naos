@@ -267,7 +267,6 @@ def _named(server: Row, policies: dict[str, Row], names: dict[str, str]) -> list
             PolicyRef(
                 id=policy_id,
                 label=policy_label(policy_id, names),
-                note=policy_id if names.get(policy_id) else "unnamed",
                 line=f"{_plural(len(rules), 'rule')} on {server['name']} \u00b7 "
                 + " \u00b7 ".join(_rule_line(rule) for rule in rules),
             )

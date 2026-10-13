@@ -5,7 +5,7 @@ from typing import Any
 import httpx
 import pytest
 from fastapi.testclient import TestClient
-from stub_api import MCPPOL, MNTPOL, MODELPOL, NETPOL, POLICIES, SHELLPOL, WRITES
+from stub_api import MCPPOL, MNTPOL, MODELPOL, NETPOL, POLICIES, SHELLPOL, WRITES, policy_row
 
 from naos_web.client import detail_of
 
@@ -499,3 +499,22 @@ def test_a_confirmed_policy_delete_goes_back_to_the_list(
 
     assert response.headers["HX-Redirect"] == "/policies"
     assert writes[0][:2] == ("DELETE", f"/policies/{MNTPOL}")
+
+
+def test_a_named_policy_shows_its_name_not_its_id(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(policy_row(NETPOL), "name", "network_alpha")
+    monkeypatch.setitem(policy_row(SHELLPOL), "name", "shell_alpha")
+    listed = client.get("/policies").text
+    panel = client.get(f"/policies/{NETPOL}", headers=HX).text
+    deleting = flat(client.get(f"/policies/{NETPOL}/delete", headers=HX).text)
+    names = ("read_file", "grep", "list_dir", "git_status")
+    form = {"kind": "shell", "name": "shell_alpha"} | {f"cap.{name}": "on" for name in names}
+    exists = client.post("/policies/new", data=form, headers=HX).text
+
+    assert '<span class="run__strong">network_alpha</span>' in listed
+    assert "Search policy name, id or digest" in listed
+    assert '<h2 class="panel__name">network_alpha</h2>' in panel
+    assert "network policy network_alpha \u00b7" in deleting
+    assert "The API answered 200 with shell_alpha" in exists

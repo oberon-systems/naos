@@ -277,16 +277,17 @@ def _reached(row: Row) -> str:
     return f"{format.coarse(max(row['received_at'] - row['at'], 0))} after the runner wrote it"
 
 
-def _policy(gate: str | None, run: Row | None) -> list[Fact]:
+def _policy(gate: str | None, run: Row | None, policies: dict[str, str]) -> list[Fact]:
     if gate is None or run is None:
         return []
     policy = run["spec"].get(gate, {}).get("policy")
+    name = policies.get(policy or "")
     return [
         Fact("Gate", gate),
         Fact(
             "Policy",
-            policy or "none \u00b7 default deny",
-            bool(policy),
+            (name or policy) if policy else "none \u00b7 default deny",
+            bool(policy) and not name,
             f"/policies/{policy}" if policy else None,
         ),
         Fact("Run status", str(run["status"])),
@@ -306,7 +307,9 @@ def _where(run: Row | None, run_id: str | None, runner_id: str | None, runner: s
     return f"{place} on {runner or runner_id}" if runner_id else place
 
 
-def detail(row: Row, run: Row | None, names: dict[str, str]) -> Detail:
+def detail(
+    row: Row, run: Row | None, names: dict[str, str], policies: dict[str, str] | None = None
+) -> Detail:
     logged = events.log_row(row, {})
     schema = events.SCHEMAS.get(str(row["source"]), {}).get(row["event"])
     fields = list(schema.fields) if schema is not None else []
@@ -353,7 +356,7 @@ def detail(row: Row, run: Row | None, names: dict[str, str]) -> Detail:
         if logged.refused
         else [Fact(name, _value(data[name]), True) for name in fields if name in data],
         schema=_schema(fields),
-        policy=_policy(gate, run),
+        policy=_policy(gate, run, policies or {}),
         logs=_logs(run, runner_id, names),
         denial=bool(gate) and logged.error,
     )

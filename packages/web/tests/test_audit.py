@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from stub_api import TRAIL_QUERIES
+from stub_api import NETPOL, TRAIL_QUERIES, policy_row
 
 HX = {"HX-Request": "true"}
 Queries = list[dict[str, Any]]
@@ -206,3 +206,11 @@ def test_an_unreachable_api_is_named(offline: TestClient) -> None:
     body = offline.get("/audit").text
 
     assert "the api did not answer" in body
+
+
+def test_a_denial_popup_names_a_named_policy(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(policy_row(NETPOL), "name", "network_alpha")
+
+    assert _facts(client.get(f"/audit/{DENIED}", headers=HX).text)["Policy"] == "network_alpha"

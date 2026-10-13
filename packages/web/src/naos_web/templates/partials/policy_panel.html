@@ -2,12 +2,12 @@
 {{ scrim("/policies") }}
 <section class="panel panel--run panel--runner"
          role="dialog"
-         aria-label="Policy {{ policy.id }}">
+         aria-label="Policy {{ policy.name }}">
     <header class="panel__header run__header">
         <div class="panel__title">
             {{ closer("/policies", label="←", klass="panel__close policy__back") }}
             <span class="dot dot--lg tone-{{ policy.tone }}"></span>
-            <h2 class="panel__name run__mono">{{ policy.id }}</h2>
+            <h2 class="panel__name{{ " run__mono" if not policy.named }}">{{ policy.name }}</h2>
             {{ pill(policy.pill, policy.pill_tone) }}
             <span class="profile__tag">{{ policy.tag }}</span>
             <span class="table__secondary">{{ policy.kind }}</span>

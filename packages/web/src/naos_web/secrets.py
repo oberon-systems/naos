@@ -178,6 +178,7 @@ class NamedBy:
     tag: str
     id: str
     short_id: str
+    name: str
     kind: str
     role: str
     line: str
@@ -228,6 +229,7 @@ def _named(usage: Row, policies: dict[str, Row]) -> NamedBy:
         tag=usage["kind"],
         id=usage["id"],
         short_id=short(usage["id"]),
+        name=str(policy.get("name") or "") if policy else "",
         kind=kind,
         role=role,
         line=line,

@@ -12,7 +12,7 @@
             {{ closer(back, get=back) }}
         </div>
         <p class="panel__facts">
-            Run #{{ run.seq }} · {{ pill(run.status, tone) }} · holds <span class="run__mono">{{ held }}</span>. The Run keeps working; nothing restarts.
+            Run #{{ run.seq }} · {{ pill(run.status, tone) }} · holds {{ held }}. The Run keeps working; nothing restarts.
         </p>
     </header>
     <form class="dialog"
@@ -60,7 +60,6 @@
                                            hx-trigger="change">
                                     <span>
                                         <span class="run__strong">{{ choice.label }}</span>
-                                        <span class="table__id">{{ choice.id }}</span>
                                     </span>
                                 </label>
                                 <span class="mcp__item-note">

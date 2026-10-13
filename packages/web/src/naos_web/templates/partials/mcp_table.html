@@ -70,7 +70,7 @@
                 <td>
                     <div class="mcp__refs">
                         {% for item in server.policies %}
-                            <a class="run__mono action"
+                            <a class="action"
                                href="/policies/{{ item.id }}"
                                hx-get="/policies/{{ item.id }}"
                                hx-target="#overlay"

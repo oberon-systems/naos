@@ -8,7 +8,7 @@
             <h2 class="panel__name">Policy already exists</h2>
             {{ closer("/policies") }}
         </div>
-        <p class="panel__facts">The API answered 200 with {{ existing.id }}</p>
+        <p class="panel__facts">The API answered 200 with {{ existing.get("name") or existing.id }}</p>
     </header>
     <form class="dialog"
           method="post"

@@ -409,6 +409,7 @@ class RunRefusal:
 @dataclass(frozen=True)
 class RunModelRow:
     policy_id: str
+    policy_name: str
     calls: str
     meters: list[Meter]
     providers: list[RunProvider]
@@ -507,6 +508,7 @@ def _model(policy: Row | None, usage: Row | None) -> RunModelRow | None:
     document, denied = policy["document"], usage["denied"]
     return RunModelRow(
         policy_id=policy["id"],
+        policy_name=str(policy.get("name") or policy["id"]),
         calls=f"{usage['calls']} \u00b7 {denied} refused" if denied else str(usage["calls"]),
         meters=[
             _meter("Input tokens", usage["input_tokens"], document["max_input_tokens"]),

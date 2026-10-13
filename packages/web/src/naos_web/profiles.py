@@ -237,6 +237,7 @@ class PolicyLine:
     tag: str
     id: str
     summary: str
+    name: str = ""
 
 
 @dataclass(frozen=True)
@@ -283,7 +284,8 @@ def profile_detail(
         policy_id = spec[name]["policy"]
         found = known.get(policy_id) if policy_id else None
         summary = summary_of(found) if found else CLOSED[name]
-        lines.append(PolicyLine(TAGS[name], policy_id or "", summary))
+        label = (found.get("name") or "") if found else ""
+        lines.append(PolicyLine(TAGS[name], policy_id or "", summary, label))
     pill, pill_tone = _pill(profile)
     return ProfileDetailRow(
         id=profile["id"],

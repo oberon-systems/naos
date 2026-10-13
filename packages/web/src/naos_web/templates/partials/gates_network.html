@@ -17,7 +17,7 @@
                     <a class="action"
                        href="/policies/{{ network.policy_id }}"
                        hx-get="/policies/{{ network.policy_id }}"
-                       hx-target="#overlay">{{ network.policy_id }}</a>
+                       hx-target="#overlay">{{ network.policy_name }}</a>
                 {% else %}
                     <span>{{ "temporary edit" if network.policy_tag[0] == "temporary" else "none" }}</span>
                 {% endif %}

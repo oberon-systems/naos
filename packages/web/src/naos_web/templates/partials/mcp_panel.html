@@ -83,8 +83,8 @@
                             hx-target="#overlay"
                             hx-trigger="click, keyup[key=='Enter']">
                             <div>
-                                <div class="run__strong run__mono">{{ item.label }}</div>
-                                <div class="table__id">{{ item.note }}</div>
+                                <div class="run__strong">{{ item.label }}</div>
+                                {% if item.note %}<div class="table__id">{{ item.note }}</div>{% endif %}
                             </div>
                             <span class="table__secondary">{{ item.line }}</span>
                         </li>

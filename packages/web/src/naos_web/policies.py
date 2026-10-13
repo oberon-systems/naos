@@ -6,7 +6,7 @@ from typing import Literal
 
 from naos_web import format
 from naos_web.client import Row
-from naos_web.new_run import FormError, short
+from naos_web.new_run import FormError, policy_name, short
 from naos_web.pages import Summary, TileValue, Tone
 from naos_web.profiles import ProfileRow, holders, profile_rows, summary_of
 from naos_web.rows import Fact, RunRow, run_rows
@@ -199,6 +199,8 @@ def _usage(policy: Row) -> tuple[str, str]:
 @dataclass(frozen=True)
 class PolicyRow:
     id: str
+    name: str
+    named: bool
     digest: str
     kind: Kind
     tag: str
@@ -218,6 +220,8 @@ def policy_rows(policies: list[Row], now: int) -> list[PolicyRow]:
         rows.append(
             PolicyRow(
                 id=policy["id"],
+                name=policy_name(policy),
+                named=bool(policy.get("name")),
                 digest=_digest(policy["digest"]),
                 kind=policy["kind"],
                 tag=TAGS[policy["kind"]],
@@ -294,6 +298,8 @@ class Provider:
 @dataclass(frozen=True)
 class PolicyDetail:
     id: str
+    name: str
+    named: bool
     kind: Kind
     tag: str
     tone: Tone
@@ -589,6 +595,8 @@ def policy_detail(policy: Row, secrets: dict[str, Row | None], now: int) -> Poli
     }
     return PolicyDetail(
         id=policy["id"],
+        name=policy_name(policy),
+        named=bool(policy.get("name")),
         kind=kind,
         tag=TAGS[kind],
         tone="green" if _used(policy) else "faint",
@@ -868,7 +876,7 @@ def busy_note(policy: Row) -> str:
         parts.append(f"used by {_plural(policy['runs_open'], 'unfinished run')}")
     if not parts:
         return ""
-    label = policy.get("name") or policy["id"]
+    label = policy_name(policy)
     return f"{label} is {' and '.join(parts)}. It can be deleted once nothing uses it."
 
 

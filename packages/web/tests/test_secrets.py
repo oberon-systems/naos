@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from stub_api import MCPSRV, MODELPOL, NOW, WRITES
+from stub_api import MCPSRV, MODELPOL, NOW, WRITES, policy_row
 
 HX = {"HX-Request": "true"}
 ROW = '<tr class="runs-table__row"'
@@ -269,3 +269,14 @@ def test_the_page_behind_a_shared_link_is_the_list(client: TestClient) -> None:
     assert body.count(ROW) >= 4 and 'aria-label="Secret alpha-token"' in body
     assert 'src="/static/secret.js"' in body
     assert client.get("/static/secret.js").status_code == 200
+
+
+def test_a_named_policy_is_shown_by_its_name(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(policy_row(MODELPOL), "name", "model_alpha")
+    overview = client.get("/secrets/alpha-key", headers=HX).text
+    used = client.get("/secrets/alpha-key/used", headers=HX).text
+
+    assert re.search(rf'href="/policies/{MODELPOL}"[^>]*>model_alpha</a>', overview)
+    assert f'title="{MODELPOL}">model_alpha</div>' in used

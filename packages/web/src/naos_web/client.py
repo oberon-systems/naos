@@ -296,6 +296,15 @@ class ApiClient:
         row: Row = await self._call("GET", f"/policies/{policy_id}")
         return (await self._registered([row]))[0]
 
+    # A finished run may name a policy deleted since; that reads as no policy at all.
+    async def kept_policy(self, policy_id: str) -> Row | None:
+        try:
+            return await self.policy(policy_id)
+        except ApiError as err:
+            if err.status == 404:
+                return None
+            raise
+
     async def create_run(self, spec: Row, idempotency_key: str) -> Row:
         row: Row = await self._call(
             "POST", "/runs", json=spec, headers={"Idempotency-Key": idempotency_key}
@@ -507,7 +516,7 @@ class ApiClient:
             self.run_events(run_id),
             self.runners(),
             self.images(),
-            asyncio.gather(*(self.policy(policy_id) for policy_id in named)),
+            asyncio.gather(*(self.kept_policy(policy_id) for policy_id in named)),
             self._collected(run),
             self._spent(run),
         )
@@ -517,7 +526,7 @@ class ApiClient:
             run=run,
             events=events,
             runner=next((row for row in runners if row["id"] == holder), None),
-            policies={policy["kind"]: policy for policy in policies},
+            policies={policy["kind"]: policy for policy in policies if policy},
             images=images,
             profile=profile,
             runners={row["id"]: row["name"] for row in runners},

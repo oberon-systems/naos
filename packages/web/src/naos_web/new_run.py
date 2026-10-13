@@ -163,6 +163,10 @@ def short(identifier: str) -> str:
     return f"{identifier[:12]}\u2026" if len(identifier) > 13 else identifier
 
 
+def policy_name(policy: Row) -> str:
+    return str(policy.get("name") or policy["id"])
+
+
 def policy_label(policy: Row) -> str:
     return f"{policy.get('name') or short(policy['id'])} \u00b7 {_policy_detail(policy)}"
 

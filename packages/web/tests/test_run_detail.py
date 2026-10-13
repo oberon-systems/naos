@@ -2,8 +2,9 @@ import re
 from collections.abc import Iterator
 
 import pytest
+import stub_api
 from fastapi.testclient import TestClient
-from stub_api import MODELPOL, RUNS, WRITES
+from stub_api import MCPPOL, MODELPOL, POLICIES, RUNS, WRITES, policy_row
 
 STARTED = "run_9f21c4"
 PENDING = "run_3a90f8"
@@ -314,3 +315,26 @@ def test_the_overlay_redraws_its_header_and_overview(client: TestClient) -> None
         overview,
     )
     assert 'hx-select-oob="#run-header"' in terminal
+
+
+def test_the_overview_names_its_policies(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(policy_row(MODELPOL), "name", "model_alpha")
+    monkeypatch.setitem(policy_row(MCPPOL), "name", "alpha-search")
+    body = client.get(f"/runs/{STARTED}", headers=HX).text
+
+    assert re.search(rf'hx-get="/policies/{MODELPOL}"\s+hx-target="#overlay">model_alpha</a>', body)
+    assert "edited from alpha-search" in body
+    assert re.search(r"<dt>Created with</dt>\s*<dd>\s*<a[^>]*>alpha-search</a>", body)
+
+
+def test_a_run_opens_once_its_policy_is_deleted(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    kept = [row for row in POLICIES if row["id"] != MODELPOL]
+    monkeypatch.setattr(stub_api, "POLICIES", kept)
+    response = client.get(f"/runs/{STARTED}", headers=HX)
+
+    assert response.status_code == 200
+    assert f'hx-get="/policies/{MODELPOL}"' not in response.text

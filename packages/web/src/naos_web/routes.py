@@ -545,13 +545,19 @@ async def _mcp_card(api: ApiClient, run: Row) -> run_mcp.McpCard:
     return run_mcp.card(run, gate, {policy["id"]: policy for policy in policies})
 
 
+async def _policy_name(api: ApiClient, policy_id: str | None) -> str:
+    found = await api.kept_policy(policy_id) if policy_id else None
+    return new_run.policy_name(found) if found else policy_id or ""
+
+
 async def _network(api: ApiClient, run: Row, network: Network) -> gates.Network:
     decision, limit, host = network
     gate, rows = await asyncio.gather(
         api.run_gate(run["id"], "network"),
         api.gate_trail(run["id"], gates.EVENTS[decision], limit),
     )
-    return gates.network(run, gate, rows, decision, limit, host)
+    view = gates.network(run, gate, rows, decision, limit, host)
+    return replace(view, policy_name=await _policy_name(api, view.policy_id))
 
 
 async def _shell(api: ApiClient, run: Row, shell: ShellView) -> gates.Shell:
@@ -560,7 +566,8 @@ async def _shell(api: ApiClient, run: Row, shell: ShellView) -> gates.Shell:
         api.run_gate(run["id"], "shell"),
         api.gate_trail(run["id"], gates.SHELL_EVENTS[decision], limit),
     )
-    return gates.shell(run, gate, rows, decision, limit)
+    view = gates.shell(run, gate, rows, decision, limit)
+    return replace(view, policy_name=await _policy_name(api, view.policy_id))
 
 
 # Declared after /runs/new, which this path would otherwise take for a run id.
@@ -2339,14 +2346,17 @@ async def audit_export(
 async def _audit_popup(request: Request, event_id: str, now: int, tab: AuditTab) -> HTMLResponse:
     api: ApiClient = request.app.state.api
     try:
-        picked, runners = await asyncio.gather(api.trail_event(event_id), api.runners())
+        picked, runners, policies = await asyncio.gather(
+            api.trail_event(event_id), api.runners(), api.policies()
+        )
         run = await _held(api, picked)
         lines = await _timeline(api, picked, run) if tab == "logs" else []
     except ApiError as err:
         return failed_overlay(request, PAGES["audit"], err)
     names = {runner["id"]: runner["name"] for runner in runners}
+    named = {policy["id"]: policy.get("name") or "" for policy in policies}
     popup = {
-        "detail": trail.detail(picked, run, names),
+        "detail": trail.detail(picked, run, names, named),
         "tab": tab,
         "log_lines": trail.timeline(lines, names, event_id),
         "denial_note": trail.DENIAL_NOTE,

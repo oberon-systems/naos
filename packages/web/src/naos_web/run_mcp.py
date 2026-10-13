@@ -161,7 +161,7 @@ def card(run: Row, gate: Row, policies: dict[str, Row]) -> McpCard:
         policy=label(held, names),
         edited_from=label(previous, names) if previous else "",
         created_id=created,
-        created=created or "none",
+        created=label(created, names) if created else "none",
         rules=mcp_rules(document),
         rules_line=f"{len(rules)} \u00b7 {denies} deny",
         calls=f"{gate['calls']} \u00b7 {gate['denied']} denied",
@@ -221,7 +221,7 @@ def _choice(policy: Row, held: str | None, picked: str, names: dict[str, str]) -
     note += f" \u00b7 {_plural(len(secrets), 'secret')}" if secrets else " \u00b7 no secrets"
     return Choice(
         id=policy["id"],
-        label=names.get(policy["id"]) or "unnamed",
+        label=names.get(policy["id"]) or short(policy["id"]),
         note=f"holds now \u00b7 {note}" if policy["id"] == held else note,
         held=policy["id"] == held,
         picked=policy["id"] == picked,

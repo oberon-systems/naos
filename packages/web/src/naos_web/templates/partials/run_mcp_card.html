@@ -22,7 +22,7 @@
             <dt>Policy</dt>
             <dd>
                 {% if mcp.policy_id %}
-                    <a class="run__fact-link run__mono"
+                    <a class="run__fact-link"
                        href="/policies/{{ mcp.policy_id }}"
                        hx-get="/policies/{{ mcp.policy_id }}"
                        hx-target="#overlay">{{ mcp.policy }}</a>
@@ -32,7 +32,7 @@
                 {% endif %}
             </dd>
             <dt>Created with</dt>
-            <dd class="run__mono">
+            <dd>
                 {% if mcp.created_id %}
                     <a class="run__fact-link"
                        href="/policies/{{ mcp.created_id }}"
@@ -113,10 +113,10 @@
                 <div class="mcp__change">
                     <span class="table__id">{{ change.seq }}</span>
                     <span class="run__mono table__secondary">{{ change.time }}</span>
-                    <span class="run__mono">{{ change.before }}</span>
+                    <span>{{ change.before }}</span>
                     <span>→</span>
                     {% if change.after_id %}
-                        <a class="run__fact-link run__mono"
+                        <a class="run__fact-link"
                            href="/policies/{{ change.after_id }}"
                            hx-get="/policies/{{ change.after_id }}"
                            hx-target="#overlay">{{ change.after }}</a>
@@ -133,7 +133,7 @@
             <div class="mcp__change">
                 <span class="table__id">start</span>
                 <span class="run__mono table__secondary">{{ mcp.start }}</span>
-                <span class="run__mono">{{ mcp.created }}</span>
+                <span>{{ mcp.created }}</span>
                 <span class="table__secondary">the policy the Run was created with; spec.mcp keeps it</span>
             </div>
         </li>

@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from stub_api import MCPPOL, WRITES
+from stub_api import MCPPOL, WRITES, policy_row
 
 HX = {"HX-Request": "true"}
 ROW = '<tr class="runs-table__row"'
@@ -167,3 +167,13 @@ def test_a_built_in_server_cannot_be_edited(client: TestClient, writes: list[Any
 
     assert "built-in and cannot change" in body
     assert writes == []
+
+
+def test_a_server_names_its_policies_once(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(policy_row(MCPPOL), "name", "alpha-search")
+    body = client.get("/mcp/alpha", headers=HX).text
+
+    assert '<div class="run__strong">alpha-search</div>' in body
+    assert "unnamed" not in body and f'class="table__id">{MCPPOL}' not in body

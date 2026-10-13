@@ -80,6 +80,7 @@ class Network:
     requests: list[Request]
     total: int
     more: int | None
+    policy_name: str = ""
 
 
 @dataclass(frozen=True)
@@ -121,6 +122,7 @@ class Shell:
     calls: list[Call]
     total: int
     more: int | None
+    policy_name: str = ""
 
 
 # A live gate shows even without a policy, since a Run without one is exactly what it reports.

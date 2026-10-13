@@ -1,8 +1,9 @@
 import re
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
-from stub_api import NETPOL, NOW, RUNS, SHELLPOL
+from stub_api import NETPOL, NOW, RUNS, SHELLPOL, policy_row
 
 from naos_web import format, gates
 
@@ -217,3 +218,12 @@ def test_a_shell_gate_without_calls_counts_nothing() -> None:
         ("0", "no call was made"),
         ("0", "none granted"),
     ]
+
+
+def test_each_gate_names_its_policy(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(policy_row(NETPOL), "name", "network_alpha")
+    monkeypatch.setitem(policy_row(SHELLPOL), "name", "shell_alpha")
+
+    link = r'hx-get="/policies/{}"\s+hx-target="#overlay">{}</a>'
+    assert re.search(link.format(NETPOL, "network_alpha"), _gates(client))
+    assert re.search(link.format(SHELLPOL, "shell_alpha"), _shell(client))

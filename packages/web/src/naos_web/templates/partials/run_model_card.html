@@ -10,11 +10,11 @@
         <div class="model__budget">
             <dl class="run__facts model__facts">
                 <dt>Policy</dt>
-                <dd class="run__mono">
+                <dd>
                     <a class="action"
                        href="/policies/{{ run.model.policy_id }}"
                        hx-get="/policies/{{ run.model.policy_id }}"
-                       hx-target="#overlay">{{ run.model.policy_id }}</a>
+                       hx-target="#overlay">{{ run.model.policy_name }}</a>
                 </dd>
                 <dt>Calls</dt>
                 <dd>

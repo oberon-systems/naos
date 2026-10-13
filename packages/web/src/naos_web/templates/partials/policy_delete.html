@@ -18,7 +18,7 @@
             {{ closer(back, get=back) }}
         </div>
         <p class="panel__facts">
-            {{ policy.kind }} policy {{ policy.id }} · {{ named }} {{ "profile" if named == 1 else "profiles" }} · {{ policy.runs_total }} {{ "run" if policy.runs_total == 1 else "runs" }}
+            {{ policy.kind }} policy {{ label }} · {{ named }} {{ "profile" if named == 1 else "profiles" }} · {{ policy.runs_total }} {{ "run" if policy.runs_total == 1 else "runs" }}
         </p>
     </header>
     <form class="dialog"

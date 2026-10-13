@@ -18,7 +18,7 @@
                     <a class="action"
                        href="/policies/{{ shell_gate.policy_id }}"
                        hx-get="/policies/{{ shell_gate.policy_id }}"
-                       hx-target="#overlay">{{ shell_gate.policy_id }}</a>
+                       hx-target="#overlay">{{ shell_gate.policy_name }}</a>
                 {% else %}
                     <span>{{ "temporary edit" if shell_gate.policy_tag[0] == "temporary" else "none" }}</span>
                 {% endif %}

@@ -42,7 +42,7 @@
                     <dt>Policies</dt>
                     <dd>
                         {% for item in change.policies %}
-                            <a class="run__fact-link run__mono"
+                            <a class="run__fact-link"
                                href="/policies/{{ item.id }}"
                                hx-get="/policies/{{ item.id }}"
                                hx-target="#overlay"

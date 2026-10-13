@@ -814,6 +814,12 @@ POLICIES: list[Row] = [
         "runs_total": 1,
     },
 ]
+
+
+def policy_row(policy_id: str) -> Row:
+    return next(row for row in POLICIES if row["id"] == policy_id)
+
+
 DAY = 86400
 HOLDER = {"run_id": "run_9f21c4", "seq": 128, "status": "STARTED", "profile_id": "prof_7a1c30"}
 EARLIER = {"run_id": "run_0d4492", "seq": 121, "status": "COMPLETED", "profile_id": None}

@@ -6,7 +6,7 @@
            type="search"
            name="q"
            value="{{ query }}"
-           placeholder="Search policy id or digest…"
+           placeholder="Search policy name, id or digest…"
            aria-label="Search policies"
            hx-get="/policies"
            hx-include="#policy-kind"
@@ -38,7 +38,7 @@
                 <td>
                     <div class="runners-table__name">
                         <span class="dot tone-{{ policy.tone }}"></span>
-                        <span class="run__mono run__strong">{{ policy.id }}</span>
+                        <span class="run__strong{{ " run__mono" if not policy.named }}">{{ policy.name }}</span>
                     </div>
                     <div class="table__id">{{ policy.digest }}</div>
                 </td>
