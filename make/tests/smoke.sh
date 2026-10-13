@@ -895,7 +895,7 @@ if [row["id"] for row in json.load(sys.stdin)] != [sys.argv[1]]:
     curl -fsS "$web/policies?kind=model" >"$TEMP_DIR/policies-kind.html"
     curl -fsS "$web/policies/$model_policy" >"$TEMP_DIR/policies-model.html"
     curl -fsS -X POST "$web/policies/new" --data-urlencode "kind=shell" \
-        --data-urlencode "cap.read_file=on" --data-urlencode "cap.list_dir=on" \
+        --data-urlencode "name=shell_alpha" --data-urlencode "cap.read_file=on" --data-urlencode "cap.list_dir=on" \
         --data-urlencode "cap.grep=on" >"$TEMP_DIR/policies-exists.html"
     "$VENV/bin/python" - "$TEMP_DIR" "$network_policy" "$shell_policy" "$run" "$model_policy" \
         "$secret" "$operator" "$openai_key" "$anthropic_key" <<'PY' || fail "the policies page is wrong"
@@ -1427,6 +1427,7 @@ done
 model_policy="$(
     curl -fsS -o /dev/null -w '%{redirect_url}' -X POST "$web/policies/new" \
         --data-urlencode "kind=model" \
+        --data-urlencode "name=model_alpha" \
         --data-urlencode "max_input=1000" \
         --data-urlencode "max_output=10" \
         --data-urlencode "providers.0.name=alpha" \
