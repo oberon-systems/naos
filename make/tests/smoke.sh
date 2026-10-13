@@ -594,6 +594,28 @@ check_model_tab() {
     done
 }
 
+mcp_tab() {
+    curl -fsS "$web/runs/$run/gates/mcp?decision=denied" >"$TEMP_DIR/run-mcp-tab.html"
+    for text in "MCP POLICY" "MCP OVER THE RUN" "GATE EVENTS" "CALLS BY SERVER AND TOOL" \
+        "mcp_policy_configured" "no rule allows this call" "denied by rule" "Denied ·"; do
+        grep -qF -- "$text" "$TEMP_DIR/run-mcp-tab.html" || return 1
+    done
+}
+
+# The MCP view lists the calls the Run was denied and the rule that denied each, and names secrets only.
+check_mcp_tab() {
+    wait_for 60 mcp_tab
+    curl -fsS "$web/runs/$run/gates/mcp?decision=secrets" >"$TEMP_DIR/run-mcp-secrets.html"
+    for text in "SECRETS THE AGENT ASKED FOR" "agent-key" "alpha-token" "not granted" \
+        "A value read belongs to the agent" "CALLS TO SECRETS"; do
+        grep -qF -- "$text" "$TEMP_DIR/run-mcp-secrets.html" || fail "the secrets view lacks: $text"
+    done
+    for value in "$agent_secret" "$secret" "$operator"; do
+        ! grep -qF -- "$value" "$TEMP_DIR/run-mcp-tab.html" "$TEMP_DIR/run-mcp-secrets.html" ||
+            fail "the mcp view carries a secret"
+    done
+}
+
 check_diff() {
     local diff
     diff="$(echo "$TEMP_DIR"/runs/*/diff.json)"
@@ -1642,6 +1664,7 @@ check_gates_tab
 check_live_shell
 check_shell_tab
 check_model_tab
+check_mcp_tab
 echo "reading the console through the api and the terminal tab..."
 wait_for 30 console_shipped
 check_terminal
