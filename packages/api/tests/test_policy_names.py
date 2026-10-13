@@ -1,3 +1,4 @@
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -79,15 +80,26 @@ def test_a_policy_a_profile_names_stays(client: TestClient) -> None:
     assert client.get("/api/v1/audit", params={"event": "policy_deleted"}).json() == []
 
 
-def test_a_policy_a_run_took_stays_after_the_run_ended(
+def test_an_unfinished_run_holds_its_policy(
+    client: TestClient, spec_body: dict[str, Any], create_run: Callable[[str], str]
+) -> None:
+    create_run("key-1")
+    path = f"/api/v1/policies/{spec_body['model']['policy']}"
+
+    refused = client.delete(path)
+
+    assert refused.status_code == 409
+    assert re.search(r"used by 1 unfinished run: #\d+ \(PENDING\)", refused.json()["detail"])
+    assert client.get(path).status_code == 200
+
+
+def test_a_policy_goes_once_its_runs_have_ended(
     client: TestClient, spec_body: dict[str, Any], create_run: Callable[[str], str]
 ) -> None:
     run_id = create_run("key-1")
     client.post(f"/api/v1/runs/{run_id}/stop")
     path = f"/api/v1/policies/{spec_body['model']['policy']}"
 
-    refused = client.delete(path)
-
-    assert refused.status_code == 409
-    assert "kept by the record of 1 run" in refused.json()["detail"]
-    assert client.get(path).status_code == 200
+    assert client.delete(path).status_code == 204
+    assert client.get(path).status_code == 404
+    assert client.get(f"/api/v1/runs/{run_id}").status_code == 200

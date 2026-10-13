@@ -94,7 +94,7 @@ def test_list_rejects_bad_query(client: TestClient, params: dict[str, Any]) -> N
     assert client.get("/api/v1/runs", params=params).status_code == 422
 
 
-@pytest.mark.parametrize("method", ["PUT", "PATCH", "DELETE"])
+@pytest.mark.parametrize("method", ["PUT", "PATCH"])
 def test_run_has_no_mutation_endpoints(
     client: TestClient, spec_body: dict[str, Any], method: str
 ) -> None:

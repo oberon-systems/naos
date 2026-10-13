@@ -262,3 +262,29 @@ def test_an_older_failure_falls_out_of_the_window(
 
 def test_summary_needs_the_operator(raw_client: TestClient) -> None:
     assert raw_client.get("/api/v1/runs/summary").status_code == 401
+
+
+def test_a_finished_run_is_deleted_and_the_audit_stays(
+    client: TestClient, session: Session, create_run: CreateRun
+) -> None:
+    run_id = create_run("key-1")
+    session.add(Merge(run_id=run_id, entries=[{"path": "a.py", "change": "modified"}]))
+    session.commit()
+    client.post(f"/api/v1/runs/{run_id}/stop")
+
+    assert client.delete(f"/api/v1/runs/{run_id}").status_code == 204
+    assert client.get(f"/api/v1/runs/{run_id}").status_code == 404
+    assert session.get(Merge, run_id) is None
+    [event] = client.get("/api/v1/audit", params={"event": "run_deleted"}).json()
+    assert event["run_id"] == run_id
+    assert event["data"] == {"seq": 1, "status": "CANCELLED"}
+
+
+def test_an_unfinished_run_is_never_deleted(client: TestClient, create_run: CreateRun) -> None:
+    run_id = create_run("key-1")
+
+    refused = client.delete(f"/api/v1/runs/{run_id}")
+
+    assert refused.status_code == 409
+    assert "is PENDING: stop it before deleting" in refused.json()["detail"]
+    assert client.get(f"/api/v1/runs/{run_id}").status_code == 200

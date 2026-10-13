@@ -207,6 +207,11 @@ def change_policy(run_id: str, body: PolicyChangeIn, session: SessionDep) -> Run
     return _held(session, RunRead.of(run))
 
 
+@router.delete("/runs/{run_id}", status_code=204)
+def delete_run(run_id: str, session: SessionDep) -> None:
+    runs.delete_run(session, run_id)
+
+
 @router.post("/runs/{run_id}/stop")
 def stop_run(run_id: str, session: SessionDep) -> RunRead:
     return RunRead.of(runs.stop_run(session, run_id))

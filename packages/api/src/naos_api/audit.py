@@ -24,6 +24,7 @@ API_EVENTS: dict[str, frozenset[str]] = {
     "run_assigned": frozenset({"lease_id", "slot", "slots"}),
     "run_transition": frozenset({"from", "to", "reason"}),
     "run_stop_requested": frozenset({"status"}),
+    "run_deleted": frozenset({"seq", "status"}),
     "runner_registered": frozenset(),
     "runner_revoked": frozenset(),
     "runner_drained": frozenset(),

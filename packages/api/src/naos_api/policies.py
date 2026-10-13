@@ -223,19 +223,22 @@ def _plural(count: int, noun: str) -> str:
     return f"{count} {noun}" if count == 1 else f"{count} {noun}s"
 
 
-# A Run keeps the id of its policy for good, so a policy any Run took stays with that record.
+# Only a Run that has not finished holds its policy; a finished one keeps the bare id.
 def delete_policy(session: Session, policy_id: str) -> None:
     policy = get_policy(session, policy_id)
-    view = view_policies(session, [policy])[0]
     parts = []
-    if view.profiles:
-        names = ", ".join(profile.name for profile in profiles_naming(session, policy_id))
-        parts.append(f"named by {_plural(len(view.profiles), 'profile')}: {names}")
-    if view.runs_total:
-        parts.append(f"kept by the record of {_plural(view.runs_total, 'run')}")
+    profiles = profiles_naming(session, policy_id)
+    if profiles:
+        names = ", ".join(profile.name for profile in profiles)
+        parts.append(f"named by {_plural(len(profiles), 'profile')}: {names}")
+    holding = names_policy(policy_id), col(Run.status).not_in(TERMINAL)
+    runs = session.exec(select(Run).where(*holding).order_by(col(Run.seq))).all()
+    if runs:
+        held = ", ".join(f"#{run.seq} ({run.status})" for run in runs)
+        parts.append(f"used by {_plural(len(runs), 'unfinished run')}: {held}")
     if parts:
         raise PolicyBusyError(f"policy {policy_id} is {' and '.join(parts)}")
-    taken = select(Run.id).where(names_policy(policy_id))
+    taken = select(Run.id).where(*holding)
     result = session.exec(delete(Policy).where(col(Policy.id) == policy_id, ~taken.exists()))
     if result.rowcount == 1:
         audit.record(

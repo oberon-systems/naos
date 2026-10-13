@@ -4,7 +4,7 @@ from pathlib import PurePosixPath
 from typing import Any
 from uuid import uuid4
 
-from sqlmodel import Session, col, func, or_, select, update
+from sqlmodel import Session, col, delete, func, or_, select, update
 
 from naos_api import audit, mcp_servers
 from naos_api.audit import Actor
@@ -19,7 +19,17 @@ from naos_api.images.service import booted_image, check_image
 from naos_api.lifecycle import ACTIVE, TERMINAL, RunStatus, ensure_transition
 from naos_api.mcp import McpPolicyIn, resolve_mcp_policy
 from naos_api.model import ModelPolicyIn, resolve_model_policy
-from naos_api.models import Lease, Merge, Policy, Profile, Run, Runner, RunPolicy
+from naos_api.models import (
+    ConsoleChunk,
+    ConsoleSize,
+    Lease,
+    Merge,
+    Policy,
+    Profile,
+    Run,
+    Runner,
+    RunPolicy,
+)
 from naos_api.network import NetworkPolicyIn, resolve_network_policy
 from naos_api.policies import (
     check_refs,
@@ -361,6 +371,20 @@ def transition_run(
     if result.rowcount == 1 or run.status is target:
         return run
     raise InvalidTransitionError(f"run {run_id} is {run.status}, expected {expected}")
+
+
+# A finished Run goes with its console, merge and policy edits; the audit trail stays.
+def delete_run(session: Session, run_id: str) -> None:
+    run = get_run(session, run_id)
+    if run.status not in TERMINAL:
+        raise InvalidTransitionError(f"run #{run.seq} is {run.status}: stop it before deleting")
+    for table in (RunPolicy, Merge, ConsoleChunk, ConsoleSize):
+        session.exec(delete(table).where(col(table.run_id) == run_id))
+    session.exec(delete(Run).where(col(Run.id) == run_id))
+    audit.record(
+        session, "run_deleted", actor="operator", run_id=run_id, seq=run.seq, status=str(run.status)
+    )
+    session.commit()
 
 
 def stop_run(session: Session, run_id: str) -> Run:
