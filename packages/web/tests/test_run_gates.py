@@ -3,7 +3,18 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from stub_api import IDLE_GATE, MODEL_GATE, MODELPOL, NETPOL, NOW, RUNS, SHELLPOL, policy_row
+from stub_api import (
+    IDLE_GATE,
+    MCP_EVENTS,
+    MCPPOL,
+    MODEL_GATE,
+    MODELPOL,
+    NETPOL,
+    NOW,
+    RUNS,
+    SHELLPOL,
+    policy_row,
+)
 
 from naos_web import format, gates
 
@@ -47,7 +58,7 @@ def test_the_gates_of_the_run_are_switched_between(client: TestClient) -> None:
 
     active = r'logs__kind--active"\s+href="[^"]+"\s+hx-get="[^"]+"\s+hx-target="#overlay">'
     assert re.search(active + "Network<", body)
-    assert 'logs__kind--idle">MCP</span>' in body
+    assert f'hx-get="/runs/{STARTED}/gates/mcp"' in body
     assert f'hx-get="/runs/{STARTED}/gates/shell"' in body
     assert f'hx-get="/runs/{STARTED}/gates/model"' in body
 
@@ -327,3 +338,104 @@ def test_the_model_policy_is_named(client: TestClient, monkeypatch: pytest.Monke
 
     link = r'hx-get="/policies/{}"\s+hx-target="#overlay">{}</a>'
     assert re.search(link.format(MODELPOL, "model_alpha"), _model(client))
+
+
+def _mcp(client: TestClient, run_id: str = STARTED, **params: str) -> str:
+    response = client.get(f"/runs/{run_id}/gates/mcp", params=params, headers=HX)
+    assert response.status_code == 200, response.text
+    body: str = response.text
+    return body
+
+
+def _calls(body: str) -> str:
+    return body.split("CALLS ·", 1)[1]
+
+
+def test_the_mcp_view_reads_the_gate_from_the_audit(client: TestClient) -> None:
+    body = _mcp(client)
+
+    active = r'logs__kind--active"\s+href="[^"]+"\s+hx-get="[^"]+"\s+hx-target="#overlay">'
+    assert re.search(active + "MCP<", body)
+    assert "MCP POLICY" in body and ">temporary</code>" in body and "edited from" in body
+    assert f'hx-get="/policies/{MCPPOL}"' in body and 'hx-get="/mcp/alpha"' in body
+    assert "3 · 1 deny · 1 with a budget" in body and "2 edits" not in body
+    assert "All · 212" in body and "Allowed · 208" in body and "Denied · 4" in body
+    assert "Secrets · 3" in body and "agent-key 2 · 1 refused" in body
+    groups = body.split("CALLS BY SERVER AND TOOL · 4", 1)[1].split("CALLS ·", 1)[0]
+    tools = re.findall(r'class="gates__host">\s*([^<\s]+)', groups)
+    assert tools == ["unknown", "delete", "get", "search"]
+
+
+def test_the_mcp_timeline_marks_every_gate_event(client: TestClient) -> None:
+    body = _mcp(client)
+
+    assert "MCP OVER THE RUN" in body and "lanes__bar--denied" in body
+    lanes = re.findall(r'class="lanes__name[^"]*"[^>]*>([^<]+)<', body)
+    assert lanes == ["policy", "alpha", "beta", "secrets", "shell", "unknown"]
+    assert "GATE EVENTS · 6" in body and "the broker serves the VM" in body
+    assert "&lt;b&gt;duplicate&lt;/b&gt; request id" in body and "<b>duplicate" not in body
+    assert ">alpha-token</code>" in body
+    assert f'hx-get="/audit/evt_{70:032x}"' in body and f'href="/audit/evt_{72:032x}"' in body
+
+
+def test_a_rule_budget_shows_what_it_spent(client: TestClient) -> None:
+    body = _mcp(client)
+
+    budgets = body.split("RULE BUDGETS · 1", 1)[1].split("CALLS BY SERVER", 1)[0]
+    assert "rule 2" in budgets and "name = agent-key" in budgets
+    assert "5 for the Run" in budgets and "2 / 5" in budgets and "width: 40%" in budgets
+
+
+def test_an_mcp_call_says_why_it_was_denied_and_never_shows_arguments(
+    client: TestClient,
+) -> None:
+    calls = _calls(_mcp(client))
+
+    assert "denied by rule 0" in calls and "no rule allows this call" in calls
+    assert "docs://alpha/" in calls and "refused: unexpected field arguments" in calls
+    assert "<b>search</b>" not in calls
+    assert "Arguments and results of a call are never logged" in calls
+
+
+def test_mcp_calls_are_filtered_by_decision(client: TestClient) -> None:
+    denied = _calls(_mcp(client, decision="denied"))
+
+    assert f"/audit/evt_{84:032x}" in denied and f"/audit/evt_{85:032x}" not in denied
+    assert 'href="/runs/run_9f21c4/gates/mcp?decision=secrets"' in denied
+
+
+def test_the_secrets_view_names_each_secret_and_never_a_value(client: TestClient) -> None:
+    body = _mcp(client, decision="secrets")
+
+    asked = body.split("SECRETS THE AGENT ASKED FOR · 2", 1)[1].split("CALLS TO SECRETS", 1)[0]
+    assert 'hx-get="/secrets/agent-key"' in asked and 'hx-get="/secrets/prod-key"' not in asked
+    assert ">not granted<" in asked and "2 of 5 for the Run" in asked
+    assert "A value read belongs to the agent" in body
+    calls = body.split("CALLS TO SECRETS · 3", 1)[1]
+    assert calls.index("agent-key") < calls.index("prod-key")
+    assert f"/audit/evt_{84:032x}" not in calls
+    assert "secret-alpha-value" not in body
+
+
+def test_a_secret_read_is_paired_with_its_call() -> None:
+    calls = [row for row in MCP_EVENTS if row["event"] == "mcp_call"]
+    reads = [row for row in MCP_EVENTS if row["event"] == "secret_read"]
+
+    assert gates.paired(calls, reads) == {
+        f"evt_{80:032x}": "prod-key",
+        f"evt_{83:032x}": "agent-key",
+    }
+    assert gates.paired(calls, []) == {}
+
+
+def test_a_run_without_mcp_calls_says_so(client: TestClient) -> None:
+    body = _mcp(client, WAITING)
+
+    assert "allows nothing" in body and "No call yet" in body
+    assert "CALLS BY SERVER AND TOOL" not in body and "RULE BUDGETS" not in body
+
+
+def test_a_pending_run_waits_for_its_mcp_gate(client: TestClient) -> None:
+    body = _mcp(client, PENDING)
+
+    assert "The Run has not started" in body and "MCP OVER THE RUN" not in body

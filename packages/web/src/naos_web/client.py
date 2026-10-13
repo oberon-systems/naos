@@ -220,11 +220,18 @@ class ApiClient:
         return row
 
     async def gate_trail(
-        self, run_id: str, events: tuple[str, ...], limit: int, decision: str | None = None
+        self,
+        run_id: str,
+        events: tuple[str, ...],
+        limit: int,
+        decision: str | None = None,
+        server: str | None = None,
     ) -> list[Row]:
         params = {"run_id": run_id, "event": list(events), "limit": limit, "order": "desc"}
         if decision is not None:
             params["decision"] = decision
+        if server is not None:
+            params["server"] = server
         rows: list[Row] = await self._call("GET", "/audit", params=params)
         return rows
 

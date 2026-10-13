@@ -1,0 +1,135 @@
+{% set mcp_base = base ~ "/mcp" %}
+{% set to_secrets = mcp_gate.decision == "secrets" %}
+<section class="card run__card">
+    <div class="run__card-header">
+        <h3 class="run__card-title">{{ "CALLS TO SECRETS" if to_secrets else "CALLS" }} · {{ mcp_gate.total }}</h3>
+        <div class="logs__kinds">
+            {% for key, label in mcp_gate.filters %}
+                {% set href = mcp_base ~ ("" if key == "all" else "?decision=" ~ key) %}
+                <a class="logs__kind{{ " logs__kind--active" if key == mcp_gate.decision }}"
+                   href="{{ href }}"
+                   hx-get="{{ href }}"
+                   hx-target="#overlay">{{ label }}</a>
+            {% endfor %}
+        </div>
+    </div>
+    <table class="table logs__table gates__table">
+        <colgroup>
+            <col class="logs__col-time">
+            <col class="gates__col-decision">
+            {% if to_secrets %}
+                <col class="gates__col-count">
+                <col class="gates__col-secret">
+            {% else %}
+                <col class="gates__col-server">
+                <col class="gates__col-call-tool">
+            {% endif %}
+            <col>
+            <col class="gates__col-count">
+            <col class="gates__col-count">
+        </colgroup>
+        <thead>
+            <tr>
+                <th>TIME</th>
+                <th>DECISION</th>
+                {% if to_secrets %}
+                    <th>TOOL</th>
+                    <th>SECRET</th>
+                {% else %}
+                    <th>SERVER</th>
+                    <th>TOOL / RESOURCE</th>
+                {% endif %}
+                <th>CATEGORY</th>
+                <th>RULE</th>
+                <th>DURATION</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in mcp_gate.calls %}
+                <tr class="gates__request{{ " logs__row--refused" if row.refused }}"
+                    hx-get="/audit/{{ row.id }}"
+                    hx-target="#overlay">
+                    <td class="logs__time">
+                        <a href="/audit/{{ row.id }}">{{ row.time }}</a>
+                    </td>
+                    <td>
+                        <span class="logs__source gates__decision--{{ row.decision }}">{{ row.decision }}</span>
+                    </td>
+                    {% if to_secrets %}
+                        <td class="gates__host">{{ row.tool }}</td>
+                        <td class="gates__host">
+                            {% if row.secret and row.decision == "allowed" %}
+                                <a class="gates__server"
+                                   href="/secrets/{{ row.secret }}"
+                                   hx-get="/secrets/{{ row.secret }}"
+                                   hx-target="#overlay">{{ row.secret }}</a>
+                            {% elif row.secret %}
+                                {{ row.secret }}
+                            {% else %}
+                                <span class="gates__why">names only</span>
+                            {% endif %}
+                        </td>
+                    {% else %}
+                        <td class="gates__who{{ " gates__who--unknown" if not row.known }}">
+                            {% if row.link %}
+                                <a class="gates__server"
+                                   href="/mcp/{{ row.server }}"
+                                   hx-get="/mcp/{{ row.server }}"
+                                   hx-target="#overlay">{{ row.server }}</a>
+                            {% else %}
+                                {{ row.server }}
+                            {% endif %}
+                        </td>
+                        <td class="gates__host">
+                            {{ row.tool }}
+                            {% if row.resource %}<span class="gates__resource">{{ row.resource }}</span>{% endif %}
+                        </td>
+                    {% endif %}
+                    <td class="gates__reason">
+                        {% if row.refused %}
+                            <span class="gates__reason--denied">{{ row.why }}</span>
+                        {% elif row.category == "none" %}
+                            —
+                        {% else %}
+                            <span class="gates__category">
+                                <code class="profile__tag model__category--{{ row.tone }}">{{ row.category }}</code>
+                                <span class="gates__why">{{ row.why }}</span>
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="gates__rule{{ " gates__rule--none" if row.rule == "none" }}">
+                        {% if row.rule_policy %}
+                            <a href="/policies/{{ row.rule_policy }}"
+                               hx-get="/policies/{{ row.rule_policy }}"
+                               hx-target="#overlay">{{ row.rule }}</a>
+                        {% else %}
+                            {{ row.rule }}
+                        {% endif %}
+                    </td>
+                    <td class="gates__count">{{ row.duration }}</td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td class="logs__empty" colspan="7">No call yet.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <div class="gates__footer">
+        {% if to_secrets %}
+            <span>A row opens its mcp_call; the name comes from the secret_read written beside it. A value is never logged.</span>
+        {% else %}
+            <span>A row opens its event. Arguments and results of a call are never logged, so no row carries them.</span>
+        {% endif %}
+        <span class="gates__more">
+            <span>{{ mcp_gate.calls | length }} of {{ mcp_gate.total }}</span>
+            {% if mcp_gate.more %}
+                {% set href = mcp_base ~ "?limit=" ~ mcp_gate.more ~ ("" if mcp_gate.decision == "all" else "&decision=" ~ mcp_gate.decision) %}
+                <a class="logs__export"
+                   href="{{ href }}"
+                   hx-get="{{ href }}"
+                   hx-target="#overlay">Load older</a>
+            {% endif %}
+        </span>
+    </div>
+</section>

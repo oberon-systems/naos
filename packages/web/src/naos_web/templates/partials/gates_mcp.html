@@ -1,0 +1,326 @@
+{% from "components.html" import dot %}
+{% set mcp_base = base ~ "/mcp" %}
+<div class="gates__summary">
+    <section class="card run__card">
+        <div class="run__card-header">
+            <h3 class="run__card-title">MCP POLICY</h3>
+            {% if mcp_gate.policy_id %}
+                <a class="card__link"
+                   href="/policies/{{ mcp_gate.policy_id }}"
+                   hx-get="/policies/{{ mcp_gate.policy_id }}"
+                   hx-target="#overlay">Open policy</a>
+            {% endif %}
+        </div>
+        <dl class="run__facts">
+            <dt>Policy</dt>
+            <dd class="gates__policy">
+                {% if mcp_gate.policy_id %}
+                    <a class="action"
+                       href="/policies/{{ mcp_gate.policy_id }}"
+                       hx-get="/policies/{{ mcp_gate.policy_id }}"
+                       hx-target="#overlay">{{ mcp_gate.policy_name }}</a>
+                {% endif %}
+                <code class="profile__tag gates__tag--{{ mcp_gate.policy_tag[1] }}">{{ mcp_gate.policy_tag[0] }}</code>
+                {% if mcp_gate.edited_from %}
+                    <span class="table__secondary">edited from</span>
+                    <a class="action"
+                       href="/policies/{{ mcp_gate.edited_from_id }}"
+                       hx-get="/policies/{{ mcp_gate.edited_from_id }}"
+                       hx-target="#overlay">{{ mcp_gate.edited_from }}</a>
+                {% endif %}
+            </dd>
+            <dt>Configured</dt>
+            <dd>
+                {{ mcp_gate.configured }}
+            </dd>
+            <dt>Rules</dt>
+            <dd class="gates__policy">
+                <span>{{ mcp_gate.rules_line }}</span>
+                <a class="action"
+                   href="/runs/{{ run.id }}"
+                   hx-get="/runs/{{ run.id }}"
+                   hx-target="#overlay">Show rules</a>
+            </dd>
+            <dt>Servers</dt>
+            <dd class="gates__tags">
+                {% for name, external in mcp_gate.servers %}
+                    {% if external %}
+                        <a class="gates__server"
+                           href="/mcp/{{ name }}"
+                           hx-get="/mcp/{{ name }}"
+                           hx-target="#overlay">{{ name }}</a>
+                    {% else %}
+                        <span class="gates__server">{{ name }}</span>
+                    {% endif %}
+                {% else %}
+                    none
+                {% endfor %}
+            </dd>
+            <dt>Changed live</dt>
+            <dd>
+                {{ mcp_gate.changed }}
+            </dd>
+        </dl>
+    </section>
+    {% for tile in mcp_gate.tiles %}
+        <section class="tile gates__tile">
+            <div class="tile__head">
+                <span class="run__card-title">{{ tile.label | upper }}</span>
+            </div>
+            <div class="tile__value">
+                {% if tile.tone and tile.counted %}{{ dot(tile.tone) }}{% endif %}
+                <span class="tile__number gates__number{{ " gates__number--none" if not tile.counted }}">{{ tile.value }}</span>
+            </div>
+            <span class="tile__note">{{ tile.note }}</span>
+            {% if loop.last and tile.counted %}
+                <a class="card__link"
+                   href="{{ mcp_base }}?decision=secrets"
+                   hx-get="{{ mcp_base }}?decision=secrets"
+                   hx-target="#overlay">Open secrets</a>
+            {% endif %}
+        </section>
+    {% endfor %}
+</div>
+{% if not mcp_gate.started %}
+    <section class="card gates__empty">
+        <strong>The Run has not started</strong>
+        <span>The runner configures the MCP broker when it starts the VM.</span>
+        <span>Calls show here from then on.</span>
+    </section>
+{% else %}
+    {% set line = mcp_gate.timeline %}
+    <section class="card run__card">
+        <div class="run__card-header">
+            <h3 class="run__card-title">MCP OVER THE RUN</h3>
+            <span class="table__secondary">{{ line.span }} · bars are calls per minute · a marker opens its events</span>
+        </div>
+        <div class="lanes">
+            <div class="lanes__row lanes__row--markers">
+                <div class="lanes__track lanes__track--alone">
+                    {% for marker in line.markers %}
+                        <a class="lanes__marker profile__tag gates__tag--{{ marker.tone }}"
+                           style="left: {{ marker.left }}%"
+                           href="/audit/{{ marker.id }}"
+                           hx-get="/audit/{{ marker.id }}"
+                           hx-target="#overlay">{{ marker.label }}</a>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="lanes__row">
+                <span class="lanes__name lanes__name--policy">policy</span>
+                <div class="lanes__track">
+                    {% for segment in line.segments %}
+                        <span class="lanes__segment gates__tag--{{ segment.tone }}"
+                              style="left: {{ segment.place.left }}%;
+                                     width: {{ segment.place.width }}%"
+                              title="{{ segment.label }}">{{ segment.label }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% for lane in line.lanes %}
+                <div class="lanes__row">
+                    {% if lane.link %}
+                        <a class="lanes__name"
+                           href="/mcp/{{ lane.server }}"
+                           hx-get="/mcp/{{ lane.server }}"
+                           hx-target="#overlay">{{ lane.server }}</a>
+                    {% else %}
+                        <span class="lanes__name{{ " lanes__name--unknown" if not lane.known }}">{{ lane.server }}</span>
+                    {% endif %}
+                    <div class="lanes__track">
+                        {% for span in lane.spans %}
+                            <span class="lanes__held"
+                                  style="left: {{ span.left }}%;
+                                         width: {{ span.width }}%"></span>
+                        {% endfor %}
+                        {% for bar in lane.bars %}
+                            <span class="lanes__bar{{ " lanes__bar--denied" if bar.denied }}"
+                                  style="left: {{ bar.place.left }}%;
+                                         width: {{ bar.place.width }}%;
+                                         height: {{ bar.height }}px"></span>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endfor %}
+            <div class="lanes__row">
+                <div class="spend__axis lanes__track--alone">
+                    {% for tick in line.axis %}<span>{{ tick }}</span>{% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="lanes__events">
+            <div class="lanes__events-head">
+                <span class="run__card-title">GATE EVENTS · {{ mcp_gate.events | length }}</span>
+                <span class="lanes__kinds">mcp_policy_configured · mcp_attached · mcp_rejected · mcp_credentials_updated · policy_changed</span>
+            </div>
+            <table class="table logs__table gates__table">
+                <colgroup>
+                    <col class="gates__col-number">
+                    <col class="logs__col-time">
+                    <col class="gates__col-event">
+                    <col>
+                    <col class="gates__col-actor">
+                </colgroup>
+                <tbody>
+                    {% for event in mcp_gate.events %}
+                        <tr class="gates__request{{ " logs__row--refused" if event.refused }}"
+                            hx-get="/audit/{{ event.id }}"
+                            hx-target="#overlay">
+                            <td>
+                                <code class="profile__tag gates__tag--{{ event.tone }}">{{ event.number }}</code>
+                            </td>
+                            <td class="logs__time">
+                                <a href="/audit/{{ event.id }}">{{ event.time }}</a>
+                            </td>
+                            <td class="gates__host">{{ event.event }}</td>
+                            <td class="gates__reason">
+                                <span class="gates__category">
+                                    {% if event.before %}
+                                        <span class="gates__for">{{ event.before }}</span>
+                                        <span>→</span>
+                                        <span class="gates__for">{{ event.after }}</span>
+                                    {% endif %}
+                                    <span class="gates__why{{ " gates__reason--denied" if event.event == "mcp_rejected" or event.refused }}">{{ event.detail }}</span>
+                                    {% for name in event.names %}<code class="profile__tag model__secret">{{ name }}</code>{% endfor %}
+                                </span>
+                            </td>
+                            <td>
+                                <code class="profile__tag">{{ event.actor }}</code>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td class="logs__empty" colspan="5">No gate event yet.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% if mcp_gate.budgets %}
+        <section class="card run__card">
+            <div class="run__card-header">
+                <h3 class="run__card-title">RULE BUDGETS · {{ mcp_gate.budgets | length }}</h3>
+                <span class="table__secondary">a denied call spends nothing · a rule kept across a change keeps what it spent</span>
+            </div>
+            <table class="table logs__table gates__table">
+                <colgroup>
+                    <col class="gates__col-rule-index">
+                    <col class="gates__col-provider">
+                    <col class="gates__col-call-path">
+                    <col class="gates__col-limit">
+                    <col class="gates__col-spent">
+                    <col>
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>RULE</th>
+                        <th>SERVER</th>
+                        <th>TOOL</th>
+                        <th>BUDGET</th>
+                        <th>SPENT</th>
+                        <th>NOTE</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for budget in mcp_gate.budgets %}
+                        <tr>
+                            <td class="gates__rule">rule {{ budget.rule }}</td>
+                            <td class="gates__who">
+                                {% if budget.link %}
+                                    <a class="gates__server"
+                                       href="/mcp/{{ budget.server }}"
+                                       hx-get="/mcp/{{ budget.server }}"
+                                       hx-target="#overlay">{{ budget.server }}</a>
+                                {% else %}
+                                    {{ budget.server }}
+                                {% endif %}
+                            </td>
+                            <td class="gates__host">
+                                {{ budget.tool }}
+                                {% if budget.constraint %}<span class="gates__resource">{{ budget.constraint }}</span>{% endif %}
+                            </td>
+                            <td>{{ budget.limit }}</td>
+                            <td>
+                                <span class="gates__spent">
+                                    <span class="gates__meter"><span class="gates__meter-fill{{ " gates__meter-fill--full" if budget.full }}"
+      style="width: {{ budget.meter }}%"></span></span>
+                                    <code>{{ budget.spent }}</code>
+                                </span>
+                            </td>
+                            <td class="gates__reason">
+                                {% if budget.refused %}
+                                    <code class="profile__tag model__category--red">{{ budget.refused }} refused</code>
+                                {% endif %}
+                                {% if budget.since %}
+                                    <span class="gates__why">since {{ budget.since }} · a new rule starts at 0</span>
+                                {% elif not budget.refused %}
+                                    —
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    {% endif %}
+    {% if not mcp_gate.groups %}
+        <section class="card gates__empty">
+            <strong>No call yet</strong>
+            <span>The agent has not called a tool or read a resource through the broker.</span>
+            <span>Calls, denials and the budgets they spend show here from the first one.</span>
+        </section>
+    {% else %}
+        <section class="card run__card">
+            <div class="run__card-header">
+                <h3 class="run__card-title">CALLS BY SERVER AND TOOL · {{ mcp_gate.groups_total }}</h3>
+                <span class="table__secondary">denied first · grouped by server, tool and resource</span>
+            </div>
+            <table class="table logs__table gates__table">
+                <colgroup>
+                    <col class="gates__col-server">
+                    <col class="gates__col-call-path">
+                    <col class="gates__col-count">
+                    <col class="gates__col-count">
+                    <col class="gates__col-count">
+                    <col>
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>SERVER</th>
+                        <th>TOOL / RESOURCE</th>
+                        <th>CALLS</th>
+                        <th>DENIED</th>
+                        <th>SLOWEST</th>
+                        <th>LAST CALL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for group in mcp_gate.groups %}
+                        <tr>
+                            <td class="gates__who{{ " gates__who--unknown" if not group.known }}">
+                                {% if group.link %}
+                                    <a class="gates__server"
+                                       href="/mcp/{{ group.server }}"
+                                       hx-get="/mcp/{{ group.server }}"
+                                       hx-target="#overlay">{{ group.server }}</a>
+                                {% else %}
+                                    {{ group.server }}
+                                {% endif %}
+                            </td>
+                            <td class="gates__host">
+                                {{ group.tool }}
+                                {% if group.resource %}<span class="gates__resource">{{ group.resource }}</span>{% endif %}
+                            </td>
+                            <td class="gates__count">{{ group.calls }}</td>
+                            <td class="gates__count{{ " gates__count--denied" if group.denied else " gates__count--zero" }}">{{ group.denied }}</td>
+                            <td class="gates__count">{{ group.slowest }}</td>
+                            <td class="logs__time">{{ group.last }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+        {% include "partials/gates_mcp_calls.html" %}
+    {% endif %}
+{% endif %}

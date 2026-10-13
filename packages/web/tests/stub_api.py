@@ -515,6 +515,17 @@ TRAIL: list[Row] = [
     _trail(41901, 30, "run_claimed", {"token": "secret-alpha-value"}),
 ]
 TRAIL_QUERIES: list[Row] = []
+MCP_KINDS = frozenset(
+    {
+        "mcp_call",
+        "secret_read",
+        "mcp_policy_configured",
+        "mcp_attached",
+        "mcp_rejected",
+        "mcp_credentials_updated",
+        "policy_changed",
+    }
+)
 
 
 @stub.get("/api/v1/audit/summary")
@@ -548,6 +559,7 @@ def audit(
     limit: int = Query(100),
     order: str = "asc",
     decision: str | None = None,
+    server: str | None = None,
 ) -> list[Row]:
     if secret is not None:
         return SECRET_EVENTS.get(secret, [])[:limit]
@@ -556,6 +568,16 @@ def audit(
             row
             for row in MODEL_EVENTS
             if row["run_id"] == run_id and decision in (None, row["data"]["decision"])
+        ]
+        return (found[::-1] if order == "desc" else found)[:limit]
+    if run_id is not None and event and set(event) <= MCP_KINDS and event != ["policy_changed"]:
+        found = [
+            row
+            for row in MCP_EVENTS
+            if row["run_id"] == run_id
+            and row["event"] in event
+            and decision in (None, row["data"].get("decision"))
+            and server in (None, row["data"].get("server"))
         ]
         return (found[::-1] if order == "desc" else found)[:limit]
     if run_id is not None and event and all(name.startswith("network_") for name in event):
@@ -1685,6 +1707,18 @@ QUIET_NETWORK: Row = {
 }
 
 
+def _mcp_group(server: str, tool: str, calls: int, denied: int, slowest: int, last: int) -> Row:
+    return {
+        "server": server,
+        "tool": tool,
+        "resource": "none",
+        "calls": calls,
+        "denied": denied,
+        "slowest_ms": slowest,
+        "last_at": last,
+    }
+
+
 MCP_GATE: Row = {
     "policy_id": None,
     "document": HELD_MCP,
@@ -1692,12 +1726,76 @@ MCP_GATE: Row = {
     "calls": 212,
     "denied": 4,
     "secret_reads": [{"name": "agent-key", "reads": 2}],
+    "secrets": [
+        {"name": "agent-key", "reads": 2, "refused": 0, "last_at": NOW - 41},
+        {"name": "prod-key", "reads": 0, "refused": 1, "last_at": NOW - 50},
+    ],
+    "groups_total": 4,
+    "groups": [
+        _mcp_group("unknown", "unknown", 2, 2, 0, NOW - 70),
+        _mcp_group("alpha", "delete", 1, 1, 2, NOW - 20),
+        _mcp_group("secrets", "get", 3, 1, 18, NOW - 40),
+        _mcp_group("alpha", "search", 206, 0, 12400, NOW - 10),
+    ],
+    "minutes": [
+        {"at": NOW - 120, "server": "alpha", "calls": 100, "denied": 0},
+        {"at": NOW - 60, "server": "alpha", "calls": 107, "denied": 1},
+        {"at": NOW - 60, "server": "secrets", "calls": 3, "denied": 1},
+        {"at": NOW - 60, "server": "unknown", "calls": 2, "denied": 2},
+    ],
+    "budgets": [{"rule": 2, "spent": 2, "peak": 1, "refused": 0, "since": NOW - 140}],
 }
+IDLE_MCP: Row = MCP_GATE | {
+    "document": None,
+    "configured_at": None,
+    "calls": 0,
+    "denied": 0,
+    "secret_reads": [],
+    "secrets": [],
+    "groups_total": 0,
+    "groups": [],
+    "minutes": [],
+    "budgets": [],
+}
+MCP_CALL: Row = {
+    "server": "alpha",
+    "tool": "search",
+    "resource": "none",
+    "decision": "allow",
+    "duration_ms": 12400,
+    "category": "none",
+    "rule": "1",
+}
+DENIED_CALL: Row = MCP_CALL | {"decision": "deny", "duration_ms": 1, "category": "denied"}
+# The started Run's broker: attached, one live change, a rejected message, calls and two reads.
+MCP_EVENTS: list[Row] = [
+    _runner(70, NOW - 133, "mcp_policy_configured", {}),
+    _runner(71, NOW - 132, "mcp_attached", {}),
+    _event(
+        72,
+        NOW - 60,
+        "policy_changed",
+        {"kind": "mcp", "from": MCPPOL, "to": None, "digest": "0" * 64},
+        actor="operator",
+    ),
+    _runner(73, NOW - 56, "mcp_policy_configured", {}),
+    _runner(74, NOW - 55, "mcp_rejected", {"reason": "<b>duplicate</b> request id"}),
+    _runner(75, NOW - 54, "mcp_credentials_updated", {"names": "alpha-token"}),
+    _runner(
+        80, NOW - 50, "mcp_call", DENIED_CALL | {"server": "secrets", "tool": "get", "rule": "none"}
+    ),
+    _runner(81, NOW - 50, "secret_read", {"name": "prod-key", "decision": "deny"}),
+    _runner(82, NOW - 41, "secret_read", {"name": "agent-key", "decision": "allow"}),
+    _runner(83, NOW - 40, "mcp_call", MCP_CALL | {"server": "secrets", "tool": "get", "rule": "2"}),
+    _runner(84, NOW - 20, "mcp_call", DENIED_CALL | {"tool": "delete", "rule": "0"}),
+    _runner(85, NOW - 10, "mcp_call", MCP_CALL | {"resource": "docs://alpha/"}),
+    _runner(86, NOW - 5, "mcp_call", MCP_CALL | {"tool": "<b>search</b>", "arguments": "{}"}),
+]
 
 
 @stub.get("/api/v1/runs/{run_id}/gates/mcp")
 def mcp_gate(run_id: str) -> Row:
-    return MCP_GATE
+    return MCP_GATE if run_id == RUNS[0]["id"] else IDLE_MCP
 
 
 # A stored policy the api does not hold is refused, as the api refuses it.

@@ -1,9 +1,9 @@
 {% set base = "/runs/" ~ run.id ~ "/gates" %}
-{% set shown = "network" if network else "shell" if shell_gate else "model" %}
+{% set shown = "network" if network else "shell" if shell_gate else "mcp" if mcp_gate else "model" %}
 <div class="run__body run__body--gates">
     <div class="logs__filters">
         <div class="logs__kinds">
-            {% for gate in (network or shell_gate or model_gate).gates %}
+            {% for gate in (network or shell_gate or mcp_gate or model_gate).gates %}
                 {% if gate.live %}
                     {% set href = base if gate.key == "network" else base ~ "/" ~ gate.key %}
                     <a class="logs__kind{{ " logs__kind--active" if gate.key == shown }}"
@@ -16,7 +16,10 @@
             {% endfor %}
         </div>
         <div class="logs__scope">
-            <span class="logs__run">{{ run.id }}</span>
+            <a class="logs__run gates__run"
+               href="/runs/{{ run.id }}"
+               hx-get="/runs/{{ run.id }}"
+               hx-target="#overlay">{{ run.id }}</a>
             <span class="run__sep">·</span>
             <span>counted from the audit</span>
         </div>
@@ -25,6 +28,10 @@
         {% include "partials/gates_network.html" %}
     {% elif shell_gate %}
         {% include "partials/gates_shell.html" %}
+    {% elif mcp_gate and mcp_gate.decision == "secrets" %}
+        {% include "partials/gates_mcp_secrets.html" %}
+    {% elif mcp_gate %}
+        {% include "partials/gates_mcp.html" %}
     {% else %}
         {% include "partials/gates_model.html" %}
     {% endif %}

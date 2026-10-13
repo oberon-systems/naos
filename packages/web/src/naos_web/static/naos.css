@@ -3300,6 +3300,186 @@ form {
   color: var(--faint);
 }
 
+.gates__tag--grey { background: var(--grey-bg); color: var(--grey-text); }
+.gates__tag--green { background: var(--green-bg); color: var(--green-text); }
+.gates__tag--red { background: var(--red-bg); color: var(--red-text); }
+
+.gates__run,
+.gates__server {
+  font-family: var(--font-mono);
+  color: var(--blue-text);
+  text-decoration: none;
+}
+
+.gates__table .gates__who .gates__server {
+  font-family: inherit;
+}
+
+.gates__resource {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--soft);
+}
+
+.gates__col-server { width: 130px; }
+.gates__col-call-tool { width: 240px; }
+.gates__col-secret { width: 180px; }
+.gates__col-number { width: 44px; }
+.gates__col-event { width: 200px; }
+.gates__col-actor { width: 90px; }
+.gates__col-rule-index { width: 80px; }
+.gates__col-limit { width: 150px; }
+.gates__col-spent { width: 240px; }
+
+.gates__spent {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gates__spent code {
+  font-family: var(--font-mono);
+  color: var(--ink);
+}
+
+.gates__meter {
+  position: relative;
+  width: 140px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--grey-bg);
+  overflow: hidden;
+}
+
+.gates__meter-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 3px;
+  background: var(--blue-dot);
+}
+
+.gates__meter-fill--full {
+  background: var(--amber-dot);
+}
+
+.gates__note {
+  gap: 4px;
+  padding: 12px 16px;
+  border-color: #fedf89;
+  background: var(--amber-bg);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.gates__note strong {
+  font-weight: 600;
+  color: var(--amber-text);
+}
+
+.lanes {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 16px 8px;
+}
+
+.lanes__row {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  align-items: center;
+  min-height: 30px;
+}
+
+.lanes__row--markers {
+  min-height: 22px;
+}
+
+.lanes__track--alone {
+  grid-column: 2;
+}
+
+.lanes__name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--blue-text);
+  text-decoration: none;
+}
+
+.lanes__name--policy {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--soft);
+}
+
+.lanes__name--unknown {
+  color: var(--faint);
+}
+
+.lanes__track {
+  position: relative;
+  height: 26px;
+}
+
+.lanes__row--markers .lanes__track {
+  height: 20px;
+}
+
+.lanes__marker {
+  position: absolute;
+  top: 0;
+  text-decoration: none;
+}
+
+.lanes__segment {
+  position: absolute;
+  top: 3px;
+  height: 20px;
+  overflow: hidden;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.lanes__held {
+  position: absolute;
+  bottom: 0;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+}
+
+.lanes__bar {
+  position: absolute;
+  bottom: 4px;
+  border-radius: 1px;
+  background: var(--blue-dot);
+  box-shadow: inset 2px 0 0 #fff, inset -2px 0 0 #fff;
+}
+
+.lanes__bar--denied {
+  background: var(--red-dot);
+}
+
+.lanes__events {
+  padding: 0 0 4px;
+}
+
+.lanes__events-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 16px 6px;
+}
+
+.lanes__kinds {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--faint);
+}
+
 /* mcp servers */
 
 .mcp-table th:nth-child(1),

@@ -90,7 +90,7 @@ class McpCard:
     changeable: bool
 
 
-def _summary(before: list[Row], after: list[Row]) -> str:
+def summary(before: list[Row], after: list[Row]) -> str:
     gone, came = set(allowed(before)), set(allowed(after))
     parts = [f"added server {name}" for name in sorted(came - gone)]
     parts += [f"took away {name}" for name in sorted(gone - came)]
@@ -185,7 +185,7 @@ def card(run: Row, gate: Row, policies: dict[str, Row]) -> McpCard:
                 before=label(change["previous_id"], names),
                 after=label(change["policy_id"], names),
                 after_id=change["policy_id"],
-                note=_summary(documents[index], documents[index + 1]),
+                note=summary(documents[index], documents[index + 1]),
                 now=index == len(history) - 1,
             )
             for index, change in reversed(list(enumerate(history)))

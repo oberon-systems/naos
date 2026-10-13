@@ -111,6 +111,7 @@ Tab = Literal["overview", "terminal", "logs", "changes", "gates"]
 Network = tuple[gates.Decision, int, str | None]
 ShellView = tuple[gates.Decision, int]
 ModelView = tuple[gates.Decision, int]
+McpView = tuple[gates.McpDecision, int]
 StateQuery = Annotated[State, Query()]
 Fleet = Literal["all", "live", "stale", "revoked"]
 FleetQuery = Annotated[Fleet, Query()]
@@ -504,14 +505,17 @@ async def _run_panel(
     network: Network = ("all", gates.PAGE, None),
     shell_view: ShellView | None = None,
     model_view: ModelView | None = None,
+    mcp_view: McpView | None = None,
 ) -> HTMLResponse:
     api: ApiClient = request.app.state.api
     try:
         detail = await api.run_detail(run_id)
-        on_network = tab == "gates" and shell_view is None and model_view is None
+        other = shell_view or model_view or mcp_view
+        on_network = tab == "gates" and other is None
         network_view = await _network(api, detail.run, network) if on_network else None
         shell_gate = await _shell(api, detail.run, shell_view) if shell_view else None
         model_gate = await _model_gate(api, detail.run, model_view) if model_view else None
+        mcp_gate = await _mcp_gate(api, detail.run, mcp_view, now) if mcp_view else None
         held = tab == "overview" and detail.run["mcp_document"] is not None
         mcp = await _mcp_card(api, detail.run) if held else None
     except ApiError as err:
@@ -540,6 +544,7 @@ async def _run_panel(
         network=network_view,
         shell_gate=shell_gate,
         model_gate=model_gate,
+        mcp_gate=mcp_gate,
         mcp=mcp,
     )
 
@@ -547,6 +552,27 @@ async def _run_panel(
 async def _mcp_card(api: ApiClient, run: Row) -> run_mcp.McpCard:
     gate, policies = await asyncio.gather(api.run_gate(run["id"], "mcp"), api.policies("mcp"))
     return run_mcp.card(run, gate, {policy["id"]: policy for policy in policies})
+
+
+async def _mcp_gate(api: ApiClient, run: Row, view: McpView, now: int) -> gates.Mcp:
+    decision, limit = view
+    run_id = run["id"]
+    secrets = decision == "secrets"
+    gate, rows, trail, policies = await asyncio.gather(
+        api.run_gate(run_id, "mcp"),
+        api.gate_trail(
+            run_id,
+            ("mcp_call",),
+            limit,
+            gates.MCP_DECISIONS[decision],
+            "secrets" if secrets else None,
+        ),
+        api.gate_trail(run_id, gates.MCP_EVENTS, gates.MOST),
+        api.policies("mcp"),
+    )
+    reads = await api.gate_trail(run_id, ("secret_read",), limit) if secrets else []
+    kept = {policy["id"]: policy for policy in policies}
+    return gates.mcp(run, gate, rows, trail, kept, decision, limit, now, reads)
 
 
 async def _policy_name(api: ApiClient, policy_id: str | None) -> str:
@@ -649,6 +675,17 @@ async def run_gates_model(
     limit: Annotated[int, Query(ge=1, le=gates.MOST)] = gates.PAGE,
 ) -> HTMLResponse:
     return await _run_panel(request, run_id, now, "gates", model_view=(decision, limit))
+
+
+@router.get("/runs/{run_id}/gates/mcp", response_class=HTMLResponse)
+async def run_gates_mcp(
+    request: Request,
+    run_id: str,
+    now: NowDep,
+    decision: gates.McpDecision = "all",
+    limit: Annotated[int, Query(ge=1, le=gates.MOST)] = gates.PAGE,
+) -> HTMLResponse:
+    return await _run_panel(request, run_id, now, "gates", mcp_view=(decision, limit))
 
 
 @router.get("/runs/{run_id}/changes", response_class=HTMLResponse)
