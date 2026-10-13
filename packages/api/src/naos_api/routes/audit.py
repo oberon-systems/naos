@@ -49,6 +49,7 @@ def search_events(
     run_id: str | None = None,
     secret: str | None = None,
     decision: Literal["allow", "deny"] | None = None,
+    server: Annotated[str | None, Query(max_length=256)] = None,
     event: Annotated[list[str] | None, Query(max_length=100)] = None,
     since: Annotated[int | None, Query(ge=0)] = None,
     after: Annotated[int | None, Query(ge=0)] = None,
@@ -68,6 +69,7 @@ def search_events(
         run_id=run_id,
         secret=secret,
         decision=decision,
+        server=server,
     )
     return [AuditEventRead.of(row) for row in found]
 

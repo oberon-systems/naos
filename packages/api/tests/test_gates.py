@@ -5,7 +5,8 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from naos_api.models import AuditEvent
+from naos_api.models import AuditEvent, RunPolicy
+from naos_api.spec import PolicyKind
 
 CreateRun = Callable[[str], str]
 
@@ -283,32 +284,181 @@ def _event(session: Session, run_id: str, at: int, event: str, **data: Any) -> N
     session.commit()
 
 
+def _mcp_call(
+    session: Session, run_id: str, at: int, tool: str, decision: str = "allow", **fields: Any
+) -> None:
+    data = {
+        "server": "alpha",
+        "tool": tool,
+        "resource": "none",
+        "decision": decision,
+        "duration_ms": 5,
+        "category": "none" if decision == "allow" else "denied",
+        "rule": "none",
+    }
+    _event(session, run_id, at, "mcp_call", **(data | fields))
+
+
+def _mcp_run(client: TestClient, spec_body: dict[str, Any], rules: list[Any]) -> dict[str, Any]:
+    policy = client.post("/api/v1/policies", json={"kind": "mcp", "document": {"rules": rules}})
+    assert policy.status_code in (200, 201), policy.text
+    spec_body["mcp"] = {"policy": policy.json()["id"]}
+    run: dict[str, Any] = client.post(
+        "/api/v1/runs", json=spec_body, headers={"Idempotency-Key": f"key-{uuid4().hex}"}
+    ).json()
+    return run
+
+
+def _mcp(client: TestClient, run_id: str) -> dict[str, Any]:
+    response = client.get(f"/api/v1/runs/{run_id}/gates/mcp")
+    assert response.status_code == 200, response.text
+    body: dict[str, Any] = response.json()
+    return body
+
+
 def test_the_mcp_gate_counts_calls_and_secret_reads(
     client: TestClient, session: Session, spec_body: dict[str, Any], mcp_body: dict[str, Any]
 ) -> None:
-    policy = client.post("/api/v1/policies", json={"kind": "mcp", "document": mcp_body})
-    spec_body["mcp"] = {"policy": policy.json()["id"]}
-    run = client.post("/api/v1/runs", json=spec_body, headers={"Idempotency-Key": "key-1"}).json()
-    other = client.post("/api/v1/runs", json=spec_body, headers={"Idempotency-Key": "key-2"})
+    run = _mcp_run(client, spec_body, mcp_body["rules"])
+    other = _mcp_run(client, spec_body, mcp_body["rules"])
     for at, decision in ((10, "allow"), (11, "deny"), (12, "allow")):
-        _event(session, run["id"], at, "mcp_call", server="alpha", decision=decision)
-    _event(session, other.json()["id"], 13, "mcp_call", server="alpha", decision="deny")
+        _mcp_call(session, run["id"], at, "search", decision)
+    _mcp_call(session, other["id"], 13, "search", "deny")
     for at, name in ((14, "beta-key"), (15, "alpha-key"), (16, "alpha-key")):
         _event(session, run["id"], at, "secret_read", name=name, decision="allow")
     _event(session, run["id"], 17, "secret_read", name="beta-key", decision="deny")
     _event(session, run["id"], 18, "mcp_policy_configured")
 
-    response = client.get(f"/api/v1/runs/{run['id']}/gates/mcp")
+    gate = _mcp(client, run["id"])
 
-    assert response.status_code == 200, response.text
-    assert response.json() == {
-        "policy_id": policy.json()["id"],
+    assert {key: gate[key] for key in ("policy_id", "document", "configured_at")} == {
+        "policy_id": spec_body["mcp"]["policy"],
         "document": run["mcp_document"],
         "configured_at": 18,
-        "calls": 3,
-        "denied": 1,
-        "secret_reads": [{"name": "alpha-key", "reads": 2}, {"name": "beta-key", "reads": 1}],
     }
+    assert (gate["calls"], gate["denied"]) == (3, 1)
+    assert gate["secret_reads"] == [
+        {"name": "alpha-key", "reads": 2},
+        {"name": "beta-key", "reads": 1},
+    ]
+    assert gate["secrets"] == [
+        {"name": "alpha-key", "reads": 2, "refused": 0, "last_at": 16},
+        {"name": "beta-key", "reads": 1, "refused": 1, "last_at": 17},
+    ]
+    assert gate["budgets"] == []
+
+
+def test_mcp_calls_are_grouped_by_server_and_tool_denied_first(
+    client: TestClient, session: Session, spec_body: dict[str, Any], mcp_body: dict[str, Any]
+) -> None:
+    run_id = _mcp_run(client, spec_body, mcp_body["rules"])["id"]
+    _mcp_call(session, run_id, 60, "search", duration_ms=40)
+    _mcp_call(session, run_id, 61, "search", duration_ms=900)
+    _mcp_call(session, run_id, 125, "delete", "deny")
+    _mcp_call(session, run_id, 130, "resources/read", resource="docs://alpha/")
+    _mcp_call(session, run_id, 131, "read_file", server="shell", duration_ms=3)
+
+    gate = _mcp(client, run_id)
+
+    assert gate["groups_total"] == 4
+    assert [(g["server"], g["tool"], g["resource"]) for g in gate["groups"]] == [
+        ("alpha", "delete", "none"),
+        ("alpha", "search", "none"),
+        ("alpha", "resources/read", "docs://alpha/"),
+        ("shell", "read_file", "none"),
+    ]
+    assert gate["groups"][1] == {
+        "server": "alpha",
+        "tool": "search",
+        "resource": "none",
+        "calls": 2,
+        "denied": 0,
+        "slowest_ms": 900,
+        "last_at": 61,
+    }
+    assert gate["groups"][0]["denied"] == 1
+    assert gate["minutes"] == [
+        {"at": 60, "server": "alpha", "calls": 2, "denied": 0},
+        {"at": 120, "server": "alpha", "calls": 2, "denied": 1},
+        {"at": 120, "server": "shell", "calls": 1, "denied": 0},
+    ]
+
+
+BUDGETED = [
+    {"server": "alpha", "tool": "search", "effect": "allow", "max_calls": 5},
+    {"server": "alpha", "tool": "fetch", "effect": "allow", "max_calls_per_minute": 2},
+]
+
+
+def test_a_rule_budget_counts_what_its_rule_charged(
+    client: TestClient, session: Session, spec_body: dict[str, Any], mcp_body: dict[str, Any]
+) -> None:
+    run = _mcp_run(client, spec_body, BUDGETED)
+    fetch, search = ("0", "1")
+    for at in (60, 61, 62):
+        _mcp_call(session, run["id"], at, "search", rule=search)
+    _mcp_call(session, run["id"], 63, "search", "deny", rule=search)
+    for at in (60, 70, 130):
+        _mcp_call(session, run["id"], at, "fetch", rule=fetch, category="timeout")
+    _mcp_call(session, run["id"], 64, "delete", "deny")
+
+    gate = _mcp(client, run["id"])
+
+    assert gate["budgets"] == [
+        {"rule": 0, "spent": 3, "peak": 2, "refused": 0, "since": run["created_at"]},
+        {"rule": 1, "spent": 3, "peak": 3, "refused": 1, "since": run["created_at"]},
+    ]
+
+
+def test_a_kept_rule_keeps_its_budget_across_a_change(
+    client: TestClient, session: Session, spec_body: dict[str, Any], mcp_body: dict[str, Any]
+) -> None:
+    run = _mcp_run(client, spec_body, BUDGETED)
+    rules = [
+        {"server": "alpha", "tool": "delete", "effect": "deny"},
+        BUDGETED[0],
+        {**BUDGETED[1], "max_calls_per_minute": 3},
+    ]
+    changed = client.post("/api/v1/policies", json={"kind": "mcp", "document": {"rules": rules}})
+    document = client.get(f"/api/v1/policies/{changed.json()['id']}").json()["document"]
+    session.add(
+        RunPolicy(
+            run_id=run["id"],
+            seq=1,
+            kind=PolicyKind.MCP,
+            policy_id=changed.json()["id"],
+            document={"servers": [], "secrets": [], "rules": document["rules"]},
+            created_at=100,
+        )
+    )
+    session.commit()
+    _event(session, run["id"], 103, "mcp_policy_configured")
+    for at in (90, 101):
+        _mcp_call(session, run["id"], at, "search", rule="1")
+        _mcp_call(session, run["id"], at, "fetch", rule="0")
+    _mcp_call(session, run["id"], 104, "search", rule="2")
+    _mcp_call(session, run["id"], 105, "fetch", rule="1")
+
+    gate = _mcp(client, run["id"])
+
+    assert gate["budgets"] == [
+        {"rule": 1, "spent": 1, "peak": 1, "refused": 0, "since": 103},
+        {"rule": 2, "spent": 3, "peak": 3, "refused": 0, "since": run["created_at"]},
+    ]
+
+
+def test_the_audit_is_filtered_by_server(
+    client: TestClient, session: Session, create_run: CreateRun
+) -> None:
+    run_id = create_run("key-1")
+    _mcp_call(session, run_id, 10, "get", server="secrets")
+    _mcp_call(session, run_id, 11, "search")
+    _event(session, run_id, 12, "secret_read", name="alpha-key", decision="allow")
+
+    params = {"run_id": run_id, "event": ["mcp_call", "secret_read"], "server": "secrets"}
+    found = client.get("/api/v1/audit", params=params).json()
+
+    assert [(row["event"], row["data"]["tool"]) for row in found] == [("mcp_call", "get")]
 
 
 def test_a_run_without_a_shell_policy_grants_nothing(

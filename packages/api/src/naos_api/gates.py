@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from sqlmodel import Session, case, col, func, select
 from sqlmodel.sql.expression import Select
 
-from naos_api.models import AuditEvent, Policy, Run
+from naos_api.models import AuditEvent, Policy, Run, RunPolicy
 from naos_api.policies import held_document
 from naos_api.spec import PolicyKind
 
@@ -285,6 +285,38 @@ class SecretReads(BaseModel):
     reads: int
 
 
+class SecretUse(BaseModel):
+    name: str
+    reads: int
+    refused: int
+    last_at: int
+
+
+class McpGroup(BaseModel):
+    server: str
+    tool: str
+    resource: str
+    calls: int
+    denied: int
+    slowest_ms: int
+    last_at: int
+
+
+class McpMinute(BaseModel):
+    at: int
+    server: str
+    calls: int
+    denied: int
+
+
+class McpBudget(BaseModel):
+    rule: int
+    spent: int
+    peak: int
+    refused: int
+    since: int
+
+
 class McpGate(BaseModel):
     policy_id: str | None
     document: dict[str, Any] | None
@@ -292,6 +324,80 @@ class McpGate(BaseModel):
     calls: int
     denied: int
     secret_reads: list[SecretReads]
+    secrets: list[SecretUse]
+    groups_total: int
+    groups: list[McpGroup]
+    minutes: list[McpMinute]
+    budgets: list[McpBudget]
+
+
+def _documents(session: Session, run: Run) -> list[tuple[int, list[dict[str, Any]]]]:
+    created = run.spec.get("mcp", {}).get("policy")
+    policy = session.get(Policy, created) if created else None
+    held = [(run.created_at, policy.document["rules"] if policy else [])]
+    changes = select(RunPolicy).where(
+        col(RunPolicy.run_id) == run.id, col(RunPolicy.kind) == PolicyKind.MCP
+    )
+    configured = session.exec(
+        select(AuditEvent.at).where(
+            col(AuditEvent.run_id) == run.id, col(AuditEvent.event) == "mcp_policy_configured"
+        )
+    ).all()
+    for change in session.exec(changes.order_by(col(RunPolicy.seq))).all():
+        # A call belongs to the document the broker held, which it takes when it says so.
+        taken = [at for at in configured if at >= change.created_at] or [change.created_at]
+        held.append((min(taken), (change.document or {}).get("rules", [])))
+    return held
+
+
+# A rule kept across a change keeps what it spent, so the count walks back while it stays.
+def _budgets(session: Session, run: Run) -> list[McpBudget]:
+    held = _documents(session, run)
+    data = col(AuditEvent.data)
+    at = col(AuditEvent.at)
+    whens = [(at >= start, index) for index, (start, _) in reversed(list(enumerate(held)))]
+    segment = case(*whens[:-1], else_=0) if len(held) > 1 else None
+    refused = data["category"].as_string() == "denied"
+    rule = data["rule"].as_string()
+    minute = at - at % 60
+    keys = (rule, minute) if segment is None else (segment, rule, minute)
+    per_minute: Select[tuple[Any, ...]] = Select(
+        *keys, func.sum(case((refused, 0), else_=1)), func.sum(case((refused, 1), else_=0))
+    )
+    found = session.exec(
+        per_minute.where(
+            col(AuditEvent.run_id) == run.id, col(AuditEvent.event) == "mcp_call", rule != "none"
+        ).group_by(*keys)
+    ).all()
+    rows = [tuple(row) if segment is not None else (0, *row) for row in found]
+    counted: dict[tuple[int, str], list[tuple[int, int, int]]] = {}
+    for row in rows:
+        counted.setdefault((row[0], row[1]), []).append((row[2], row[3], row[4]))
+    last = len(held) - 1
+    budgets = []
+    for index, kept in enumerate(held[last][1]):
+        limited = kept.get("max_calls") or kept.get("max_calls_per_minute")
+        if kept["effect"] != "allow" or not limited:
+            continue
+        spent: dict[int, int] = {}
+        refusals = 0
+        first = last
+        while first >= 0 and kept in held[first][1]:
+            position = str(held[first][1].index(kept))
+            for at_minute, charged, denied in counted.get((first, position), []):
+                spent[at_minute] = spent.get(at_minute, 0) + charged
+                refusals += denied
+            first -= 1
+        budgets.append(
+            McpBudget(
+                rule=index,
+                spent=sum(spent.values()),
+                peak=max(spent.values(), default=0),
+                refused=refusals,
+                since=held[first + 1][0],
+            )
+        )
+    return budgets
 
 
 def mcp(session: Session, run: Run) -> McpGate:
@@ -300,9 +406,42 @@ def mcp(session: Session, run: Run) -> McpGate:
     mine = col(AuditEvent.run_id) == run.id
     count = select(func.count()).select_from(AuditEvent)
     calls = (mine, event == "mcp_call")
+    denied = func.sum(case((data["decision"].as_string() == "deny", 1), else_=0))
     name = data["name"].as_string()
     read = (mine, event == "secret_read", data["decision"].as_string() == "allow")
     reads = session.exec(select(name, func.count()).where(*read).group_by(name).order_by(name))
+    allowed_read = func.sum(case((data["decision"].as_string() == "allow", 1), else_=0))
+    used: Select[tuple[str, int, int, int]] = Select(
+        name, allowed_read, denied, func.max(AuditEvent.at)
+    )
+    secrets = session.exec(
+        used.where(mine, event == "secret_read").group_by(name).order_by(name).limit(GROUPS)
+    ).all()
+    server, tool, resource = (data[key].as_string() for key in ("server", "tool", "resource"))
+    groups: Select[tuple[str, str, str, int, int, int, int]] = Select(
+        server,
+        tool,
+        resource,
+        func.count(),
+        denied,
+        func.max(data["duration_ms"].as_integer()),
+        func.max(AuditEvent.at),
+    )
+    rows = session.exec(
+        groups.where(*calls)
+        .group_by(server, tool, resource)
+        .order_by(denied.desc(), func.count().desc(), server, tool, resource)
+        .limit(GROUPS)
+    ).all()
+    every = select(server).where(*calls).group_by(server, tool, resource)
+    minute = col(AuditEvent.at) - col(AuditEvent.at) % 60
+    per_minute: Select[tuple[int, str, int, int]] = Select(minute, server, func.count(), denied)
+    minutes = session.exec(
+        per_minute.where(*calls)
+        .group_by(minute, server)
+        .order_by(minute.desc(), server.desc())
+        .limit(MINUTES)
+    ).all()
     configured = session.exec(
         select(func.max(AuditEvent.at)).where(mine, event == "mcp_policy_configured")
     ).one()
@@ -313,4 +452,25 @@ def mcp(session: Session, run: Run) -> McpGate:
         calls=session.exec(count.where(*calls)).one(),
         denied=session.exec(count.where(*calls, data["decision"].as_string() == "deny")).one(),
         secret_reads=[SecretReads(name=row[0], reads=row[1]) for row in reads.all()],
+        secrets=[
+            SecretUse(name=row[0], reads=row[1], refused=row[2], last_at=row[3]) for row in secrets
+        ],
+        groups_total=session.exec(select(func.count()).select_from(every.subquery())).one(),
+        groups=[
+            McpGroup(
+                server=row[0],
+                tool=row[1],
+                resource=row[2],
+                calls=row[3],
+                denied=row[4],
+                slowest_ms=row[5],
+                last_at=row[6],
+            )
+            for row in rows
+        ],
+        minutes=[
+            McpMinute(at=row[0], server=row[1], calls=row[2], denied=row[3])
+            for row in reversed(minutes)
+        ],
+        budgets=_budgets(session, run),
     )

@@ -293,6 +293,7 @@ def search(
     run_id: str | None = None,
     secret: str | None = None,
     decision: str | None = None,
+    server: str | None = None,
 ) -> Sequence[AuditEvent]:
     statement = select(AuditEvent)
     if run_id is not None:
@@ -324,6 +325,8 @@ def search(
         statement = statement.where(col(AuditEvent.event).in_(events))
     if decision is not None:
         statement = statement.where(col(AuditEvent.data)["decision"].as_string() == decision)
+    if server is not None:
+        statement = statement.where(col(AuditEvent.data)["server"].as_string() == server)
     if since is not None:
         statement = statement.where(col(AuditEvent.at) >= since)
     if after is not None:
