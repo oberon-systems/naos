@@ -642,6 +642,16 @@ def stop(run_id: str) -> Row:
     return RUNS[0]
 
 
+@stub.delete("/api/v1/runs/{run_id}", response_model=None)
+def delete_run(run_id: str) -> Response:
+    WRITES.append(("DELETE", f"/runs/{run_id}", {}, None))
+    found = next(row for row in RUNS if row["id"] == run_id)
+    if found["status"] not in ("COMPLETED", "FAILED", "CANCELLED"):
+        detail = f"run #{found['seq']} is {found['status']}: stop it before deleting"
+        return JSONResponse({"detail": detail}, 409)
+    return Response(status_code=204)
+
+
 def profile(
     pid: str,
     name: str,

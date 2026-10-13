@@ -162,6 +162,44 @@ def test_the_stop_confirm_asks_before_it_posts(client: TestClient) -> None:
     assert ">No</a>" in body
 
 
+def test_only_a_finished_run_offers_delete(client: TestClient) -> None:
+    started = client.get(f"/runs/{STARTED}", headers=HX).text
+    failed = client.get(f"/runs/{FAILED}", headers=HX).text
+
+    assert f"/runs/{STARTED}/delete" not in started
+    assert re.search(
+        rf'class="button button--outline-danger"\s+href="/runs/{FAILED}/delete"\s+'
+        rf'hx-get="/runs/{FAILED}/delete"\s+hx-target="#overlay">Delete</a>',
+        failed,
+    )
+    assert "Stop run</a>" not in failed
+
+
+def test_the_delete_confirm_asks_before_it_posts(client: TestClient) -> None:
+    body = client.get(f"/runs/{FAILED}/delete", headers=HX).text
+
+    assert "Delete run?</h2>" in body
+    assert "Delete run #122 for good?" in body
+    assert "The audit keeps its events." in body
+    assert f'hx-post="/runs/{FAILED}/delete"' in body
+    assert re.search(r'class="button button--danger"\s+type="submit">Yes', body)
+
+
+def test_deleting_goes_through_the_api_and_back_to_the_list(
+    client: TestClient, writes: list[tuple[str, str, dict[str, object], str | None]]
+) -> None:
+    response = client.post(f"/runs/{FAILED}/delete", headers=HX)
+
+    assert [(method, path) for method, path, *_ in writes] == [("DELETE", f"/runs/{FAILED}")]
+    assert response.headers["HX-Redirect"] == "/runs"
+
+
+def test_an_unfinished_run_says_why_it_stays(client: TestClient) -> None:
+    body = client.post(f"/runs/{STARTED}/delete", headers=HX).text
+
+    assert "run #128 is STARTED: stop it before deleting" in body
+
+
 def test_the_rerun_confirm_lists_what_the_new_run_gets(client: TestClient) -> None:
     body = client.get(f"/runs/{STARTED}/rerun", headers=HX).text
 

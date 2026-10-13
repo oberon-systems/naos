@@ -39,6 +39,22 @@ def stop(run: RunDetailRow) -> Confirm:
     )
 
 
+def delete(run: RunDetailRow) -> Confirm:
+    return Confirm(
+        title="Delete run?",
+        subject=run.id,
+        question=f"Delete run #{run.seq} for good?",
+        note=(
+            "Its console log, changes and policy edits go with it. The audit keeps its events. "
+            "Only a finished run can be deleted."
+        ),
+        action=f"/runs/{run.id}/delete",
+        back=f"/runs/{run.id}",
+        footer="the audit keeps who deleted it",
+        danger=True,
+    )
+
+
 # The rerun carries the spec and nothing else, so the new run waits for whichever
 # runner is free rather than the one that held this one.
 def rerun(run: RunDetailRow, key: str) -> Confirm:

@@ -102,6 +102,8 @@
                         {% endfor %}
                     </div>
                 </div>
+                {{ input("name", form.name, "Name", form.kind ~ "_alpha", mono=true, error="required · a policy name") }}
+                <span class="field__hint">required · filled in as {{ form.kind }}_alpha, {{ form.kind }}_beta… · unique among {{ form.kind }} policies · shown in every list instead of the id</span>
                 {% if form.kind == "mount" %}
                     <h3 class="run__card-title profile__section">WORKSPACE</h3>
                     <div class="policy__workspace">
@@ -186,8 +188,6 @@
                     {% endfor %}
                     {% if not form.full("providers") %}{{ step('add:providers', '+ Add provider') }}{% endif %}
                 {% else %}
-                    {{ input("name", form.name, "Name, optional", "alpha-search", mono=true) }}
-                    <span class="field__hint">unique among mcp policies · shown beside the id in lists</span>
                     {{ mcp.rules(form, servers, effects) }}
                     {{ mcp.grants(form, secrets) }}
                 {% endif %}

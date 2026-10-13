@@ -5,7 +5,7 @@ from typing import Any
 import httpx
 import pytest
 from fastapi.testclient import TestClient
-from stub_api import MCPPOL, MNTPOL, MODELPOL, NETPOL, SHELLPOL, WRITES
+from stub_api import MCPPOL, MNTPOL, MODELPOL, NETPOL, POLICIES, SHELLPOL, WRITES
 
 from naos_web.client import detail_of
 
@@ -177,6 +177,7 @@ def test_the_form_switches_kind_and_adds_rows(client: TestClient) -> None:
 def test_a_new_policy_opens_it(client: TestClient, writes: list[Any]) -> None:
     form = {
         "kind": "network",
+        "name": "network_alpha",
         "allow.0.protocol": "https",
         "allow.0.host": "example.com",
         "allow.0.ip": "",
@@ -189,6 +190,7 @@ def test_a_new_policy_opens_it(client: TestClient, writes: list[Any]) -> None:
     assert response.headers["HX-Redirect"] == "/policies/netpol_new001"
     assert writes[0][2] == {
         "kind": "network",
+        "name": "network_alpha",
         "document": {
             "allow": [{"protocol": "https", "host": "example.com"}],
             "deny": [{"ip": "192.0.2.10"}],
@@ -198,7 +200,7 @@ def test_a_new_policy_opens_it(client: TestClient, writes: list[Any]) -> None:
 
 def test_an_equivalent_document_shows_the_existing_policy(client: TestClient) -> None:
     names = ("read_file", "grep", "list_dir", "git_status")
-    form = {"kind": "shell"} | {f"cap.{name}": "on" for name in names}
+    form = {"kind": "shell", "name": "shell_alpha"} | {f"cap.{name}": "on" for name in names}
     body = client.post("/policies/new", data=form, headers=HX).text
 
     assert "Policy already exists" in body
@@ -208,10 +210,34 @@ def test_an_equivalent_document_shows_the_existing_policy(client: TestClient) ->
 
 
 def test_a_refused_document_shows_the_api_message(client: TestClient) -> None:
-    form = {"kind": "mount", "workspace": "/etc/alpha", "workspace_mode": "rw"}
+    form = {"kind": "mount", "name": "mount_alpha", "workspace": "/etc/alpha"}
     body = client.post("/policies/new", data=form, headers=HX).text
 
     assert "dialog__error" in body and "outside the allowed roots" in body
+
+
+def test_a_new_form_names_the_policy_after_the_free_letter(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    network_policy = next(row for row in POLICIES if row["id"] == NETPOL)
+    monkeypatch.setitem(network_policy, "name", "network_alpha")
+    network = client.get("/policies/new", params={"kind": "network"}, headers=HX).text
+    model = client.get("/policies/new", params={"kind": "model"}, headers=HX).text
+    copied = client.get(f"/policies/{MNTPOL}/new", headers=HX).text
+
+    assert re.search(r'name="name"\s+value="network_beta"', network)
+    assert re.search(r'name="name"\s+value="model_alpha"', model)
+    assert re.search(r'name="name"\s+value="mount_alpha"', copied)
+    assert "unique among model policies" in model
+
+
+@pytest.mark.parametrize("name", ["", "Alpha Beta"])
+def test_a_policy_needs_a_name(client: TestClient, writes: list[Any], name: str) -> None:
+    form = {"kind": "shell", "name": name, "cap.grep": "on"}
+    body = client.post("/policies/new", data=form, headers=HX).text
+
+    assert "a policy name is 1-64 lowercase letters" in body
+    assert writes == []
 
 
 def test_new_from_this_maps_a_mount_document_back(client: TestClient) -> None:
@@ -385,6 +411,7 @@ def test_a_refused_document_names_the_field_but_not_its_value() -> None:
 def test_a_new_model_policy_sends_the_document(client: TestClient, writes: list[Any]) -> None:
     form = {
         "kind": "model",
+        "name": "model_alpha",
         "max_input": "2000000",
         "max_output": "200000",
         "providers.0.name": "alpha",
@@ -400,6 +427,7 @@ def test_a_new_model_policy_sends_the_document(client: TestClient, writes: list[
     assert response.headers["HX-Redirect"] == "/policies/modelpol_new001"
     assert writes[0][2] == {
         "kind": "model",
+        "name": "model_alpha",
         "document": {
             "providers": [
                 {

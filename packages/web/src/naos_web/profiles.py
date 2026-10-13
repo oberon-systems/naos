@@ -365,11 +365,7 @@ def gate_fields(form: Form, policies: list[Row]) -> list[GateField]:
     for name, kind in POLICY_KINDS:
         chosen = form.values[name]
         options = [Option("", CLOSED[name], chosen == "")] + [
-            Option(
-                policy["id"],
-                f"{short(policy['id'])} \u00b7 {policy_label(policy)}",
-                policy["id"] == chosen,
-            )
+            Option(policy["id"], policy_label(policy), policy["id"] == chosen)
             for policy in policies
             if policy["kind"] == kind
         ]

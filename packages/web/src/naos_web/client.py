@@ -310,6 +310,9 @@ class ApiClient:
         row: Row = await self._call("POST", f"/runs/{run_id}/stop")
         return row
 
+    async def delete_run(self, run_id: str) -> None:
+        await self._request("DELETE", f"/runs/{run_id}")
+
     async def profiles(self, query: str | None = None, policy: str | None = None) -> list[Row]:
         params = {"q": query} if query else {}
         if policy is not None:

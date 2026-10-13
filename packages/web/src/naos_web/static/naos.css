@@ -1013,6 +1013,10 @@ body {
   color: var(--soft);
 }
 
+.field__hint--lines {
+  white-space: pre-line;
+}
+
 /* Red only once the browser refused the field: after a submit, or after it was edited. */
 .field__error,
 .dialog__invalid {

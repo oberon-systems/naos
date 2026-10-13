@@ -14,6 +14,11 @@
                        href="/runs/{{ run.id }}/stop"
                        hx-get="/runs/{{ run.id }}/stop"
                        hx-target="#overlay">Stop run</a>
+                {% elif run.deletable %}
+                    <a class="button button--outline-danger"
+                       href="/runs/{{ run.id }}/delete"
+                       hx-get="/runs/{{ run.id }}/delete"
+                       hx-target="#overlay">Delete</a>
                 {% endif %}
                 <a class="button button--secondary"
                    href="/runs/{{ run.id }}/rerun"

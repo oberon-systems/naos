@@ -5,7 +5,6 @@ from typing import Any, Literal
 from uuid import uuid4
 
 from naos_web.client import Choices
-from naos_web.rows import model_line
 
 Row = dict[str, Any]
 Mode = Literal["update", "new"]
@@ -164,8 +163,12 @@ def short(identifier: str) -> str:
     return f"{identifier[:12]}\u2026" if len(identifier) > 13 else identifier
 
 
-# Labels read the resolved document; a credential is named by the policy, its value never is.
 def policy_label(policy: Row) -> str:
+    return f"{policy.get('name') or short(policy['id'])} \u00b7 {_policy_detail(policy)}"
+
+
+# Labels read the resolved document; a credential is named by the policy, its value never is.
+def _policy_detail(policy: Row) -> str:
     document = policy["document"]
     kind = policy["kind"]
     if kind == "mount":
@@ -180,7 +183,7 @@ def policy_label(policy: Row) -> str:
     if kind == "shell":
         return f"{len(document['allow'])} capabilities"
     if kind == "model":
-        return model_line(document)
+        return ", ".join(model for item in document["providers"] for model in item["models"])
     names = sorted({rule["server"] for rule in document["rules"]})
     return f"{len(names)} servers · {', '.join(names)}"
 
@@ -228,10 +231,20 @@ def _profile_hint(name: str, base: Mapping[str, str] | None, labels: Mapping[str
     return f"profile: {shown} {unit}".rstrip()
 
 
+def _providers_hint(policy: Row | None) -> str:
+    if policy is None or policy["kind"] != "model":
+        return ""
+    return "\n".join(
+        f"{item['name']} \u00b7 {item['api']}: {', '.join(item['models'])}"
+        for item in policy["document"]["providers"]
+    )
+
+
 def configure_fields(draft: Draft, profile: Row | None, choices: Choices) -> dict[str, Field]:
     base = values_of(profile["spec"]) if profile else None
     edited = set(draft.edited(profile))
     labels = {policy["id"]: policy_label(policy) for policy in choices.policies}
+    by_id = {policy["id"]: policy for policy in choices.policies}
     fields: dict[str, Field] = {}
     for name, unit in NUMBERS.items():
         fields[name] = Field(
@@ -255,7 +268,9 @@ def configure_fields(draft: Draft, profile: Row | None, choices: Choices) -> dic
             label=LABELS[name],
             value=chosen,
             edited=name in edited,
-            hint=_profile_hint(name, base, labels) if name in edited else short(chosen),
+            hint=_profile_hint(name, base, labels)
+            if name in edited
+            else _providers_hint(by_id.get(chosen)),
             options=options,
             error=REQUIRED.get(name, ""),
         )

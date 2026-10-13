@@ -1,5 +1,5 @@
 {% macro field_hint(field) -%}
-    {% if field.hint %}<span class="field__hint">{{ field.hint }}</span>{% endif %}
+    {% if field.hint %}<span class="field__hint field__hint--lines">{{ field.hint }}</span>{% endif %}
 {%- endmacro %}
 {% macro number(field, low, high, error="required") -%}
     <label class="field{{ " field--edited" if field.edited }}">

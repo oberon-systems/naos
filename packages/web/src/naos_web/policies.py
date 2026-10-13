@@ -78,6 +78,34 @@ CREDENTIAL_RULE = (
     "a credential is the name of a secret: 1-64 lowercase letters, digits, dots, dashes "
     "and underscores"
 )
+POLICY_NAME = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
+POLICY_NAME_RULE = "a policy name is 1-64 lowercase letters, digits, dots, dashes and underscores"
+GREEK = [
+    "alpha",
+    "beta",
+    "gamma",
+    "delta",
+    "epsilon",
+    "zeta",
+    "eta",
+    "theta",
+    "iota",
+    "kappa",
+    "lambda",
+    "mu",
+    "nu",
+    "xi",
+    "omicron",
+    "pi",
+    "rho",
+    "sigma",
+    "tau",
+    "upsilon",
+    "phi",
+    "chi",
+    "psi",
+    "omega",
+]
 MAX_INPUT = "2000000"
 MAX_OUTPUT = "200000"
 
@@ -699,6 +727,9 @@ class PolicyForm:
                 pairs += [(f"{name}.{index}.{key}", value) for key, value in item.items()]
         return pairs
 
+    def checked_name(self) -> str:
+        return _named(self.name, POLICY_NAME, POLICY_NAME_RULE)
+
     def suggested(self, item: dict[str, str]) -> list[str]:
         taken = set(_split(item["models"]))
         return [model for model in MODEL_SUGGESTIONS.get(item["api"], ()) if model not in taken]
@@ -860,6 +891,14 @@ def _provider(item: dict[str, str]) -> Row:
         "timeout_seconds": _whole(item["timeout"], "timeout"),
         "max_requests_per_minute": _whole(item["requests"], "requests per minute"),
     }
+
+
+# The first of <kind>_alpha, <kind>_beta... no policy of that kind holds yet.
+def default_name(form: PolicyForm, policies: list[Row]) -> PolicyForm:
+    taken = {policy.get("name") for policy in policies if policy["kind"] == form.kind}
+    numbers = (str(number) for number in range(len(GREEK) + 1, len(GREEK) + len(taken) + 2))
+    names = (f"{form.kind}_{suffix}" for suffix in (*GREEK, *numbers))
+    return replace(form, name=next(name for name in names if name not in taken))
 
 
 def new_form(kind: str) -> PolicyForm:

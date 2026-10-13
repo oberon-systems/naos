@@ -93,7 +93,7 @@ def test_a_new_profile_opens_with_every_gate_closed(client: TestClient) -> None:
     gates = ("nothing mounted", "no network", "no shell", "no servers, no secrets")
     for closed in (*gates, "no providers, no keys"):
         assert re.search(rf'<option value=""\s*selected>none \u2014 {closed}</option>', body)
-    assert "1 provider \u00b7 1 model</option>" in body
+    assert "modelpol_7c1\u2026 \u00b7 alpha-mini</option>" in body
     assert "Every gate starts closed" in body
 
 

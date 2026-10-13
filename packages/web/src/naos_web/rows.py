@@ -429,6 +429,7 @@ class RunDetailRow:
     elapsed: str
     attempt: str
     stoppable: bool
+    deletable: bool
     profile_id: str | None
     run: list[Fact]
     policy: list[Fact]
@@ -608,6 +609,7 @@ def run_detail(
         elapsed=elapsed,
         attempt=f"attempt {format.DASH}",
         stoppable=run["status"] in STOPPABLE,
+        deletable=run["status"] in FINISHED,
         profile_id=profile["id"] if profile else None,
         run=[
             Fact("Run id", run["id"], mono=True),

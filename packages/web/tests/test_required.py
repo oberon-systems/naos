@@ -17,8 +17,8 @@ FORMS = [
     ("GET", "/profiles/new", {}, {"name", "cpu", "memory_mib", "disk_gib", "timeout"}),
     ("GET", "/secrets/_new", {}, {"name", "value"}),
     ("GET", "/mcp/_new", {}, {"name", "url", "timeout", "calls"}),
-    ("GET", "/policies/new?kind=mount", {}, {"workspace"}),
-    ("POST", "/policies/new", MCP, {"rules.0.target"}),
+    ("GET", "/policies/new?kind=mount", {}, {"name", "workspace"}),
+    ("POST", "/policies/new", MCP, {"name", "rules.0.target"}),
     (
         "POST",
         "/policies/new",
@@ -37,6 +37,7 @@ MESSAGES = [
     ("GET", "/images/register", {}, "required · sha256 of the qcow2"),
     ("GET", "/profiles/new", {}, "required · a unique profile name"),
     ("GET", "/policies/new?kind=mount", {}, "required · a host directory under an allowed root"),
+    ("GET", "/policies/new?kind=shell", {}, "required · a policy name"),
     ("POST", "/policies/new", MCP, "required · a tool or a resource prefix"),
     ("POST", "/policies/new", MODEL, "required · at least one model"),
     ("POST", "/policies/new", MODEL, "required · a secret from the list"),

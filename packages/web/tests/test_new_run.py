@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from stub_api import MODELPOL, WRITES
+from stub_api import MODELPOL, POLICIES, WRITES
 
 HX = {"HX-Request": "true"}
 BUILD_SMALL = "prof_7a1c30"
@@ -96,7 +96,22 @@ def test_configure_copies_the_picked_profile(client: TestClient) -> None:
     assert "any live runner with a free slot · alpha, beta, gamma" in body
     assert "delta" not in body and "epsilon" not in body
     assert "alpha-token" not in body
-    assert re.search(rf'<option value="{MODELPOL}"\s*>1 provider · 1 model</option>', body)
+    unnamed = "modelpol_7c1\u2026 · alpha-mini"
+    assert re.search(rf'<option value="{MODELPOL}"\s*>{unnamed}</option>', body)
+
+
+def test_configure_names_each_policy_and_lists_the_models(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model = next(row for row in POLICIES if row["id"] == MODELPOL)
+    monkeypatch.setitem(model, "name", "model_alpha")
+    form = {"key": KEY, "profile": DOCS}
+    body = client.post("/runs/new/configure", data=form, headers=HX).text
+
+    assert re.search(rf'<option value="{MODELPOL}"\s*selected>model_alpha · alpha-mini<', body)
+    hints = re.findall(r'class="field__hint[^"]*">([^<]*)<', body)
+    assert "alpha · openai: alpha-mini" in hints
+    assert not [hint for hint in hints if "pol_" in hint]
 
 
 def test_configure_marks_edited_fields_with_the_profile_value(client: TestClient) -> None:
@@ -172,7 +187,7 @@ def test_a_picked_model_policy_reaches_the_profile(client: TestClient, writes: l
     review = client.post("/runs/new/review", data=form, headers=HX).text
     client.post("/runs/new", data=form, headers=HX)
 
-    assert "none \u2192 1 provider · 1 model" in review
+    assert "none \u2192 modelpol_7c1\u2026 · alpha-mini" in review
     assert writes[0][2]["spec"]["model"] == {"policy": MODELPOL}
 
 

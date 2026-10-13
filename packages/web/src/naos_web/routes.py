@@ -782,7 +782,8 @@ async def _confirm(request: Request, run_id: str, now: int, ask: str) -> HTMLRes
     except ApiError as err:
         return failed_overlay(request, PAGES["runs"], err)
     row = _detail_row(detail, now)
-    asked = confirm.stop(row) if ask == "stop" else confirm.rerun(row, uuid4().hex)
+    asks = {"stop": confirm.stop, "delete": confirm.delete}
+    asked = asks[ask](row) if ask in asks else confirm.rerun(row, uuid4().hex)
     return render(
         request,
         PAGES["runs"],
@@ -930,6 +931,11 @@ async def stop_confirm(request: Request, run_id: str, now: NowDep) -> HTMLRespon
     return await _confirm(request, run_id, now, "stop")
 
 
+@router.get("/runs/{run_id}/delete", response_class=HTMLResponse)
+async def run_delete_confirm(request: Request, run_id: str, now: NowDep) -> HTMLResponse:
+    return await _confirm(request, run_id, now, "delete")
+
+
 # The key is rendered with the confirm, so a double submit replays onto the same new Run.
 @router.get("/runs/{run_id}/rerun", response_class=HTMLResponse)
 async def rerun_confirm(request: Request, run_id: str, now: NowDep) -> HTMLResponse:
@@ -946,6 +952,15 @@ async def stop_run(request: Request, run_id: str, now: NowDep) -> Response:
     if wants_fragment(request):
         return await run(request, run_id, now)
     return _reopen(request, run_id)
+
+
+@router.post("/runs/{run_id}/delete", response_class=HTMLResponse)
+async def delete_run(request: Request, run_id: str) -> Response:
+    try:
+        await request.app.state.api.delete_run(run_id)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["runs"], err)
+    return _moved(request, "/runs")
 
 
 @router.post("/runs/{run_id}/rerun", response_class=HTMLResponse)
@@ -1612,7 +1627,12 @@ async def _policy_form(
 # Declared before /policies/{policy_id}, which would otherwise take "new" for an id.
 @router.get("/policies/new", response_class=HTMLResponse)
 async def new_policy(request: Request, now: NowDep, kind: str = "mount") -> HTMLResponse:
-    return await _policy_form(request, now, documents.new_form(kind))
+    form = documents.new_form(kind)
+    try:
+        policies = await request.app.state.api.policies(kind=form.kind)
+    except ApiError as err:
+        return failed_overlay(request, PAGES["policies"], err)
+    return await _policy_form(request, now, documents.default_name(form, policies))
 
 
 # A step adds or drops a row and redraws the form; only a plain submit reaches the api.
@@ -1627,7 +1647,7 @@ async def create_policy(request: Request, now: NowDep) -> Response:
         document = form.document()
         if form.kind == "model":
             documents.check_credentials(document, {row["name"] for row in await api.secrets()})
-        created, fresh = await api.create_policy(form.kind, document, form.name or None)
+        created, fresh = await api.create_policy(form.kind, document, form.checked_name())
     except (ApiError, new_run.FormError) as err:
         return await _policy_form(request, now, form, str(err))
     if fresh:
@@ -1690,9 +1710,11 @@ async def policy_from(request: Request, policy_id: str, now: NowDep) -> HTMLResp
     api: ApiClient = request.app.state.api
     try:
         found = await api.policy(policy_id)
+        policies = await api.policies(kind=found["kind"])
     except ApiError as err:
         return failed_overlay(request, PAGES["policies"], err)
-    return await _policy_form(request, now, documents.from_document(found))
+    form = documents.default_name(documents.from_document(found), policies)
+    return await _policy_form(request, now, form)
 
 
 async def _policy_delete_dialog(
