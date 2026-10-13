@@ -37,7 +37,7 @@ Mako==1.4.3
 MarkupSafe==3.0.3
 nodeenv==1.10.0
 packaging==26.3
-penpot-local-stack==0.1.1
+penpot-local-stack==0.1.5
 platformdirs==4.11.8
 pluggy==1.6.0
 pre_commit==4.6.2
