@@ -578,6 +578,22 @@ check_shell_tab() {
     done
 }
 
+model_tab() {
+    curl -fsS "$web/runs/$run/gates/model?decision=denied" >"$TEMP_DIR/run-model-tab.html"
+    for text in "MODEL POLICY" "SPENT OVER THE RUN" "CALLS BY MODEL" "$model_policy" "openai-key" \
+        "token budget spent" "model outside the policy" "Denied ·"; do
+        grep -qF -- "$text" "$TEMP_DIR/run-model-tab.html" || return 1
+    done
+}
+
+# The model view lists every call of the Run with its tokens and why the refused ones were refused.
+check_model_tab() {
+    wait_for 60 model_tab
+    for value in "$openai_key" "$anthropic_key" "$operator"; do
+        ! grep -qF -- "$value" "$TEMP_DIR/run-model-tab.html" || fail "the model view carries a credential"
+    done
+}
+
 check_diff() {
     local diff
     diff="$(echo "$TEMP_DIR"/runs/*/diff.json)"
@@ -1625,6 +1641,7 @@ check_live_network
 check_gates_tab
 check_live_shell
 check_shell_tab
+check_model_tab
 echo "reading the console through the api and the terminal tab..."
 wait_for 30 console_shipped
 check_terminal
