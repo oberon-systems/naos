@@ -121,28 +121,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 18424,
       "y": 960.1999999880791,
-      "width": 146.46250915527344,
-      "height": 16,
-      "x1": 0,
-      "y1": -0.800000011920929,
-      "x2": 146.46250915527344,
-      "y2": 15.199999988079071,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "500",
+      "y1": -0.800000011920929,
+      "width": 146.46250915527344,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 18424,
+      "x1": 0,
+      "y2": 15.199999988079071,
       "fills": [
         {
           "fillColor": "#101828",
           "fillOpacity": 1
         }
       ],
+      "x2": 146.46250915527344,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 16,
       "text": "Delete run #128 for good?"
     }
   ]

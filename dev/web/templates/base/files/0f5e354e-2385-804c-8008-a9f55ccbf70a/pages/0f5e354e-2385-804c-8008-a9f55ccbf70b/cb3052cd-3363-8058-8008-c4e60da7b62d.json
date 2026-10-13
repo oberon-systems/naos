@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 16020,
       "y": 1115.1999999880786,
-      "width": 107.57500457763672,
-      "height": 16,
-      "x1": 0,
-      "y1": -0.800000011920929,
-      "x2": 107.57500457763672,
-      "y2": 15.199999988079071,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "500",
+      "y1": -0.800000011920929,
+      "width": 107.57500457763672,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 16020,
+      "x1": 0,
+      "y2": 15.199999988079071,
       "fills": [
         {
           "fillColor": "#d0d5dd",
           "fillOpacity": 1
         }
       ],
+      "x2": 107.57500457763672,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 16,
       "text": "Update build-small"
     }
   ]

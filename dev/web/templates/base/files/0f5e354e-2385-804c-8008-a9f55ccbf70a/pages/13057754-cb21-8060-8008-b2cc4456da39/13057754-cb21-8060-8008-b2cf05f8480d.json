@@ -3,36 +3,36 @@
   "name": "Text",
   "type": "text",
   "x": 784,
-  "y": 1376,
+  "y": 1469,
   "width": 592,
   "height": 31,
   "rotation": 0,
   "selrect": {
     "x": 784,
-    "y": 1376,
+    "y": 1469,
     "width": 592,
     "height": 31,
     "x1": 784,
-    "y1": 1376,
+    "y1": 1469,
     "x2": 1376,
-    "y2": 1407
+    "y2": 1500
   },
   "points": [
     {
       "x": 784,
-      "y": 1376
+      "y": 1469
     },
     {
       "x": 1376,
-      "y": 1376
+      "y": 1469
     },
     {
       "x": 1376,
-      "y": 1407
+      "y": 1500
     },
     {
       "x": 784,
-      "y": 1407
+      "y": 1500
     }
   ],
   "transform": {
@@ -119,53 +119,53 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 1390.5454547405243,
+      "x": 784,
+      "y": 1482.6000002026558,
+      "width": 578.3125,
+      "height": 12.800000190734863,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 578.3125,
+      "y2": 13.600000202655792,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
-      "y1": 0.7272727489471436,
-      "width": 577.7159423828125,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 784,
-      "x1": 0,
-      "y2": 14.545454740524292,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
-      "x2": 577.7159423828125,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "height": 13.818181991577148,
       "text": "Mounted at /naos/<last segment of the host path> and used as the workdir. rw writes land on the upper disk and reach the "
     },
     {
-      "y": 1405.9431819915771,
+      "x": 784,
+      "y": 1498,
+      "width": 126.5250015258789,
+      "height": 12.799999237060547,
+      "x1": 0,
+      "y1": 16.200000762939453,
+      "x2": 126.5250015258789,
+      "y2": 29,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
-      "y1": 16.125,
-      "width": 126.38636779785156,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 784,
-      "x1": 0,
-      "y2": 29.94318199157715,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
-      "x2": 126.38636779785156,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "height": 13.818181991577148,
       "text": "host only through a merge."
     }
   ]

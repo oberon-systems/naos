@@ -1,0 +1,102 @@
+{
+  "id": "9df0b9b1-c2cf-807e-8008-c86aa34cdc21",
+  "name": "card body",
+  "type": "frame",
+  "x": 4764,
+  "y": 205,
+  "width": 520,
+  "height": 396.00000000000045,
+  "rotation": 0,
+  "selrect": {
+    "x": 4764,
+    "y": 205,
+    "width": 520,
+    "height": 396.00000000000045,
+    "x1": 4764,
+    "y1": 205,
+    "x2": 5284,
+    "y2": 601.0000000000005
+  },
+  "points": [
+    {
+      "x": 4764,
+      "y": 205
+    },
+    {
+      "x": 5284,
+      "y": 205
+    },
+    {
+      "x": 5284,
+      "y": 601.0000000000005
+    },
+    {
+      "x": 4764,
+      "y": 601.0000000000005
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "9df0b9b1-c2cf-807e-8008-c86aa34cdc1a",
+  "frameId": "9df0b9b1-c2cf-807e-8008-c86aa34cdc1a",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 16,
+    "p3": 14,
+    "p4": 16
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "13057754-cb21-8060-8008-b2cc4456da39",
+  "layoutItemVSizing": "auto",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": [],
+  "shapes": [
+    "9df0b9b1-c2cf-807e-8008-c86aa34cdc23",
+    "9df0b9b1-c2cf-807e-8008-c86aa34cdc24",
+    "9df0b9b1-c2cf-807e-8008-c86aa34cdc25",
+    "9df0b9b1-c2cf-807e-8008-c86aa34cdc26",
+    "9df0b9b1-c2cf-807e-8008-c86aa34cdc27",
+    "9df0b9b1-c2cf-807e-8008-c86aa34cdc28",
+    "9df0b9b1-c2cf-807e-8008-c86aa34cdc29",
+    "9df0b9b1-c2cf-807e-8008-c86aa34cdc2a",
+    "9df0b9b1-c2cf-807e-8008-c86aa34cdc2b"
+  ]
+}

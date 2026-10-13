@@ -1,0 +1,209 @@
+{
+  "id": "9df0b9b1-c2cf-807e-8008-c86a534ed9df",
+  "name": "error text",
+  "type": "text",
+  "x": 3676,
+  "y": 1232,
+  "width": 408,
+  "height": 51,
+  "rotation": 0,
+  "selrect": {
+    "x": 3676,
+    "y": 1232,
+    "width": 408,
+    "height": 51,
+    "x1": 3676,
+    "y1": 1232,
+    "x2": 4084,
+    "y2": 1283
+  },
+  "points": [
+    {
+      "x": 3676,
+      "y": 1232
+    },
+    {
+      "x": 4084,
+      "y": 1232
+    },
+    {
+      "x": 4084,
+      "y": 1283
+    },
+    {
+      "x": 3676,
+      "y": 1283
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "9df0b9b1-c2cf-807e-8008-c86a534ed9dc",
+  "frameId": "9df0b9b1-c2cf-807e-8008-c86a534ed9dc",
+  "flipX": null,
+  "flipY": null,
+  "layoutItemAbsolute": false,
+  "growType": "auto-height",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "12",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#b42318",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "the api answered 409 for /secrets/gh-token: named by registry server github, alpha-search and mcp_beta; held by #128 STARTED and #131 PENDING. Drop it from them and let the Runs finish first."
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "12",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#b42318",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "layoutItemHSizing": "fill",
+  "pageId": "7823e34b-9569-805c-8008-b65d5d40411a",
+  "layoutItemVSizing": "fix",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 3676,
+      "y": 1247.999999821186,
+      "width": 398.9375,
+      "height": 15.199999809265137,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 398.9375,
+      "y2": 15.999999821186066,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#b42318",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "the api answered 409 for /secrets/gh-token: named by registry server github, "
+    },
+    {
+      "x": 3676,
+      "y": 1264.7999992370605,
+      "width": 400.5,
+      "height": 15.19999885559082,
+      "x1": 0,
+      "y1": 17.600000381469727,
+      "x2": 400.5,
+      "y2": 32.79999923706055,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#b42318",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "alpha-search and mcp_beta; held by #128 STARTED and #131 PENDING. Drop "
+    },
+    {
+      "x": 3676,
+      "y": 1281.6000022888184,
+      "width": 203.08750915527344,
+      "height": 15.200000762939453,
+      "x1": 0,
+      "y1": 34.400001525878906,
+      "x2": 203.08750915527344,
+      "y2": 49.60000228881836,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#b42318",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "it from them and let the Runs finish first."
+    }
+  ],
+  "strokes": [],
+  "shadow": [],
+  "layoutItemMargin": {
+    "m1": 0,
+    "m2": 0,
+    "m3": 0,
+    "m4": 0
+  },
+  "layoutItemZIndex": 0
+}

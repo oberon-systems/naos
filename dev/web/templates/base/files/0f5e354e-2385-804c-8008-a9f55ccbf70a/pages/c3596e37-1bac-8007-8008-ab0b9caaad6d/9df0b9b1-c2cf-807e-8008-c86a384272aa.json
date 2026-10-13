@@ -1,0 +1,113 @@
+{
+  "id": "9df0b9b1-c2cf-807e-8008-c86a384272aa",
+  "name": "Body",
+  "type": "frame",
+  "x": 6700,
+  "y": 102,
+  "width": 640,
+  "height": 706,
+  "rotation": 0,
+  "selrect": {
+    "x": 6700,
+    "y": 102,
+    "width": 640,
+    "height": 706,
+    "x1": 6700,
+    "y1": 102,
+    "x2": 7340,
+    "y2": 808
+  },
+  "points": [
+    {
+      "x": 6700,
+      "y": 102
+    },
+    {
+      "x": 7340,
+      "y": 102
+    },
+    {
+      "x": 7340,
+      "y": 808
+    },
+    {
+      "x": 6700,
+      "y": 808
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "9df0b9b1-c2cf-807e-8008-c86a384272a9",
+  "frameId": "9df0b9b1-c2cf-807e-8008-c86a384272a9",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutItemAbsolute": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 20,
+    "p2": 24,
+    "p3": 24,
+    "p4": 24
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "showContent": false,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 16,
+    "columnGap": 16
+  },
+  "pageId": "c3596e37-1bac-8007-8008-ab0b9caaad6d",
+  "layoutItemVSizing": "auto",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "shadow": [],
+  "r4": 0,
+  "layoutItemMargin": {
+    "m1": 0,
+    "m2": 0,
+    "m3": 0,
+    "m4": 0
+  },
+  "fills": [],
+  "layoutItemZIndex": 0,
+  "shapes": [
+    "9df0b9b1-c2cf-807e-8008-c86a384272ad",
+    "9df0b9b1-c2cf-807e-8008-c86a384272ae",
+    "9df0b9b1-c2cf-807e-8008-c86a384272af",
+    "9df0b9b1-c2cf-807e-8008-c86a384272b0",
+    "9df0b9b1-c2cf-807e-8008-c86a384272b1",
+    "9df0b9b1-c2cf-807e-8008-c86a384272b2",
+    "9df0b9b1-c2cf-807e-8008-c86a384272b3",
+    "9df0b9b1-c2cf-807e-8008-c86a384272b4",
+    "9df0b9b1-c2cf-807e-8008-c86a384272b5",
+    "9df0b9b1-c2cf-807e-8008-c86a384272b6"
+  ]
+}

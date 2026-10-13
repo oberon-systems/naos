@@ -121,78 +121,78 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 6284,
       "y": 135.80000191926956,
-      "width": 427.5874938964844,
-      "height": 16.000001907348633,
-      "x1": 0,
-      "y1": 0.800000011920929,
-      "x2": 427.5874938964844,
-      "y2": 16.80000191926956,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "400",
+      "y1": 0.800000011920929,
+      "width": 427.5874938964844,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 6284,
+      "x1": 0,
+      "y2": 16.80000191926956,
       "fills": [
         {
           "fillColor": "#344054",
           "fillOpacity": 1
         }
       ],
+      "x2": 427.5874938964844,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 16.000001907348633,
       "text": "The image leaves the catalog and cannot be picked for a new Run. Runs that "
     },
     {
-      "x": 6284,
       "y": 154,
-      "width": 423.5625,
-      "height": 16,
-      "x1": 0,
-      "y1": 19,
-      "x2": 423.5625,
-      "y2": 35,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "400",
+      "y1": 19,
+      "width": 423.5625,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 6284,
+      "x1": 0,
+      "y2": 35,
       "fills": [
         {
           "fillColor": "#344054",
           "fillOpacity": 1
         }
       ],
+      "x2": 423.5625,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 16,
       "text": "ended on it keep the digest they booted. A restart of the stand never adds it "
     },
     {
-      "x": 6284,
       "y": 172.20000076293945,
-      "width": 30.274999618530273,
-      "height": 16,
-      "x1": 0,
-      "y1": 37.20000076293945,
-      "x2": 30.274999618530273,
-      "y2": 53.20000076293945,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "400",
+      "y1": 37.20000076293945,
+      "width": 30.274999618530273,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 6284,
+      "x1": 0,
+      "y2": 53.20000076293945,
       "fills": [
         {
           "fillColor": "#344054",
           "fillOpacity": 1
         }
       ],
+      "x2": 30.274999618530273,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 16,
       "text": "back."
     }
   ],

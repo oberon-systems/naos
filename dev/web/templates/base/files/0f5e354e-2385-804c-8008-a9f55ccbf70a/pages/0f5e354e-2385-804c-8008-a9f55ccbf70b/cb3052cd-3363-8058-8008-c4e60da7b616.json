@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 16485,
       "y": 1435.0000003576283,
-      "width": 54.60000228881836,
-      "height": 17.600000381469727,
-      "x1": 0,
-      "y1": -1.600000023841858,
-      "x2": 54.60000228881836,
-      "y2": 16.00000035762787,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "400",
+      "y1": -1.600000023841858,
+      "width": 54.60000228881836,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 16485,
+      "x1": 0,
+      "y2": 16.00000035762787,
       "fills": [
         {
           "fillColor": "#344054",
           "fillOpacity": 1
         }
       ],
+      "x2": 54.60000228881836,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
+      "height": 17.600000381469727,
       "text": "PENDING"
     }
   ]

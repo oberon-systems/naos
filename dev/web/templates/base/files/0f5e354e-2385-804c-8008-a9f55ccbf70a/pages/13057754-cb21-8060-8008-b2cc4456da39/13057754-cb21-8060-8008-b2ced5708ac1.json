@@ -3,36 +3,36 @@
   "name": "hint",
   "type": "text",
   "x": 24,
-  "y": 1570,
+  "y": 1663,
   "width": 592,
   "height": 31,
   "rotation": 0,
   "selrect": {
     "x": 24,
-    "y": 1570,
+    "y": 1663,
     "width": 592,
     "height": 31,
     "x1": 24,
-    "y1": 1570,
+    "y1": 1663,
     "x2": 616,
-    "y2": 1601
+    "y2": 1694
   },
   "points": [
     {
       "x": 24,
-      "y": 1570
+      "y": 1663
     },
     {
       "x": 616,
-      "y": 1570
+      "y": 1663
     },
     {
       "x": 616,
-      "y": 1601
+      "y": 1694
     },
     {
       "x": 24,
-      "y": 1601
+      "y": 1694
     }
   ],
   "transform": {
@@ -119,53 +119,53 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "y": 1584.5454547405243,
+      "x": 24,
+      "y": 1676.6000002026558,
+      "width": 567.9375,
+      "height": 12.800000190734863,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 567.9375,
+      "y2": 13.600000202655792,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
-      "y1": 0.7272727489471436,
-      "width": 567.352294921875,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 24,
-      "x1": 0,
-      "y2": 14.545454740524292,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
-      "x2": 567.352294921875,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "height": 13.818181991577148,
       "text": "A rule sets at least one of protocol, host or ip. Hosts are lowercased and lose a trailing dot; an address goes in ip, never in "
     },
     {
-      "y": 1599.9431819915771,
+      "x": 24,
+      "y": 1692,
+      "width": 119.4000015258789,
+      "height": 12.799999237060547,
+      "x1": 0,
+      "y1": 16.200000762939453,
+      "x2": 119.4000015258789,
+      "y2": 29,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
-      "y1": 16.125,
-      "width": 119.2727279663086,
       "textDecoration": "none",
       "letterSpacing": "normal",
-      "x": 24,
-      "x1": 0,
-      "y2": 29.94318199157715,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
-      "x2": 119.2727279663086,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
-      "height": 13.818181991577148,
       "text": "host; localhost is refused."
     }
   ]
