@@ -386,7 +386,9 @@ check_gates() {
         grep '"event":"secret_read"' "$TEMP_DIR/agent.log" | grep -qF -- "$read" ||
             fail "no secret_read for: $read"
     done
-    grep -q 'budget of rule [0-9]* is spent' "$TEMP_DIR/console.log" ||
+    # No rule denies alpha, so a refused search that names a rule is its spent budget.
+    grep '"event":"mcp_call"' "$TEMP_DIR/agent.log" |
+        grep -q '"server":"alpha","tool":"search",.*"decision":"deny".*"category":"denied","rule":"[0-9]' ||
         fail "a spent rule budget was not refused"
     grep '"event":"mcp_call"' "$TEMP_DIR/agent.log" | grep -q '"decision":"allow".*"rule":"[0-9]' ||
         fail "an allowed mcp_call does not name its rule"
