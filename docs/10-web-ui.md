@@ -10,7 +10,7 @@ Views:
 - Run detail;
 - console;
 - logs;
-- network/shell/MCP events: the `Gates` tab of the Run detail, after
+- network/shell/MCP/model events: the `Gates` tab of the Run detail, after
   `Logs & Audit`, switches between the gates the Run's policies name. The
   network view shows the policy in force and when the runner configured it,
   allowed and denied counts, the hosts the Run reached grouped by host,
@@ -20,7 +20,13 @@ Views:
   even for a Run without a shell policy, lists the granted capabilities and
   the guest mount roots, the calls grouped by capability and path with the
   denied ones first, and the calls with the same filters; a path and a reason
-  show as plain text, and no command output or file content is ever shown;
+  show as plain text, and no command output or file content is ever shown.
+  The model view lists the providers with their models, rate and credential
+  name, the allowed and denied calls and the slowest one, the tokens spent
+  against the budget and the requests of each provider against its rate per
+  minute, the calls grouped by provider and model with the denied ones first,
+  and the calls with the same filters; a refused call names its category, and
+  no prompt, completion or key is ever shown;
 - filesystem diff;
 - merge approval;
 - profiles;

@@ -191,11 +191,21 @@ and `last_failure_reason`, the reason of the newest failure in that window.
 from the audit on every read and never stored. `gate` is `model`, `network`,
 `shell` or `mcp`.
 
-For `model` it answers `calls`, `denied`, `input_tokens` and `output_tokens`
-summed over the Run's `model_call` events, and `refusals`, the last five
-denied calls newest first, each with `id`, `at`, `provider`, `model` and
-`category`. The budget itself is in the model policy
+For `model` it answers the policy the Run holds now, `policy_id` (null for a
+temporary edit) and its `document`, `configured_at` of the latest
+`model_policy_configured`, `calls`, `denied`, `input_tokens` and
+`output_tokens` summed over the Run's `model_call` events, and `refusals`, the
+last five denied calls newest first, each with `id`, `at`, `provider`, `model`
+and `category`. The budget itself is in the model policy
 ([13](13-model-gateway.md#budget-and-rate)).
+
+`groups` are the calls by `provider` and `model`, each with `calls`,
+`denied`, `input_tokens`, `output_tokens`, `slowest_ms` and `last_at`, denied
+ones first and at most 200 of them; `groups_total` counts them all. `minutes`
+are the calls by UTC minute and `provider`, oldest first and at most the
+newest 2000, each with `at`, the start of the minute, `requests`, `denied`,
+`input_tokens` and `output_tokens`. The calls themselves are read from
+`GET /audit` with `run_id`, the event `model_call` and `decision`.
 
 For `network` it answers the policy the Run holds now, `policy_id` (null for a
 temporary edit) and its `document`, `configured_at` of the latest
@@ -307,7 +317,9 @@ is valid ([04](04-runner-design.md#lease-fencing)).
 
 `GET /runs?runner={runner_id}` lists the Runs that any lease of that runner
 held, newest first. `GET /audit?order=desc` reads the trail newest first, so
-a screen can show the latest entries of one runner.
+a screen can show the latest entries of one runner. `GET /audit?decision=`
+keeps the events whose `decision` is `allow` or `deny`, the calls of the mcp
+and model gates.
 
 ## Deleting runs
 
