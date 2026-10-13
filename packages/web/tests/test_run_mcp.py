@@ -104,6 +104,19 @@ def test_save_as_a_new_policy_sends_the_name(client: TestClient, writes: list[An
     assert writes[0][2]["save"] is True and writes[0][2]["name"] == "alpha-search-beta"
 
 
+@pytest.mark.parametrize("name", ["", "Alpha Beta"])
+def test_save_as_a_new_policy_needs_a_name(
+    client: TestClient, writes: list[Any], name: str
+) -> None:
+    fields = EDIT | {"keep": "save", "save_name": name}
+    review = client.post(f"{RUN}/mcp", data=fields | {"step": "review"}, headers=HX).text
+    applied = client.post(f"{RUN}/mcp/apply", data=fields, headers=HX).text
+
+    assert "a policy name is 1-64 lowercase letters" in review
+    assert "a policy name is 1-64 lowercase letters" in applied
+    assert writes == []
+
+
 def test_a_stored_policy_shows_what_the_run_gets(client: TestClient, writes: list[Any]) -> None:
     listed = client.get(f"{RUN}/mcp", params={"source": "stored"}, headers=HX).text
     fields = {"source": "stored", "policy_id": MCPPOL}

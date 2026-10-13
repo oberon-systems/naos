@@ -5,7 +5,16 @@ from typing import Literal
 from naos_web.client import Row
 from naos_web.new_run import FormError, short
 from naos_web.pages import STATUS_TONE, Tone
-from naos_web.policies import McpRule, PolicyForm, from_document, granted, mcp_rules, read_form
+from naos_web.policies import (
+    POLICY_NAME,
+    POLICY_NAME_RULE,
+    McpRule,
+    PolicyForm,
+    from_document,
+    granted,
+    mcp_rules,
+    read_form,
+)
 
 Source = Literal["edit", "stored"]
 Keep = Literal["temporary", "save"]
@@ -340,7 +349,7 @@ def change_body(fields: dict[str, str]) -> Row:
     form, _, keep, name = read_dialog(fields)
     body: Row = {"kind": "mcp", "document": form.document()}
     if keep == "save":
-        body["save"] = True
-        if name:
-            body["name"] = name
+        if not POLICY_NAME.match(name):
+            raise FormError(POLICY_NAME_RULE)
+        body |= {"save": True, "name": name}
     return body

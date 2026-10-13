@@ -125,6 +125,7 @@
                             </span>
                         </label>
                         {{ fields.text("save_name", save_name, "Name", "alpha-search-beta", mono=true) }}
+                        <span class="field__hint">required · unique among mcp policies · shown in every list instead of the id</span>
                     </div>
                     <span class="field__hint">{{ held }} itself is never overwritten: it stays as the profiles and the other Runs use it.</span>
                 {% endif %}
