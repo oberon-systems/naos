@@ -444,16 +444,16 @@ def test_delete_asks_yes_or_no_for_a_policy_nothing_names(client: TestClient) ->
     assert ">No</a>" in body
 
 
-def test_delete_is_refused_up_front_for_a_policy_in_use(
+def test_delete_is_refused_up_front_only_while_a_policy_is_in_use(
     client: TestClient, writes: list[Any]
 ) -> None:
     named = client.get(f"/policies/{NETPOL}/delete", headers=HX).text
     taken = client.get(f"/policies/{SHELLPOL}/delete", headers=HX).text
 
     assert "cannot be deleted" in named
-    assert "is named by 3 profiles and kept by the record of 28 runs" in named
-    assert "is kept by the record of 3 runs" in taken
+    assert "is named by 3 profiles and used by 1 unfinished run" in named
     assert ">Yes<" not in named and ">OK</a>" in named
+    assert "cannot be deleted" not in taken and ">Yes<" in taken
     assert writes == []
 
 

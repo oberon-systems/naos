@@ -203,3 +203,12 @@ def test_an_in_page_request_still_gets_the_fragment(client: TestClient) -> None:
     fragment = client.get("/runs", headers=HX).text
 
     assert '<header class="topbar">' not in fragment
+
+
+def test_the_list_redraws_itself_under_its_filter(client: TestClient) -> None:
+    page = client.get("/runs").text
+    fragment = client.get("/runs", params={"state": "active"}, headers=HX).text
+
+    poll = r'<div hidden\s+hx-get="/runs\?state={}"\s+hx-trigger="every 5s"\s+hx-target="#page">'
+    assert re.search(poll.format("all"), page)
+    assert re.search(poll.format("active"), fragment)

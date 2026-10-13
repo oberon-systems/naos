@@ -156,3 +156,10 @@ def test_the_terminal_never_answers_device_attribute_queries() -> None:
 
     assert 'registerCsiHandler({ final: "c" }, () => true)' in script
     assert 'registerCsiHandler({ prefix: ">", final: "c" }, () => true)' in script
+
+
+def test_copy_and_paste_are_left_to_the_browser() -> None:
+    script = SCRIPT.read_text()
+
+    assert "term.attachCustomKeyEventHandler(" in script
+    assert 'key === "v" || (key === "c" && term.hasSelection())' in script

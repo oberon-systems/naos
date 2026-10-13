@@ -1,3 +1,4 @@
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -6,6 +7,9 @@ from urllib.parse import urlsplit
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.responses import Response
+from starlette.staticfiles import PathLike
+from starlette.types import Scope
 
 from naos_web import format
 from naos_web.client import ApiClient, read_token
@@ -13,6 +17,21 @@ from naos_web.routes import router
 from naos_web.settings import get_settings
 
 HERE = Path(__file__).parent
+
+
+class Static(StaticFiles):
+    """Every load revalidates, so a browser never runs the scripts of an older build."""
+
+    def file_response(
+        self,
+        full_path: PathLike,
+        stat_result: os.stat_result,
+        scope: Scope,
+        status_code: int = 200,
+    ) -> Response:
+        response = super().file_response(full_path, stat_result, scope, status_code)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
 
 
 def api_endpoint(api_base_url: str) -> str:
@@ -49,7 +68,7 @@ def create_app() -> FastAPI:
         read_token(settings.operator_token_file),
         settings.api_timeout_seconds,
     )
-    app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
+    app.mount("/static", Static(directory=HERE / "static"), name="static")
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

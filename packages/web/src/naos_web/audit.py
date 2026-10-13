@@ -43,6 +43,7 @@ KINDS: dict[str, Kind] = {
     "run_assigned": LIFECYCLE,
     "run_transition": LIFECYCLE,
     "run_stop_requested": LIFECYCLE,
+    "run_deleted": LIFECYCLE,
     "run_claimed": LIFECYCLE,
     "run_failed": LIFECYCLE,
     "waiting_rebound": LIFECYCLE,

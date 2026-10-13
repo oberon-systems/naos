@@ -80,3 +80,10 @@ def test_htmx_is_served_from_the_application(client: TestClient) -> None:
     assert "fonts.googleapis.com" not in body
     assert client.get("/static/vendor/htmx.min.js").status_code == 200
     assert client.get("/static/naos.css").status_code == 200
+
+
+def test_static_files_are_revalidated_on_every_load(client: TestClient) -> None:
+    response = client.get("/static/terminal.js")
+
+    assert response.headers["cache-control"] == "no-cache"
+    assert response.headers["etag"]

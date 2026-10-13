@@ -211,6 +211,9 @@ API: dict[str, Schema] = {
         lambda d: d["to"] == "FAILED",
     ),
     "run_stop_requested": Schema({"status": _text}, _data(lambda d: f"while {d['status']}")),
+    "run_deleted": Schema(
+        {"seq": _count, "status": _text}, _data(lambda d: f"#{d['seq']} {d['status']}")
+    ),
     "policy_changed": Schema(
         {"kind": _text, "from": _maybe_text, "to": _maybe_text, "digest": _text},
         _data(_policy_changed),

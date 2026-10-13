@@ -263,3 +263,16 @@ def test_the_overlay_never_renders_a_secret(client: TestClient) -> None:
     assert "operator-token" not in body
     assert "Bearer" not in body
     assert "Authorization" not in body
+
+
+def test_the_overlay_redraws_its_header_and_overview(client: TestClient) -> None:
+    overview = client.get(f"/runs/{STARTED}", headers=HX).text
+    terminal = client.get(f"/runs/{STARTED}/terminal", headers=HX).text
+
+    assert 'id="run-header"' in overview and 'id="run-overview"' in overview
+    assert re.search(
+        rf'hx-get="/runs/{STARTED}"\s+hx-trigger="every 5s"\s+'
+        r'hx-select-oob="#run-header,#run-overview"\s+hx-swap="none"',
+        overview,
+    )
+    assert 'hx-select-oob="#run-header"' in terminal

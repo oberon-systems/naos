@@ -104,12 +104,13 @@ def test_nothing_is_red_before_the_browser_refuses_a_field() -> None:
     assert ":invalid " not in css.replace(":user-invalid", "").replace(":required:invalid", "")
 
 
-def test_a_required_policy_is_red_at_once_and_shuts_next() -> None:
+def test_a_required_policy_is_red_at_once_and_shuts_next(client: TestClient) -> None:
     css = CSS.read_text()
+    script = (CSS.parent / "dialog.js").read_text()
 
     assert ".field:has(.field__select:required:invalid) .field__error" in css
     assert ".field__select:required:invalid {" in css
-    assert re.search(
-        r"form:has\(\.field__select:required:invalid\) \.dialog__next \{[^}]*pointer-events: none;",
-        css,
-    )
+    assert ".dialog__next:disabled {" in css
+    assert 'querySelectorAll("select[required]")' in script
+    assert "next.disabled" in script
+    assert '<script src="/static/dialog.js" defer></script>' in client.get("/runs").text

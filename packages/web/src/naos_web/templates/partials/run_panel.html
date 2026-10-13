@@ -3,7 +3,7 @@
 <section class="panel panel--run{{ " panel--terminal" if tab == "terminal" }}"
          role="dialog"
          aria-label="Run #{{ run.seq }}">
-    <header class="panel__header run__header">
+    <header class="panel__header run__header" id="run-header">
         <div class="panel__title">
             <h2 class="panel__name">Run #{{ run.seq }}</h2>
             {{ pill(run.status, run.tone) }}
@@ -72,7 +72,7 @@
     {% elif tab == "gates" %}
         {% include "partials/run_gates.html" %}
     {% else %}
-        <div class="run__body">
+        <div class="run__body" id="run-overview">
             <div class="run__column">
                 {% with title="Run", facts=run.run, link=none %}
                     {% include "partials/run_facts_card.html" %}
@@ -93,4 +93,10 @@
             {% endif %}
         </div>
     {% endif %}
+    {# Only the header and the overview body are redrawn: other tabs hold a terminal or a form. #}
+    <div hidden
+         hx-get="/runs/{{ run.id }}"
+         hx-trigger="every 5s"
+         hx-select-oob="#run-header{{ ',#run-overview' if tab == 'overview' }}"
+         hx-swap="none"></div>
 </section>

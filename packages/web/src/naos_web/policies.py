@@ -833,12 +833,12 @@ def busy_note(policy: Row) -> str:
     parts = []
     if policy["profiles"]:
         parts.append(f"named by {_plural(len(policy['profiles']), 'profile')}")
-    if policy["runs_total"]:
-        parts.append(f"kept by the record of {_plural(policy['runs_total'], 'run')}")
+    if policy["runs_open"]:
+        parts.append(f"used by {_plural(policy['runs_open'], 'unfinished run')}")
     if not parts:
         return ""
     label = policy.get("name") or policy["id"]
-    return f"{label} is {' and '.join(parts)}. It stays while they name it."
+    return f"{label} is {' and '.join(parts)}. It can be deleted once nothing uses it."
 
 
 def check_credentials(document: Row, known: set[str]) -> None:

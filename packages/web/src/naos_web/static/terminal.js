@@ -25,6 +25,15 @@
     // reached the agent as typed text; tmux does without it
     term.parser.registerCsiHandler({ final: "c" }, () => true);
     term.parser.registerCsiHandler({ prefix: ">", final: "c" }, () => true);
+    // Ctrl+V and Ctrl+C over a selection are left to the browser's paste and copy;
+    // a bare Ctrl+C still reaches the guest as an interrupt
+    term.attachCustomKeyEventHandler((event) => {
+      if (!event.ctrlKey || event.altKey || event.metaKey) {
+        return true;
+      }
+      const key = event.key.toLowerCase();
+      return !(key === "v" || (key === "c" && term.hasSelection()));
+    });
     const fit = new FitAddon.FitAddon();
     term.loadAddon(fit);
     const surface = document.createElement("div");

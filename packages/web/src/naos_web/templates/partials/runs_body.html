@@ -6,3 +6,7 @@
         {% include "partials/runners_card.html" %}
     </aside>
 </div>
+<div hidden
+     hx-get="/runs?state={{ state }}"
+     hx-trigger="every 5s"
+     hx-target="#page"></div>
