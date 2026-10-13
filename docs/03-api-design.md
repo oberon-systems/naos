@@ -105,6 +105,7 @@ GET /api/v1/runs
 GET /api/v1/runs/summary
 GET /api/v1/runs/{run_id}
 POST /api/v1/runs/{run_id}/stop
+DELETE /api/v1/runs/{run_id}
 POST /api/v1/runs/{run_id}/policies
 GET /api/v1/runners
 POST /api/v1/runners/{runner_id}/revoke
@@ -308,6 +309,12 @@ is valid ([04](04-runner-design.md#lease-fencing)).
 held, newest first. `GET /audit?order=desc` reads the trail newest first, so
 a screen can show the latest entries of one runner.
 
+## Deleting runs
+
+`DELETE /runs/{run_id}` answers 204 for a finished Run and records
+`run_deleted`. Its console, merge and policy changes go with it; the audit
+trail stays. A Run that has not finished answers 409: stop it first.
+
 ## Idempotency
 
 - `POST /runs` requires an `Idempotency-Key` header. The same key with the same
@@ -370,8 +377,9 @@ case. Each policy, here and in `GET /policies/{policy_id}`, carries
 The web form reads the list to offer a policy per kind.
 
 `DELETE /policies/{policy_id}` answers 204 and records `policy_deleted`. It
-answers 409 while a profile names the policy or the record of any Run, ended
-or not, keeps its id: the detail names the profiles and counts the Runs. A
+answers 409 while a profile names the policy or a Run that has not finished
+holds it: the detail names the profiles and the Runs with their status. A
+finished Run keeps the id of a deleted policy. A
 `model` policy is stored only when every provider's `credential` is the name
 of an existing secret; another name answers 422.
 

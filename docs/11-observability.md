@@ -54,6 +54,7 @@ describe, so a change and its event land or fail together.
 | `run_assigned` | system | `lease_id`, `slot` and `slots` of the runner that took it |
 | `run_transition` | operator, runner, system | `from`, `to`, `reason` |
 | `run_stop_requested` | operator | `status` |
+| `run_deleted` | operator | `seq` and the final `status` of the Run |
 | `runner_registered` | runner | none |
 | `runner_revoked` | operator | none; the lease it ends is recorded as `lease_expired` by the operator |
 | `runner_drained` | operator | none |
