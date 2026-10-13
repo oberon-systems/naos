@@ -164,15 +164,15 @@ def test_a_model_provider_names_its_credential(
 ) -> None:
     _secret(client, "alpha-key")
     _secret(client, "beta-key")
-    created = client.post("/api/v1/policies", json={"kind": "model", "document": model_body})
-    policy_id = created.json()["id"]
+    body = {"kind": "model", "name": "model_alpha", "document": model_body}
+    policy_id = client.post("/api/v1/policies", json=body).json()["id"]
 
     row = client.get("/api/v1/secrets/beta-key").json()
     refused = client.delete("/api/v1/secrets/beta-key")
 
     assert row["named_by"] == [{"kind": "model", "id": policy_id, "server": "beta"}]
     assert refused.status_code == 409
-    assert f"{policy_id} (provider beta)" in refused.json()["detail"]
+    assert "model_alpha (provider beta)" in refused.json()["detail"]
 
 
 def test_delete_of_an_unused_secret(client: TestClient) -> None:

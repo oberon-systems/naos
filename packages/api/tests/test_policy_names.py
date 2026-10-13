@@ -64,7 +64,7 @@ def test_a_policy_nothing_names_is_deleted_and_audited(client: TestClient) -> No
 
 
 def test_a_policy_a_profile_names_stays(client: TestClient) -> None:
-    created = _create(client, SHELL).json()
+    created = _create(client, SHELL, "shell_alpha").json()
     spec = {
         "runtime": {"cpu": 2, "memory_mib": 4096, "disk_gib": 20},
         "merge": {"policy": "ask"},
@@ -76,7 +76,7 @@ def test_a_policy_a_profile_names_stays(client: TestClient) -> None:
     refused = client.delete(f"/api/v1/policies/{created['id']}")
 
     assert refused.status_code == 409
-    assert "named by 1 profile: alpha" in refused.json()["detail"]
+    assert "policy shell_alpha is named by 1 profile: alpha" in refused.json()["detail"]
     assert client.get("/api/v1/audit", params={"event": "policy_deleted"}).json() == []
 
 

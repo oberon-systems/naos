@@ -237,7 +237,7 @@ def delete_policy(session: Session, policy_id: str) -> None:
         held = ", ".join(f"#{run.seq} ({run.status})" for run in runs)
         parts.append(f"used by {_plural(len(runs), 'unfinished run')}: {held}")
     if parts:
-        raise PolicyBusyError(f"policy {policy_id} is {' and '.join(parts)}")
+        raise PolicyBusyError(f"policy {policy.name or policy_id} is {' and '.join(parts)}")
     taken = select(Run.id).where(*holding)
     result = session.exec(delete(Policy).where(col(Policy.id) == policy_id, ~taken.exists()))
     if result.rowcount == 1:
@@ -251,7 +251,7 @@ def delete_policy(session: Session, policy_id: str) -> None:
         )
     session.commit()
     if result.rowcount != 1:
-        raise PolicyBusyError(f"policy {policy_id} was taken by a run")
+        raise PolicyBusyError(f"policy {policy.name or policy_id} was taken by a run")
 
 
 def check_refs(session: Session, spec: ProfileSpec) -> None:

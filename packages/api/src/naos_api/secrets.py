@@ -241,12 +241,13 @@ def set_expiry(session: Session, name: str, expires_at: int | None) -> Secret:
     return secret
 
 
-def _busy_detail(view: SecretView) -> str:
+# A policy is named by its name; a registry entry and an unnamed policy by their id.
+def _busy_detail(view: SecretView, names: dict[str, str | None]) -> str:
     role = {"reg": "server", "model": "provider"}
     named = [
-        f"{usage.id} (granted to agents)"
+        f"{names.get(usage.id) or usage.id} (granted to agents)"
         if usage.kind == "grant"
-        else f"{usage.id} ({role[usage.kind]} {usage.server})"
+        else f"{names.get(usage.id) or usage.id} ({role[usage.kind]} {usage.server})"
         for usage in view.named_by
     ]
     held = [f"#{holder.seq} {holder.status}" for holder in view.held_by]
@@ -271,7 +272,9 @@ def delete_secret(session: Session, name: str, now: int) -> None:
             held_by=[holder.run_id for holder in view.held_by],
         )
         session.commit()
-        raise SecretBusyError(_busy_detail(view))
+        ids = [usage.id for usage in view.named_by if usage.kind != "reg"]
+        named = select(Policy.id, Policy.name).where(col(Policy.id).in_(ids))
+        raise SecretBusyError(_busy_detail(view, dict(session.exec(named).all())))
     session.delete(secret)
     audit.record(session, "secret_deleted", actor="operator", name=name)
     session.commit()
