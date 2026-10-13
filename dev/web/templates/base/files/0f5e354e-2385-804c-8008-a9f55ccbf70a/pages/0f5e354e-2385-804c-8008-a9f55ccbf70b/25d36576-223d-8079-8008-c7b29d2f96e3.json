@@ -1,0 +1,103 @@
+{
+  "id": "25d36576-223d-8079-8008-c7b29d2f96e3",
+  "name": "meta row",
+  "type": "frame",
+  "x": 18424,
+  "y": 65,
+  "width": 1072,
+  "height": 20,
+  "rotation": 0,
+  "selrect": {
+    "x": 18424,
+    "y": 65,
+    "width": 1072,
+    "height": 20,
+    "x1": 18424,
+    "y1": 65,
+    "x2": 19496,
+    "y2": 85
+  },
+  "points": [
+    {
+      "x": 18424,
+      "y": 65
+    },
+    {
+      "x": 19496,
+      "y": 65
+    },
+    {
+      "x": 19496,
+      "y": 85
+    },
+    {
+      "x": 18424,
+      "y": 85
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "25d36576-223d-8079-8008-c7b29d2f53d3",
+  "frameId": "25d36576-223d-8079-8008-c7b29d2f53d3",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "layoutItemHSizing": "fix",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 12,
+    "columnGap": 12
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "fix",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "row",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": [],
+  "shapes": [
+    "25d36576-223d-8079-8008-c7b29d2f96e5",
+    "25d36576-223d-8079-8008-c7b29d2f96e6",
+    "25d36576-223d-8079-8008-c7b29d2f96e7",
+    "25d36576-223d-8079-8008-c7b29d2f96e8",
+    "25d36576-223d-8079-8008-c7b29d2f96e9",
+    "25d36576-223d-8079-8008-c7b29d2f96ea",
+    "25d36576-223d-8079-8008-c7b29d2f96eb",
+    "25d36576-223d-8079-8008-c7b29d2f96ec",
+    "25d36576-223d-8079-8008-c7b29d2f96ed",
+    "25d36576-223d-8079-8008-c7b29d2f96ee"
+  ]
+}
