@@ -10,6 +10,7 @@ from naos_api.spec import PolicyKind
 
 REFUSALS = 5
 GROUPS = 200
+MINUTES = 2000
 
 
 class ModelRefusal(BaseModel):
@@ -20,46 +21,130 @@ class ModelRefusal(BaseModel):
     category: str
 
 
+class ModelGroup(BaseModel):
+    provider: str
+    model: str
+    calls: int
+    denied: int
+    input_tokens: int
+    output_tokens: int
+    slowest_ms: int
+    last_at: int
+
+
+class ModelMinute(BaseModel):
+    at: int
+    provider: str
+    requests: int
+    denied: int
+    input_tokens: int
+    output_tokens: int
+
+
 class ModelGate(BaseModel):
+    policy_id: str | None
+    document: dict[str, Any] | None
+    configured_at: int | None
     calls: int
     denied: int
     input_tokens: int
     output_tokens: int
     refusals: list[ModelRefusal]
+    groups_total: int
+    groups: list[ModelGroup]
+    minutes: list[ModelMinute]
 
 
 # Counted from the audit on every read, so the answer is never a copy that can drift from it.
-def model(session: Session, run_id: str) -> ModelGate:
+def model(session: Session, run: Run) -> ModelGate:
     data = col(AuditEvent.data)
-    calls = (col(AuditEvent.run_id) == run_id, col(AuditEvent.event) == "model_call")
-    denied = (*calls, data["decision"].as_string() == "deny")
-    count, spent_in, spent_out = session.exec(
-        select(
-            func.count(),
-            func.sum(data["input_tokens"].as_integer()),
-            func.sum(data["output_tokens"].as_integer()),
-        )
-        .select_from(AuditEvent)
-        .where(*calls)
-    ).one()
-    refused = session.exec(select(func.count()).select_from(AuditEvent).where(*denied)).one()
+    event = col(AuditEvent.event)
+    mine = col(AuditEvent.run_id) == run.id
+    calls = (mine, event == "model_call")
+    refused = data["decision"].as_string() == "deny"
+    provider, name = data["provider"].as_string(), data["model"].as_string()
+    spent_in = func.coalesce(func.sum(data["input_tokens"].as_integer()), 0)
+    spent_out = func.coalesce(func.sum(data["output_tokens"].as_integer()), 0)
+    denied = func.sum(case((refused, 1), else_=0))
+    totals = session.exec(select(func.count(), denied, spent_in, spent_out).where(*calls)).one()
     last = session.exec(
-        select(AuditEvent).where(*denied).order_by(col(AuditEvent.seq).desc()).limit(REFUSALS)
+        select(AuditEvent)
+        .where(*calls, refused)
+        .order_by(col(AuditEvent.seq).desc())
+        .limit(REFUSALS)
     ).all()
+    groups: Select[tuple[str, str, int, int, int, int, int, int]] = Select(
+        provider,
+        name,
+        func.count(),
+        denied,
+        spent_in,
+        spent_out,
+        func.max(data["duration_ms"].as_integer()),
+        func.max(AuditEvent.at),
+    )
+    rows = session.exec(
+        groups.where(*calls)
+        .group_by(provider, name)
+        .order_by(denied.desc(), func.count().desc(), provider, name)
+        .limit(GROUPS)
+    ).all()
+    every = select(provider).where(*calls).group_by(provider, name)
+    minute = col(AuditEvent.at) - col(AuditEvent.at) % 60
+    per_minute: Select[tuple[int, str, int, int, int, int]] = Select(
+        minute, provider, func.count(), denied, spent_in, spent_out
+    )
+    minutes = session.exec(
+        per_minute.where(*calls)
+        .group_by(minute, provider)
+        .order_by(minute.desc(), provider.desc())
+        .limit(MINUTES)
+    ).all()
+    configured = session.exec(
+        select(func.max(AuditEvent.at)).where(mine, event == "model_policy_configured")
+    ).one()
     return ModelGate(
-        calls=count,
-        denied=refused,
-        input_tokens=spent_in or 0,
-        output_tokens=spent_out or 0,
+        policy_id=run.model_policy_id,
+        document=held_document(session, run, PolicyKind.MODEL),
+        configured_at=configured,
+        calls=totals[0],
+        denied=totals[1] or 0,
+        input_tokens=totals[2],
+        output_tokens=totals[3],
         refusals=[
             ModelRefusal(
-                id=event.id,
-                at=event.at,
-                provider=event.data["provider"],
-                model=event.data["model"],
-                category=event.data["category"],
+                id=row.id,
+                at=row.at,
+                provider=row.data["provider"],
+                model=row.data["model"],
+                category=row.data["category"],
             )
-            for event in last
+            for row in last
+        ],
+        groups_total=session.exec(select(func.count()).select_from(every.subquery())).one(),
+        groups=[
+            ModelGroup(
+                provider=row[0],
+                model=row[1],
+                calls=row[2],
+                denied=row[3],
+                input_tokens=row[4],
+                output_tokens=row[5],
+                slowest_ms=row[6],
+                last_at=row[7],
+            )
+            for row in rows
+        ],
+        minutes=[
+            ModelMinute(
+                at=row[0],
+                provider=row[1],
+                requests=row[2],
+                denied=row[3],
+                input_tokens=row[4],
+                output_tokens=row[5],
+            )
+            for row in reversed(minutes)
         ],
     )
 

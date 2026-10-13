@@ -243,7 +243,7 @@ def gate_summary(
         return gates.shell(session, run)
     if gate == "mcp":
         return gates.mcp(session, run)
-    return gates.model(session, run_id)
+    return gates.model(session, run)
 
 
 # The log is read by people, so it carries the text and not the screen.

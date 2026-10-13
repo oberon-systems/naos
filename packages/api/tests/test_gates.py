@@ -43,13 +43,23 @@ def _gate(client: TestClient, run_id: str) -> dict[str, Any]:
 
 
 def test_a_run_without_calls_has_spent_nothing(client: TestClient, create_run: CreateRun) -> None:
-    assert _gate(client, create_run("key-1")) == {
+    gate = _gate(client, create_run("key-1"))
+
+    assert gate["policy_id"] == "modelpol_" + "c" * 32
+    assert gate["document"]["providers"][0]["credential"] == "gamma-key"
+    assert gate["configured_at"] is None
+    assert {key: gate[key] for key in ("calls", "denied", "input_tokens", "output_tokens")} == {
         "calls": 0,
         "denied": 0,
         "input_tokens": 0,
         "output_tokens": 0,
-        "refusals": [],
     }
+    assert (gate["refusals"], gate["groups"], gate["groups_total"], gate["minutes"]) == (
+        [],
+        [],
+        0,
+        [],
+    )
 
 
 def test_calls_are_summed_for_their_run_only(
@@ -83,6 +93,88 @@ def test_only_the_last_refusals_are_listed_newest_first(
 
     assert gate["denied"] == 7
     assert [row["id"] for row in gate["refusals"]] == refused[:1:-1]
+
+
+def test_calls_are_grouped_by_provider_and_model_denied_first(
+    client: TestClient, session: Session, create_run: CreateRun
+) -> None:
+    run_id = create_run("key-1")
+    _call(session, run_id, 60, input_tokens=100, output_tokens=10, duration_ms=900)
+    _call(session, run_id, 70, input_tokens=50, output_tokens=5, duration_ms=4000)
+    _call(session, run_id, 130, provider="beta", model="beta-pro", decision="deny", category="rate")
+    _call(session, run_id, 140, provider="unknown", model="beta-max", decision="deny")
+
+    gate = _gate(client, run_id)
+
+    assert [(row["provider"], row["model"]) for row in gate["groups"]] == [
+        ("beta", "beta-pro"),
+        ("unknown", "beta-max"),
+        ("alpha", "alpha-mini"),
+    ]
+    assert gate["groups"][2] == {
+        "provider": "alpha",
+        "model": "alpha-mini",
+        "calls": 2,
+        "denied": 0,
+        "input_tokens": 150,
+        "output_tokens": 15,
+        "slowest_ms": 4000,
+        "last_at": 70,
+    }
+    assert gate["groups_total"] == 3
+
+
+def test_calls_are_counted_per_minute_and_provider(
+    client: TestClient, session: Session, create_run: CreateRun
+) -> None:
+    run_id = create_run("key-1")
+    _call(session, run_id, 61, input_tokens=100, output_tokens=10)
+    _call(session, run_id, 119, input_tokens=20, output_tokens=2)
+    _call(session, run_id, 120, decision="deny", category="budget")
+    _call(session, run_id, 125, provider="beta", model="beta-pro")
+
+    minutes = _gate(client, run_id)["minutes"]
+
+    assert minutes == [
+        {
+            "at": 60,
+            "provider": "alpha",
+            "requests": 2,
+            "denied": 0,
+            "input_tokens": 120,
+            "output_tokens": 12,
+        },
+        {
+            "at": 120,
+            "provider": "alpha",
+            "requests": 1,
+            "denied": 1,
+            "input_tokens": 0,
+            "output_tokens": 0,
+        },
+        {
+            "at": 120,
+            "provider": "beta",
+            "requests": 1,
+            "denied": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+        },
+    ]
+
+
+def test_the_audit_is_filtered_by_decision(
+    client: TestClient, session: Session, create_run: CreateRun
+) -> None:
+    run_id = create_run("key-1")
+    _call(session, run_id, 10)
+    refused = _call(session, run_id, 11, decision="deny", category="budget")
+    params = {"run_id": run_id, "event": "model_call", "decision": "deny"}
+
+    rows = client.get("/api/v1/audit", params=params).json()
+
+    assert [row["id"] for row in rows] == [refused]
+    assert client.get("/api/v1/audit", params={"decision": "maybe"}).status_code == 422
 
 
 def test_an_unknown_run_or_gate_is_refused(client: TestClient, create_run: CreateRun) -> None:
