@@ -122,28 +122,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 3664,
       "y": 1147.7000004053116,
-      "width": 90.3125,
-      "height": 21.600000381469727,
-      "x1": 0,
-      "y1": 1.600000023841858,
-      "x2": 90.3125,
-      "y2": 23.200000405311584,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "18px",
       "fontWeight": "700",
+      "y1": 1.600000023841858,
+      "width": 90.3125,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 3664,
+      "x1": 0,
+      "y2": 23.200000405311584,
       "fills": [
         {
           "fillColor": "#101828",
           "fillOpacity": 1
         }
       ],
+      "x2": 90.3125,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 21.600000381469727,
       "text": "New policy"
     }
   ],

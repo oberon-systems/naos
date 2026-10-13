@@ -120,28 +120,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 2644,
       "y": 731.6000002026556,
-      "width": 714.9750366210938,
-      "height": 12.800000190734863,
-      "x1": 0,
-      "y1": 0.800000011920929,
-      "x2": 714.9750366210938,
-      "y2": 13.600000202655792,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 0.800000011920929,
+      "width": 714.9750366210938,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 2644,
+      "x1": 0,
+      "y2": 13.600000202655792,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 714.9750366210938,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 12.800000190734863,
       "text": "A Run is listed once the secret was issued to it or read by its agent. It holds the value until it leaves STARTED; a finished Run stays listed with what it read."
     }
   ]

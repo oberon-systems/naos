@@ -215,103 +215,103 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 3732,
       "y": 475.99999964237213,
-      "width": 6.612500190734863,
-      "height": 14.399999618530273,
-      "x1": 0,
-      "y1": 1.600000023841858,
-      "x2": 6.612500190734863,
-      "y2": 15.999999642372131,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 1.600000023841858,
+      "width": 6.612500190734863,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 3732,
+      "x1": 0,
+      "y2": 15.999999642372131,
       "fills": [
         {
           "fillColor": "#344054",
           "fillOpacity": 1
         }
       ],
+      "x2": 6.612500190734863,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
+      "height": 14.399999618530273,
       "text": "{"
     },
     {
-      "x": 3732,
       "y": 493.60000228881836,
-      "width": 13.21250057220459,
-      "height": 14.400001525878906,
-      "x1": 0,
-      "y1": 19.200000762939453,
-      "x2": 13.21250057220459,
-      "y2": 33.60000228881836,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 19.200000762939453,
+      "width": 13.21250057220459,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 3732,
+      "x1": 0,
+      "y2": 33.60000228881836,
       "fills": [
         {
           "fillColor": "#344054",
           "fillOpacity": 1
         }
       ],
+      "x2": 13.21250057220459,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
+      "height": 14.400001525878906,
       "text": "  "
     },
     {
-      "x": 3745.2125005722046,
       "y": 493.60000228881836,
-      "width": 369.6125183105469,
-      "height": 14.400001525878906,
-      "x1": 13.21250057220459,
-      "y1": 19.200000762939453,
-      "x2": 382.82501888275146,
-      "y2": 33.60000228881836,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 19.200000762939453,
+      "width": 369.6125183105469,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 3745.2125005722046,
+      "x1": 13.21250057220459,
+      "y2": 33.60000228881836,
       "fills": [
         {
           "fillColor": "#344054",
           "fillOpacity": 1
         }
       ],
+      "x2": 382.82501888275146,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
+      "height": 14.400001525878906,
       "text": "\"allow\": [\"git_status\", \"grep\", \"list_dir\", \"read_file\"]"
     },
     {
-      "x": 3732,
       "y": 511.20000076293945,
-      "width": 6.612500190734863,
-      "height": 14.400001525878906,
-      "x1": 0,
-      "y1": 36.79999923706055,
-      "x2": 6.612500190734863,
-      "y2": 51.20000076293945,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 36.79999923706055,
+      "width": 6.612500190734863,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 3732,
+      "x1": 0,
+      "y2": 51.20000076293945,
       "fills": [
         {
           "fillColor": "#344054",
           "fillOpacity": 1
         }
       ],
+      "x2": 6.612500190734863,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
+      "height": 14.400001525878906,
       "text": "}"
     }
   ]

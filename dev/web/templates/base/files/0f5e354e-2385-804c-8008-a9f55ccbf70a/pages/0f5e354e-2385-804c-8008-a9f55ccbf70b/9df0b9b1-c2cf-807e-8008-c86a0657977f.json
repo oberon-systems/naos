@@ -167,53 +167,53 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 6160,
       "y": 1176.8000001907349,
-      "width": 195.6750030517578,
-      "height": 12.800000190734863,
-      "x1": 0,
-      "y1": 0,
-      "x2": 195.6750030517578,
-      "y2": 12.800000190734863,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 0,
+      "width": 195.6750030517578,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 6160,
+      "x1": 0,
+      "y2": 12.800000190734863,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 195.6750030517578,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 12.800000190734863,
       "text": "alpha \u00b7 openai: gpt-5.6-luna, gpt-5.6-terra"
     },
     {
-      "x": 6160,
       "y": 1190,
-      "width": 142.85000610351562,
-      "height": 12.800000190734863,
-      "x1": 0,
-      "y1": 13.199999809265137,
-      "x2": 142.85000610351562,
-      "y2": 26,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 13.199999809265137,
+      "width": 142.85000610351562,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 6160,
+      "x1": 0,
+      "y2": 26,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 142.85000610351562,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 12.800000190734863,
       "text": "beta \u00b7 gemini: gemini-3.5-flash"
     }
   ]

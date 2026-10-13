@@ -1,0 +1,110 @@
+{
+  "id": "2bcd31b0-b66e-80a5-8008-c8f2ea6f80c0",
+  "name": "event 7 mcp_credentials_updated 14:02:09",
+  "type": "frame",
+  "x": 19680,
+  "y": 943,
+  "width": 1040,
+  "height": 32,
+  "rotation": 0,
+  "selrect": {
+    "x": 19680,
+    "y": 943,
+    "width": 1040,
+    "height": 32,
+    "x1": 19680,
+    "y1": 943,
+    "x2": 20720,
+    "y2": 975
+  },
+  "points": [
+    {
+      "x": 19680,
+      "y": 943
+    },
+    {
+      "x": 20720,
+      "y": 943
+    },
+    {
+      "x": 20720,
+      "y": 975
+    },
+    {
+      "x": 19680,
+      "y": 975
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "2bcd31b0-b66e-80a5-8008-c8f2d285bd15",
+  "frameId": "2bcd31b0-b66e-80a5-8008-c8f2d285bd15",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "fix",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "interactions": [
+    {
+      "eventType": "click",
+      "actionType": "open-overlay",
+      "destination": "9df0b9b1-c2cf-807e-8008-c869c5518690",
+      "positionRelativeTo": null,
+      "preserveScroll": false,
+      "overlayPosType": "center",
+      "closeClickOutside": true,
+      "backgroundOverlay": true
+    }
+  ],
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "row",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": [],
+  "shapes": [
+    "2bcd31b0-b66e-80a5-8008-c8f2ec64b972",
+    "2bcd31b0-b66e-80a5-8008-c8f2ec1e1f1b",
+    "2bcd31b0-b66e-80a5-8008-c8f2ebe6dc7a",
+    "2bcd31b0-b66e-80a5-8008-c8f2eb95b1f6",
+    "2bcd31b0-b66e-80a5-8008-c8f2eb282b4d"
+  ]
+}

@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 6945,
       "y": 229.9000005722046,
-      "width": 151.8125,
-      "height": 14.40000057220459,
-      "x1": 0,
-      "y1": 0,
-      "x2": 151.8125,
-      "y2": 14.40000057220459,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 0,
+      "width": 151.8125,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 6945,
+      "x1": 0,
+      "y2": 14.40000057220459,
       "fills": [
         {
           "fillColor": "#667085",
           "fillOpacity": 1
         }
       ],
+      "x2": 151.8125,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
+      "height": 14.40000057220459,
       "text": "https://api.example.com"
     }
   ]

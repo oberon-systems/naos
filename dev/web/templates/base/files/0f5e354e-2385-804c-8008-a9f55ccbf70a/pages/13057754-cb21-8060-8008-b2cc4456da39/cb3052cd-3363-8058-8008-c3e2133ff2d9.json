@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 7968,
       "y": 1775.4999999999993,
-      "width": 93.61250305175781,
-      "height": 16,
-      "x1": 0,
-      "y1": 0,
-      "x2": 93.61250305175781,
-      "y2": 16,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "400",
+      "y1": 0,
+      "width": 93.61250305175781,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 7968,
+      "x1": 0,
+      "y2": 16,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 93.61250305175781,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
+      "height": 16,
       "text": "pick a secret"
     }
   ]

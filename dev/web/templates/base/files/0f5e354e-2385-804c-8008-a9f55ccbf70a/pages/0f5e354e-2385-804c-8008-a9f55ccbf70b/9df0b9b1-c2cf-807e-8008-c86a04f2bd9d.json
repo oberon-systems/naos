@@ -119,28 +119,28 @@
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 4818,
       "y": 1515.199999988079,
-      "width": 184.65000915527344,
-      "height": 16,
-      "x1": 0,
-      "y1": -0.800000011920929,
-      "x2": 184.65000915527344,
-      "y2": 15.199999988079071,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "13px",
       "fontWeight": "400",
+      "y1": -0.800000011920929,
+      "width": 184.65000915527344,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 4818,
+      "x1": 0,
+      "y2": 15.199999988079071,
       "fills": [
         {
           "fillColor": "#101828",
           "fillOpacity": 1
         }
       ],
+      "x2": 184.65000915527344,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 16,
       "text": "network_alpha \u00b7 allowlist \u00b7 3 hosts"
     }
   ]
