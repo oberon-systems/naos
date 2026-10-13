@@ -1,11 +1,12 @@
 {% set base = "/runs/" ~ run.id ~ "/gates" %}
+{% set shown = "network" if network else "shell" if shell_gate else "model" %}
 <div class="run__body run__body--gates">
     <div class="logs__filters">
         <div class="logs__kinds">
-            {% for gate in (network or shell_gate).gates %}
+            {% for gate in (network or shell_gate or model_gate).gates %}
                 {% if gate.live %}
                     {% set href = base if gate.key == "network" else base ~ "/" ~ gate.key %}
-                    <a class="logs__kind{{ " logs__kind--active" if gate.key == ("network" if network else "shell") }}"
+                    <a class="logs__kind{{ " logs__kind--active" if gate.key == shown }}"
                        href="{{ href }}"
                        hx-get="{{ href }}"
                        hx-target="#overlay">{{ gate.label }}</a>
@@ -22,7 +23,9 @@
     </div>
     {% if network %}
         {% include "partials/gates_network.html" %}
-    {% else %}
+    {% elif shell_gate %}
         {% include "partials/gates_shell.html" %}
+    {% else %}
+        {% include "partials/gates_model.html" %}
     {% endif %}
 </div>

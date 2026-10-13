@@ -547,9 +547,17 @@ def audit(
     after: int | None = None,
     limit: int = Query(100),
     order: str = "asc",
+    decision: str | None = None,
 ) -> list[Row]:
     if secret is not None:
         return SECRET_EVENTS.get(secret, [])[:limit]
+    if run_id is not None and event == ["model_call"]:
+        found = [
+            row
+            for row in MODEL_EVENTS
+            if row["run_id"] == run_id and decision in (None, row["data"]["decision"])
+        ]
+        return (found[::-1] if order == "desc" else found)[:limit]
     if run_id is not None and event and all(name.startswith("network_") for name in event):
         found = [row for row in NETWORK_EVENTS if row["run_id"] == run_id and row["event"] in event]
         return (found[::-1] if order == "desc" else found)[:limit]
@@ -1478,7 +1486,11 @@ def run_events(run_id: str) -> list[Row]:
 
 
 # One Run has called its models: the output budget is nearly spent and two calls were refused.
+MINUTE = NOW - 120 - (NOW - 120) % 60
 MODEL_GATE: Row = {
+    "policy_id": MODELPOL,
+    "document": policy_row(MODELPOL)["document"],
+    "configured_at": NOW - 130,
     "calls": 14,
     "denied": 2,
     "input_tokens": 64000,
@@ -1499,8 +1511,96 @@ MODEL_GATE: Row = {
             "category": "denied",
         },
     ],
+    "groups_total": 2,
+    "groups": [
+        {
+            "provider": "alpha",
+            "model": "alpha-mini",
+            "calls": 13,
+            "denied": 1,
+            "input_tokens": 64000,
+            "output_tokens": 9800,
+            "slowest_ms": 41200,
+            "last_at": NOW - 30,
+        },
+        {
+            "provider": "unknown",
+            "model": "beta-max",
+            "calls": 1,
+            "denied": 1,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "slowest_ms": 1,
+            "last_at": NOW - 90,
+        },
+    ],
+    "minutes": [
+        {
+            "at": MINUTE,
+            "provider": "alpha",
+            "requests": 8,
+            "denied": 0,
+            "input_tokens": 40000,
+            "output_tokens": 6000,
+        },
+        {
+            "at": MINUTE + 60,
+            "provider": "unknown",
+            "requests": 1,
+            "denied": 1,
+            "input_tokens": 0,
+            "output_tokens": 0,
+        },
+        {
+            "at": MINUTE + 120,
+            "provider": "alpha",
+            "requests": 55,
+            "denied": 1,
+            "input_tokens": 24000,
+            "output_tokens": 3800,
+        },
+    ],
 }
-IDLE_GATE: Row = {"calls": 0, "denied": 0, "input_tokens": 0, "output_tokens": 0, "refusals": []}
+IDLE_GATE: Row = {
+    "policy_id": None,
+    "document": None,
+    "configured_at": None,
+    "calls": 0,
+    "denied": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "refusals": [],
+    "groups_total": 0,
+    "groups": [],
+    "minutes": [],
+}
+MODEL_CALL: Row = {
+    "provider": "alpha",
+    "model": "alpha-mini",
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "decision": "deny",
+    "duration_ms": 2,
+    "category": "budget",
+}
+MODEL_EVENTS: list[Row] = [
+    _runner(
+        60,
+        NOW - 100,
+        "model_call",
+        MODEL_CALL
+        | {
+            "model": "<b>alpha</b>-mini",
+            "input_tokens": 18204,
+            "output_tokens": 1840,
+            "decision": "allow",
+            "duration_ms": 12400,
+            "category": "none",
+        },
+    ),
+    _runner(61, NOW - 30, "model_call", MODEL_CALL),
+    _runner(62, NOW - 20, "model_call", MODEL_CALL | {"prompt": "<script>alert(1)</script>"}),
+]
 
 
 @stub.get("/api/v1/runs/{run_id}/gates/model")

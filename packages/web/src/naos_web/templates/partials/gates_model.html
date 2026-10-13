@@ -1,0 +1,266 @@
+{% from "components.html" import dot %}
+{% set model_base = base ~ "/model" %}
+<div class="gates__summary">
+    <section class="card run__card">
+        <div class="run__card-header">
+            <h3 class="run__card-title">MODEL POLICY</h3>
+            {% if model_gate.policy_id %}
+                <a class="card__link"
+                   href="/policies/{{ model_gate.policy_id }}"
+                   hx-get="/policies/{{ model_gate.policy_id }}"
+                   hx-target="#overlay">Open policy</a>
+            {% endif %}
+        </div>
+        <dl class="run__facts">
+            <dt>Policy</dt>
+            <dd class="gates__policy">
+                {% if model_gate.policy_id %}
+                    <a class="action"
+                       href="/policies/{{ model_gate.policy_id }}"
+                       hx-get="/policies/{{ model_gate.policy_id }}"
+                       hx-target="#overlay">{{ model_gate.policy_name }}</a>
+                {% else %}
+                    <span>{{ "temporary edit" if model_gate.policy_tag[0] == "temporary" else "none" }}</span>
+                {% endif %}
+                <code class="profile__tag gates__tag--{{ model_gate.policy_tag[1] }}">{{ model_gate.policy_tag[0] }}</code>
+            </dd>
+            <dt>Configured</dt>
+            <dd>
+                {{ model_gate.configured }}
+            </dd>
+            {% for provider in model_gate.providers %}
+                <dt class="gates__provider">{{ provider.name }}</dt>
+                <dd class="gates__tags">
+                    <code class="profile__tag">{{ provider.api }}</code>
+                    <span class="table__secondary">{{ provider.models }}</span>
+                    <span class="gates__rate">{{ provider.rate }}</span>
+                    <a class="profile__tag model__secret"
+                       href="/secrets/{{ provider.credential }}"
+                       hx-get="/secrets/{{ provider.credential }}"
+                       hx-target="#overlay">{{ provider.credential }}</a>
+                </dd>
+            {% else %}
+                <dt>Providers</dt>
+                <dd>
+                    none
+                </dd>
+            {% endfor %}
+            <dt>Changed live</dt>
+            <dd>
+                {{ model_gate.changed }}
+            </dd>
+        </dl>
+    </section>
+    {% for tile in model_gate.tiles %}
+        <section class="tile gates__tile">
+            <div class="tile__head">
+                <span class="run__card-title">{{ tile.label | upper }}</span>
+            </div>
+            <div class="tile__value">
+                {% if tile.tone and tile.counted %}{{ dot(tile.tone) }}{% endif %}
+                <span class="tile__number gates__number{{ " gates__number--none" if not tile.counted }}">{{ tile.value }}</span>
+            </div>
+            <span class="tile__note">{{ tile.note }}</span>
+        </section>
+    {% endfor %}
+</div>
+{% if not model_gate.started %}
+    <section class="card gates__empty">
+        <strong>The Run has not started</strong>
+        <span>The runner configures the model gateway when it starts the VM.</span>
+        <span>Calls show here from then on.</span>
+    </section>
+{% elif not model_gate.groups %}
+    <section class="card gates__empty">
+        <strong>No call yet</strong>
+        <span>The agent has not called a model through the gateway.</span>
+        <span>Calls, their tokens and the budget they spend show here from the first one.</span>
+    </section>
+{% else %}
+    {% if model_gate.spend %}
+        {% set spend = model_gate.spend %}
+        <section class="card run__card">
+            <div class="run__card-header">
+                <h3 class="run__card-title">SPENT OVER THE RUN</h3>
+                <span class="table__secondary">per minute · {{ spend.axis[0] }} – {{ spend.axis[-1] }} · the runner's window restarts with the runner</span>
+            </div>
+            <div class="spend">
+                <div class="spend__panel">
+                    <h4 class="spend__title">Tokens against the budget</h4>
+                    <div class="spend__legend">
+                        <span>{{ dot("green") }} input <code>{{ spend.input }}</code></span>
+                        <span>{{ dot("amber") }} output <code>{{ spend.output }}</code></span>
+                    </div>
+                    <svg class="spend__chart"
+                         viewBox="0 -2 504 108"
+                         preserveAspectRatio="none"
+                         role="img"
+                         aria-label="tokens spent against the budget">
+                        <line class="spend__grid" x1="0" y1="52" x2="504" y2="52" />
+                        <line class="spend__base" x1="0" y1="104" x2="504" y2="104" />
+                        <line class="spend__limit" x1="0" y1="0" x2="504" y2="0" />
+                        <polyline class="spend__input" points="{{ spend.input_line }}" />
+                        <polyline class="spend__output" points="{{ spend.output_line }}" />
+                    </svg>
+                    <div class="spend__axis">
+                        {% for tick in spend.axis %}<span>{{ tick }}</span>{% endfor %}
+                    </div>
+                </div>
+                <div class="spend__panel">
+                    <h4 class="spend__title">Requests against the rate</h4>
+                    {% for strip in spend.strips %}
+                        <div class="spend__legend">
+                            <strong>{{ strip.provider }}</strong>
+                            <span>{{ strip.note }}</span>
+                            {% if strip.refused %}<span class="gates__reason--denied">{{ strip.refused }}</span>{% endif %}
+                        </div>
+                        <svg class="spend__strip"
+                             viewBox="0 0 504 44"
+                             preserveAspectRatio="none"
+                             role="img"
+                             aria-label="requests per minute of {{ strip.provider }}">
+                            <line class="spend__base" x1="0" y1="44" x2="504" y2="44" />
+                            <line class="spend__limit" x1="0" y1="6" x2="504" y2="6" />
+                            {% for bar in strip.bars %}
+                                <rect class="spend__bar--{{ bar.tone }}" x="{{ bar.x }}" y="{{ bar.y }}" width="{{ spend.bar_width }}" height="{{ bar.height }}" />
+                            {% endfor %}
+                        </svg>
+                    {% endfor %}
+                    <div class="spend__axis">
+                        {% for tick in spend.axis %}<span>{{ tick }}</span>{% endfor %}
+                    </div>
+                </div>
+            </div>
+        </section>
+    {% endif %}
+    <section class="card run__card">
+        <div class="run__card-header">
+            <h3 class="run__card-title">CALLS BY MODEL · {{ model_gate.groups_total }}</h3>
+            <span class="table__secondary">denied first · grouped by provider and model</span>
+        </div>
+        <table class="table logs__table gates__table">
+            <colgroup>
+                <col class="gates__col-provider">
+                <col class="gates__col-model">
+                <col class="gates__col-count">
+                <col class="gates__col-tokens">
+                <col class="gates__col-tokens">
+                <col class="gates__col-count">
+                <col class="gates__col-count">
+                <col>
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>PROVIDER</th>
+                    <th>MODEL</th>
+                    <th>CALLS</th>
+                    <th>INPUT</th>
+                    <th>OUTPUT</th>
+                    <th>DENIED</th>
+                    <th>SLOWEST</th>
+                    <th>LAST CALL</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for group in model_gate.groups %}
+                    <tr>
+                        <td class="gates__who{{ " gates__who--unknown" if not group.known }}">{{ group.provider }}</td>
+                        <td class="gates__host">{{ group.model }}</td>
+                        <td class="gates__count">{{ group.calls }}</td>
+                        <td class="gates__count{{ " gates__count--zero" if group.input == "0" }}">{{ group.input }}</td>
+                        <td class="gates__count{{ " gates__count--zero" if group.output == "0" }}">{{ group.output }}</td>
+                        <td class="gates__count{{ " gates__count--denied" if group.denied else " gates__count--zero" }}">{{ group.denied }}</td>
+                        <td class="gates__count">{{ group.slowest }}</td>
+                        <td class="logs__time">{{ group.last }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    <section class="card run__card">
+        <div class="run__card-header">
+            <h3 class="run__card-title">CALLS · {{ model_gate.total }}</h3>
+            <div class="logs__kinds">
+                {% for key, label in model_gate.filters %}
+                    {% set href = model_base ~ ("" if key == "all" else "?decision=" ~ key) %}
+                    <a class="logs__kind{{ " logs__kind--active" if key == model_gate.decision }}"
+                       href="{{ href }}"
+                       hx-get="{{ href }}"
+                       hx-target="#overlay">{{ label }}</a>
+                {% endfor %}
+            </div>
+        </div>
+        <table class="table logs__table gates__table">
+            <colgroup>
+                <col class="logs__col-time">
+                <col class="gates__col-decision">
+                <col class="gates__col-provider">
+                <col class="gates__col-call-model">
+                <col class="gates__col-tokens">
+                <col class="gates__col-tokens">
+                <col class="gates__col-count">
+                <col>
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>TIME</th>
+                    <th>DECISION</th>
+                    <th>PROVIDER</th>
+                    <th>MODEL</th>
+                    <th>INPUT</th>
+                    <th>OUTPUT</th>
+                    <th>DURATION</th>
+                    <th>CATEGORY</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in model_gate.calls %}
+                    <tr class="gates__request{{ " logs__row--refused" if row.refused }}"
+                        hx-get="/audit/{{ row.id }}"
+                        hx-target="#overlay">
+                        <td class="logs__time">
+                            <a href="/audit/{{ row.id }}">{{ row.time }}</a>
+                        </td>
+                        <td>
+                            <span class="logs__source gates__decision--{{ row.decision }}">{{ row.decision }}</span>
+                        </td>
+                        <td class="gates__who{{ " gates__who--unknown" if not row.known }}">{{ row.provider }}</td>
+                        <td class="gates__host">{{ row.model }}</td>
+                        <td class="gates__count{{ " gates__count--zero" if row.input == "0" }}">{{ row.input }}</td>
+                        <td class="gates__count{{ " gates__count--zero" if row.output == "0" }}">{{ row.output }}</td>
+                        <td class="gates__count">{{ row.duration }}</td>
+                        <td class="gates__reason">
+                            {% if row.refused %}
+                                <span class="gates__reason--denied">{{ row.why }}</span>
+                            {% elif row.category == "none" %}
+                                —
+                            {% else %}
+                                <span class="gates__category">
+                                    <code class="profile__tag model__category--{{ row.tone }}">{{ row.category }}</code>
+                                    <span class="gates__why">{{ row.why }}</span>
+                                </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td class="logs__empty" colspan="8">No call yet.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="gates__footer">
+            <span>A row opens its event. Tokens and durations come from the provider's answer; prompts, completions and keys are never logged.</span>
+            <span class="gates__more">
+                <span>{{ model_gate.calls | length }} of {{ model_gate.total }}</span>
+                {% if model_gate.more %}
+                    {% set href = model_base ~ "?limit=" ~ model_gate.more ~ ("" if model_gate.decision == "all" else "&decision=" ~ model_gate.decision) %}
+                    <a class="logs__export"
+                       href="{{ href }}"
+                       hx-get="{{ href }}"
+                       hx-target="#overlay">Load older</a>
+                {% endif %}
+            </span>
+        </div>
+    </section>
+{% endif %}

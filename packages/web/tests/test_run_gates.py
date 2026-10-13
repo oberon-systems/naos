@@ -3,7 +3,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from stub_api import NETPOL, NOW, RUNS, SHELLPOL, policy_row
+from stub_api import IDLE_GATE, MODEL_GATE, MODELPOL, NETPOL, NOW, RUNS, SHELLPOL, policy_row
 
 from naos_web import format, gates
 
@@ -47,8 +47,9 @@ def test_the_gates_of_the_run_are_switched_between(client: TestClient) -> None:
 
     active = r'logs__kind--active"\s+href="[^"]+"\s+hx-get="[^"]+"\s+hx-target="#overlay">'
     assert re.search(active + "Network<", body)
-    assert 'logs__kind--idle">MCP</span>' in body and 'logs__kind--idle">Model</span>' in body
+    assert 'logs__kind--idle">MCP</span>' in body
     assert f'hx-get="/runs/{STARTED}/gates/shell"' in body
+    assert f'hx-get="/runs/{STARTED}/gates/model"' in body
 
 
 def test_guest_text_is_inert_and_an_untyped_event_is_refused(client: TestClient) -> None:
@@ -227,3 +228,102 @@ def test_each_gate_names_its_policy(client: TestClient, monkeypatch: pytest.Monk
     link = r'hx-get="/policies/{}"\s+hx-target="#overlay">{}</a>'
     assert re.search(link.format(NETPOL, "network_alpha"), _gates(client))
     assert re.search(link.format(SHELLPOL, "shell_alpha"), _shell(client))
+
+
+def _model(client: TestClient, run_id: str = STARTED, **params: str) -> str:
+    response = client.get(f"/runs/{run_id}/gates/model", params=params, headers=HX)
+    assert response.status_code == 200, response.text
+    body: str = response.text
+    return body
+
+
+def test_the_model_view_reads_the_gate_from_the_audit(client: TestClient) -> None:
+    body = _model(client)
+
+    active = r'logs__kind--active"\s+href="[^"]+"\s+hx-get="[^"]+"\s+hx-target="#overlay">'
+    assert re.search(active + "Model<", body)
+    assert "MODEL POLICY" in body and MODELPOL in body and ">stored</code>" in body
+    assert 'hx-get="/secrets/alpha-key"' in body and "60/min" in body
+    assert "All · 14" in body and "Allowed · 12" in body and "Denied · 2" in body
+    assert "41.2 s" in body and "alpha / alpha-mini · limit 600 s" in body
+    groups = body.split("CALLS BY MODEL ·", 1)[1].split("CALLS ·", 1)[0]
+    assert groups.index("alpha-mini") < groups.index("beta-max")
+
+
+def test_the_spend_is_drawn_against_the_budget_and_the_rate(client: TestClient) -> None:
+    body = _model(client)
+
+    assert "SPENT OVER THE RUN" in body
+    assert "64 000 / 100 000 · 64%" in body and "9 800 / 10 000 · 98%" in body
+    assert "60/min · peak 55/min" in body and "1 refused" in body
+    assert 'class="spend__bar--red"' in body
+
+
+def test_model_guest_text_is_inert_and_an_untyped_event_is_refused(client: TestClient) -> None:
+    body = _model(client)
+
+    assert "<b>alpha</b>" not in body and "&lt;b&gt;alpha&lt;/b&gt;-mini" in body
+    assert "<script>" not in body
+    assert "refused: unexpected field prompt" in body
+    assert ">token budget spent</span>" in body
+    assert f'hx-get="/audit/evt_{60:032x}"' in body
+
+
+def test_model_calls_are_filtered_by_decision(client: TestClient) -> None:
+    denied = _model(client, decision="denied").split("CALLS ·", 1)[1]
+
+    assert f"/audit/evt_{60:032x}" not in denied and f"/audit/evt_{61:032x}" in denied
+    assert 'href="/runs/run_9f21c4/gates/model?decision=allowed"' in denied
+
+
+def test_a_run_without_model_calls_says_so(client: TestClient) -> None:
+    body = _model(client, WAITING)
+
+    assert "allows nothing" in body and "No call yet" in body
+    assert "CALLS BY MODEL ·" not in body and "SPENT OVER THE RUN" not in body
+
+
+def test_a_pending_run_waits_for_its_model_gate(client: TestClient) -> None:
+    body = _model(client, PENDING)
+
+    assert "The Run has not started" in body and "CALLS ·" not in body
+
+
+def test_a_model_gate_without_calls_counts_nothing() -> None:
+    gate = IDLE_GATE | {"document": MODEL_GATE["document"], "policy_id": MODELPOL}
+
+    view = gates.model(RUNS[0], gate, [], "all", gates.PAGE)
+
+    assert view.spend is None and view.policy_tag == ("stored", "grey")
+    assert [(tile.value, tile.note) for tile in view.tiles] == [
+        ("0", "calls the policy let through"),
+        ("0", "no call was made"),
+        (format.DASH, "no call was answered"),
+    ]
+
+
+def test_a_long_run_is_drawn_in_wider_buckets() -> None:
+    minutes = [
+        {
+            "at": NOW + 60 * index,
+            "provider": "alpha",
+            "requests": 1,
+            "denied": 0,
+            "input_tokens": 10,
+            "output_tokens": 1,
+        }
+        for index in range(0, 600, 3)
+    ]
+    gate = MODEL_GATE | {"minutes": minutes}
+
+    spend = gates.model(RUNS[0], gate, [], "all", gates.PAGE).spend
+
+    assert spend is not None and len(spend.strips[0].bars) <= gates.BARS
+    assert spend.input == "2 000 / 100 000 · 2%"
+
+
+def test_the_model_policy_is_named(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(policy_row(MODELPOL), "name", "model_alpha")
+
+    link = r'hx-get="/policies/{}"\s+hx-target="#overlay">{}</a>'
+    assert re.search(link.format(MODELPOL, "model_alpha"), _model(client))

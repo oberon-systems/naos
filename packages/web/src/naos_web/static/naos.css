@@ -3193,6 +3193,113 @@ form {
   color: var(--faint);
 }
 
+.gates__col-provider { width: 110px; }
+.gates__col-model { width: 190px; }
+.gates__col-call-model { width: 160px; }
+.gates__col-tokens { width: 130px; }
+
+.gates__provider {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.gates__rate {
+  color: var(--faint);
+}
+
+.gates__table .gates__who {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.gates__table .gates__who--unknown {
+  color: var(--faint);
+}
+
+.gates__category {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gates__table .gates__why {
+  color: var(--muted);
+}
+
+.spend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+  padding: 2px 16px 16px;
+}
+
+.spend__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.spend__title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.spend__legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  font-size: 11px;
+  color: var(--soft);
+}
+
+.spend__legend strong {
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.spend__legend code {
+  font-family: var(--font-mono);
+  color: var(--ink);
+}
+
+.spend__chart,
+.spend__strip {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+
+.spend__chart { height: 120px; }
+.spend__strip { height: 44px; }
+
+.spend__chart line,
+.spend__chart polyline,
+.spend__strip line {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.spend__grid { stroke: var(--divider); }
+.spend__base { stroke: var(--border); }
+.spend__limit { stroke: var(--red-dot); stroke-dasharray: 4 3; }
+.spend__input { stroke: var(--green-dot); stroke-width: 2; stroke-linejoin: round; }
+.spend__output { stroke: var(--amber-dot); stroke-width: 2; stroke-linejoin: round; }
+.spend__bar--blue { fill: var(--blue-dot); }
+.spend__bar--amber { fill: var(--amber-dot); }
+.spend__bar--red { fill: var(--red-dot); }
+
+.spend__axis {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--faint);
+}
+
 /* mcp servers */
 
 .mcp-table th:nth-child(1),

@@ -110,6 +110,7 @@ State = Literal["all", "active", "queued", "waiting_merge", "failed"]
 Tab = Literal["overview", "terminal", "logs", "changes", "gates"]
 Network = tuple[gates.Decision, int, str | None]
 ShellView = tuple[gates.Decision, int]
+ModelView = tuple[gates.Decision, int]
 StateQuery = Annotated[State, Query()]
 Fleet = Literal["all", "live", "stale", "revoked"]
 FleetQuery = Annotated[Fleet, Query()]
@@ -502,13 +503,15 @@ async def _run_panel(
     error: str | None = None,
     network: Network = ("all", gates.PAGE, None),
     shell_view: ShellView | None = None,
+    model_view: ModelView | None = None,
 ) -> HTMLResponse:
     api: ApiClient = request.app.state.api
     try:
         detail = await api.run_detail(run_id)
-        on_network = tab == "gates" and shell_view is None
+        on_network = tab == "gates" and shell_view is None and model_view is None
         network_view = await _network(api, detail.run, network) if on_network else None
         shell_gate = await _shell(api, detail.run, shell_view) if shell_view else None
+        model_gate = await _model_gate(api, detail.run, model_view) if model_view else None
         held = tab == "overview" and detail.run["mcp_document"] is not None
         mcp = await _mcp_card(api, detail.run) if held else None
     except ApiError as err:
@@ -536,6 +539,7 @@ async def _run_panel(
         log_rows=events.log_rows(detail.events, detail.runners, kind),
         network=network_view,
         shell_gate=shell_gate,
+        model_gate=model_gate,
         mcp=mcp,
     )
 
@@ -567,6 +571,16 @@ async def _shell(api: ApiClient, run: Row, shell: ShellView) -> gates.Shell:
         api.gate_trail(run["id"], gates.SHELL_EVENTS[decision], limit),
     )
     view = gates.shell(run, gate, rows, decision, limit)
+    return replace(view, policy_name=await _policy_name(api, view.policy_id))
+
+
+async def _model_gate(api: ApiClient, run: Row, model: ModelView) -> gates.Model:
+    decision, limit = model
+    gate, rows = await asyncio.gather(
+        api.run_gate(run["id"], "model"),
+        api.gate_trail(run["id"], ("model_call",), limit, gates.MODEL_DECISIONS[decision]),
+    )
+    view = gates.model(run, gate, rows, decision, limit)
     return replace(view, policy_name=await _policy_name(api, view.policy_id))
 
 
@@ -624,6 +638,17 @@ async def run_gates_shell(
     limit: Annotated[int, Query(ge=1, le=gates.MOST)] = gates.PAGE,
 ) -> HTMLResponse:
     return await _run_panel(request, run_id, now, "gates", shell_view=(decision, limit))
+
+
+@router.get("/runs/{run_id}/gates/model", response_class=HTMLResponse)
+async def run_gates_model(
+    request: Request,
+    run_id: str,
+    now: NowDep,
+    decision: gates.Decision = "all",
+    limit: Annotated[int, Query(ge=1, le=gates.MOST)] = gates.PAGE,
+) -> HTMLResponse:
+    return await _run_panel(request, run_id, now, "gates", model_view=(decision, limit))
 
 
 @router.get("/runs/{run_id}/changes", response_class=HTMLResponse)
