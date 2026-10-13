@@ -26,7 +26,17 @@ Views:
   against the budget and the requests of each provider against its rate per
   minute, the calls grouped by provider and model with the denied ones first,
   and the calls with the same filters; a refused call names its category, and
-  no prompt, completion or key is ever shown;
+  no prompt, completion or key is ever shown.
+  The MCP view shows the policy the Run holds, the allowed and denied calls
+  and the secrets read, a timeline with the policy in force, each server's
+  calls per minute and numbered markers for the gate events listed below it,
+  the rule budgets with what each spent, the calls grouped by server, tool
+  and resource with the denied ones first, and the calls with the filters
+  All, Allowed, Denied and Secrets. A denied call names the rule that denied
+  it or whose budget is spent. The Secrets filter lists every name the agent
+  asked for, granted or not, notes that a value read belongs to the agent,
+  and shows the calls to the `secrets` server with the name only; no
+  argument, result or secret value is ever shown;
 - filesystem diff;
 - merge approval;
 - profiles;

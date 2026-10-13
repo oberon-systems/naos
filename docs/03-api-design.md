@@ -233,6 +233,28 @@ events, and `secret_reads`: each granted secret the agent read, as `name` and
 `reads`, counted from the allowed `secret_read` events. A value is never part
 of it.
 
+`secrets` is every name the agent asked for, granted or not, with `reads`,
+`refused` and `last_at` from its `secret_read` events. `groups` are the calls
+by `server`, `tool` and `resource`, each with `calls`, `denied`, `slowest_ms`
+and `last_at`, denied ones first and at most 200 of them; `groups_total`
+counts them all. `minutes` are the calls by UTC minute and `server`, oldest
+first and at most the newest 2000, each with `at`, `calls` and `denied`.
+
+`budgets` covers each allow rule of the held document that carries
+`max_calls` or `max_calls_per_minute`: `rule` is its index, `spent` the calls
+it charged, `peak` the most it charged in one UTC minute, `refused` the calls
+denied once its budget was spent, and `since` the time it began to count. A
+rule kept the same across a policy change keeps what it spent, as the broker
+does, so `since` is the start of the Run unless the rule came with a change.
+A call belongs to the document the broker held at the time, which it takes
+at the first `mcp_policy_configured` after the change.
+
+The calls are read from `GET /audit` with `run_id`, the event `mcp_call`,
+`decision` and `server`. The gate events are `mcp_policy_configured`,
+`mcp_attached`, `mcp_rejected`, `mcp_credentials_updated` and
+`policy_changed` with kind `mcp`; neither `mcp_attached` nor `mcp_rejected`
+names a server, so the servers a Run held come from its `policy_history`.
+
 ## Console
 
 The runner ships the output of a VM's `ttyS0` as it appears
@@ -319,7 +341,7 @@ is valid ([04](04-runner-design.md#lease-fencing)).
 held, newest first. `GET /audit?order=desc` reads the trail newest first, so
 a screen can show the latest entries of one runner. `GET /audit?decision=`
 keeps the events whose `decision` is `allow` or `deny`, the calls of the mcp
-and model gates.
+and model gates, and `GET /audit?server=` the mcp calls of one server.
 
 ## Deleting runs
 
