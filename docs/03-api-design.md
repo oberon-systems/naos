@@ -645,6 +645,25 @@ The operator side of a WAITING_MERGE Run. All three answer with `run_id`,
 curl -fsS "$api/api/v1/runs/$run/merge" -d '{"paths": ["notes.txt"], "resolutions": {"notes.txt": "take"}}'
 ```
 
+`WS /api/v1/runs/{run_id}/merge/entries/{index}/content` reads the content of
+one file entry of the diff, while the Run waits for its merge and after it. It
+takes the operator token, refuses a directory, a symlink, a rejected entry and
+an index past the diff, and writes a `merge_content_viewed` audit event with
+the `path` and `index`, never the bytes. Each text frame asks for one range,
+`{"side": "host" | "agent", "offset": n, "length": n}`, with a length up to
+262144 bytes.
+
+A binary frame answers it: one byte for the side (0 host, 1 agent), eight bytes
+of offset, eight bytes of the side's whole size, then the bytes. A side that has
+no such file, the host of a `created` entry or the agent of a `deleted` one,
+answers with a text frame `{"side", "offset", "absent": true}`, and a range the
+runner cannot read with `{"side", "offset", "error"}`. There is no size cap:
+the viewer asks for the next range as it scrolls.
+
+The API reads nothing itself. It forwards each range to the runner that holds
+the Run's changes over that runner's own socket, and only while the runner
+holds a live lease ([04](04-runner-design.md#content)).
+
 ## Runner interface
 
 Runners use the same API under `/api/v1/runners`. A runner token is not an
@@ -658,6 +677,7 @@ POST /api/v1/runners/{runner_id}/runs/{run_id}/transition  runner token
 POST /api/v1/runners/{runner_id}/runs/{run_id}/diff        runner token
 POST /api/v1/runners/{runner_id}/runs/{run_id}/merge       runner token
 POST /api/v1/runners/{runner_id}/events                      runner token
+WS   /api/v1/runners/{runner_id}/content                     runner token
 ```
 
 ### Runner credentials

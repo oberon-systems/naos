@@ -47,7 +47,9 @@ Each entry carries `path` (relative to the workspace), `change` and `kind`
 (`file`, `dir`, `symlink`, `other`); files add `size`, `sha256` and `mode`
 (permission bits), symlinks add `target`, renames add `from`. Entries are
 sorted by path bytes, so the same disk always yields the same `diff.json`.
-File contents stay on the upper disk.
+File contents stay on the upper disk; an operator reads both sides of a file
+entry in ranges through the API ([03](03-api-design.md#merge)), and every such
+read is audited.
 
 The host side at collection time is the base a merge checks against. A
 `modified` file adds `base_sha256` and `base_mode`, a `modified` symlink adds
@@ -156,7 +158,8 @@ completes.
 The agent's changes outlive the Run. Destroying a VM that has an upper disk,
 because its Run ended or it became an orphan, moves `upper.img`,
 `diff.json`, `merge/` and `vm.json` to `archive/<vm_id>/` in the runner's VM
-directory and deletes the rest. Nothing removes the archive yet: an operator
+directory and deletes the rest. `vm.json` names the workspace of a writable
+Run, so the content of an archived diff can still be read. Nothing removes the archive yet: an operator
 deletes a directory once its backup and exports are no longer needed.
 
 ```bash

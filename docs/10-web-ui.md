@@ -37,7 +37,12 @@ Views:
   asked for, granted or not, notes that a value read belongs to the agent,
   and shows the calls to the `secrets` server with the name only; no
   argument, result or secret value is ever shown;
-- filesystem diff;
+- filesystem diff, with the content of the picked file entry: the host and
+  agent sides scrolled together, the lines that differ marked, a jump to the
+  next difference and bytes that are not text shown as hex. Both sides are
+  read in ranges as the operator scrolls, with no size cap, and rendered as
+  inert text: no markup, links or terminal escapes are interpreted and every
+  byte is kept. A directory and a rejected entry have no content;
 - merge approval;
 - profiles;
 - policies, immutable: find by id or digest, read the resolved document and who uses it, create one of each kind, and delete one that no profile names and no Run took, after a confirm; a policy in use opens a refusal instead;

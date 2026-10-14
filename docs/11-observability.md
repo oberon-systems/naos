@@ -65,6 +65,7 @@ describe, so a change and its event land or fail together.
 | `credentials_issued` | runner | `names` of the secrets, never the values, and `ttl` |
 | `diff_reported` | runner | `entries`, `rejected`, `sensitive` counts, merge `policy`, `decided` |
 | `merge_decided` | operator | `paths` and `resolutions` counts |
+| `merge_content_viewed` | operator | `path` and `index` of the entry read, never its bytes |
 | `merge_reported` | runner | `outcome`, `conflicts` and the `applied`, `skipped`, `exported`, `backed_up` counts |
 | `policy_created` | operator | `policy_id`, `kind` |
 | `policy_named` | operator | `policy_id`, `kind`, `name` |

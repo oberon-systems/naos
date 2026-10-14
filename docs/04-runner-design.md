@@ -256,6 +256,27 @@ not held (409), the agent stops shipping it. The runner never listens for an
 attach: operators reach the console through the API
 ([03](03-api-design.md#console)).
 
+## Content
+
+An operator reads the files of a collected diff through the API
+([03](03-api-design.md#merge)), and the runner answers. It holds one websocket
+to `WS /api/v1/runners/{runner_id}/content` for as long as it runs, carrying
+its bearer token, and dials it again five seconds after it drops. The runner
+never listens on a port for it.
+
+Each text frame down the socket asks for a range:
+`{"id", "run_id", "index", "side", "offset", "length"}`. The runner finds the
+Run's `diff.json` and `upper.img` in its VM directory, or under
+`archive/<vm_id>/` once the VM is gone, by the `run_id` in `vm.json`. It reads
+the agent's side with its own read-only ext4 reader, never by mounting the
+upper disk, and the host's side from the workspace that `vm.json` records,
+opened one component at a time, read-only and never through a symlink. A
+range is at most 262144 bytes.
+
+The answer is a binary frame of eight bytes of `id`, eight bytes of the side's
+whole size and the bytes, or a text frame `{"id", "absent": true}` for a side
+without the file, or `{"id", "error"}`.
+
 ## Lease fencing
 
 The agent keeps a local lease deadline, measured from when each heartbeat was
