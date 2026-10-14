@@ -87,6 +87,31 @@ impl Host {
         }))
     }
 
+    /// The regular file at `path`, opened read-only; anything else, or nothing, is `None`.
+    pub fn file(&self, path: &[Vec<u8>]) -> Result<Option<File>, AgentError> {
+        let Some((name, parents)) = path.split_last() else {
+            return Ok(None);
+        };
+        let Some(parent) = self.dir(parents)? else {
+            return Ok(None);
+        };
+        let name = OsString::from_vec(name.clone());
+        // A device or a fifo is never opened, so reading one cannot act on the host.
+        let stat = match fstatat(&parent, name.as_os_str(), AtFlags::AT_SYMLINK_NOFOLLOW) {
+            Ok(stat) if stat.st_mode & SFlag::S_IFMT.bits() == SFlag::S_IFREG.bits() => stat,
+            Ok(_) | Err(Errno::ENOENT | Errno::ENOTDIR) => return Ok(None),
+            Err(err) => return Err(host_error(err)),
+        };
+        let flags = OFlag::O_RDONLY | OFlag::O_NOFOLLOW | OFlag::O_CLOEXEC | OFlag::O_NONBLOCK;
+        let file = match openat(&parent, name.as_os_str(), flags, Mode::empty()) {
+            Ok(fd) => File::from(fd),
+            Err(Errno::ENOENT | Errno::ELOOP) => return Ok(None),
+            Err(err) => return Err(host_error(err)),
+        };
+        let meta = file.metadata()?;
+        Ok((meta.is_file() && meta.ino() == stat.st_ino).then_some(file))
+    }
+
     pub fn root(&self) -> Result<OwnedFd, AgentError> {
         Ok(self.root.try_clone()?)
     }

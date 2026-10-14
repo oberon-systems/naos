@@ -111,6 +111,9 @@ struct VmMeta {
     digest: String,
     #[serde(default)]
     model_cid: Option<u32>,
+    /// The host workspace a writable Run was laid over, where its diff reads the host's side.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    workspace: Option<PathBuf>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -490,6 +493,9 @@ impl QemuRuntime {
             image_id: run.spec.image.id.clone(),
             digest: run.spec.image.digest.clone(),
             model_cid,
+            workspace: workspace
+                .filter(|workspace| workspace.mode == WorkspaceMode::ReadWrite)
+                .map(|workspace| workspace.host.clone()),
         };
         write_private(
             &paths.meta(),
@@ -1028,6 +1034,21 @@ fn check_vhost_vsock() -> Result<(), AgentError> {
 fn random_cid() -> Result<u32, AgentError> {
     let raw = u32::from_str_radix(&random_hex(4)?, 16).map_err(runtime_error)?;
     Ok(CID_FIRST + raw % (CID_LAST - CID_FIRST))
+}
+
+/// Where the collected changes of `run_id` lie, in its VM directory or under `archive/`, with
+/// the workspace they were collected against.
+pub fn changes_of(vm_dir: &Path, run_id: &str) -> Option<(VmPaths, Option<PathBuf>)> {
+    let live = fs::read_dir(vm_dir).ok()?;
+    let archived = fs::read_dir(vm_dir.join(ARCHIVE_DIR)).into_iter().flatten();
+    live.chain(archived)
+        .flatten()
+        .filter(|entry| entry.file_name().to_str().is_some_and(is_vm_id))
+        .find_map(|entry| {
+            let meta = read_meta(&entry.path())?;
+            let paths = VmPaths::new(entry.path());
+            (meta.run_id == run_id && paths.diff().is_file()).then_some((paths, meta.workspace))
+        })
 }
 
 fn read_meta(dir: &Path) -> Option<VmMeta> {

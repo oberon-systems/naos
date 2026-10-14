@@ -11,6 +11,7 @@ use libs::audit::{self, Spool};
 use libs::config::{self, Config};
 use libs::console;
 use libs::console::ship::{Shipper, SHIP_INTERVAL};
+use libs::content;
 use libs::credentials::CredentialStore;
 use libs::error::AgentError;
 use libs::image::HttpImages;
@@ -79,6 +80,11 @@ async fn serve(config: Config) -> Result<(), AgentError> {
             tokio::time::sleep(SHIP_INTERVAL).await;
         }
     });
+    tokio::spawn(content::serve(
+        config.api_url.clone(),
+        CredentialStore::new(&config.state_dir),
+        config.runtime.vm_dir.clone(),
+    ));
     let mut terminate = signal(SignalKind::terminate())?;
     tracing::info!(name = %config.name, capacity = config.capacity, "naos-runner started");
 

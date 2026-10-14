@@ -3,6 +3,7 @@ pub mod api;
 pub mod audit;
 pub mod config;
 pub mod console;
+pub mod content;
 pub mod credentials;
 pub mod error;
 pub mod ids;

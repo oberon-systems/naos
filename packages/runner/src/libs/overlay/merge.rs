@@ -693,7 +693,7 @@ fn checked_target(fs: &Ext4, inode: &Inode, entry: &Entry) -> Result<String, Age
     }
 }
 
-fn lookup(fs: &Ext4, data: &Inode, path: &[Vec<u8>]) -> Result<Inode, AgentError> {
+pub(super) fn lookup(fs: &Ext4, data: &Inode, path: &[Vec<u8>]) -> Result<Inode, AgentError> {
     let mut inode = data.clone();
     for part in path {
         let children = fs.read_dir(&inode)?;
@@ -776,7 +776,7 @@ fn exists<Fd: AsFd, P: ?Sized + nix::NixPath>(dir: Fd, name: &P) -> Result<bool,
 }
 
 /// A diff path as components, refused unless it is plainly relative.
-fn parts(path: &str) -> Option<Vec<Vec<u8>>> {
+pub(super) fn parts(path: &str) -> Option<Vec<Vec<u8>>> {
     let parts: Vec<Vec<u8>> = path
         .split('/')
         .map(|part| part.as_bytes().to_vec())

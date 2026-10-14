@@ -979,3 +979,31 @@ async fn a_restarted_runner_holds_nothing_until_the_api_names_the_run() {
     );
     assert!(secret_of(&restarted, "run_b").is_none());
 }
+
+#[test]
+fn collected_changes_are_found_in_the_vm_directory_or_the_archive() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let place = |at: PathBuf, run_id: &str, workspace: Option<&str>| {
+        fs::create_dir_all(&at).expect("mkdir");
+        let vm_id = at.file_name().and_then(OsStr::to_str).expect("name");
+        let meta = json!({"vm_id": vm_id, "run_id": run_id, "image_id": "img_a",
+            "digest": "sha256:a", "workspace": workspace});
+        fs::write(at.join("vm.json"), meta.to_string()).expect("meta");
+        fs::write(at.join("diff.json"), r#"{"entries": []}"#).expect("diff");
+    };
+    let (live, kept) = (
+        format!("vm_{}", "a".repeat(32)),
+        format!("vm_{}", "b".repeat(32)),
+    );
+    place(dir.path().join(&live), "run_alpha", Some("/srv/alpha"));
+    place(dir.path().join(ARCHIVE_DIR).join(&kept), "run_beta", None);
+
+    let alpha = changes_of(dir.path(), "run_alpha").expect("alpha");
+    let beta = changes_of(dir.path(), "run_beta").expect("beta");
+
+    assert_eq!(alpha.0.dir, dir.path().join(&live));
+    assert_eq!(alpha.1, Some(PathBuf::from("/srv/alpha")));
+    assert_eq!(beta.0.dir, dir.path().join(ARCHIVE_DIR).join(&kept));
+    assert_eq!(beta.1, None);
+    assert!(changes_of(dir.path(), "run_gamma").is_none());
+}

@@ -103,15 +103,19 @@ impl Sessions {
 
 /// The same host with a websocket scheme. Built by hand because `Url::set_scheme`
 /// refuses some of these swaps outright.
-fn socket_url(api_url: &Url, runner_id: &str, run_id: &str) -> String {
+pub fn socket_base(api_url: &Url) -> String {
     let base = api_url.as_str().trim_end_matches('/');
-    let base = match base.strip_prefix("https") {
+    match base.strip_prefix("https") {
         Some(rest) => format!("wss{rest}"),
         None => match base.strip_prefix("http") {
             Some(rest) => format!("ws{rest}"),
             None => base.to_string(),
         },
-    };
+    }
+}
+
+fn socket_url(api_url: &Url, runner_id: &str, run_id: &str) -> String {
+    let base = socket_base(api_url);
     format!("{base}/api/v1/runners/{runner_id}/runs/{run_id}/console")
 }
 

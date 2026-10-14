@@ -795,3 +795,113 @@ fn a_deleted_directory_needs_the_rename_out_of_it() {
     assert!(!fixture.has("docs"));
     assert_eq!(fixture.kept("backup", "docs/x.md"), "x\n");
 }
+
+fn entry<'a>(diff: &'a Diff, path: &str) -> &'a Entry {
+    diff.entries
+        .iter()
+        .find(|entry| entry.path == path)
+        .expect("entry")
+}
+
+fn side(
+    fixture: &Fixture,
+    upper: &Path,
+    entry: &Entry,
+    side: content::Side,
+    offset: u64,
+    length: u64,
+) -> Option<content::Piece> {
+    content::read(upper, Some(&fixture.host), entry, side, offset, length).expect("read")
+}
+
+#[test]
+fn both_sides_of_a_changed_file_are_read() {
+    let fixture = Fixture::new();
+    fixture.host_file("notes.txt", "alpha\n");
+    fixture.host_file("old.txt", "old\n");
+    fixture.host_file("moved.txt", "moved content\n");
+    fixture.source("notes", "beta\n");
+    fixture.source("added", "gamma\n");
+    fixture.source("moved", "moved content\n");
+    let upper = fixture.upper(
+        "write notes notes.txt\n\
+         write added added.txt\n\
+         mknod old.txt c 0 0\n\
+         mknod moved.txt c 0 0\n\
+         write moved renamed.txt\n",
+    );
+    let diff = collect(&upper, &fixture.host).expect("collect");
+    let read =
+        |path: &str, at: content::Side| side(&fixture, &upper, entry(&diff, path), at, 0, 64);
+    let piece = |size: u64, data: &str| {
+        Some(content::Piece {
+            size,
+            data: data.as_bytes().to_vec(),
+        })
+    };
+
+    assert_eq!(read("notes.txt", content::Side::Agent), piece(5, "beta\n"));
+    assert_eq!(read("notes.txt", content::Side::Host), piece(6, "alpha\n"));
+    assert_eq!(read("added.txt", content::Side::Agent), piece(6, "gamma\n"));
+    assert_eq!(read("added.txt", content::Side::Host), None);
+    assert_eq!(read("old.txt", content::Side::Agent), None);
+    assert_eq!(read("old.txt", content::Side::Host), piece(4, "old\n"));
+    assert_eq!(
+        read("renamed.txt", content::Side::Host),
+        piece(14, "moved content\n")
+    );
+}
+
+#[test]
+fn a_range_spans_blocks_and_stops_at_the_end_of_the_file() {
+    let fixture = Fixture::new();
+    let body: String = (0..10_000u32)
+        .map(|at| char::from(b'a' + u8::try_from(at % 26).expect("letter")))
+        .collect();
+    fixture.source("big", &body);
+    let upper = fixture.upper("write big big.txt\n");
+    let diff = collect(&upper, &fixture.host).expect("collect");
+    let big = entry(&diff, "big.txt");
+    let read = |offset, length| {
+        side(&fixture, &upper, big, content::Side::Agent, offset, length)
+            .expect("agent side")
+            .data
+    };
+
+    assert_eq!(read(4090, 20), body.as_bytes()[4090..4110]);
+    assert_eq!(read(9990, 100), body.as_bytes()[9990..]);
+    assert!(read(20_000, 10).is_empty());
+}
+
+#[test]
+fn a_directory_has_no_content_and_a_host_symlink_is_not_followed() {
+    let fixture = Fixture::new();
+    fixture.host_file("notes.txt", "alpha\n");
+    fixture.source("notes", "beta\n");
+    let upper = fixture.upper("write notes notes.txt\nmkdir newdir\n");
+    let diff = collect(&upper, &fixture.host).expect("collect");
+    let outside = fixture.dir.path().join("outside.txt");
+    write_file(&outside, "secret\n");
+    fs::remove_file(fixture.host.join("notes.txt")).expect("remove");
+    symlink(&outside, fixture.host.join("notes.txt")).expect("symlink");
+
+    let dir = content::read(
+        &upper,
+        Some(&fixture.host),
+        entry(&diff, "newdir"),
+        content::Side::Agent,
+        0,
+        64,
+    );
+    let host = side(
+        &fixture,
+        &upper,
+        entry(&diff, "notes.txt"),
+        content::Side::Host,
+        0,
+        64,
+    );
+
+    refused(dir.map(|_| Diff::default()), "has no content");
+    assert_eq!(host, None);
+}

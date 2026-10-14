@@ -266,6 +266,38 @@ impl Ext4 {
         zeros(&mut buffer, inode.size - position, &mut sink)
     }
 
+    /// The bytes from `offset` on, at most `length` and never past the file's end; holes and
+    /// unwritten extents read as zeros.
+    pub fn read_range(
+        &self,
+        inode: &Inode,
+        offset: u64,
+        length: u64,
+    ) -> Result<Vec<u8>, AgentError> {
+        let end = offset.saturating_add(length).min(inode.size);
+        if offset >= end {
+            return Ok(Vec::new());
+        }
+        let mut data = vec![0u8; usize::try_from(end - offset).map_err(corrupt)?];
+        for extent in self.extents(inode)? {
+            let start = extent.logical * self.block_size;
+            let (from, to) = (
+                start.max(offset),
+                (start + extent.len * self.block_size).min(end),
+            );
+            if extent.unwritten || from >= to {
+                continue;
+            }
+            let at = usize::try_from(from - offset).map_err(corrupt)?;
+            let len = usize::try_from(to - from).map_err(corrupt)?;
+            self.read_at(
+                &mut data[at..at + len],
+                extent.physical * self.block_size + (from - start),
+            )?;
+        }
+        Ok(data)
+    }
+
     fn read_small(&self, inode: &Inode) -> Result<Vec<u8>, AgentError> {
         if inode.size > MAX_METADATA_BYTES {
             return Err(corrupt(format!("inode {} too large", inode.number)));

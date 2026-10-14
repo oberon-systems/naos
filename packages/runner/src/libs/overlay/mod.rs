@@ -1,3 +1,4 @@
+pub mod content;
 mod ext4;
 mod host;
 pub mod merge;
