@@ -1,5 +1,6 @@
 import asyncio
 import json
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, replace
 from http import HTTPStatus
 from typing import Annotated, Literal
@@ -464,6 +465,8 @@ def _merge_context(detail: RunDetail, now: int) -> changes.Context:
     run = detail.run
     decided = [row for row in detail.events if row["event"] == "merge_decided"]
     vms = [row["vm_id"] for row in detail.events if row.get("vm_id")]
+    mount = (detail.policies.get("mount") or {}).get("document") or {}
+    roots = [m["host_path"] for m in mount.get("mounts", []) if m["guest_path"] == mount["workdir"]]
     return changes.Context(
         run_id=run["id"],
         workspace=run["workspace"] or "",
@@ -472,6 +475,7 @@ def _merge_context(detail: RunDetail, now: int) -> changes.Context:
         vm_id=vms[-1] if vms else None,
         decided=decided[-1] if decided else None,
         now=now,
+        host_root=roots[0].rstrip("/") if roots else "",
     )
 
 
@@ -534,6 +538,8 @@ async def _run_panel(
         report_note=changes.REPORT_NOTE,
         where_note=changes.WHERE_NOTE,
         list_note=changes.LIST_NOTE,
+        content_note=changes.CONTENT_NOTE,
+        hex_note=changes.HEX_NOTE,
         entry_note=changes.ENTRY_NOTE,
         sensitive_note=changes.SENSITIVE_NOTE,
         rejected_note=changes.REJECTED_NOTE,
@@ -808,10 +814,8 @@ async def _until_disconnect(websocket: WebSocket, outbox: "asyncio.Queue[bytes |
             outbox.put_nowait(frame)
 
 
-async def _relay(
-    api: ApiClient, websocket: WebSocket, run_id: str, outbox: "asyncio.Queue[bytes | str]"
-) -> None:
-    async for frame in api.attach(run_id, outbox):
+async def _relay(websocket: WebSocket, frames: AsyncIterator[bytes | str]) -> None:
+    async for frame in frames:
         if isinstance(frame, str):
             await websocket.send_text(frame)
         else:
@@ -819,15 +823,27 @@ async def _relay(
     await websocket.close()
 
 
-# The page has no login of its own, so a socket opened from another origin is refused.
-@router.websocket("/runs/{run_id}/terminal/ws")
-async def run_terminal_stream(websocket: WebSocket, run_id: str) -> None:
+def _same_origin(websocket: WebSocket) -> None:
     origin = urlsplit(websocket.headers.get("origin", "")).netloc
     if origin and origin != websocket.headers.get("host"):
         raise WebSocketException(status.WS_1008_POLICY_VIOLATION, "foreign origin")
+
+
+# The page has no login of its own, so a socket opened from another origin is refused.
+@router.websocket("/runs/{run_id}/terminal/ws")
+async def run_terminal_stream(websocket: WebSocket, run_id: str) -> None:
+    _same_origin(websocket)
     await websocket.accept()
     outbox: asyncio.Queue[bytes | str] = asyncio.Queue()
-    relay = asyncio.create_task(_relay(websocket.app.state.api, websocket, run_id, outbox))
+    await _pipe(websocket, websocket.app.state.api.attach(run_id, outbox), outbox)
+
+
+async def _pipe(
+    websocket: WebSocket,
+    frames: AsyncIterator[bytes | str],
+    outbox: "asyncio.Queue[bytes | str]",
+) -> None:
+    relay = asyncio.create_task(_relay(websocket, frames))
     listener = asyncio.create_task(_until_disconnect(websocket, outbox))
     try:
         await asyncio.wait({relay, listener}, return_when=asyncio.FIRST_COMPLETED)
@@ -836,6 +852,15 @@ async def run_terminal_stream(websocket: WebSocket, run_id: str) -> None:
     finally:
         relay.cancel()
         listener.cancel()
+
+
+# The ranges the pane asks for, relayed to the api under the operator token the page never sees.
+@router.websocket("/runs/{run_id}/changes/{index}/content/ws")
+async def run_content_stream(websocket: WebSocket, run_id: str, index: int) -> None:
+    _same_origin(websocket)
+    await websocket.accept()
+    outbox: asyncio.Queue[bytes | str] = asyncio.Queue()
+    await _pipe(websocket, websocket.app.state.api.content(run_id, index, outbox), outbox)
 
 
 def _reopen(request: Request, run_id: str) -> Response:

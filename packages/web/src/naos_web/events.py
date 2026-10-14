@@ -116,6 +116,10 @@ def _applied(data: Row) -> str:
     )
 
 
+def _viewed(data: Row) -> str:
+    return f"read {data['path']}"
+
+
 def _typing(data: Row) -> str:
     return f"keyboard taken by the {data['view']}"
 
@@ -249,6 +253,7 @@ API: dict[str, Schema] = {
         lambda d: d["outcome"] == "conflict",
         frozenset(MERGE_COUNTS),
     ),
+    "merge_content_viewed": Schema({"path": _text, "index": _count}, _data(_viewed)),
     "console_attached": Schema({}, _none),
     "console_typing": Schema({"view": _text}, _data(_typing)),
     "runner_registered": Schema({}, lambda row: "enrollment token"),

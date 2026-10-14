@@ -1886,6 +1886,212 @@ form {
   color: var(--blue-text);
 }
 
+/* entry content */
+
+.reader {
+  grid-column: 1 / -1;
+}
+
+.reader__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px 8px;
+}
+
+.reader__title,
+.reader__jump {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.reader__jump {
+  flex: none;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--soft);
+}
+
+.reader__path {
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.reader__summary {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--soft);
+}
+
+.reader__heads {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  padding-right: 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--strip);
+}
+
+.reader__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--soft);
+}
+
+.reader__head + .reader__head {
+  border-left: 1px solid var(--border);
+}
+
+.reader__side {
+  font-family: var(--font-sans);
+  font-weight: 600;
+}
+
+.reader__where {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reader__size {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.reader__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.reader__lines {
+  position: relative;
+  max-height: 396px;
+  overflow-y: auto;
+}
+
+.reader__row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 53px minmax(0, 1fr);
+  min-height: 22px;
+}
+
+.reader__no {
+  padding-right: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 22px;
+  text-align: right;
+  color: var(--faint);
+}
+
+.reader__no:nth-child(3) {
+  border-left: 1px solid var(--border);
+}
+
+.reader__code {
+  padding-right: 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 22px;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.reader__no--changed,
+.reader__code--changed {
+  background: var(--amber-bg);
+}
+
+.reader__no--added,
+.reader__code--added {
+  background: var(--green-bg);
+}
+
+.reader__no--removed,
+.reader__code--removed {
+  background: var(--red-bg);
+}
+
+.reader__no--filler,
+.reader__code--filler {
+  background: var(--grey-bg);
+}
+
+.reader__no--changed {
+  color: var(--amber-text);
+}
+
+.reader__no--added {
+  color: var(--green-text);
+}
+
+.reader__no--removed {
+  color: var(--red-text);
+}
+
+.reader__escape {
+  color: var(--red-text);
+}
+
+.reader__hex {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  white-space: pre;
+}
+
+.reader__ascii {
+  color: var(--soft);
+}
+
+.reader__byte--diff {
+  font-weight: 700;
+  color: var(--amber-text);
+}
+
+.reader__track {
+  position: relative;
+  background: var(--sunken);
+}
+
+.reader__tick {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+}
+
+.reader__tick--changed {
+  background: var(--amber-dot);
+}
+
+.reader__tick--added {
+  background: var(--green-dot);
+}
+
+.reader__tick--removed {
+  background: var(--red-dot);
+}
+
+.reader__state {
+  margin: 0;
+  padding: 6px 14px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
 /* run terminal */
 
 .run__body--terminal {

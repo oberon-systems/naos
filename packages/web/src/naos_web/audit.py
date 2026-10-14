@@ -73,6 +73,7 @@ KINDS: dict[str, Kind] = {
     "diff_reported": MERGE,
     "merge_decided": MERGE,
     "merge_reported": MERGE,
+    "merge_content_viewed": MERGE,
     "merge_conflict": MERGE,
     "merge_applied": MERGE,
     "runner_registered": HEALTH,

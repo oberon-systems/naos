@@ -107,8 +107,16 @@
         </div>
         {% for row in diff.rows %}
             {% if plain %}
-                <div class="changes__row changes__row--plain{{ " changes__row--rejected" if row.rejected }}">
-                    <span class="changes__pick">{{ entry(row) }}</span>
+                <div class="changes__row changes__row--plain{{ " changes__row--picked" if diff.focus == row.index }}{{ " changes__row--rejected" if row.rejected }}">
+                    {% if row.rejected %}
+                        <span class="changes__pick">{{ entry(row) }}</span>
+                    {% else %}
+                        {% set href = diff.link(entry=row.index) %}
+                        <a class="changes__pick"
+                           href="{{ href }}"
+                           hx-get="{{ href }}"
+                           hx-target="#overlay">{{ entry(row) }}</a>
+                    {% endif %}
                 </div>
             {% else %}
                 <div class="changes__row{{ " changes__row--picked" if diff.focus == row.index }}{{ " changes__row--conflict" if row.conflict is not none }}{{ " changes__row--rejected" if row.rejected }}">
@@ -268,6 +276,47 @@
             </section>
         {% endif %}
     </div>
+    {% if diff.content %}
+        {% set item = diff.content %}
+        <section class="card reader"
+                 data-stream="{{ item.stream }}"
+                 data-change="{{ item.change }}"
+                 data-host="{{ "1" if item.host else "0" }}"
+                 data-agent="{{ "1" if item.agent else "0" }}">
+            <div class="reader__header">
+                <div class="reader__title">
+                    <h3 class="run__card-title">CONTENT</h3>
+                    <span class="reader__path">{{ item.path }}</span>
+                    <span class="reader__summary" data-summary>{{ item.change }}</span>
+                </div>
+                <div class="reader__jump">
+                    <span class="reader__position" data-position></span>
+                    <button class="button button--outline button--small"
+                            type="button"
+                            data-next
+                            disabled>Next difference ↓</button>
+                </div>
+            </div>
+            <div class="reader__heads">
+                <div class="reader__head">
+                    <span class="reader__side">HOST</span>
+                    <span class="reader__where">{{ item.host or "not on the host" }}</span>
+                    <span class="reader__size" data-size="host"></span>
+                </div>
+                <div class="reader__head">
+                    <span class="reader__side">AGENT</span>
+                    <span class="reader__where">{{ item.agent or "not on the agent side" }}</span>
+                    <span class="reader__size" data-size="agent"></span>
+                </div>
+            </div>
+            <div class="reader__body">
+                <div class="reader__lines" data-lines tabindex="0"></div>
+                <div class="reader__track" data-track aria-hidden="true"></div>
+            </div>
+            <p class="reader__state" data-state role="status">Reading…</p>
+            <p class="changes__footer" data-note data-hex-note="{{ hex_note }}">{{ content_note }}</p>
+        </section>
+    {% endif %}
     {% set bar = diff.bar %}
     <section class="card changes__bar"
              {% if diff.state == "sent" %}hx-get="{{ diff.link() }}" hx-trigger="every 2s" hx-target="#overlay"{% endif %}>

@@ -63,8 +63,18 @@ CHANGE_TONE: dict[str, Tone] = {
     "rejected": "grey",
 }
 LIST_NOTE = (
-    "Sorted by path bytes, as collected. File contents stay on the upper disk; "
-    "a change is judged by size, mode and sha256."
+    "Sorted by path bytes, as collected. Pick an entry to read the host and agent versions below."
+)
+CONTENT_NOTE = (
+    "Both sides scroll together and are read from the runner as you scroll, with no size cap. "
+    "Contents come from the guest and are shown as inert text: no markup, links or escapes are "
+    "interpreted, every byte is kept. Every view is audited."
+)
+HEX_NOTE = (
+    "Bytes that are not text are shown as hex: the offset, 16 bytes and their printable "
+    "characters, differing bytes marked. A directory has no content and a rejected entry cannot "
+    "be picked. Contents come from the guest and are shown as inert text, every byte kept. "
+    "Every view is audited."
 )
 ENTRY_NOTE = (
     "The base is the host file at collection time; the merge applies only while the host "
@@ -133,6 +143,17 @@ class Picked:
     facts: list[Fact]
 
 
+# One side is empty where it has no file: the host for a created entry, the agent for a deleted one.
+@dataclass(frozen=True)
+class Content:
+    index: int
+    path: str
+    change: str
+    stream: str
+    host: str
+    agent: str
+
+
 @dataclass(frozen=True)
 class Conflict:
     index: int
@@ -196,6 +217,7 @@ class Changes:
     focus: int | None
     rows: list[EntryRow]
     picked: Picked | None
+    content: Content | None
     conflict: Conflict | None
     sensitive: list[EntryRow]
     sensitive_left: int
@@ -299,6 +321,21 @@ def _picked(index: int, entry: Row) -> Picked:
         change=entry["change"],
         tone=CHANGE_TONE[entry["change"]],
         facts=facts,
+    )
+
+
+def _content(index: int, entry: Row, ctx: "Context") -> Content | None:
+    change = entry["change"]
+    if entry["kind"] != "file" or change == "rejected":
+        return None
+    source = entry.get("from") if change == "renamed" else entry["path"]
+    return Content(
+        index=index,
+        path=entry["path"],
+        change=change,
+        stream=f"/runs/{ctx.run_id}/changes/{index}/content/ws",
+        host="" if change == "created" else "/".join(filter(None, (ctx.host_root, source))),
+        agent="" if change == "deleted" else "upper disk",
     )
 
 
@@ -539,6 +576,7 @@ class Context:
     vm_id: str | None
     decided: Row | None
     now: int
+    host_root: str = ""
 
 
 def _bar(merge: Row, kind: State, rows: list[EntryRow], sel: Selection, ctx: Context) -> Bar:
@@ -643,6 +681,7 @@ def changes(
         else None
     )
     sensitive = [row for row in rows if row.sensitive]
+    focus = conflict.index if conflict is not None else first
     return Changes(
         base=f"/runs/{ctx.run_id}/changes",
         state=kind,
@@ -651,11 +690,16 @@ def changes(
         filters=filters,
         counts={key: sum(1 for row in rows if _matches(row, key)) for key, _ in filters},
         shown=shown,
-        focus=conflict.index if conflict is not None else first,
+        focus=focus,
         rows=[row for row in rows if _matches(row, shown)],
         picked=(
             _picked(first, entries[first])
             if first is not None and kind in ("waiting", "sent")
+            else None
+        ),
+        content=(
+            _content(focus, entries[focus], ctx)
+            if focus is not None and any(_matches(row, shown) for row in rows if row.index == focus)
             else None
         ),
         conflict=conflict,

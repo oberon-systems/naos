@@ -138,6 +138,7 @@ RUNS: list[Row] = [
         finished=None,
         merge={"changed": 12, "conflicts": 0},
         created=NOW - 660,
+        policies={"mounts": {"policy": MNTPOL}},
     ),
     run(125, "run_41d70e", "STARTING", runner=GAMMA, started=NOW - 12, created=NOW - 30),
     run(124, "run_3a90f8", "PENDING", reason=None, runner=None, created=NOW - 60),

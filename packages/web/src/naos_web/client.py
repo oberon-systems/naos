@@ -254,10 +254,20 @@ class ApiClient:
     # The api ends the stream once the run is over; a refused attach is an ApiError.
     # Console output comes down as bytes, the size the viewer asked for goes up
     # and its answer comes back down as text.
-    async def attach(
+    def attach(
         self, run_id: str, outbox: "asyncio.Queue[bytes | str] | None" = None
     ) -> AsyncIterator[bytes | str]:
-        path = f"/runs/{run_id}/attach"
+        return self._socket(f"/runs/{run_id}/attach", outbox)
+
+    # One entry's content: a range is asked for as text and comes back as bytes.
+    def content(
+        self, run_id: str, index: int, outbox: "asyncio.Queue[bytes | str]"
+    ) -> AsyncIterator[bytes | str]:
+        return self._socket(f"/runs/{run_id}/merge/entries/{index}/content", outbox)
+
+    async def _socket(
+        self, path: str, outbox: "asyncio.Queue[bytes | str] | None"
+    ) -> AsyncIterator[bytes | str]:
         try:
             async with aconnect_ws(path, self._http, session_class=AsyncWebSocketSession) as ws:
                 sender = asyncio.create_task(_send(ws, outbox)) if outbox is not None else None
@@ -521,7 +531,7 @@ class ApiClient:
     async def run_detail(self, run_id: str) -> RunDetail:
         run = await self.run(run_id)
         spec = run["spec"]
-        kinds = ("network", "mcp", "model")
+        kinds = ("mounts", "network", "mcp", "model")
         named = [spec[kind]["policy"] for kind in kinds if spec[kind]["policy"]]
         events, runners, images, policies, merge, model = await asyncio.gather(
             self.run_events(run_id),

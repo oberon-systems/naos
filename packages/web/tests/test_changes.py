@@ -1,8 +1,11 @@
+import asyncio
 import copy
 import re
+from collections.abc import AsyncIterator
 
 import pytest
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 from stub_api import MERGES
 
 WAITING = "run_5be317"
@@ -135,3 +138,88 @@ def test_review_and_diff_open_the_tab(client: TestClient) -> None:
             rf'hx-target="#overlay">{label}</a>',
             body,
         )
+
+
+def _reader(body: str) -> str:
+    start = body.rindex("<section", 0, body.index('class="card reader"'))
+    return body[start : body.index("</section>", start)]
+
+
+def test_the_content_pane_reads_both_sides_of_the_picked_entry(client: TestClient) -> None:
+    body = client.get(f"/runs/{WAITING}/changes?entry=5", headers=HX).text
+    reader = _reader(body)
+
+    assert f'data-stream="/runs/{WAITING}/changes/5/content/ws"' in reader
+    assert 'data-host="1"' in reader
+    assert 'data-agent="1"' in reader
+    assert _text(reader).startswith(
+        "CONTENT src/api/handlers.py modified Next difference \u2193 "
+        "HOST /srv/projects/alpha/api/src/api/handlers.py AGENT upper disk"
+    )
+    assert "Every view is audited." in reader
+    assert "Bytes that are not text are shown as hex" in reader
+
+
+def test_a_side_without_the_file_is_named_and_a_rename_reads_its_source(
+    client: TestClient,
+) -> None:
+    created = _reader(client.get(f"/runs/{WAITING}/changes?entry=2", headers=HX).text)
+    deleted = _reader(client.get(f"/runs/{WAITING}/changes?entry=6", headers=HX).text)
+    renamed = _reader(client.get(f"/runs/{WAITING}/changes?entry=7", headers=HX).text)
+
+    assert 'data-host="0"' in created
+    assert "not on the host" in created
+    assert 'data-agent="0"' in deleted
+    assert "not on the agent side" in deleted
+    assert "HOST /srv/projects/alpha/api/src/api/router.py" in _text(renamed)
+
+
+def test_a_directory_or_a_symlink_has_no_content(client: TestClient) -> None:
+    for index in (3, 8):
+        body = client.get(f"/runs/{WAITING}/changes?entry={index}", headers=HX).text
+
+        assert 'class="card reader"' not in body
+
+
+def test_a_merged_run_still_reads_its_entries(client: TestClient) -> None:
+    body = client.get(f"/runs/{MERGED}/changes?entry=1", headers=HX).text
+
+    assert f'href="/runs/{MERGED}/changes?entry=0"' in body
+    assert f'data-stream="/runs/{MERGED}/changes/1/content/ws"' in _reader(body)
+
+
+def test_the_content_stream_relays_ranges_both_ways(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    asked: list[tuple[str, int]] = []
+
+    async def content(
+        run_id: str, index: int, outbox: "asyncio.Queue[bytes | str]"
+    ) -> AsyncIterator[bytes | str]:
+        asked.append((run_id, index))
+        while True:
+            frame = await outbox.get()
+            yield bytes([1]) + (0).to_bytes(8, "big") + (5).to_bytes(8, "big") + b"beta\n"
+            yield frame if isinstance(frame, str) else frame.decode()
+
+    monkeypatch.setattr(client.app.state.api, "content", content)  # type: ignore[attr-defined]
+    ask = '{"side": "agent", "offset": 0, "length": 65536}'
+
+    with client.websocket_connect(f"/runs/{WAITING}/changes/5/content/ws") as websocket:
+        websocket.send_text(ask)
+        piece = websocket.receive_bytes()
+        echoed = websocket.receive_text()
+
+    assert asked == [(WAITING, 5)]
+    assert piece.endswith(b"beta\n")
+    assert echoed == ask
+
+
+def test_a_content_stream_from_another_origin_is_refused(client: TestClient) -> None:
+    headers = {"origin": "http://example.com"}
+
+    with (
+        pytest.raises(WebSocketDisconnect),
+        client.websocket_connect(f"/runs/{WAITING}/changes/5/content/ws", headers=headers),
+    ):
+        pass
