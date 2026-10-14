@@ -7,11 +7,12 @@ from sqlmodel import Session, col, update
 from naos_api import audit, runners, runs
 from naos_api.errors import InvalidTransitionError, MergeError, NotFoundError
 from naos_api.lifecycle import RunStatus
-from naos_api.models import Merge, Run
+from naos_api.models import Lease, Merge, Run
 from naos_api.spec import RunSpec
 
 S = RunStatus
 REJECTED = "rejected"
+FILE = "file"
 
 
 def _live(entries: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
@@ -32,6 +33,33 @@ def get_merge(session: Session, run_id: str) -> Merge:
     if merge is None:
         raise NotFoundError(f"run {run_id} has no collected diff")
     return merge
+
+
+# Recorded before a byte travels, with the path and never the bytes; answers the
+# runner that holds the Run's changes.
+def viewed(session: Session, run_id: str, index: int) -> str:
+    run = runs.get_run(session, run_id)
+    entries = get_merge(session, run_id).entries
+    if not 0 <= index < len(entries):
+        raise NotFoundError(f"run {run_id} has no entry {index}")
+    entry = entries[index]
+    if entry["kind"] != FILE or entry["change"] == REJECTED:
+        raise MergeError(f"{entry['path']} has no content")
+    # the lease outlives its expiry as a row, so a merged Run still names its runner
+    lease = session.get(Lease, run.lease_id) if run.lease_id else None
+    if lease is None:
+        raise NotFoundError(f"run {run_id} has no runner")
+    audit.record(
+        session,
+        "merge_content_viewed",
+        actor="operator",
+        run_id=run_id,
+        runner_id=lease.runner_id,
+        path=entry["path"],
+        index=index,
+    )
+    session.commit()
+    return lease.runner_id
 
 
 def report_diff(

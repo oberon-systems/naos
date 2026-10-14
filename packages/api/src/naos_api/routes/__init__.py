@@ -3,6 +3,8 @@ from fastapi import APIRouter
 from naos_api.routes.audit import router as _audit_router
 from naos_api.routes.console import router as console_router
 from naos_api.routes.console import runner_router as runner_console_router
+from naos_api.routes.content import router as content_router
+from naos_api.routes.content import runner_router as runner_content_router
 from naos_api.routes.deps import domain_error_handler
 from naos_api.routes.images import router as _images_router
 from naos_api.routes.mcp_servers import router as _mcp_servers_router
@@ -26,7 +28,9 @@ api_router.include_router(_audit_router)
 __all__ = [
     "api_router",
     "console_router",
+    "content_router",
     "domain_error_handler",
     "runner_console_router",
+    "runner_content_router",
     "runner_router",
 ]

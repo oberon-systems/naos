@@ -66,5 +66,9 @@ class ConsoleFullError(DomainError):
     """The run's console log reached its size limit."""
 
 
+class ContentUnavailableError(DomainError):
+    """The runner holding a Run's changes is not connected, or did not answer in time."""
+
+
 class SizeError(DomainError):
     """A console size outside what a terminal can be."""

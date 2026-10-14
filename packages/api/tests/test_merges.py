@@ -1,13 +1,19 @@
+import json
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from httpx import Response
-from sqlmodel import Session
+from sqlmodel import Session, select
+from starlette.testclient import WebSocketTestSession
+from starlette.websockets import WebSocketDisconnect
 
 from naos_api import runners
+from naos_api.auth import require_operator_connection
 from naos_api.lifecycle import RunStatus
+from naos_api.models import AuditEvent
 
 S = RunStatus
 LEASE_TTL = 60
@@ -325,3 +331,83 @@ def test_a_runner_can_fail_a_waiting_run(
     )
 
     assert failed.json()["status"] == S.FAILED
+
+
+NOTES = 4
+
+
+def _content(client: TestClient, run_id: str, index: int) -> WebSocketTestSession:
+    cast(FastAPI, client.app).dependency_overrides[require_operator_connection] = lambda: None
+    return client.websocket_connect(f"/api/v1/runs/{run_id}/merge/entries/{index}/content")
+
+
+def _held(client: TestClient, runner: dict[str, str]) -> WebSocketTestSession:
+    return client.websocket_connect(
+        f"/api/v1/runners/{runner['runner_id']}/content", headers=_bearer(runner)
+    )
+
+
+def _ask(viewer: WebSocketTestSession, side: str, offset: int, length: int) -> None:
+    viewer.send_text(json.dumps({"side": side, "offset": offset, "length": length}))
+
+
+def test_an_entry_is_read_in_ranges_through_the_runner_socket(
+    client: TestClient, register: Register, spec_body: dict[str, Any], session: Session
+) -> None:
+    runner, run_id = _waiting(client, register, spec_body)
+
+    with _held(client, runner) as held, _content(client, run_id, NOTES) as viewer:
+        _ask(viewer, "agent", 2, 3)
+        ask = json.loads(held.receive_text())
+        held.send_bytes(ask["id"].to_bytes(8, "big") + (5).to_bytes(8, "big") + b"ta\n")
+        piece = viewer.receive_bytes()
+        _ask(viewer, "host", 0, 64)
+        absent = json.loads(held.receive_text())
+        held.send_text(json.dumps({"id": absent["id"], "absent": True}))
+        gone = json.loads(viewer.receive_text())
+        _ask(viewer, "host", 64, 64)
+        failed = json.loads(held.receive_text())
+        held.send_text(json.dumps({"id": failed["id"], "error": "the upper disk is gone"}))
+        refused = json.loads(viewer.receive_text())
+
+    assert ask == {
+        "id": ask["id"],
+        "run_id": run_id,
+        "index": NOTES,
+        "side": "agent",
+        "offset": 2,
+        "length": 3,
+    }
+    assert piece == bytes([1]) + (2).to_bytes(8, "big") + (5).to_bytes(8, "big") + b"ta\n"
+    assert gone == {"side": "host", "offset": 0, "absent": True}
+    assert refused == {"side": "host", "offset": 64, "error": "the upper disk is gone"}
+    viewed = session.exec(select(AuditEvent).where(AuditEvent.event == "merge_content_viewed"))
+    assert [(row.actor, row.run_id, row.data) for row in viewed] == [
+        ("operator", run_id, {"path": "notes.txt", "index": NOTES})
+    ]
+
+
+def test_a_range_waits_for_no_runner_that_is_not_connected(
+    client: TestClient, register: Register, spec_body: dict[str, Any]
+) -> None:
+    _, run_id = _waiting(client, register, spec_body)
+
+    with _content(client, run_id, NOTES) as viewer:
+        _ask(viewer, "agent", 0, 64)
+        refused = json.loads(viewer.receive_text())
+
+    assert refused["side"] == "agent"
+    assert "is not connected" in refused["error"]
+
+
+@pytest.mark.parametrize("index", [0, 5, 99])
+def test_a_directory_a_rejected_entry_or_no_entry_has_no_content(
+    client: TestClient, register: Register, spec_body: dict[str, Any], session: Session, index: int
+) -> None:
+    _, run_id = _waiting(client, register, spec_body)
+
+    with pytest.raises(WebSocketDisconnect), _content(client, run_id, index):
+        pass
+
+    viewed = session.exec(select(AuditEvent).where(AuditEvent.event == "merge_content_viewed"))
+    assert list(viewed) == []

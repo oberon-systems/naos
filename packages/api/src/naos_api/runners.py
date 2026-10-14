@@ -104,6 +104,13 @@ def _live_lease(session: Session, runner_id: str) -> Lease | None:
     return session.exec(statement).first()
 
 
+# A runner answers for the changes it keeps only while it holds a lease; the sweep
+# is what ends a lapsed one.
+def serving(session: Session, runner_id: str) -> None:
+    if _live_lease(session, runner_id) is None:
+        raise LeaseError(f"runner {runner_id} holds no live lease")
+
+
 @dataclass(frozen=True)
 class HeldRun:
     id: str
