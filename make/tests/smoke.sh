@@ -701,6 +701,66 @@ check_merge() {
     fi
 }
 
+# The Changes tab reads a merged path on both sides through the web, and the read is audited.
+check_content() {
+    local index
+    index="$(merge_state | "$VENV/bin/python" -c '
+import json, sys
+entries = json.load(sys.stdin)["entries"]
+print(next(at for at, entry in enumerate(entries) if entry["path"] == "notes.txt"))
+')"
+    curl -fsS "$web/runs/$run/changes?entry=$index" |
+        grep -qF "data-stream=\"/runs/$run/changes/$index/content/ws\"" ||
+        fail "the changes tab has no content pane for notes.txt"
+    "$VENV/bin/python" - "$web" "$run" "$index" <<'CONTENT' || fail "the web did not read notes.txt"
+import json
+import sys
+
+import anyio
+import httpx
+from httpx_ws import aconnect_ws
+
+SIDES = ("host", "agent")
+
+
+async def read(ws: object, side: str) -> bytes:
+    await ws.send_text(json.dumps({"side": side, "offset": 0, "length": 65536}))
+    frame = getattr(await ws.receive(timeout=20), "data", None)
+    if isinstance(frame, str):
+        raise LookupError(f"{side}: {frame}")
+    if frame[0] != SIDES.index(side) or int.from_bytes(frame[9:17], "big") != len(frame) - 17:
+        sys.exit(f"the {side} side came back as {frame!r}")
+    return frame[17:]
+
+
+async def main() -> None:
+    web, run, index = sys.argv[1:4]
+    url = f"{web}/runs/{run}/changes/{index}/content/ws"
+    # the runner dials its content socket on its own schedule
+    for _ in range(20):
+        try:
+            async with httpx.AsyncClient() as client, aconnect_ws(url, client) as ws:
+                read_sides = {side: await read(ws, side) for side in SIDES}
+            break
+        except LookupError as err:
+            print(err, file=sys.stderr)
+            await anyio.sleep(1)
+    else:
+        sys.exit("the runner never answered for notes.txt")
+    if read_sides != {"host": b"beta\n", "agent": b"beta\n"}:
+        sys.exit(f"notes.txt read as {read_sides}")
+
+
+anyio.run(main)
+CONTENT
+    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/events?limit=10000" | "$VENV/bin/python" -c '
+import json, sys
+rows = [row for row in json.load(sys.stdin) if row["event"] == "merge_content_viewed"]
+if not rows or {(row["actor"], row["data"]["path"]) for row in rows} != {("operator", "notes.txt")}:
+    sys.exit(f"the content read left no operator audit entry: {rows}")
+'
+}
+
 # The runner posts its events after each cycle, so the timeline fills in shortly after the log.
 audited() {
     curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/events?limit=10000" |
@@ -1697,6 +1757,8 @@ check_merge_tab merged
 check_run_view COMPLETED finished
 check_summary COMPLETED 0
 check_merge
+echo "reading a merged path on both sides through the changes tab..."
+check_content
 echo "checking the audit timeline of the run..."
 wait_for 60 audited
 check_secrets
