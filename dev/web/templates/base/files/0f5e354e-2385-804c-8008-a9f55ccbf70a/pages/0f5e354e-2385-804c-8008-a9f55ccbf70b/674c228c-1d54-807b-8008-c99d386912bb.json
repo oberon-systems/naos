@@ -1,0 +1,103 @@
+{
+  "id": "674c228c-1d54-807b-8008-c99d386912bb",
+  "name": "meta row",
+  "type": "frame",
+  "x": 6544,
+  "y": 2565,
+  "width": 1072,
+  "height": 20,
+  "rotation": 0,
+  "selrect": {
+    "x": 6544,
+    "y": 2565,
+    "width": 1072,
+    "height": 20,
+    "x1": 6544,
+    "y1": 2565,
+    "x2": 7616,
+    "y2": 2585
+  },
+  "points": [
+    {
+      "x": 6544,
+      "y": 2565
+    },
+    {
+      "x": 7616,
+      "y": 2565
+    },
+    {
+      "x": 7616,
+      "y": 2585
+    },
+    {
+      "x": 6544,
+      "y": 2585
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "674c228c-1d54-807b-8008-c99d3868dde5",
+  "frameId": "674c228c-1d54-807b-8008-c99d3868dde5",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "center",
+  "layoutPaddingType": "simple",
+  "r2": 0,
+  "layoutItemHSizing": "fix",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 12,
+    "columnGap": 12
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "fix",
+  "r3": 0,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 0,
+  "layoutFlexDir": "row",
+  "layoutAlignContent": "stretch",
+  "strokes": [],
+  "proportion": 1,
+  "r4": 0,
+  "fills": [],
+  "shapes": [
+    "674c228c-1d54-807b-8008-c99d386912bd",
+    "674c228c-1d54-807b-8008-c99d386912be",
+    "674c228c-1d54-807b-8008-c99d386912bf",
+    "674c228c-1d54-807b-8008-c99d386912c0",
+    "674c228c-1d54-807b-8008-c99d386912c1",
+    "674c228c-1d54-807b-8008-c99d386912c2",
+    "674c228c-1d54-807b-8008-c99d386912c3",
+    "674c228c-1d54-807b-8008-c99d386912c4",
+    "674c228c-1d54-807b-8008-c99d386912c5",
+    "674c228c-1d54-807b-8008-c99d386912c6"
+  ]
+}

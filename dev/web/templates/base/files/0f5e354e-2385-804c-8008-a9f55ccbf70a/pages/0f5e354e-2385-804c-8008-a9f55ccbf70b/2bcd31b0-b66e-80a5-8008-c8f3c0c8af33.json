@@ -115,59 +115,59 @@
     ]
   },
   "layoutItemHSizing": "fill",
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 20920,
       "y": 456.49999982118607,
-      "width": 1036.8875732421875,
-      "height": 15.199999809265137,
-      "x1": 0,
-      "y1": 0.800000011920929,
-      "x2": 1036.8875732421875,
-      "y2": 15.999999821186066,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "400",
+      "y1": 0.800000011920929,
+      "width": 1036.8875732421875,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 20920,
+      "x1": 0,
+      "y2": 15.999999821186066,
       "fills": [
         {
           "fillColor": "#475467",
           "fillOpacity": 1
         }
       ],
+      "x2": 1036.8875732421875,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 15.199999809265137,
       "text": "From the read on it may reach the model provider, the agent's own files and so the upper disk, and whatever the agent prints lands in the console log. naos writes no value anywhere, and this view shows "
     },
     {
-      "x": 20920,
       "y": 473.29999923706055,
-      "width": 437.26251220703125,
-      "height": 15.19999885559082,
-      "x1": 0,
-      "y1": 17.600000381469727,
-      "x2": 437.26251220703125,
-      "y2": 32.79999923706055,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "12px",
       "fontWeight": "400",
+      "y1": 17.600000381469727,
+      "width": 437.26251220703125,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 20920,
+      "x1": 0,
+      "y2": 32.79999923706055,
       "fills": [
         {
           "fillColor": "#475467",
           "fillOpacity": 1
         }
       ],
+      "x2": 437.26251220703125,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 15.19999885559082,
       "text": "names only. Registry credentials and model provider keys are never listed or returned."
     }
-  ],
-  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b"
+  ]
 }

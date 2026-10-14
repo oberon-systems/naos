@@ -114,34 +114,34 @@
       }
     ]
   },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 20155,
       "y": 738.6000003814697,
-      "width": 564.0125122070312,
-      "height": 13.600000381469727,
-      "x1": 0,
-      "y1": 0,
-      "x2": 564.0125122070312,
-      "y2": 13.600000381469727,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "10px",
       "fontWeight": "400",
+      "y1": 0,
+      "width": 564.0125122070312,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 20155,
+      "x1": 0,
+      "y2": 13.600000381469727,
       "fills": [
         {
           "fillColor": "#98a2b3",
           "fillOpacity": 1
         }
       ],
+      "x2": 564.0125122070312,
       "direction": "ltr",
       "fontFamily": "\"JetBrains Mono\"",
+      "height": 13.600000381469727,
       "text": "mcp_policy_configured \u00b7 mcp_attached \u00b7 mcp_rejected \u00b7 mcp_credentials_updated \u00b7 policy_changed"
     }
-  ],
-  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b"
+  ]
 }

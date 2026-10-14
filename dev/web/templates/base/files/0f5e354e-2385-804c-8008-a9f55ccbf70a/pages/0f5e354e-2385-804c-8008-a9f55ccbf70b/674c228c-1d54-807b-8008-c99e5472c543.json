@@ -1,0 +1,174 @@
+{
+  "id": "674c228c-1d54-807b-8008-c99e5472c543",
+  "name": "Text",
+  "type": "text",
+  "x": 6558,
+  "y": 3843.0000000000005,
+  "width": 1044,
+  "height": 31,
+  "rotation": 0,
+  "selrect": {
+    "x": 6558,
+    "y": 3843.0000000000005,
+    "width": 1044,
+    "height": 31,
+    "x1": 6558,
+    "y1": 3843.0000000000005,
+    "x2": 7602,
+    "y2": 3874.0000000000005
+  },
+  "points": [
+    {
+      "x": 6558,
+      "y": 3843.0000000000005
+    },
+    {
+      "x": 7602,
+      "y": 3843.0000000000005
+    },
+    {
+      "x": 7602,
+      "y": 3874.0000000000005
+    },
+    {
+      "x": 6558,
+      "y": 3874.0000000000005
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "674c228c-1d54-807b-8008-c99e52c85943",
+  "frameId": "674c228c-1d54-807b-8008-c99e52c85943",
+  "flipX": null,
+  "flipY": null,
+  "growType": "auto-height",
+  "content": {
+    "type": "root",
+    "children": [
+      {
+        "type": "paragraph-set",
+        "children": [
+          {
+            "lineHeight": "1.4",
+            "fontStyle": "normal",
+            "children": [
+              {
+                "lineHeight": "1.4",
+                "fontStyle": "normal",
+                "typographyRefId": null,
+                "textTransform": "none",
+                "textAlign": "left",
+                "fontId": "gfont-inter-tight",
+                "fontSize": "11",
+                "fontWeight": "400",
+                "typographyRefFile": null,
+                "textDirection": "ltr",
+                "fontVariantId": "regular",
+                "textDecoration": "none",
+                "letterSpacing": "0",
+                "fills": [
+                  {
+                    "fillColor": "#667085",
+                    "fillOpacity": 1
+                  }
+                ],
+                "fontFamily": "Inter Tight",
+                "text": "Both sides scroll together and are read from the runner as you scroll, with no size cap. Contents come from the guest and are shown as inert text: no markup, links or escapes are interpreted, every byte is kept. Every view is audited."
+              }
+            ],
+            "typographyRefId": null,
+            "textTransform": "none",
+            "textAlign": "left",
+            "fontId": "gfont-inter-tight",
+            "fontSize": "11",
+            "fontWeight": "400",
+            "typographyRefFile": null,
+            "textDirection": "ltr",
+            "type": "paragraph",
+            "fontVariantId": "regular",
+            "textDecoration": "none",
+            "letterSpacing": "0",
+            "fills": [
+              {
+                "fillColor": "#667085",
+                "fillOpacity": 1
+              }
+            ],
+            "fontFamily": "Inter Tight"
+          }
+        ]
+      }
+    ]
+  },
+  "layoutItemHSizing": "fill",
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "auto",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "positionData": [
+    {
+      "x": 6558,
+      "y": 3856.6000002026562,
+      "width": 1043.3250732421875,
+      "height": 12.800000190734863,
+      "x1": 0,
+      "y1": 0.800000011920929,
+      "x2": 1043.3250732421875,
+      "y2": 13.600000202655792,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#667085",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "Both sides scroll together and are read from the runner as you scroll, with no size cap. Contents come from the guest and are shown as inert text: no markup, links or escapes are interpreted, every byte is kept. Every view is "
+    },
+    {
+      "x": 6558,
+      "y": 3872.0000000000005,
+      "width": 37.92499923706055,
+      "height": 12.799999237060547,
+      "x1": 0,
+      "y1": 16.200000762939453,
+      "x2": 37.92499923706055,
+      "y2": 29,
+      "fontStyle": "normal",
+      "textTransform": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "textDecoration": "none",
+      "letterSpacing": "normal",
+      "fills": [
+        {
+          "fillColor": "#667085",
+          "fillOpacity": 1
+        }
+      ],
+      "direction": "ltr",
+      "fontFamily": "\"Inter Tight\"",
+      "text": "audited."
+    }
+  ]
+}

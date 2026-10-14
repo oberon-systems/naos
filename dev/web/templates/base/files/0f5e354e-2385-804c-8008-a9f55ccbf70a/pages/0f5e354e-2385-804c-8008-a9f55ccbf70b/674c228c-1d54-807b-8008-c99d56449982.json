@@ -1,0 +1,113 @@
+{
+  "id": "674c228c-1d54-807b-8008-c99d56449982",
+  "name": "Card Content",
+  "type": "frame",
+  "x": 6544,
+  "y": 3355,
+  "width": 1072,
+  "height": 530,
+  "rotation": 0,
+  "selrect": {
+    "x": 6544,
+    "y": 3355,
+    "width": 1072,
+    "height": 530,
+    "x1": 6544,
+    "y1": 3355,
+    "x2": 7616,
+    "y2": 3885
+  },
+  "points": [
+    {
+      "x": 6544,
+      "y": 3355
+    },
+    {
+      "x": 7616,
+      "y": 3355
+    },
+    {
+      "x": 7616,
+      "y": 3885
+    },
+    {
+      "x": 6544,
+      "y": 3885
+    }
+  ],
+  "transform": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "transformInverse": {
+    "a": 1.0,
+    "b": 0.0,
+    "c": 0.0,
+    "d": 1.0,
+    "e": 0.0,
+    "f": 0.0
+  },
+  "parentId": "674c228c-1d54-807b-8008-c99d3868dde1",
+  "frameId": "674c228c-1d54-807b-8008-c99d3868dde1",
+  "flipX": null,
+  "flipY": null,
+  "hideFillOnExport": false,
+  "layoutGapType": "multiple",
+  "layoutPadding": {
+    "p1": 0,
+    "p2": 0,
+    "p3": 0,
+    "p4": 0
+  },
+  "layoutWrapType": "nowrap",
+  "layout": "flex",
+  "hideInViewer": true,
+  "layoutAlignItems": "start",
+  "layoutPaddingType": "simple",
+  "r2": 10,
+  "showContent": false,
+  "layoutItemHSizing": "fill",
+  "proportionLock": false,
+  "layoutGap": {
+    "rowGap": 0,
+    "columnGap": 0
+  },
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
+  "layoutItemVSizing": "auto",
+  "r3": 10,
+  "layoutJustifyContent": "start",
+  "constraintsV": "top",
+  "constraintsH": "left",
+  "r1": 10,
+  "layoutFlexDir": "column",
+  "layoutAlignContent": "stretch",
+  "strokes": [
+    {
+      "strokeStyle": "solid",
+      "strokeColor": "#e4e7ec",
+      "strokeOpacity": 1,
+      "strokeAlignment": "inner",
+      "strokeWidth": 1
+    }
+  ],
+  "proportion": 1,
+  "r4": 10,
+  "fills": [
+    {
+      "fillColor": "#ffffff",
+      "fillOpacity": 1
+    }
+  ],
+  "shapes": [
+    "674c228c-1d54-807b-8008-c99e52c85943",
+    "674c228c-1d54-807b-8008-c99e52790fa2",
+    "674c228c-1d54-807b-8008-c99de2bd6712",
+    "674c228c-1d54-807b-8008-c99d695d6b19",
+    "674c228c-1d54-807b-8008-c99d5f0fb1ad",
+    "674c228c-1d54-807b-8008-c99d56c33cf5"
+  ]
+}

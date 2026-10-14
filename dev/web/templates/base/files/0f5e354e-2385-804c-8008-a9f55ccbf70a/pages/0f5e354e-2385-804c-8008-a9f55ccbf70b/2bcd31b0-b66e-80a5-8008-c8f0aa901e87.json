@@ -115,59 +115,59 @@
     ]
   },
   "layoutItemHSizing": "fill",
+  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b",
   "constraintsV": "top",
   "constraintsH": "left",
   "positionData": [
     {
-      "x": 20584,
       "y": 293.6000002026558,
-      "width": 131.47500610351562,
-      "height": 12.800000190734863,
-      "x1": 0,
-      "y1": 0.800000011920929,
-      "x2": 131.47500610351562,
-      "y2": 13.600000202655792,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 0.800000011920929,
+      "width": 131.47500610351562,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 20584,
+      "x1": 0,
+      "y2": 13.600000202655792,
       "fills": [
         {
           "fillColor": "#667085",
           "fillOpacity": 1
         }
       ],
+      "x2": 131.47500610351562,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 12.800000190734863,
       "text": "agent-key 2 \u00b7 deploy-key 1 \u00b7 "
     },
     {
-      "x": 20584,
       "y": 309,
-      "width": 42.35000228881836,
-      "height": 12.799999237060547,
-      "x1": 0,
-      "y1": 16.200000762939453,
-      "x2": 42.35000228881836,
-      "y2": 29,
       "fontStyle": "normal",
       "textTransform": "none",
       "fontSize": "11px",
       "fontWeight": "400",
+      "y1": 16.200000762939453,
+      "width": 42.35000228881836,
       "textDecoration": "none",
       "letterSpacing": "normal",
+      "x": 20584,
+      "x1": 0,
+      "y2": 29,
       "fills": [
         {
           "fillColor": "#667085",
           "fillOpacity": 1
         }
       ],
+      "x2": 42.35000228881836,
       "direction": "ltr",
       "fontFamily": "\"Inter Tight\"",
+      "height": 12.799999237060547,
       "text": "1 refused"
     }
-  ],
-  "pageId": "0f5e354e-2385-804c-8008-a9f55ccbf70b"
+  ]
 }
