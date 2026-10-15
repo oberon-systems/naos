@@ -1,3 +1,40 @@
+## runner-0.2.0 (2026-10-15)
+
+### Features
+
+- **release**: install the runner of a release
+- **runner**: read entry content for the api
+- **runner**: serve the openai responses api
+- **runner**: serve a gemini provider in the openai format
+- **runner**: start goose and hand it the model
+- **runner**: boot only the image the api handed over
+- **runner**: apply a changed model policy to a running vm
+- **runner**: apply a changed network policy to a running vm
+- **runner**: apply a changed shell policy to a running vm
+- **runner**: swap the mcp policy of a running vm
+- **runner**: serve granted secrets from the broker
+- **runner**: enforce the mcp rules in the broker
+- **runner**: serve each Run a model gateway on its naos.model port
+- **runner**: report where the agent runs
+- **runner**: hold a console socket to the api and type into the guest
+- **runner**: apply the console size inside the guest
+- **runner**: ship the console log to the api
+
+### Bug Fixes
+
+- **runner**: let go of what a run holds when it ends
+- **runner**: start a claimed run from a fresh read
+- **runner**: serve the model gateway over vsock instead of a serial port
+- **runner**: prepare the state directory at start
+
+### Build
+
+- **dev/stack**: kickstart the whole stack locally
+
+### Documentation
+
+- **docs**: describe installing a release
+
 ## runner-0.1.0 (2026-09-20)
 
 ### Features
