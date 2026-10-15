@@ -20,6 +20,14 @@ release, writes its settings and a systemd unit; see
 curl -fsSL https://github.com/oberon-systems/naos/releases/latest/download/install-runner.sh | sh
 ```
 
+The same command upgrades the runner. `uninstall` removes the unit, the
+binaries, the settings, the enrollment token and the state; it asks first,
+`--force` does not:
+
+```bash
+curl -fsSL https://github.com/oberon-systems/naos/releases/latest/download/install-runner.sh | sh -s -- uninstall
+```
+
 From [crates.io](https://crates.io/crates/naos-runner) instead:
 
 ```bash

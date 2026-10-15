@@ -57,3 +57,12 @@ the layouts, upgrades and uninstalling.
 curl -fsSL https://github.com/oberon-systems/naos/releases/latest/download/install-stack.sh | sh
 curl -fsSL https://github.com/oberon-systems/naos/releases/latest/download/install-runner.sh | sh
 ```
+
+The same commands upgrade what is installed. `uninstall` removes everything an
+installer put on the host, the data included; it asks first, `--force` does
+not:
+
+```bash
+curl -fsSL https://github.com/oberon-systems/naos/releases/latest/download/install-runner.sh | sh -s -- uninstall
+curl -fsSL https://github.com/oberon-systems/naos/releases/latest/download/install-stack.sh | sh -s -- uninstall
+```
