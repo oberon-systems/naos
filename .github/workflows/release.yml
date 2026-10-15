@@ -66,7 +66,7 @@ jobs:
           sed -e "s|\${NAOS_API_IMAGE[^}]*}|$API_REF|" -e "s|\${NAOS_WEB_IMAGE[^}]*}|$WEB_REF|" \
             docker/compose.yaml > dist/compose.yaml
           grep -q "$API_REF" dist/compose.yaml && grep -q "$WEB_REF" dist/compose.yaml
-          cp docker/.env.example dist/.env.example
+          cp docker/.env.example dist/env.example
           sed -e "s/^stamped_release=\$/stamped_release=$GITHUB_REF_NAME/" \
             -e "s/^stamped_runner=\$/stamped_runner=$RUNNER/" \
             release/install-runner.sh > dist/install-runner.sh
@@ -76,7 +76,7 @@ jobs:
             release/install-stack.sh > dist/install-stack.sh
           grep -q "^stamped_runner=$RUNNER\$" dist/install-runner.sh
           grep -q "^stamped_image_sha256=$IMAGE_SHA256\$" dist/install-stack.sh
-          cd dist && sha256sum compose.yaml .env.example install-runner.sh install-stack.sh > SHA256SUMS
+          cd dist && sha256sum compose.yaml env.example install-runner.sh install-stack.sh > SHA256SUMS
       - name: Publish release
         run: |
           changes="$(awk -v head="## $GITHUB_REF_NAME " \
@@ -88,7 +88,7 @@ jobs:
             "| runner | runner-$RUNNER |" "| image | image-$IMAGE |" \
             "" "$changes")"
           gh release create "$GITHUB_REF_NAME" \
-            dist/compose.yaml dist/.env.example dist/install-runner.sh dist/install-stack.sh \
+            dist/compose.yaml dist/env.example dist/install-runner.sh dist/install-stack.sh \
             dist/SHA256SUMS \
             --title "naos $GITHUB_REF_NAME" \
             --notes "$notes" \

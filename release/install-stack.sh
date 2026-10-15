@@ -264,16 +264,16 @@ doctor() {
 fetch() {
     tmp="$(mktemp -d)"
     base="https://github.com/$repo/releases/download/$stamped_release"
-    for file in compose.yaml .env.example SHA256SUMS; do
+    for file in compose.yaml env.example SHA256SUMS; do
         curl -fsSL -o "$tmp/$file" "$base/$file" || fail "cannot download $file of $stamped_release"
     done
-    (cd "$tmp" && grep -E ' (compose\.yaml|\.env\.example)$' SHA256SUMS | sha256sum -c - >/dev/null) ||
+    (cd "$tmp" && grep -E ' (compose\.yaml|env\.example)$' SHA256SUMS | sha256sum -c - >/dev/null) ||
         fail "the files of $stamped_release do not match their SHA256SUMS"
     put install -d -m 0755 -o "$(id -un)" -g "$(id -gn)" "$dir"
     put install -d -m 0700 -o "$(id -un)" -g "$(id -gn)" "$db"
     [ ! -f "$dir/compose.yaml" ] || cp "$dir/compose.yaml" "$dir/compose.yaml.prev"
     cp "$tmp/compose.yaml" "$dir/compose.yaml"
-    cp "$tmp/.env.example" "$dir/.env.example"
+    cp "$tmp/env.example" "$dir/.env.example"
     rm -rf "$tmp"
 }
 
