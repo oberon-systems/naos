@@ -1,6 +1,6 @@
 # 14 - Install
 
-A naos release, tagged `X.Y.Z`, is the stack as one version: the compose file
+A naos release, tagged `X.Y.Z` or `X.Y.Z-rcN`, is the stack as one version: the compose file
 with the api and web images pinned by digest, and two installers that know the
 runner and the VM image of that release. It is made of the newest component
 releases (`naos-api-*`, `naos-web-*`, `runner-*`, `image-*`) at the time it is
@@ -116,6 +116,10 @@ cd release
 cz bump
 git push origin main "$(sed -n 's/^  version: //p' .cz.yaml)"
 ```
+
+A release candidate is bumped the same way with `cz bump 1.0.0-rc0` for the
+first one and `cz bump --prerelease rc` for the next. It is published as the
+latest release too, so the installers pick it up.
 
 The tag starts `.github/workflows/release.yml`. It takes the newest release of
 every component, pins the api and web images by digest in `compose.yaml`,

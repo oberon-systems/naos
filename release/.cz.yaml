@@ -10,7 +10,7 @@ commitizen:
   - amend!
   - 'bump:'
   bump_message: 'bump: naos $current_version -> $new_version'
-  major_version_zero: true
+  major_version_zero: false
   name: wyld_cz
   pre_bump_hooks:
   - sh changelog.sh
