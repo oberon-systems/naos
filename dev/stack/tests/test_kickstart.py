@@ -26,7 +26,6 @@ done
 case "$url" in
 */releases\?*) cat "$FAKE/releases" ;;
 */image-2.0.0/SHA256SUMS) cat "$FAKE/sums" ;;
-*/api/v1/audit\?*) cat "$FAKE/registered" ;;
 */api/v1/images) if [ -n "$posted" ]; then cat >"$FAKE/posted"; else cat "$FAKE/images"; fi ;;
 *) echo "unexpected $url" >&2; exit 22 ;;
 esac
@@ -49,7 +48,6 @@ def stand(tmp_path: Path) -> Path:
     (fake / "releases").write_text(RELEASES)
     (fake / "sums").write_text(f"{SUM}  naos-agents-2.0.0.qcow2\n{'cd' * 32}  other.qcow2\n")
     (fake / "images").write_text("[]")
-    (fake / "registered").write_text("[]")
     return tmp_path
 
 
@@ -65,28 +63,29 @@ def _register(stand: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_a_fresh_stand_registers_the_newest_release_through_the_api(stand: Path) -> None:
+def test_a_stand_registers_the_newest_release_through_the_api(stand: Path) -> None:
     done = _register(stand)
 
     assert done.returncode == 0, done.stderr
     release = "https://github.com/alpha/beta/releases/download/image-2.0.0"
     assert json.loads((stand / "fake/posted").read_text()) == {
-        "id": "naos-agents",
+        "id": "naos-agents-2.0.0",
         "version": "2.0.0",
         "digest": f"sha256:{SUM}",
         "url": f"{release}/naos-agents-2.0.0.qcow2",
     }
 
 
-def test_a_catalog_that_holds_an_image_is_left_alone(stand: Path) -> None:
-    (stand / "fake/images").write_text('[{"id": "image_alpha"}]')
+def test_a_catalog_with_other_images_still_gets_the_newest(stand: Path) -> None:
+    other = "cd" * 32
+    (stand / "fake/images").write_text(f'[{{"id": "image_alpha", "digest": "sha256:{other}"}}]')
 
     assert _register(stand).returncode == 0
-    assert not (stand / "fake/posted").exists()
+    assert json.loads((stand / "fake/posted").read_text())["id"] == "naos-agents-2.0.0"
 
 
-def test_a_deleted_image_is_not_added_back(stand: Path) -> None:
-    (stand / "fake/registered").write_text('[{"event": "image_registered"}]')
+def test_the_newest_release_already_in_the_catalog_is_not_posted_again(stand: Path) -> None:
+    (stand / "fake/images").write_text(f'[{{"id": "image_alpha", "digest": "sha256:{SUM}"}}]')
 
     assert _register(stand).returncode == 0
     assert not (stand / "fake/posted").exists()

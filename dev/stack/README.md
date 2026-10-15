@@ -29,12 +29,12 @@ starts compose with `NAOS_DATABASE_AUTO_MIGRATE=true`, so the api brings the
 empty database to its schema, waits for `/healthz` and starts the runner in
 the background.
 
-A stand whose catalog is empty and never held an image gets the project's
-newest one: kickstart reads the newest `image-<version>` release of the
-repository on GitHub and registers `naos-agents-<version>.qcow2` through
+Every kickstart registers the project's newest image: it reads the newest
+`image-<version>` release of the repository on GitHub and registers
+`naos-agents-<version>.qcow2` as `naos-agents-<version>` through
 `POST /api/v1/images`, with the url of the asset and the sha256 from
-`SHA256SUMS`. After that the catalog is the operator's: an image deleted
-there is not added back by a later kickstart.
+`SHA256SUMS`. It skips the post only when that digest is already in the
+catalog, so a new release reaches a running stand on its next kickstart.
 Every later run reuses the same tokens and skips whatever is already up.
 
 Every run builds all three from this tree, before anything starts. Docker caches

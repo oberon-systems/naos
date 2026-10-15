@@ -99,17 +99,14 @@ settings() {
     name="${NAOS_AGENT_NAME:-alpha}"
 }
 
-count() {
-    curl -fsS -H "Authorization: Bearer $(cat "$LOCAL/operator")" "$api/api/v1/$1" |
-        "$python" -c "import json, sys; print(len(json.load(sys.stdin)))"
+has_digest() {
+    curl -fsS -H "Authorization: Bearer $(cat "$LOCAL/operator")" "$api/api/v1/images" |
+        "$python" -c "import json, sys; sys.exit(sys.argv[1] not in [i['digest'] for i in json.load(sys.stdin)])" "$1"
 }
 
-# A new stand starts with the project's newest image, registered through the api like any
-# other. A catalog that ever held an image is the operator's and is left as it is.
+# Every start registers the project's newest image; the id carries the version because
+# the catalog keeps one image per id.
 register_image() {
-    if [ "$(count images)" != 0 ] || [ "$(count 'audit?event=image_registered&limit=1')" != 0 ]; then
-        return
-    fi
     local repo version release image sum
     repo="$(git -C "$ROOT" remote get-url origin |
         sed -E 's#^(git@github\.com:|https://github\.com/)##; s#\.git$##')"
@@ -121,9 +118,10 @@ register_image() {
     image="naos-agents-$version.qcow2"
     sum="$(curl -fsSL "$release/SHA256SUMS" | awk -v name="$image" '$2 == name { print $1 }')"
     [ -n "$sum" ] || fail "$image is not listed in $release/SHA256SUMS"
+    if has_digest "sha256:$sum"; then return; fi
     curl -fsS -o /dev/null -H "Authorization: Bearer $(cat "$LOCAL/operator")" \
         -H "Content-Type: application/json" "$api/api/v1/images" -d @- <<EOF
-{"id": "naos-agents", "version": "$version", "digest": "sha256:$sum", "url": "$release/$image"}
+{"id": "naos-agents-$version", "version": "$version", "digest": "sha256:$sum", "url": "$release/$image"}
 EOF
     echo "registered $image from $release"
 }
