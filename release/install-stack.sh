@@ -12,9 +12,9 @@ unit_name=naos-stack.service
 
 usage() {
     cat <<EOF
-usage: install-stack.sh [doctor] [flags]
+usage: install-stack.sh [doctor|uninstall] [flags]
 
-Without a command it installs or upgrades the stack. Every value it lacks is
+Without a command it installs or upgrades the stack; uninstall removes all of it. Every value it lacks is
 asked on the terminal; --yes, or no terminal, takes the defaults.
 
   --release X.Y.Z             naos release to install (default: the latest)
@@ -25,6 +25,7 @@ asked on the terminal; --yes, or no terminal, takes the defaults.
   --systemd | --no-systemd    install the systemd unit (default: yes)
   --linger | --no-linger      keep the user unit running without a login (xdg)
   --yes                       never ask
+  --force                     uninstall without asking
 EOF
 }
 
@@ -87,9 +88,10 @@ web_port=''
 systemd=''
 linger=''
 yes=''
+force=''
 while [ $# -gt 0 ]; do
     case "$1" in
-    doctor) command="$1" ;;
+    doctor | uninstall) command="$1" ;;
     --release) need_value "$1" $# && shift ;;
     --layout) need_value "$1" $# && layout="$2" && shift ;;
     --bind) need_value "$1" $# && bind="$2" && shift ;;
@@ -100,6 +102,7 @@ while [ $# -gt 0 ]; do
     --linger) linger=yes ;;
     --no-linger) linger=no ;;
     --yes) yes=1 ;;
+    --force) force=1 ;;
     -h | --help) usage && exit 0 ;;
     *) fail "unknown argument $1, see --help" ;;
     esac
@@ -383,6 +386,48 @@ wait_healthy() {
         sleep 1
     done
 }
+
+confirm() {
+    [ -z "$force" ] || return 0
+    interactive || fail "no terminal to confirm: pass --force"
+    printf '%s\nremove all of it? [y/N]: ' "$1" >/dev/tty
+    read -r answer </dev/tty || answer=
+    case "$answer" in [yY]*) ;; *) fail "nothing removed" ;; esac
+}
+
+# The database files belong to the postgres user of the container, so the container
+# empties the directory; sudo is the fallback when it cannot.
+uninstall() {
+    detect_layout
+    [ -n "$layout" ] || { say "no stack is installed" && return 0; }
+    paths
+    confirm "This removes the naos stack: its containers, volumes and images, $unit_name,
+$dir with .env and the tokens, and the database in $db."
+    if [ -f "$unit_dir/$unit_name" ]; then
+        systemctl_unit disable --now "$unit_name" >/dev/null 2>&1 || true
+        put rm -f "$unit_dir/$unit_name"
+        systemctl_unit daemon-reload
+    fi
+    if [ -f "$dir/compose.yaml" ]; then
+        compose down --remove-orphans || true
+        if [ -d "$db" ]; then
+            compose run --rm --no-deps -T --entrypoint find db /var/lib/postgresql/data -mindepth 1 -delete ||
+                true
+        fi
+        compose down --volumes --rmi all --remove-orphans || true
+    fi
+    put rm -rf "$db" 2>/dev/null || as_root rm -rf "$db"
+    put rm -rf "$dir/compose.yaml" "$dir/compose.yaml.prev" "$dir/.env" "$dir/.env.example" "$dir/secrets"
+    put rmdir "$dir" 2>/dev/null || true
+    [ "$layout" = system ] || rmdir "${dir%/*}" "${db%/*}" 2>/dev/null || true
+    say "removed the stack"
+    [ "$layout" = system ] || ! linger_on || say "linger stays on, turn it off with: loginctl disable-linger"
+}
+
+if [ "$command" = uninstall ]; then
+    uninstall
+    exit 0
+fi
 
 if [ "$command" = doctor ]; then
     detect_layout

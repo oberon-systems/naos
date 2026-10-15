@@ -14,7 +14,7 @@ usage() {
     cat <<EOF
 usage: install-runner.sh [doctor|uninstall] [flags]
 
-Without a command it installs or upgrades the runner. Every value it lacks is
+Without a command it installs or upgrades the runner; uninstall removes all of it. Every value it lacks is
 asked on the terminal; --yes, or no terminal, turns a missing value into an error.
 
   --release X.Y.Z             naos release to install (default: the latest)
@@ -28,6 +28,7 @@ asked on the terminal; --yes, or no terminal, turns a missing value into an erro
   --systemd | --no-systemd    install the systemd unit (default: yes)
   --linger | --no-linger      keep the user unit running without a login (xdg)
   --yes                       never ask
+  --force                     uninstall without asking
 EOF
 }
 
@@ -93,6 +94,7 @@ labels=''
 systemd=''
 linger=''
 yes=''
+force=''
 while [ $# -gt 0 ]; do
     case "$1" in
     doctor | uninstall) command="$1" ;;
@@ -109,6 +111,7 @@ while [ $# -gt 0 ]; do
     --linger) linger=yes ;;
     --no-linger) linger=no ;;
     --yes) yes=1 ;;
+    --force) force=1 ;;
     -h | --help) usage && exit 0 ;;
     *) fail "unknown argument $1, see --help" ;;
     esac
@@ -367,14 +370,37 @@ EOF
         say "could not enable linger, run: sudo loginctl enable-linger $(id -un)"
 }
 
+confirm() {
+    [ -z "$force" ] || return 0
+    interactive || fail "no terminal to confirm: pass --force"
+    printf '%s\nremove all of it? [y/N]: ' "$1" >/dev/tty
+    read -r answer </dev/tty || answer=
+    case "$answer" in [yY]*) ;; *) fail "nothing removed" ;; esac
+}
+
+# The state can hold files of the Runs' user namespaces, which only root removes.
 uninstall() {
+    detect_layout
+    [ -n "$layout" ] || { say "no runner is installed" && return 0; }
+    paths
+    confirm "This removes the naos runner: $unit_name, $link, the binaries in $bin_dir,
+the settings and the enrollment token in $conf_dir and the state in $state_dir."
     if [ -f "$unit_dir/$unit_name" ]; then
         systemctl_unit disable --now "$unit_name" >/dev/null 2>&1 || true
         put rm -f "$unit_dir/$unit_name"
         systemctl_unit daemon-reload
     fi
     put rm -f "$link"
-    say "removed the unit and $link; settings in $conf_dir and state in $state_dir are kept"
+    put rm -rf "$bin_dir" "$env_file" "$conf_dir/enrollment"
+    put rm -rf "$state_dir" 2>/dev/null || as_root rm -rf "$state_dir"
+    if [ "$layout" = system ]; then
+        as_root rm -rf "$conf_dir"
+        as_root rmdir "${conf_dir%/*}" 2>/dev/null || true
+    else
+        rmdir "$conf_dir" "${bin_dir%/*}" "${state_dir%/*}" 2>/dev/null || true
+    fi
+    say "removed the runner"
+    [ "$layout" = system ] || ! linger_on || say "linger stays on, turn it off with: loginctl disable-linger"
 }
 
 if [ "$command" = doctor ]; then
@@ -387,13 +413,13 @@ if [ "$command" = doctor ]; then
     exit
 fi
 
-choose_layout
-paths
-
 if [ "$command" = uninstall ]; then
     uninstall
     exit 0
 fi
+
+choose_layout
+paths
 
 api_url="${api_url:-$(setting NAOS_AGENT_API_URL)}"
 name="${name:-$(setting NAOS_AGENT_NAME)}"

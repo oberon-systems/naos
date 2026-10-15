@@ -9,6 +9,7 @@ tagged. This document installs, upgrades and checks a stack and its runners.
 - [Install the stack](#install-the-stack)
 - [Install a runner](#install-a-runner)
 - [Upgrade](#upgrade)
+- [Uninstall](#uninstall)
 - [Check a host](#check-a-host)
 - [Cut a release](#cut-a-release)
 
@@ -73,7 +74,8 @@ to the runner through `NAOS_AGENT_ENV_FILE`.
 
 ## Upgrade
 
-Run the same installer again. The stack keeps `.env`, the tokens and the
+Run the same installer again: it finds the layout and the settings of what is
+installed and asks nothing it already knows. The stack keeps `.env`, the tokens and the
 database, saves the old `compose.yaml` as `compose.yaml.prev`, pulls the new
 images, migrates the database, restarts the unit and registers the new VM
 image. The runner installs the new binary next to the old ones, moves the
@@ -84,8 +86,27 @@ curl -fsSL https://github.com/oberon-systems/naos/releases/latest/download/insta
 curl -fsSL https://github.com/oberon-systems/naos/releases/latest/download/install-runner.sh | sh
 ```
 
-`install-runner.sh uninstall` removes the runner unit and link and keeps the
-settings and the state.
+Arguments reach a piped script only after `sh -s --`; `sh uninstall` or
+`sh doctor` makes `sh` look for a file of that name.
+
+## Uninstall
+
+`uninstall` removes everything the installer put on the host. It lists what
+goes and asks first; `--force` removes without asking, and without a terminal
+it is required.
+
+```bash
+curl -fsSL https://github.com/oberon-systems/naos/releases/latest/download/install-runner.sh | sh -s -- uninstall
+curl -fsSL https://github.com/oberon-systems/naos/releases/latest/download/install-stack.sh | sh -s -- uninstall --force
+```
+
+| Installer | Removed |
+|---|---|
+| `install-runner.sh` | the unit, the `runner` link, the binaries, `runner.env`, the enrollment token, the state |
+| `install-stack.sh` | the unit, the containers, volumes and images, `compose.yaml`, `.env`, the tokens, the database |
+
+The api keeps the record of a removed runner. A user unit
+leaves linger on; `loginctl disable-linger` turns it off.
 
 ## Check a host
 

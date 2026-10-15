@@ -51,7 +51,7 @@ refuses a Run with a workspace until then.
 A naos release installs in two commands: the stack on one host, a runner on
 every host that runs agents. Both installers check the host first and ask for
 what they need; [docs/14-install.md](docs/14-install.md) covers the flags,
-the layouts and upgrades.
+the layouts, upgrades and uninstalling.
 
 ```bash
 curl -fsSL https://github.com/oberon-systems/naos/releases/latest/download/install-stack.sh | sh
