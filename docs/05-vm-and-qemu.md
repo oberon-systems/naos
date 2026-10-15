@@ -59,7 +59,7 @@ shell. Everything the guest can reach is on this list:
 | `-chardev file` + `-serial` | `ttyS1` into `boot.log` |
 | `-qmp unix:qmp.sock` | monitor for readiness and power-down |
 | `-fw_cfg name=opt/naos/session` | per-Run parameters from `session.json` |
-| `-device vhost-vsock-pci,guest-cid=<cid>` | the model gateway, only for a Run with a model policy ([13](13-model-gateway.md)) |
+| `-device vhost-vsock-pci,guest-cid=<cid>` | the model gateway, only for a Run with a model policy ([12](12-model-gateway.md)) |
 
 A Run whose mount policy has a workspace adds:
 
@@ -100,7 +100,7 @@ in there and attaches to the agent's tmux session. `ttyS1` carries kernel
 messages and the isolation probes into `boot.log`. The virtio-serial port
 `naos.mcp` is the agent's way to the gates: the runner serves it on
 `mcp.sock`, and [08](08-mcp-gate.md) describes what flows over it. The
-agent's model calls take vsock instead ([13](13-model-gateway.md)).
+agent's model calls take vsock instead ([12](12-model-gateway.md)).
 
 At boot `naos-probe` finds the port by name and sends it a `ping`; a missing
 port or a missing answer fails the probe, so a VM that cannot reach its gates
@@ -137,14 +137,14 @@ gates.
 No credential is baked into an image or passed in `session.json`. The keys
 in the guest environment are placeholders that the model gateway throws away.
 
-- The model gateway ([13](13-model-gateway.md)) carries the agent's model
+- The model gateway ([12](12-model-gateway.md)) carries the agent's model
   calls. The runner sets the provider's key on each call, so a key never
   enters the VM, and a Run without a model policy reaches no model.
 - The network gate ([06](06-network-gate.md)) enforces the policy host-side.
   Its callers are the `http_request` tool of the MCP broker
   ([08](08-mcp-gate.md)) and the model gateway, which gets one gate per
   provider.
-- The MCP gate ([P3](12-roadmap.md)) will hand out short-lived per-Run tokens
+- The MCP gate ([08](08-mcp-gate.md)) will hand out short-lived per-Run tokens
   where a provider cannot be proxied.
 - An interactive login inside the VM, such as an OAuth flow, will only be
   possible as an explicit capability of the Run.

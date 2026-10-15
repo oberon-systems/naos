@@ -14,7 +14,7 @@ unprivileged user namespaces and
 
 The installer of a naos release checks the host, installs the runner of that
 release, writes its settings and a systemd unit; see
-[Install a runner](https://github.com/oberon-systems/naos/blob/main/docs/14-install.md#install-a-runner):
+[Install a runner](https://github.com/oberon-systems/naos/blob/main/docs/13-install.md#install-a-runner):
 
 ```bash
 curl -fsSL https://github.com/oberon-systems/naos/releases/latest/download/install-runner.sh | sh

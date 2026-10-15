@@ -54,7 +54,7 @@ VM disk, the console log, the audit or the runner's state directory, and
 every read is audited by name.
 
 A model provider's key never enters the VM. The model gateway
-([13](13-model-gateway.md)) drops every auth header the agent sends, sets the
+([12](12-model-gateway.md)) drops every auth header the agent sends, sets the
 provider's own on the host and redacts the key in every answer, so the agent
 only ever holds a placeholder.
 

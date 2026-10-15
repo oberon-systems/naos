@@ -9,7 +9,7 @@ local test stack and a real deployment; only `.env` differs between them. A
 naos release publishes this file with both images pinned, and its
 `install-stack.sh` sets it up, updates it when run again and, with
 `uninstall`, removes it with its data; see
-[docs/14-install.md](https://github.com/oberon-systems/naos/blob/main/docs/14-install.md).
+[docs/13-install.md](https://github.com/oberon-systems/naos/blob/main/docs/13-install.md).
 
 The runner is not part of the stack. It needs KVM, virtiofsd and the host
 workspace, so it runs on the host as a user unit and reaches the api over the

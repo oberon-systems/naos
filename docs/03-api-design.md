@@ -197,7 +197,7 @@ temporary edit) and its `document`, `configured_at` of the latest
 `output_tokens` summed over the Run's `model_call` events, and `refusals`, the
 last five denied calls newest first, each with `id`, `at`, `provider`, `model`
 and `category`. The budget itself is in the model policy
-([13](13-model-gateway.md#budget-and-rate)).
+([12](12-model-gateway.md#budget-and-rate)).
 
 `groups` are the calls by `provider` and `model`, each with `calls`,
 `denied`, `input_tokens`, `output_tokens`, `slowest_ms` and `last_at`, denied
@@ -392,7 +392,7 @@ document that already has one. An unnamed policy takes the name of a later
 A Run names a policy per kind under `spec.mounts`, `spec.network`, `spec.shell`,
 `spec.mcp` and `spec.model`, and the spec never changes after that.
 `spec.model` is required: a VM gets its model gateway only when it boots
-([13](13-model-gateway.md#transport)), so a Run without one could never take
+([12](12-model-gateway.md#transport)), so a Run without one could never take
 a model later, and `POST /runs` answers 422. A profile may leave it out, but a
 Run started from that profile is refused the same way. The
 runner receives the resolved document as a snapshot rather than
@@ -400,7 +400,7 @@ the id. For `mcp` that snapshot is the Run's own, taken when the Run is
 created ([MCP servers](#mcp-servers)) and again when an operator changes the
 policy ([Changing a policy of a started Run](#changing-a-policy-of-a-started-run)). The network document is described in [06](06-network-gate.md), the
 shell document in [07](07-shell-gate.md), the MCP document in
-[08](08-mcp-gate.md), the model document in [13](13-model-gateway.md).
+[08](08-mcp-gate.md), the model document in [12](12-model-gateway.md).
 
 `GET /policies` lists every policy newest first; `kind` narrows it to one
 kind, and `q` to the policies whose id, digest or name holds the substring, ignoring
@@ -462,7 +462,7 @@ policy the Run was created with when there is none. `spec.network`,
 `spec.shell` and `spec.model` keep that first policy. The runner swaps the
 rules ([06](06-network-gate.md#live-changes)), the capabilities
 ([07](07-shell-gate.md#live-changes)) or the providers
-([13](13-model-gateway.md#live-changes)) on its next reconcile pass; the
+([12](12-model-gateway.md#live-changes)) on its next reconcile pass; the
 mount policy never changes. The credentials of the desired state follow the
 held `model` document, so the key of a provider that was taken away is no
 longer issued.

@@ -139,7 +139,7 @@ registered for the Run:
    gates take their documents the same way
    ([06](06-network-gate.md#live-changes),
    [07](07-shell-gate.md#live-changes),
-   [13](13-model-gateway.md#live-changes));
+   [12](12-model-gateway.md#live-changes));
 2. download the image from the `image_url` the API returned into
    `images/` under the VM directory, unless this process already downloaded
    that digest. Nothing else is an image: the directory is emptied when the

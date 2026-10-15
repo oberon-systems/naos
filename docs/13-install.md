@@ -1,4 +1,4 @@
-# 14 - Install
+# 13 - Install
 
 A naos release, tagged `X.Y.Z` or `X.Y.Z-rcN`, is the stack as one version: the compose file
 with the api and web images pinned by digest, and two installers that know the

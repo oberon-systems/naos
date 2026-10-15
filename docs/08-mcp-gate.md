@@ -345,7 +345,7 @@ value anywhere.
 
 Two kinds of secret naos puts in place itself, and neither is ever listed or
 returned: the `credential` of a registry server and the provider keys of the
-model gateway ([13](13-model-gateway.md)). They are not in the granted set,
+model gateway ([12](12-model-gateway.md)). They are not in the granted set,
 so a `get` of one is denied like any name without a grant.
 
 ## Resources
