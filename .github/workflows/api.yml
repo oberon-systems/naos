@@ -105,4 +105,5 @@ jobs:
             packages/api/CHANGELOG.md)"
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
+            --latest=false \
             --notes "${notes:-Naos API $VERSION on PyPI and ghcr.io.}"

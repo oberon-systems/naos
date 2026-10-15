@@ -19,7 +19,7 @@ services:
       retries: 30
 
   api:
-    image: ${NAOS_REGISTRY:-ghcr.io/oberon-systems}/naos-api:${NAOS_TAG:-latest}
+    image: ${NAOS_API_IMAGE:-ghcr.io/oberon-systems/naos-api:latest}
     restart: unless-stopped
     environment:
       NAOS_DATABASE_URL: postgresql+psycopg://${NAOS_DB_USER:-naos}:${NAOS_DB_PASSWORD:?set NAOS_DB_PASSWORD in .env}@${NAOS_DB_HOST:-db}:${NAOS_DB_PORT:-5432}/${NAOS_DB_NAME:-naos}
@@ -40,7 +40,7 @@ services:
       retries: 10
 
   web:
-    image: ${NAOS_REGISTRY:-ghcr.io/oberon-systems}/naos-web:${NAOS_TAG:-latest}
+    image: ${NAOS_WEB_IMAGE:-ghcr.io/oberon-systems/naos-web:latest}
     restart: unless-stopped
     environment:
       NAOS_WEB_API_BASE_URL: ${NAOS_WEB_API_BASE_URL:-http://127.0.0.1:8080}

@@ -1,0 +1,94 @@
+name: naos
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      packages: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      OWNER: ${{ github.repository_owner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the tag against release/.cz.yaml
+        run: |
+          test "$GITHUB_REF_NAME" = "$(sed -n 's/^  version: //p' release/.cz.yaml)"
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Take the newest release of every component
+        run: |
+          newest() {
+            gh release list --limit 300 --json tagName --jq '.[].tagName' |
+              sed -n "s/^$1\([0-9][0-9.]*\)\$/\1/p" | sort -V | tail -n 1
+          }
+          digest() {
+            docker buildx imagetools inspect "$1" --format '{{.Manifest.Digest}}'
+          }
+          api="$(newest naos-api-)"
+          web="$(newest naos-web-)"
+          runner="$(newest runner-)"
+          image="$(newest image-)"
+          for value in "$api" "$web" "$runner" "$image"; do test -n "$value"; done
+          gh release download "image-$image" -p SHA256SUMS -O image.sums
+          image_sha256="$(awk -v name="naos-agents-$image.qcow2" '$2 == name { print $1 }' image.sums)"
+          test -n "$image_sha256"
+          gh release view "runner-$runner" >/dev/null
+          api_ref="ghcr.io/$OWNER/naos-api:$api"
+          web_ref="ghcr.io/$OWNER/naos-web:$web"
+          {
+            echo "API=$api"
+            echo "WEB=$web"
+            echo "RUNNER=$runner"
+            echo "IMAGE=$image"
+            echo "IMAGE_SHA256=$image_sha256"
+            echo "API_REF=$api_ref@$(digest "$api_ref")"
+            echo "WEB_REF=$web_ref@$(digest "$web_ref")"
+          } >> "$GITHUB_ENV"
+      - name: Render the release files
+        run: |
+          mkdir dist
+          sed -e "s|\${NAOS_API_IMAGE[^}]*}|$API_REF|" -e "s|\${NAOS_WEB_IMAGE[^}]*}|$WEB_REF|" \
+            docker/compose.yaml > dist/compose.yaml
+          grep -q "$API_REF" dist/compose.yaml && grep -q "$WEB_REF" dist/compose.yaml
+          cp docker/.env.example dist/.env.example
+          sed -e "s/^stamped_release=\$/stamped_release=$GITHUB_REF_NAME/" \
+            -e "s/^stamped_runner=\$/stamped_runner=$RUNNER/" \
+            release/install-runner.sh > dist/install-runner.sh
+          sed -e "s/^stamped_release=\$/stamped_release=$GITHUB_REF_NAME/" \
+            -e "s/^stamped_image=\$/stamped_image=$IMAGE/" \
+            -e "s/^stamped_image_sha256=\$/stamped_image_sha256=$IMAGE_SHA256/" \
+            release/install-stack.sh > dist/install-stack.sh
+          grep -q "^stamped_runner=$RUNNER\$" dist/install-runner.sh
+          grep -q "^stamped_image_sha256=$IMAGE_SHA256\$" dist/install-stack.sh
+          cd dist && sha256sum compose.yaml .env.example install-runner.sh install-stack.sh > SHA256SUMS
+      - name: Publish release
+        run: |
+          changes="$(awk -v head="## $GITHUB_REF_NAME " \
+            'index($0, head) == 1 { keep = 1; next } /^## / { keep = 0 } keep' \
+            release/CHANGELOG.md)"
+          notes="$(printf '%s\n' \
+            "| Component | Release |" "|---|---|" \
+            "| api | naos-api-$API |" "| web | naos-web-$WEB |" \
+            "| runner | runner-$RUNNER |" "| image | image-$IMAGE |" \
+            "" "$changes")"
+          gh release create "$GITHUB_REF_NAME" \
+            dist/compose.yaml dist/.env.example dist/install-runner.sh dist/install-stack.sh \
+            dist/SHA256SUMS \
+            --title "naos $GITHUB_REF_NAME" \
+            --notes "$notes" \
+            --latest

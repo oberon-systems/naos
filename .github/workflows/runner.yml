@@ -83,7 +83,8 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             "dist/naos-runner-$VERSION-x86_64-linux-gnu" dist/SHA256SUMS \
             --title "$GITHUB_REF_NAME" \
-            --notes "${notes:-Runner $VERSION. Install it with packages/runner/install.sh.}"
+            --latest=false \
+            --notes "${notes:-Runner $VERSION. Install it with the install-runner.sh of a naos release.}"
 
   crates-io:
     needs: [version, release]

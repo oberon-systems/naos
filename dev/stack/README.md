@@ -24,7 +24,8 @@ make kickstart
 ```
 
 The first run writes both tokens, fills `docker/.env` from `.env.example` with
-their hashes and `NAOS_TAG=local`, builds the two images and `naos-runner`,
+their hashes and the two `:local` images in `NAOS_API_IMAGE` and
+`NAOS_WEB_IMAGE`, builds the two images and `naos-runner`,
 starts compose with `NAOS_DATABASE_AUTO_MIGRATE=true`, so the api brings the
 empty database to its schema, waits for `/healthz` and starts the runner in
 the background.

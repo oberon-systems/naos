@@ -3,8 +3,8 @@
 
 -include .env
 
-NAOS_REGISTRY ?= ghcr.io/oberon-systems
-NAOS_TAG      ?= latest
+NAOS_API_IMAGE ?= ghcr.io/oberon-systems/naos-api:latest
+NAOS_WEB_IMAGE ?= ghcr.io/oberon-systems/naos-web:latest
 
 .PHONY: images image-api image-web migrate up down
 
@@ -13,10 +13,10 @@ NAOS_TAG      ?= latest
 images: image-api image-web
 
 image-api:
-	docker build -f api/Dockerfile -t $(NAOS_REGISTRY)/naos-api:$(NAOS_TAG) ..
+	docker build -f api/Dockerfile -t $(NAOS_API_IMAGE) ..
 
 image-web:
-	docker build -f web/Dockerfile -t $(NAOS_REGISTRY)/naos-web:$(NAOS_TAG) ..
+	docker build -f web/Dockerfile -t $(NAOS_WEB_IMAGE) ..
 
 
 # stack

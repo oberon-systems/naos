@@ -44,8 +44,8 @@ A runner never sees the operator token, and the enrollment token is spent at
 registration: from then on the runner uses the runner token the api issued it.
 Either hash left unset closes its routes, it does not open them.
 
-For a deployment, also pin `NAOS_TAG` to a released version instead of
-`latest`, set `NAOS_ALLOWED_MOUNT_ROOTS` to the directories a Run may mount,
+For a deployment, take `compose.yaml` from a naos release, which pins both
+images by digest, set `NAOS_ALLOWED_MOUNT_ROOTS` to the directories a Run may mount,
 and point `NAOS_WEB_API_BASE_URL` at the api as an operator's browser reaches
 it. `NAOS_BIND` stays on `127.0.0.1` unless a reverse proxy terminating TLS
 sits in front.
@@ -72,8 +72,8 @@ database to its schema by itself. It never upgrades one that already holds
 data; see [Schema](../docs/03-api-design.md#schema).
 
 To run the images built from this working tree instead of the published ones,
-set `NAOS_TAG` in `.env` to a tag of your own, `local` for instance, and build
-them:
+set `NAOS_API_IMAGE` and `NAOS_WEB_IMAGE` in `.env` to tags of your own, the
+`:local` ones `.env.example` suggests for instance, and build them:
 
 ```bash
 make -C docker images

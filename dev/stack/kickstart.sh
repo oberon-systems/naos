@@ -51,17 +51,20 @@ check_hash() {
         fail "$env_file holds another $1: put its token in $LOCAL/$2, or run make clean"
 }
 
-# An .env written before the web ui needed a token gets the key added in place.
-# Nothing else in it is touched: an .env is edited by hand and must survive that.
-fill_web_token_file() {
-    local key=NAOS_WEB_OPERATOR_TOKEN_FILE
+api_image=ghcr.io/oberon-systems/naos-api:local
+web_image=ghcr.io/oberon-systems/naos-web:local
+
+# An .env written before a key existed gets it added in place. Nothing else in
+# it is touched: an .env is edited by hand and must survive that.
+fill_key() {
+    local key="$1" value="$2"
     if [ -n "$(sed -n "s/^$key=//p" "$env_file")" ]; then return; fi
     if grep -q "^$key=" "$env_file"; then
-        sed -i "s|^$key=.*|$key=$LOCAL/operator|" "$env_file"
+        sed -i "s|^$key=.*|$key=$value|" "$env_file"
     else
-        printf '%s\n' "$key=$LOCAL/operator" >>"$env_file"
+        printf '%s\n' "$key=$value" >>"$env_file"
     fi
-    echo "pointed the web ui at $LOCAL/operator in $env_file"
+    echo "set $key=$value in $env_file"
 }
 
 # Postgres keeps the password of its first start, so a generated one and a
@@ -70,14 +73,17 @@ write_env() {
     if [ -f "$env_file" ]; then
         check_hash NAOS_OPERATOR_TOKEN_SHA256 operator
         check_hash NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256 enrollment
-        fill_web_token_file
+        fill_key NAOS_WEB_OPERATOR_TOKEN_FILE "$LOCAL/operator"
+        fill_key NAOS_API_IMAGE "$api_image"
+        fill_key NAOS_WEB_IMAGE "$web_image"
         return
     fi
     if [ -n "$(ls -A "$compose/data/db" 2>/dev/null)" ]; then
         fail "$compose/data/db is a cluster of an older $env_file:" \
             "remove that directory, or write the .env it belongs to yourself"
     fi
-    sed -e "s|^NAOS_TAG=.*|NAOS_TAG=local|" \
+    sed -e "s|^# NAOS_API_IMAGE=.*|NAOS_API_IMAGE=$api_image|" \
+        -e "s|^# NAOS_WEB_IMAGE=.*|NAOS_WEB_IMAGE=$web_image|" \
         -e "s|^NAOS_DB_PASSWORD=.*|NAOS_DB_PASSWORD=$(token)|" \
         -e "s|^NAOS_OPERATOR_TOKEN_SHA256=.*|NAOS_OPERATOR_TOKEN_SHA256=$(digest "$LOCAL/operator")|" \
         -e "s|^NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256=.*|NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256=$(digest "$LOCAL/enrollment")|" \

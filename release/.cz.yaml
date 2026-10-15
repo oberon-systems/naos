@@ -1,0 +1,21 @@
+# The naos release: one version for the stack, published with the newest api,
+# web, runner and image releases. Its changelog collects those four components.
+commitizen:
+  allowed_prefixes:
+  - Merge
+  - Revert
+  - Pull request
+  - fixup!
+  - squash!
+  - amend!
+  - 'bump:'
+  bump_message: 'bump: naos $current_version -> $new_version'
+  major_version_zero: true
+  name: wyld_cz
+  pre_bump_hooks:
+  - sh changelog.sh
+  tag_format: $version
+  update_changelog_on_bump: false
+  version: 0.1.0
+  version_provider: commitizen
+  version_scheme: semver

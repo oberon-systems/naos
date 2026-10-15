@@ -73,4 +73,5 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             build/agents/naos-agents-*.qcow2 build/agents/SHA256SUMS \
             --title "$GITHUB_REF_NAME" \
+            --latest=false \
             --notes "Agents image ${GITHUB_REF_NAME#image-}. Import its sha256 from SHA256SUMS."
