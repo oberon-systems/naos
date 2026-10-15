@@ -20,9 +20,11 @@ release, writes its settings and a systemd unit; see
 curl -fsSL https://github.com/oberon-systems/naos/releases/latest/download/install-runner.sh | sh
 ```
 
-The same command upgrades the runner. `uninstall` removes the unit, the
-binaries, the settings, the enrollment token and the state; it asks first,
-`--force` does not:
+To update, run the same install command again: it updates the installed runner
+to the new release and keeps its settings and state.
+
+`uninstall` removes the unit, the binaries, the settings, the enrollment token
+and the state; it asks first, `--force` does not:
 
 ```bash
 curl -fsSL https://github.com/oberon-systems/naos/releases/latest/download/install-runner.sh | sh -s -- uninstall

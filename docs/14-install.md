@@ -74,7 +74,8 @@ to the runner through `NAOS_AGENT_ENV_FILE`.
 
 ## Upgrade
 
-Run the same installer again: it finds the layout and the settings of what is
+To update, run the same install command again: the installer updates what is
+installed to the new release. It finds the layout and the settings of what is
 installed and asks nothing it already knows. The stack keeps `.env`, the tokens and the
 database, saves the old `compose.yaml` as `compose.yaml.prev`, pulls the new
 images, migrates the database, restarts the unit and registers the new VM

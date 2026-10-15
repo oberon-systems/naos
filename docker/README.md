@@ -7,8 +7,8 @@ the [web ui](https://github.com/oberon-systems/naos/blob/main/packages/web/READM
 and a [PostgreSQL](https://www.postgresql.org/) database. The same file serves a
 local test stack and a real deployment; only `.env` differs between them. A
 naos release publishes this file with both images pinned, and its
-`install-stack.sh` sets it up, upgrades it and, with `uninstall`, removes it
-with its data; see
+`install-stack.sh` sets it up, updates it when run again and, with
+`uninstall`, removes it with its data; see
 [docs/14-install.md](https://github.com/oberon-systems/naos/blob/main/docs/14-install.md).
 
 The runner is not part of the stack. It needs KVM, virtiofsd and the host
