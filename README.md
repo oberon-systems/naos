@@ -46,16 +46,14 @@ them by default. Debian 13 and Ubuntu 26.04 ship virtiofsd 1.13 or newer. Where
 [docs/host/build-virtiofsd.md](docs/host/build-virtiofsd.md); the runner
 refuses a Run with a workspace until then.
 
-## Runner Install
+## Install
 
-The install script takes the newest `runner-<version>` release, checks the
-binary against the release `SHA256SUMS` and links it as `runner`:
+A naos release installs in two commands: the stack on one host, a runner on
+every host that runs agents. Both installers check the host first and ask for
+what they need; [docs/14-install.md](docs/14-install.md) covers the flags,
+the layouts and upgrades.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/oberon-systems/naos/main/packages/runner/install.sh | sh
+curl -fsSL https://github.com/oberon-systems/naos/releases/latest/download/install-stack.sh | sh
+curl -fsSL https://github.com/oberon-systems/naos/releases/latest/download/install-runner.sh | sh
 ```
-
-It installs into `${XDG_DATA_HOME:-$HOME/.local/share}/naos/bin` as
-`runner-<version>` with `runner` pointing at it, so an older version stays next
-to the new one. `NAOS_VERSION` pins a version, `NAOS_PREFIX` installs it
-somewhere else.

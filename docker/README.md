@@ -5,7 +5,10 @@ control plane from the published images: the
 [api](https://github.com/oberon-systems/naos/blob/main/packages/api/README.md),
 the [web ui](https://github.com/oberon-systems/naos/blob/main/packages/web/README.md)
 and a [PostgreSQL](https://www.postgresql.org/) database. The same file serves a
-local test stack and a real deployment; only `.env` differs between them.
+local test stack and a real deployment; only `.env` differs between them. A
+naos release publishes this file with both images pinned, and its
+`install-stack.sh` sets it up; see
+[docs/14-install.md](https://github.com/oberon-systems/naos/blob/main/docs/14-install.md).
 
 The runner is not part of the stack. It needs KVM, virtiofsd and the host
 workspace, so it runs on the host as a user unit and reaches the api over the

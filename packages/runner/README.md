@@ -12,11 +12,12 @@ unprivileged user namespaces and
 
 ## Install
 
-The install script takes the newest `runner-<version>` release, checks it
-against the release `SHA256SUMS` and links it as `runner`:
+The installer of a naos release checks the host, installs the runner of that
+release, writes its settings and a systemd unit; see
+[Install a runner](https://github.com/oberon-systems/naos/blob/main/docs/14-install.md#install-a-runner):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/oberon-systems/naos/main/packages/runner/install.sh | sh
+curl -fsSL https://github.com/oberon-systems/naos/releases/latest/download/install-runner.sh | sh
 ```
 
 From [crates.io](https://crates.io/crates/naos-runner) instead:
