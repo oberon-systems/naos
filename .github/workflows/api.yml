@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - packages/api/**
-      - packages/common/**
       - docker/api/**
       - .github/workflows/api.yml
   push:
@@ -26,7 +25,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install
-        run: pip install ./packages/common ./packages/api pytest
+        run: pip install ./packages/api pytest
       - name: Test
         run: pytest -q packages/api
 

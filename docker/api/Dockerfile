@@ -3,9 +3,8 @@
 FROM python:3.12-slim
 
 WORKDIR /srv
-COPY packages/common packages/common
 COPY packages/api packages/api
-RUN pip install --no-cache-dir ./packages/common "./packages/api[server]" \
+RUN pip install --no-cache-dir "./packages/api[server]" \
     && rm -rf packages
 
 USER nobody

@@ -1,5 +1,4 @@
 -e packages/api
--e packages/common
 -e packages/web
 alembic==1.20.0
 annotated-doc==0.0.5

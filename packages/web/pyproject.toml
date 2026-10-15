@@ -13,7 +13,6 @@ dependencies = [
   "httpx",
   "httpx-ws",
   "jinja2",
-  "naos-common",
   "pydantic-settings",
 ]
 

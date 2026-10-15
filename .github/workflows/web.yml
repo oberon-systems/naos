@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - packages/web/**
-      - packages/common/**
       - docker/web/**
       - .github/workflows/web.yml
   push:
@@ -26,7 +25,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install
-        run: pip install ./packages/common ./packages/web pytest
+        run: pip install ./packages/web pytest
       - name: Test
         run: pytest -q packages/web
 
