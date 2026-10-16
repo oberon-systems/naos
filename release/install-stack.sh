@@ -22,6 +22,7 @@ asked on the terminal; --yes, or no terminal, takes the defaults.
   --bind ADDRESS              address both ports are published on (default 127.0.0.1)
   --api-port PORT             api port (default 8080)
   --web-port PORT             web ui port (default 8000)
+  --mount-roots DIR[,DIR...]  host directories a Run may mount (default: none)
   --systemd | --no-systemd    install the systemd unit (default: yes)
   --linger | --no-linger      keep the user unit running without a login (xdg)
   --yes                       never ask
@@ -85,6 +86,8 @@ layout=''
 bind=''
 api_port=''
 web_port=''
+mount_roots=''
+mount_roots_given=''
 systemd=''
 linger=''
 yes=''
@@ -97,6 +100,7 @@ while [ $# -gt 0 ]; do
     --bind) need_value "$1" $# && bind="$2" && shift ;;
     --api-port) need_value "$1" $# && api_port="$2" && shift ;;
     --web-port) need_value "$1" $# && web_port="$2" && shift ;;
+    --mount-roots) need_value "$1" $# && mount_roots="$2" && mount_roots_given=1 && shift ;;
     --systemd) systemd=yes ;;
     --no-systemd) systemd=no ;;
     --linger) linger=yes ;;
@@ -193,6 +197,39 @@ systemctl_unit() {
 setting() {
     [ -f "$env_file" ] || return 0
     sed -n "s/^$1=//p" "$env_file"
+}
+
+# Takes "/a, /b/" and prints ["/a","/b"]; a path the api would refuse fails here, before anything is installed.
+mount_roots_json() {
+    json=
+    set -f
+    old_ifs="$IFS"
+    IFS=,
+    for raw in $1; do
+        root="$(printf '%s' "$raw" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+        [ -n "$root" ] || continue
+        root="${root%/}"
+        case "$root" in
+        '' | [!/]* | *//* | */./* | */. | */../* | */.. | *[\"\\]* | *[[:cntrl:]]*)
+            fail "mount root '$raw' must be an absolute, normalized path other than /"
+            ;;
+        esac
+        json="${json:+$json,}\"$root\""
+    done
+    IFS="$old_ifs"
+    set +f
+    printf '[%s]\n' "$json"
+}
+
+store_mount_roots() {
+    [ "$(setting NAOS_ALLOWED_MOUNT_ROOTS)" != "$roots_json" ] || return 0
+    if grep -q '^NAOS_ALLOWED_MOUNT_ROOTS=' "$env_file"; then
+        escaped="$(printf '%s' "$roots_json" | sed 's/[&|\\]/\\&/g')"
+        sed -i "s|^NAOS_ALLOWED_MOUNT_ROOTS=.*|NAOS_ALLOWED_MOUNT_ROOTS=$escaped|" "$env_file"
+    else
+        echo "NAOS_ALLOWED_MOUNT_ROOTS=$roots_json" >>"$env_file"
+    fi
+    say "set NAOS_ALLOWED_MOUNT_ROOTS=$roots_json in $env_file"
 }
 
 token() {
@@ -441,6 +478,7 @@ if [ "$command" = doctor ]; then
     exit
 fi
 
+say "every question has a flag, --help lists them"
 choose_layout
 paths
 upgrade=
@@ -451,6 +489,17 @@ web_port="${web_port:-$(setting NAOS_WEB_PORT)}"
 ask bind "address to publish the ports on" 127.0.0.1
 ask api_port "api port" 8080
 ask web_port "web ui port" 8000
+roots_json="$(setting NAOS_ALLOWED_MOUNT_ROOTS)"
+if [ -z "$mount_roots_given" ] && [ "${roots_json:-[]}" = "[]" ]; then
+    ask mount_roots "host directories a Run may mount, comma-separated" ""
+    if [ -z "$mount_roots" ] && interactive; then
+        echo "WARNING: no mount roots, so no Run can mount a workspace until NAOS_ALLOWED_MOUNT_ROOTS is set" >/dev/tty
+    fi
+    mount_roots_given=1
+fi
+if [ -n "$mount_roots_given" ]; then
+    roots_json="$(mount_roots_json "$mount_roots")"
+fi
 if command -v systemctl >/dev/null; then
     ask_yes systemd "install the systemd unit?"
 else
@@ -466,6 +515,7 @@ doctor || exit 1
 
 fetch
 write_env
+store_mount_roots
 compose pull --quiet
 if [ -n "$upgrade" ]; then
     compose run --rm api naos-api migrate
@@ -491,10 +541,20 @@ naos $stamped_release is up.
   api       $api
   settings  $env_file
   tokens    $dir/secrets/operator (operator), $dir/secrets/enrollment (runner enrollment)
+  mounts    $roots_json
 
-Set NAOS_ALLOWED_MOUNT_ROOTS in $env_file before a Run mounts a workspace.
 Install a runner on this host with:
 
   curl -fsSL https://github.com/$repo/releases/download/$stamped_release/install-runner.sh | sh -s -- \\
     --api-url $api --enrollment-token-file $dir/secrets/enrollment
 EOF
+
+if [ "$roots_json" = "[]" ]; then
+    cat >&2 <<EOF
+
+WARNING: no mount roots are set, so no Run can mount anything: a Run with a
+workspace fails with "host path ... is outside the allowed mount roots".
+Run this installer again with --mount-roots DIR[,DIR...], or set
+NAOS_ALLOWED_MOUNT_ROOTS in $env_file and restart the stack.
+EOF
+fi

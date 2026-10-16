@@ -23,13 +23,20 @@ user; it uses `sudo` only for the system layout.
 curl -fsSL https://github.com/oberon-systems/naos/releases/latest/download/install-stack.sh | sh
 ```
 
-Without flags it asks where the stack goes, which address and ports to publish
-and whether to install the systemd unit. Every question has a flag, and `--yes`
-takes the defaults:
+Without flags it asks where the stack goes, which address and ports to publish,
+which host directories a Run may mount and whether to install the systemd unit.
+Every question has a flag, `--help` lists them, and `--yes` takes the defaults:
 
 ```bash
-curl -fsSL https://github.com/oberon-systems/naos/releases/latest/download/install-stack.sh | sh -s -- --layout system --bind 127.0.0.1 --yes
+curl -fsSL https://github.com/oberon-systems/naos/releases/latest/download/install-stack.sh | sh -s -- --layout system --bind 127.0.0.1 --mount-roots /srv/workspaces --yes
 ```
+
+`--mount-roots /srv/alpha,/srv/beta` sets `NAOS_ALLOWED_MOUNT_ROOTS` in `.env`.
+Each directory is an absolute path; the runner mounts it, so it has to exist on
+the runner host, not on the stack host. Without mount roots no Run can mount
+anything, and the installer warns at the question and again after the install.
+An upgrade keeps them and asks again only while they are empty; `--mount-roots`
+changes them.
 
 | Layout | Compose, `.env`, tokens | Database | Unit |
 |---|---|---|---|
