@@ -1,5 +1,6 @@
+import hashlib
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -34,6 +35,20 @@ class Static(StaticFiles):
         return response
 
 
+def static_urls(root: Path) -> Callable[[str], str]:
+    """A new build is a new url, so a copy cached before no-cache was sent is never run."""
+    versions = {
+        path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()[:12]
+        for path in root.rglob("*")
+        if path.is_file()
+    }
+
+    def static(path: str) -> str:
+        return f"/static/{path}?v={versions[path]}"
+
+    return static
+
+
 def api_endpoint(api_base_url: str) -> str:
     return urlsplit(api_base_url).netloc or api_base_url
 
@@ -59,6 +74,7 @@ def create_app() -> FastAPI:
     )
     templates = Jinja2Templates(directory=HERE / "templates")
     templates.env.globals["fmt"] = format
+    templates.env.globals["static"] = static_urls(HERE / "static")
     app.state.templates = templates
     app.state.api_endpoint = api_endpoint(settings.api_base_url)
     app.state.api_attach_url = api_attach_url(settings.api_base_url)

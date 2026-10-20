@@ -114,4 +114,4 @@ def test_a_required_policy_is_red_at_once_and_shuts_next(client: TestClient) -> 
     assert ".dialog__next:disabled {" in css
     assert 'querySelectorAll("select[required]")' in script
     assert "next.disabled" in script
-    assert '<script src="/static/dialog.js" defer></script>' in client.get("/runs").text
+    assert '<script src="/static/dialog.js?v=' in client.get("/runs").text

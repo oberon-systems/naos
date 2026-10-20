@@ -267,7 +267,7 @@ def test_the_page_behind_a_shared_link_is_the_list(client: TestClient) -> None:
 
     assert body.count('<header class="topbar">') == 1
     assert body.count(ROW) >= 4 and 'aria-label="Secret alpha-token"' in body
-    assert 'src="/static/secret.js"' in body
+    assert 'src="/static/secret.js?v=' in body
     assert client.get("/static/secret.js").status_code == 200
 
 

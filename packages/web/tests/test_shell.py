@@ -1,7 +1,13 @@
+import hashlib
+import re
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
 from naos_web.pages import NAV
+
+STATIC = Path(__file__).parents[1] / "src/naos_web/static"
 
 PATHS = [page.href for page in NAV]
 # The pages not built yet are still the bare shell 10a built; those tiles stay empty.
@@ -75,11 +81,23 @@ def test_index_redirects_to_runs(client: TestClient) -> None:
 
 def test_htmx_is_served_from_the_application(client: TestClient) -> None:
     body = client.get("/runs").text
-    assert 'src="/static/vendor/htmx.min.js"' in body
+    assert 'src="/static/vendor/htmx.min.js?v=' in body
     assert "//unpkg" not in body
     assert "fonts.googleapis.com" not in body
     assert client.get("/static/vendor/htmx.min.js").status_code == 200
     assert client.get("/static/naos.css").status_code == 200
+
+
+@pytest.mark.parametrize("path", ["/runs", "/runs/run_9f21c4/terminal?window=1"])
+def test_scripts_are_loaded_by_a_url_their_content_names(client: TestClient, path: str) -> None:
+    body = client.get(path).text
+    digest = hashlib.sha256((STATIC / "terminal.js").read_bytes()).hexdigest()[:12]
+
+    assert f'src="/static/terminal.js?v={digest}"' in body
+    assert not re.search(r'(src|href)="/static/[^"?]+"', body)
+    response = client.get(f"/static/terminal.js?v={digest}")
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-cache"
 
 
 def test_static_files_are_revalidated_on_every_load(client: TestClient) -> None:
