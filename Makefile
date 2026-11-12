@@ -15,7 +15,7 @@ export PATH := $(CURDIR)/.packer/bin:$(PATH)
 export PACKER_PLUGIN_PATH := $(CURDIR)/.packer/plugins
 
 .DEFAULT_GOAL := shell
-.PHONY: install shell test test-api test-image test-web smoke lint run-api run-web migrate kickstart
+.PHONY: install shell test test-api test-image test-web smoke lint run-api run-web migrate kickstart vendor
 
 
 # common targets
@@ -56,6 +56,11 @@ migrate:
 
 kickstart:
 	$(MAKE) -C dev/stack kickstart
+
+
+# vendored browser code, versions from packages/web/vendor/package-lock.json
+vendor:
+	cd packages/web/vendor && npm ci --ignore-scripts --no-audit --no-fund && python3 sync.py
 
 
 # defaults

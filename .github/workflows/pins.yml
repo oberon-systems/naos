@@ -1,0 +1,120 @@
+name: pins
+
+# What Dependabot cannot read: the Alpine ISO, goose, packer and its QEMU plugin,
+# virtiofsd. One pull request per pin, after the same cooldown as dependabot.yml.
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: List what is out of date, open nothing
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  pins:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Propose updates
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry-run || 'false' }}
+          COOLDOWN_DAYS: '14'
+        run: |
+          set -euo pipefail
+          base="$(git rev-parse --abbrev-ref HEAD)"
+          cutoff="$(date -u -d "-$COOLDOWN_DAYS days" +%s)"
+          old_enough() { [ "$(date -u -d "$1" +%s)" -le "$cutoff" ]; }
+          value() { sed -n "s/^$2 *= *\"\(.*\)\"/\1/p" "$1"; }
+          set_value() { sed -i "s|^\($2 *= *\)\".*\"|\1\"$3\"|" "$1"; }
+
+          # propose NAME CURRENT LATEST DATE MESSAGE FILE...; the caller has edited the files.
+          propose() {
+            local name=$1 current=$2 latest=$3 date=$4 message=$5 branch
+            shift 5
+            branch="pins/$name-$latest"
+            if [ "$current" = "$latest" ] || ! old_enough "$date"; then
+              git checkout -q -- .
+              echo "$name: $current is current (newest $latest of $date)"
+              return
+            fi
+            echo "$name: $current -> $latest ($date)"
+            if [ "$DRY_RUN" = true ] || git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
+              git checkout -q -- .
+              return
+            fi
+            gh pr list --state open --json number,headRefName \
+              --jq ".[] | select(.headRefName | startswith(\"pins/$name-\")) | .number" |
+              xargs -r -I{} gh pr close {} --delete-branch --comment "Superseded by $latest."
+            git switch -q -c "$branch"
+            git add -- "$@"
+            git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -q -m "$message"
+            git push -q "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$branch"
+            gh pr create --base "$base" --head "$branch" --title "$message" \
+              --body "$name $current -> $latest, released $date. Opened by the pins workflow; close and reopen it to run the checks."
+            git switch -q "$base"
+          }
+
+          # goose: the musl build, its sha256 from the release asset's digest
+          f=packer/agents/pins.auto.pkrvars.hcl
+          current="$(value "$f" goose_version)"
+          release="$(gh api repos/block/goose/releases/latest)"
+          latest="$(jq -r '.tag_name | ltrimstr("v")' <<< "$release")"
+          sha="$(jq -r '.assets[] | select(.name == "goose-x86_64-unknown-linux-musl.tar.gz") | .digest | ltrimstr("sha256:")' <<< "$release")"
+          [ -n "$sha" ]
+          set_value "$f" goose_version "$latest"
+          set_value "$f" goose_sha256 "$sha"
+          propose goose "$current" "$latest" "$(jq -r .published_at <<< "$release")" \
+            "[build][image]: goose $latest" "$f"
+
+          # Alpine: the virt ISO of latest-stable and the sha256 Alpine publishes with it
+          f=packer/base/pins.auto.pkrvars.hcl
+          current="$(value "$f" alpine_version)"
+          iso="$(curl -fsS https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/latest-releases.yaml |
+            yq -o=json '[.[] | select(.flavor == "alpine-virt")][0]')"
+          latest="$(jq -r .version <<< "$iso")"
+          set_value "$f" alpine_branch "v${latest%.*}"
+          set_value "$f" alpine_version "$latest"
+          set_value "$f" iso_checksum "sha256:$(jq -r .sha256 <<< "$iso")"
+          propose alpine "$current" "$latest" "$(jq -r .date <<< "$iso")" \
+            "[build][image]: Alpine $latest" "$f"
+
+          # packer: the binary make installs and the container the workflow builds in
+          current="$(sed -n 's/^PACKER_VERSION := //p' packer/Makefile)"
+          release="$(curl -fsS https://api.releases.hashicorp.com/v1/releases/packer/latest)"
+          latest="$(jq -r .version <<< "$release")"
+          sed -i "s/^PACKER_VERSION := .*/PACKER_VERSION := $latest/" packer/Makefile
+          sed -i "s|hashicorp/packer:$current|hashicorp/packer:$latest|" .github/workflows/image.yml
+          propose packer "$current" "$latest" "$(jq -r .timestamp_created <<< "$release")" \
+            "[build][packer]: packer $latest" packer/Makefile .github/workflows/image.yml
+
+          # the QEMU plugin, pinned exactly in both templates
+          files=(packer/base/naos-base.pkr.hcl packer/agents/naos-agents.pkr.hcl)
+          current="$(sed -n 's/^ *version *= *"= \(.*\)"/\1/p' "${files[0]}")"
+          release="$(gh api repos/hashicorp/packer-plugin-qemu/releases/latest)"
+          latest="$(jq -r '.tag_name | ltrimstr("v")' <<< "$release")"
+          sed -i "s/^\( *version *= *\)\"= $current\"/\1\"= $latest\"/" "${files[@]}"
+          propose qemu-plugin "$current" "$latest" "$(jq -r .published_at <<< "$release")" \
+            "[build][packer]: QEMU plugin $latest" "${files[@]}"
+
+          # virtiofsd: the crate the host script builds, and the doc that names it
+          files=(scripts/virtiofsd-install.sh docs/host/build-virtiofsd.md)
+          current="$(sed -n 's/^version=//p' "${files[0]}")"
+          crate="$(curl -fsS -A "pins workflow (https://github.com/$GITHUB_REPOSITORY)" https://crates.io/api/v1/crates/virtiofsd)"
+          latest="$(jq -r .crate.max_stable_version <<< "$crate")"
+          sed -i "s/${current//./\\.}/$latest/g" "${files[@]}"
+          propose virtiofsd "$current" "$latest" \
+            "$(jq -r --arg v "$latest" '.versions[] | select(.num == $v) | .created_at' <<< "$crate")" \
+            "[build][scripts]: virtiofsd $latest" "${files[@]}"

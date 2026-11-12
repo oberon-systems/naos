@@ -1,0 +1,113 @@
+# Weekly update pull requests for everything the repository pins that Dependabot
+# reads; .github/workflows/pins.yml covers the rest (Alpine ISO, goose, packer).
+version: 2
+
+updates:
+  - package-ecosystem: pip
+    directories:
+      - /
+      - /packages/api
+      - /packages/web
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    commit-message:
+      prefix: "[build][pip]"
+    groups:
+      pip:
+        update-types: [minor, patch]
+    # wyld-cz requires commitizen <5; the hook rev and wyld-cz move with it by hand.
+    ignore:
+      - dependency-name: commitizen
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: pre-commit
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    commit-message:
+      prefix: "[build][pre-commit]"
+    groups:
+      pre-commit:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*commitizen*"
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    commit-message:
+      prefix: "[build][cargo]"
+    groups:
+      cargo:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directories:
+      - /docker/api
+      - /docker/web
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    commit-message:
+      prefix: "[build][docker]"
+    groups:
+      docker:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker-compose
+    directory: /docker
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    commit-message:
+      prefix: "[build][docker]"
+    groups:
+      docker-compose:
+        update-types: [minor, patch]
+
+  # web.yml copies an update into static/vendor and commits it to the pull request.
+  - package-ecosystem: npm
+    directory: /packages/web/vendor
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    commit-message:
+      prefix: "[build][npm]"
+    groups:
+      npm:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /packer/agents/files/npm
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    commit-message:
+      prefix: "[build][image]"
+    groups:
+      agents:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    commit-message:
+      prefix: "[build][github-actions]"
+    groups:
+      github-actions:
+        update-types: [minor, patch]
