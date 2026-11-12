@@ -149,7 +149,7 @@ repos:
   # hook raises NotImplementedError on every commit. Keep this rev, the pin in
   # requirements.txt and the provider release in step.
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.18.0
+    rev: v4.19.3
     hooks:
       - id: commitizen
         additional_dependencies: [wyld-cz==0.4.1]
