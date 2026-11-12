@@ -1,0 +1,39 @@
+name: Feature request
+description: A new capability or a change to how Naos works.
+title: "[feat]: "
+labels: [enhancement]
+body:
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - api
+        - web
+        - runner
+        - image
+        - gates (network, shell, MCP)
+        - docs
+        - install or release
+        - not sure
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What an operator or an agent cannot do today, and why it matters.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How it could work, and which capability a Run would have to be granted for it. A change to the architecture is agreed in docs first.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Other ways you considered, and workarounds in use today.

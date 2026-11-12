@@ -1,0 +1,65 @@
+name: Bug report
+description: Something in Naos does not work as documented.
+title: "[bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A vulnerability is not a bug report: follow SECURITY.md and report it
+        privately. Never paste tokens, provider keys or console output that
+        holds them here.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - api
+        - web
+        - runner
+        - image
+        - docs
+        - install or release
+        - not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The release (naos-api-X.Y.Z, naos-web-X.Y.Z, runner-X.Y.Z, image-X.Y.Z, X.Y.Z) or the commit.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Create a Run with a read-only workspace mount
+        2. Start it from the web UI
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: The relevant lines of the api, web or runner log, with secrets removed.
+      render: text
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Host OS, kernel, QEMU and virtiofsd versions, how the stack runs (install-stack.sh, compose, from source).
