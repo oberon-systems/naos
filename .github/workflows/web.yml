@@ -6,6 +6,7 @@ on:
       - packages/web/**
       - docker/web/**
       - .github/workflows/web.yml
+      - requirements.txt
   push:
     tags:
       - naos-web-*
@@ -25,7 +26,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install
-        run: pip install ./packages/web pytest
+        run: pip install -r requirements.txt
       - name: Test
         run: pytest -q packages/web
 
