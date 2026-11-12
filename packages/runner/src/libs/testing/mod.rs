@@ -247,10 +247,18 @@ impl Api for FakeApi {
     ) -> Result<HeartbeatReply, AgentError> {
         lock(&self.capacities).push(beat.capacity);
         lock(&self.placements).push(beat.placement.clone());
-        let rejected =
-            self.reject_heartbeats
-                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1));
-        if rejected.is_ok() {
+        let rejects = &self.reject_heartbeats;
+        let mut left = rejects.load(Ordering::SeqCst);
+        let rejected = loop {
+            if left == 0 {
+                break false;
+            }
+            match rejects.compare_exchange(left, left - 1, Ordering::SeqCst, Ordering::SeqCst) {
+                Ok(_) => break true,
+                Err(seen) => left = seen,
+            }
+        };
+        if rejected {
             return Err(AgentError::Unauthorized);
         }
         Ok(HeartbeatReply {
