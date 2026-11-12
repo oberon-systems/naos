@@ -200,7 +200,7 @@ async fn session(
                 if read > 0 {
                     let mut frame = offset.to_be_bytes().to_vec();
                     frame.extend_from_slice(&buffer[..read]);
-                    socket.send(Message::Binary(frame)).await.map_err(runtime)?;
+                    socket.send(Message::Binary(frame.into())).await.map_err(runtime)?;
                     sent = true;
                 }
             }

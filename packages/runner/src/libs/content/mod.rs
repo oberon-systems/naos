@@ -98,13 +98,17 @@ async fn session(
                 let mut frame = ask.id.to_be_bytes().to_vec();
                 frame.extend_from_slice(&piece.size.to_be_bytes());
                 frame.extend_from_slice(&piece.data);
-                Message::Binary(frame)
+                Message::Binary(frame.into())
             }
-            Ok(None) => Message::Text(json!({"id": ask.id, "absent": true}).to_string()),
+            Ok(None) => Message::Text(json!({"id": ask.id, "absent": true}).to_string().into()),
             Err(err) => {
                 // the VM may have moved to the archive since its changes were found
                 kept = None;
-                Message::Text(json!({"id": ask.id, "error": err.to_string()}).to_string())
+                Message::Text(
+                    json!({"id": ask.id, "error": err.to_string()})
+                        .to_string()
+                        .into(),
+                )
             }
         };
         socket.send(reply).await.map_err(runtime)?;
