@@ -45,7 +45,11 @@ jobs:
             branch="pins/$name-$latest"
             if [ "$current" = "$latest" ] || ! old_enough "$date"; then
               git checkout -q -- .
-              echo "$name: $current is current (newest $latest of $date)"
+              if [ "$current" = "$latest" ]; then
+                echo "$name: $current is the newest"
+              else
+                echo "$name: $current kept, $latest of $date is in the cooldown"
+              fi
               return
             fi
             echo "$name: $current -> $latest ($date)"

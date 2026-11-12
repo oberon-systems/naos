@@ -84,7 +84,10 @@ updates:
       default-days: 14
     commit-message:
       prefix: "[build][npm]"
+    # The addons pin a peer range of the core, so @xterm/* moves as one, majors included.
     groups:
+      xterm:
+        patterns: ["@xterm/*"]
       npm:
         update-types: [minor, patch]
 
