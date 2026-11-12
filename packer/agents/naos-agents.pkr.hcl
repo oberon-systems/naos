@@ -8,7 +8,7 @@ packer {
   required_plugins {
     qemu = {
       source  = "github.com/hashicorp/qemu"
-      version = "~> 1.1"
+      version = "= 1.1.6"
     }
   }
 }
@@ -18,17 +18,12 @@ variable "build_password" {
   sensitive = true
 }
 
-variable "claude_code_version" {
-  type = string
-}
-
-variable "gemini_cli_version" {
-  type = string
-}
-
 variable "goose_version" {
-  type    = string
-  default = "1.54.0"
+  type = string
+}
+
+variable "goose_sha256" {
+  type = string
 }
 
 variable "disk_size" {
@@ -97,9 +92,8 @@ build {
 
   provisioner "shell" {
     environment_vars = [
-      "CLAUDE_CODE_VERSION=${var.claude_code_version}",
-      "GEMINI_CLI_VERSION=${var.gemini_cli_version}",
       "GOOSE_VERSION=${var.goose_version}",
+      "GOOSE_SHA256=${var.goose_sha256}",
     ]
     script = "${path.root}/files/install.sh"
   }

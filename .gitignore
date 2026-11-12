@@ -9,9 +9,6 @@ CLAUDE.local.md
 .pre-commit
 .env
 
-# Exclude packer build environment
-!packer/.env
-
 # Build and tool caches
 __pycache__/
 .ruff_cache/
@@ -22,6 +19,7 @@ packer_cache/
 .packer/
 build/
 *.egg-info/
+node_modules/
 
 # Local stack, tokens and agent state
 dev/stack/local/

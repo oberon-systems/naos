@@ -20,12 +20,14 @@ There are two images, always built together by one make target. `base` installs 
 ```text
 packer/Makefile                        pinned packer, image targets
 packer/.cz.yaml                        the image version and the commitizen config that bumps it
-packer/.env                            Alpine and agent versions for make, packer and Actions
+packer/base/pins.auto.pkrvars.hcl      Alpine version and ISO sha256
 packer/base/naos-base.pkr.hcl          Alpine install, serial layout, probes
 packer/base/http/answers               setup-alpine answer file
 packer/base/files/naos-probe           isolation probes, written to ttyS1
 packer/base/files/naos-workspace       mounts the Run's workspace share and overlay
 packer/agents/naos-agents.pkr.hcl      agents, session, seal
+packer/agents/pins.auto.pkrvars.hcl    goose version and sha256
+packer/agents/files/npm/               Claude Code and Gemini CLI, package.json and its lock
 packer/agents/files/install.sh         packages, agents, default instructions
 packer/agents/files/AGENTS.md          default instructions for every agent
 packer/agents/files/seal.sh            removes sshd, host keys and passwords
@@ -64,7 +66,7 @@ The test passes when both VMs boot, `boot.log` shows `naos-ready` and `naos-prob
 
 ## Publish a release
 
-The image version lives only in `packer/.cz.yaml`; Alpine and the agents are pinned in `packer/.env`, packer itself in `packer/Makefile` and in the workflow's container tag; change them by hand. Bump the image version with [commitizen](https://commitizen-tools.github.io/commitizen/), which rewrites the file, adds the release to `packer/CHANGELOG.md` from the commits that touch `packer/` only, and creates the `image-<version>` tag. Bump on a clean tree: the bump commit takes every modified file. Push the tag: the workflow checks it against `.cz.yaml`, builds both images in the `hashicorp/packer` container of the pinned version with `/dev/kvm` and creates a GitHub release holding `naos-agents-<version>.qcow2` and its `SHA256SUMS`.
+The image version lives only in `packer/.cz.yaml`; Alpine and goose are pinned in the `pins.auto.pkrvars.hcl` next to each template, which packer loads by itself, Claude Code and Gemini CLI in `agents/files/npm/package-lock.json`, the QEMU plugin exactly in both templates, packer itself in `packer/Makefile` and in the workflow's container tag. Dependabot proposes the npm updates and the `pins` workflow the rest, each 14 days after its upstream release. Bump the image version with [commitizen](https://commitizen-tools.github.io/commitizen/), which rewrites the file, adds the release to `packer/CHANGELOG.md` from the commits that touch `packer/` only, and creates the `image-<version>` tag. Bump on a clean tree: the bump commit takes every modified file. Push the tag: the workflow checks it against `.cz.yaml`, builds both images in the `hashicorp/packer` container of the pinned version with `/dev/kvm` and creates a GitHub release holding `naos-agents-<version>.qcow2` and its `SHA256SUMS`.
 
 ```bash
 cz --config packer/.cz.yaml bump
@@ -124,7 +126,7 @@ A Run then names the image by `id` and `digest` in its spec; [05 - VM and QEMU](
 | Derives from | `build/base/naos-base-<version>.qcow2` |
 | Disk | 3G; the build grows the root filesystem of the base to it |
 | Packages | `bash`, `git`, `libgcc`, `libstdc++`, `nodejs`, `npm`, `ripgrep`, `tmux` |
-| Agents | [Goose](https://github.com/block/goose) 1.54.0, the musl build, `goose_version` in `packer/agents/naos-agents.pkr.hcl`; [Claude Code](https://code.claude.com/docs) 2.1.269 and [Gemini CLI](https://github.com/google-gemini/gemini-cli) 0.59.0, `PKR_VAR_claude_code_version` and `PKR_VAR_gemini_cli_version` in `packer/.env` |
+| Agents | [Goose](https://github.com/block/goose), the musl build checked against `goose_sha256`, both in `packer/agents/pins.auto.pkrvars.hcl`; [Claude Code](https://code.claude.com/docs) and [Gemini CLI](https://github.com/google-gemini/gemini-cli) installed by `npm ci` into `/usr/local/lib/naos-agents` from `packer/agents/files/npm/package-lock.json` |
 | Session | `naos-session` starts tmux session `agent` as `naos`, running the agent named in fw_cfg `opt/naos/session`, `goose` by default; `GOOSE_PROVIDER` and `GOOSE_MODEL` come from `model_api` and `model` of the same entry |
 | Console | a login on `ttyS0` attaches to the `agent` session |
 | Sealed | sshd removed from the runlevels, host keys deleted, `root` and `naos` locked, only `lo` configured |

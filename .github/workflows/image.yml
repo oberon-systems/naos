@@ -21,8 +21,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
-      - name: Load versions
-        run: cat packer/.env >> "$GITHUB_ENV"
       - name: Validate templates
         run: |
           for image in base agents; do
@@ -45,14 +43,12 @@ jobs:
       - name: Check the tag against .cz.yaml
         run: |
           test "$GITHUB_REF_NAME" = "image-$(sed -n 's/^  version: //p' packer/.cz.yaml)"
-      - name: Load versions
-        run: cat packer/.env >> "$GITHUB_ENV"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: |
             ~/.config/packer/plugins
             packer/base/packer_cache
-          key: image-${{ hashFiles('packer/.env') }}
+          key: image-${{ hashFiles('packer/*/pins.auto.pkrvars.hcl', 'packer/*/*.pkr.hcl') }}
           restore-keys: image-
       - name: Install QEMU and gh
         run: apk add --no-cache qemu-system-x86_64 qemu-img github-cli

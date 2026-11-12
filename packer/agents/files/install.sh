@@ -15,17 +15,23 @@ apk del .grow
 
 apk add --no-cache bash git libgcc libstdc++ nodejs npm ripgrep socat tmux
 
-npm install -g \
-    "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
-    "@google/gemini-cli@${GEMINI_CLI_VERSION}"
+# The versions and integrity hashes come from files/npm/package-lock.json.
+agents=/usr/local/lib/naos-agents
+install -d -m 0755 "$agents"
+install -m 0644 "$files/npm/package.json" "$files/npm/package-lock.json" "$agents/"
+(cd "$agents" && npm ci --omit=dev --no-audit --no-fund)
+ln -sf "$agents/node_modules/.bin/claude" /usr/local/bin/claude
+ln -sf "$agents/node_modules/.bin/gemini" /usr/local/bin/gemini
 claude --version
 gemini --version
 
 # The musl build is the one that runs on Alpine; the archive holds the binary alone.
 goose=/tmp/goose
 install -d "$goose"
-wget -qO- "https://github.com/block/goose/releases/download/v${GOOSE_VERSION}/goose-x86_64-unknown-linux-musl.tar.gz" |
-    tar -xz -C "$goose"
+wget -qO "$goose.tar.gz" "https://github.com/block/goose/releases/download/v${GOOSE_VERSION}/goose-x86_64-unknown-linux-musl.tar.gz"
+echo "${GOOSE_SHA256}  $goose.tar.gz" | sha256sum -c -
+tar -xzf "$goose.tar.gz" -C "$goose"
+rm -f "$goose.tar.gz"
 mv "$(find "$goose" -type f -name goose | head -n 1)" /usr/local/bin/goose
 chown root:root /usr/local/bin/goose
 chmod 0755 /usr/local/bin/goose

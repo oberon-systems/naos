@@ -1,8 +1,5 @@
 # Packer images for naos: `base` from the Alpine ISO and `agents` on top of it, always built together.
 
-include .env
-export
-
 PACKER_VERSION := 1.16.0
 TOOLS := $(abspath ../.packer)
 BUILD := $(abspath ../build)
