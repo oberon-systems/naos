@@ -3,7 +3,7 @@
   "private": true,
   "description": "The agent CLIs install.sh puts in the image with npm ci; dependabot keeps it current.",
   "dependencies": {
-    "@anthropic-ai/claude-code": "2.1.269",
-    "@google/gemini-cli": "0.59.0"
+    "@anthropic-ai/claude-code": "2.1.312",
+    "@google/gemini-cli": "0.66.0"
   }
 }
