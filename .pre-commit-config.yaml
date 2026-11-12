@@ -48,14 +48,14 @@ repos:
     hooks:
       - id: mypy
         additional_dependencies:
-          - alembic==1.20.0
-          - fastapi==0.141.1
+          - alembic==1.20.1
+          - fastapi==0.162.0
           - httpx==0.28.1
           - httpx-ws==0.9.0
-          - pydantic==2.13.5
-          - pydantic-settings==2.15.0
-          - pytest==9.1.1
-          - sqlmodel==0.0.42
+          - pydantic==2.14.1
+          - pydantic-settings==2.16.2
+          - pytest==9.2.0
+          - sqlmodel==0.0.48
           - transitions==0.9.3
 
   - repo: https://github.com/djlint/djLint
@@ -152,9 +152,9 @@ repos:
     rev: v4.18.0
     hooks:
       - id: commitizen
-        additional_dependencies: [wyld-cz==0.2.2]
+        additional_dependencies: [wyld-cz==0.4.1]
       - id: commitizen-branch
-        additional_dependencies: [wyld-cz==0.2.2]
+        additional_dependencies: [wyld-cz==0.4.1]
         stages: [pre-push]
 
   - repo: meta
