@@ -73,7 +73,7 @@ def model(session: Session, run: Run) -> ModelGate:
         .order_by(col(AuditEvent.seq).desc())
         .limit(REFUSALS)
     ).all()
-    groups: Select[tuple[str, str, int, int, int, int, int, int]] = Select(
+    groups: Select[str, str, int, int, int, int, int, int] = Select(
         provider,
         name,
         func.count(),
@@ -91,7 +91,7 @@ def model(session: Session, run: Run) -> ModelGate:
     ).all()
     every = select(provider).where(*calls).group_by(provider, name)
     minute = col(AuditEvent.at) - col(AuditEvent.at) % 60
-    per_minute: Select[tuple[int, str, int, int, int, int]] = Select(
+    per_minute: Select[int, str, int, int, int, int] = Select(
         minute, provider, func.count(), denied, spent_in, spent_out
     )
     minutes = session.exec(
@@ -179,7 +179,7 @@ def network(session: Session, run: Run) -> NetworkGate:
     denied = func.sum(case((event == "network_denied", 1), else_=0))
     decided = (mine, event.in_(("network_allowed", "network_denied")))
     last = func.max(AuditEvent.at)
-    groups: Select[tuple[str, str, str, int, int, int]] = Select(
+    groups: Select[str, str, str, int, int, int] = Select(
         host, protocol, rule, allowed, denied, last
     )
     rows = session.exec(
@@ -249,7 +249,7 @@ def shell(session: Session, run: Run) -> ShellGate:
     denied = func.sum(case((event == "shell_denied", 1), else_=0))
     decided = (mine, event.in_(("shell_allowed", "shell_denied")))
     last = func.max(AuditEvent.at)
-    groups: Select[tuple[str, str, int, int, int]] = Select(capability, path, allowed, denied, last)
+    groups: Select[str, str, int, int, int] = Select(capability, path, allowed, denied, last)
     rows = session.exec(
         groups.where(*decided)
         .group_by(capability, path)
@@ -361,7 +361,7 @@ def _budgets(session: Session, run: Run) -> list[McpBudget]:
     rule = data["rule"].as_string()
     minute = at - at % 60
     keys = (rule, minute) if segment is None else (segment, rule, minute)
-    per_minute: Select[tuple[Any, ...]] = Select(
+    per_minute: Select[*tuple[Any, ...]] = Select(
         *keys, func.sum(case((refused, 0), else_=1)), func.sum(case((refused, 1), else_=0))
     )
     found = session.exec(
@@ -411,14 +411,12 @@ def mcp(session: Session, run: Run) -> McpGate:
     read = (mine, event == "secret_read", data["decision"].as_string() == "allow")
     reads = session.exec(select(name, func.count()).where(*read).group_by(name).order_by(name))
     allowed_read = func.sum(case((data["decision"].as_string() == "allow", 1), else_=0))
-    used: Select[tuple[str, int, int, int]] = Select(
-        name, allowed_read, denied, func.max(AuditEvent.at)
-    )
+    used: Select[str, int, int, int] = Select(name, allowed_read, denied, func.max(AuditEvent.at))
     secrets = session.exec(
         used.where(mine, event == "secret_read").group_by(name).order_by(name).limit(GROUPS)
     ).all()
     server, tool, resource = (data[key].as_string() for key in ("server", "tool", "resource"))
-    groups: Select[tuple[str, str, str, int, int, int, int]] = Select(
+    groups: Select[str, str, str, int, int, int, int] = Select(
         server,
         tool,
         resource,
@@ -435,7 +433,7 @@ def mcp(session: Session, run: Run) -> McpGate:
     ).all()
     every = select(server).where(*calls).group_by(server, tool, resource)
     minute = col(AuditEvent.at) - col(AuditEvent.at) % 60
-    per_minute: Select[tuple[int, str, int, int]] = Select(minute, server, func.count(), denied)
+    per_minute: Select[int, str, int, int] = Select(minute, server, func.count(), denied)
     minutes = session.exec(
         per_minute.where(*calls)
         .group_by(minute, server)
