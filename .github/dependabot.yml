@@ -21,6 +21,9 @@ updates:
     ignore:
       - dependency-name: commitizen
         update-types: [version-update:semver-major]
+      # commitizen 4.x requires Deprecated <2.
+      - dependency-name: deprecated
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: pre-commit
     directory: /
