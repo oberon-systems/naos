@@ -59,7 +59,7 @@ repos:
           - transitions==0.9.3
 
   - repo: https://github.com/djlint/djLint
-    rev: v1.46.1
+    rev: v1.49.9
     hooks:
       # The hooks ship types_or: [jinja], a tag identify never puts on a
       # .html file, so without this override both silently match nothing.
