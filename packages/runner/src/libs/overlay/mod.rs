@@ -419,19 +419,25 @@ fn pair_renames(entries: Vec<Entry>) -> Vec<Entry> {
 }
 
 /// A target that is absolute, empty or climbs above the workspace root would point the host outside it.
+/// A `..` after a name is refused too: the name may be a link, so counting it as a directory lies.
 fn escapes(depth: usize, target: &str) -> bool {
     if target.is_empty() || target.starts_with('/') {
         return true;
     }
     let mut level = depth;
+    let mut named = false;
     for part in target.split('/') {
         match part {
             "" | "." => {}
+            ".." if named => return true,
             ".." => match level.checked_sub(1) {
                 Some(up) => level = up,
                 None => return true,
             },
-            _ => level += 1,
+            _ => {
+                named = true;
+                level += 1;
+            }
         }
     }
     false

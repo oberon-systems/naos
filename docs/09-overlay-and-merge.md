@@ -62,8 +62,8 @@ files, package and build manifests and Terraform files.
 
 A hardlinked file, a device, fifo or socket, setuid, setgid or sticky bits, a
 file larger than the disk, a non-UTF-8 name, a path over 4096 bytes and a
-symlink whose target is absolute or climbs above the workspace root are
-`rejected`, and collection goes on. A directory linked twice, nesting deeper
+symlink whose target is absolute, climbs above the workspace root or has a
+`..` after a name are `rejected`, and collection goes on. A directory linked twice, nesting deeper
 than 256 levels or more than 100 000 entries fail the collection, and the Run
 fails with `collection failed`.
 

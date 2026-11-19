@@ -905,3 +905,13 @@ fn a_directory_has_no_content_and_a_host_symlink_is_not_followed() {
     refused(dir.map(|_| Diff::default()), "has no content");
     assert_eq!(host, None);
 }
+
+#[test]
+fn a_symlink_target_cannot_climb_back_through_a_name() {
+    assert!(!escapes(2, "../.."));
+    assert!(!escapes(0, "a/b/c"));
+    assert!(!escapes(1, "../x/y"));
+    assert!(escapes(0, "a/b/l1/../.."));
+    assert!(escapes(2, "x/.."));
+    assert!(escapes(0, ".."));
+}
