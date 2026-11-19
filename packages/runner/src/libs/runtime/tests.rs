@@ -1007,3 +1007,17 @@ fn collected_changes_are_found_in_the_vm_directory_or_the_archive() {
     assert_eq!(beta.1, None);
     assert!(changes_of(dir.path(), "run_gamma").is_none());
 }
+
+#[test]
+fn a_base_image_naming_a_host_file_is_refused() {
+    let plain = json!({"virtual-size": 4096, "format-specific": {"type": "qcow2", "data": {}}});
+    let backed = json!({"virtual-size": 4096, "backing-filename": "/etc/shadow"});
+    let external = json!({
+        "virtual-size": 4096,
+        "format-specific": {"type": "qcow2", "data": {"data-file": "/etc/shadow"}},
+    });
+
+    assert_eq!(base_size(&plain).expect("size"), 4096);
+    assert!(base_size(&backed).is_err());
+    assert!(base_size(&external).is_err());
+}

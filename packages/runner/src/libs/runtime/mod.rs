@@ -402,15 +402,7 @@ impl QemuRuntime {
             ])
             .await?;
         let info: Value = serde_json::from_slice(&stdout).map_err(runtime_error)?;
-        // A backing file named inside the image header would make QEMU open a host path of its choosing.
-        if info.get("backing-filename").is_some() || info.get("full-backing-filename").is_some() {
-            return Err(AgentError::Image(
-                "base image must not reference a backing file".into(),
-            ));
-        }
-        info.get("virtual-size")
-            .and_then(Value::as_u64)
-            .ok_or_else(|| AgentError::Image("qemu-img did not report the image size".into()))
+        base_size(&info)
     }
 
     async fn check_virtiofsd(&self) -> Result<(), AgentError> {
@@ -1064,6 +1056,24 @@ fn write_private(path: &Path, body: &[u8]) -> Result<(), AgentError> {
         .open(path)?;
     file.write_all(body)?;
     Ok(())
+}
+
+// A backing or data file named inside the image header would make QEMU open a host path of its
+// choosing.
+fn base_size(info: &Value) -> Result<u64, AgentError> {
+    if info.get("backing-filename").is_some() || info.get("full-backing-filename").is_some() {
+        return Err(AgentError::Image(
+            "base image must not reference a backing file".into(),
+        ));
+    }
+    if info.pointer("/format-specific/data/data-file").is_some() {
+        return Err(AgentError::Image(
+            "base image must not reference a data file".into(),
+        ));
+    }
+    info.get("virtual-size")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| AgentError::Image("qemu-img did not report the image size".into()))
 }
 
 fn runtime_error(err: impl Display) -> AgentError {

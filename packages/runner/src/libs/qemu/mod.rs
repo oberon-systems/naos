@@ -140,7 +140,10 @@ pub fn argv(
         })
         .to_string(),
         "-blockdev".into(),
-        json!({ "driver": "qcow2", "node-name": "base", "file": "base-file", "read-only": true })
+        json!({
+            "driver": "qcow2", "node-name": "base", "file": "base-file",
+            "backing": null, "read-only": true,
+        })
             .to_string(),
         "-blockdev".into(),
         json!({ "driver": "file", "node-name": "overlay-file", "filename": text(paths.overlay()) })

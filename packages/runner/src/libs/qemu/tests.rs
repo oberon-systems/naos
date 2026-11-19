@@ -102,6 +102,8 @@ fn base_is_read_only_under_a_writable_overlay() {
     assert_eq!(node("base-file")["filename"], BASE);
     assert_eq!(node("base-file")["read-only"], true);
     assert_eq!(node("base")["read-only"], true);
+    assert!(node("base")["backing"].is_null());
+    assert!(node("base").get("backing").is_some());
     assert_eq!(node("disk")["backing"], "base");
     assert!(node("disk").get("read-only").is_none());
     assert_eq!(
