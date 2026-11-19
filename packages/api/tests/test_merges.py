@@ -1,3 +1,4 @@
+import asyncio
 import json
 from collections.abc import Callable
 from typing import Any, cast
@@ -12,6 +13,8 @@ from starlette.websockets import WebSocketDisconnect
 
 from naos_api import runners
 from naos_api.auth import require_operator_connection
+from naos_api.content_hub import Absent, ContentHub, Piece
+from naos_api.errors import ContentUnavailableError
 from naos_api.lifecycle import RunStatus
 from naos_api.models import AuditEvent
 
@@ -411,3 +414,29 @@ def test_a_directory_a_rejected_entry_or_no_entry_has_no_content(
 
     viewed = session.exec(select(AuditEvent).where(AuditEvent.event == "merge_content_viewed"))
     assert list(viewed) == []
+
+
+def test_only_the_asked_runner_settles_an_ask_and_only_within_its_length() -> None:
+    async def scenario() -> tuple[Any, Any, set[int]]:
+        hub = ContentHub()
+        with hub.runner("runner_alpha") as outbox:
+
+            async def asked(answer: Any, foreign: Any) -> Any:
+                pending = asyncio.create_task(hub.ask("runner_alpha", {"length": 3}, 1.0))
+                ask_id = json.loads(await outbox.get())["id"]
+                hub.answer("runner_beta", ask_id, foreign)
+                hub.answer("runner_alpha", ask_id, answer)
+                try:
+                    return ask_id, await pending
+                except ContentUnavailableError as err:
+                    return ask_id, err
+
+            first_id, first = await asked(Piece(size=3, data=b"abc"), Piece(size=3, data=b"xyz"))
+            second_id, second = await asked(Piece(size=9, data=b"abcd"), Absent())
+        return first, second, {first_id, second_id}
+
+    first, second, ids = asyncio.run(scenario())
+
+    assert first == Piece(size=3, data=b"abc")
+    assert isinstance(second, ContentUnavailableError)
+    assert len(ids) == 2 and all(ask_id > 2 for ask_id in ids)

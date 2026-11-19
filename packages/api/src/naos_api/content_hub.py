@@ -1,6 +1,6 @@
 import asyncio
-import itertools
 import json
+import secrets
 from collections.abc import Iterator
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
@@ -24,13 +24,20 @@ class Absent:
 Answer = Piece | Absent
 
 
+@dataclass(frozen=True)
+class _Waiting:
+    loop: asyncio.AbstractEventLoop
+    future: "asyncio.Future[Answer]"
+    runner_id: str
+    length: int
+
+
 # The runner holds one socket here and the operator's asks travel down it, so the
 # runner listens on no port of its own. Like the console hub it lives in one process.
 class ContentHub:
     def __init__(self) -> None:
         self._runners: dict[str, tuple[asyncio.AbstractEventLoop, Outbox]] = {}
-        self._waiting: dict[int, tuple[asyncio.AbstractEventLoop, asyncio.Future[Answer]]] = {}
-        self._ids = itertools.count(1)
+        self._waiting: dict[int, _Waiting] = {}
 
     # A second socket of the same runner replaces the first.
     @contextmanager
@@ -48,9 +55,17 @@ class ContentHub:
         if entry is None:
             raise ContentUnavailableError(f"runner {runner_id} is not connected")
         loop, outbox = entry
-        ask_id = next(self._ids)
+        ask_id = secrets.randbits(63)
+        while ask_id in self._waiting:
+            ask_id = secrets.randbits(63)
         waiting: asyncio.Future[Answer] = asyncio.get_running_loop().create_future()
-        self._waiting[ask_id] = (asyncio.get_running_loop(), waiting)
+        length = frame.get("length")
+        self._waiting[ask_id] = _Waiting(
+            asyncio.get_running_loop(),
+            waiting,
+            runner_id,
+            length if isinstance(length, int) else 0,
+        )
         try:
             loop.call_soon_threadsafe(outbox.put_nowait, _encode(ask_id, frame))
             return await asyncio.wait_for(waiting, timeout)
@@ -59,11 +74,14 @@ class ContentHub:
         finally:
             self._waiting.pop(ask_id, None)
 
-    def answer(self, ask_id: int, result: Answer | ContentUnavailableError) -> None:
+    # Only the runner an ask went to settles it, and with no more than it was asked for.
+    def answer(self, runner_id: str, ask_id: int, result: Answer | ContentUnavailableError) -> None:
         entry = self._waiting.get(ask_id)
-        if entry is None:
+        if entry is None or entry.runner_id != runner_id:
             return
-        loop, waiting = entry
+        if isinstance(result, Piece) and len(result.data) > entry.length:
+            result = ContentUnavailableError(f"runner {runner_id} answered more than was asked")
+        loop, waiting = entry.loop, entry.future
 
         def settle() -> None:
             if waiting.done():

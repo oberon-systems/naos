@@ -85,12 +85,12 @@ async def content(websocket: WebSocket, run_id: str, index: int) -> None:
         return
 
 
-def _answered(hub: ContentHub, message: Mapping[str, Any]) -> None:
+def _answered(hub: ContentHub, runner_id: str, message: Mapping[str, Any]) -> None:
     frame = message.get("bytes")
     if isinstance(frame, bytes) and len(frame) >= ID_BYTES + SIZE_BYTES:
         ask_id = int.from_bytes(frame[:ID_BYTES], "big")
         size = int.from_bytes(frame[ID_BYTES : ID_BYTES + SIZE_BYTES], "big")
-        hub.answer(ask_id, Piece(size=size, data=frame[ID_BYTES + SIZE_BYTES :]))
+        hub.answer(runner_id, ask_id, Piece(size=size, data=frame[ID_BYTES + SIZE_BYTES :]))
         return
     try:
         reply = json.loads(str(message.get("text") or ""))
@@ -98,9 +98,10 @@ def _answered(hub: ContentHub, message: Mapping[str, Any]) -> None:
     except (TypeError, ValueError, KeyError):
         return
     if reply.get("absent") is True:
-        hub.answer(ask_id, Absent())
+        hub.answer(runner_id, ask_id, Absent())
     else:
-        hub.answer(ask_id, ContentUnavailableError(str(reply.get("error"))[:REASON_CHARS]))
+        failed = ContentUnavailableError(str(reply.get("error"))[:REASON_CHARS])
+        hub.answer(runner_id, ask_id, failed)
 
 
 async def _to_runner(websocket: WebSocket, outbox: "asyncio.Queue[str]") -> None:
@@ -130,7 +131,7 @@ async def runner_content(
         sender = asyncio.create_task(_to_runner(websocket, outbox))
         try:
             while (message := await websocket.receive())["type"] != "websocket.disconnect":
-                _answered(hub, message)
+                _answered(hub, runner_id, message)
         except WebSocketDisconnect:
             return
         finally:
