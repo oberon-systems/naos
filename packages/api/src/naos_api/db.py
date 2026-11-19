@@ -6,7 +6,8 @@ from sqlmodel import Session, create_engine
 
 class Database:
     def __init__(self, url: str) -> None:
-        self.engine = create_engine(url)
+        # A failed statement's text would otherwise carry its bound values, secrets among them.
+        self.engine = create_engine(url, hide_parameters=True)
 
 
 def get_session(request: Request) -> Iterator[Session]:
