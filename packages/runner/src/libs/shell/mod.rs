@@ -283,6 +283,15 @@ impl ShellGate {
         if !root.is_dir() {
             return Err("path is not a directory");
         }
+        // The deepest mount holding the path is the ceiling, so git never finds a repository
+        // above what the policy mounted.
+        let ceiling = self
+            .roots
+            .iter()
+            .filter(|mount| root.starts_with(&mount.host))
+            .max_by_key(|mount| mount.host.components().count())
+            .map(|mount| mount.host.parent().unwrap_or(&mount.host))
+            .ok_or("path is outside every mount")?;
         let mut child = Command::new(&self.git_binary)
             .arg("--no-optional-locks")
             .arg("--no-pager")
@@ -294,6 +303,7 @@ impl ShellGate {
             .env_clear()
             .env("GIT_CONFIG_NOSYSTEM", "1")
             .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CEILING_DIRECTORIES", ceiling)
             .env("GIT_OPTIONAL_LOCKS", "0")
             .env("GIT_TERMINAL_PROMPT", "0")
             .stdin(Stdio::null())

@@ -455,6 +455,34 @@ async fn git_reports_the_worktree_without_writing_to_it() {
 }
 
 #[tokio::test]
+async fn git_does_not_reach_a_repository_above_the_mount() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    repo(dir.path());
+    fs::write(dir.path().join("tracked.txt"), "secret\n").expect("write");
+    let mounted = dir.path().join("mounted");
+    fs::create_dir(&mounted).expect("mkdir");
+    let gate = ShellGate::from_snapshot(
+        "run_a",
+        Some(&json!({ "allow": ["git_status", "git_diff"] })),
+        Some(&mounts(&mounted)),
+        &git_binary(),
+    )
+    .expect("policy");
+
+    for request in [
+        ShellRequest::GitStatus {
+            path: GUEST.to_owned(),
+        },
+        ShellRequest::GitDiff {
+            path: GUEST.to_owned(),
+        },
+    ] {
+        let err = gate.call(request).await.expect_err("denied");
+        assert!(err.to_string().contains("git failed"), "{err}");
+    }
+}
+
+#[tokio::test]
 async fn a_hostile_repository_config_cannot_hook_a_program() {
     let toucher = ["/usr/bin/touch", "/bin/touch"]
         .into_iter()
