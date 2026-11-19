@@ -57,8 +57,12 @@ The host side at collection time is the base a merge checks against. A
 replaces; a `deleted` entry describes the host entry itself. An entry whose
 path, or `from`, runs on the host or in CI once merged carries
 `"sensitive": true`: anything under `.git`, `.github`, `.gitlab`,
-`.circleci`, `.buildkite` or `.husky`, Makefiles, Dockerfiles, compose
-files, package and build manifests and Terraform files.
+`.circleci`, `.buildkite`, `.husky`, `.cargo`, `.vscode`, `.devcontainer`,
+`.claude` or `.gemini`, Makefiles, Dockerfiles, compose files, package and
+build manifests, toolchain and test-runner files such as `conftest.py` or
+`tox.ini`, agent configuration such as `.mcp.json`, and Terraform files. A
+file whose change adds an execute bit is sensitive whatever its name.
+`always` trusts this list and nothing else.
 
 A hardlinked file, a device, fifo or socket, setuid, setgid or sticky bits, a
 file larger than the disk, a non-UTF-8 name, a path over 4096 bytes and a

@@ -116,7 +116,9 @@ pub fn collect(upper: &Path, workspace: &Path) -> Result<Diff, AgentError> {
     walker.dir(&data, &[], 0, opaque)?;
     let mut entries = pair_renames(walker.entries);
     for entry in &mut entries {
-        entry.sensitive = sensitive(&entry.path) || entry.from.as_deref().is_some_and(sensitive);
+        entry.sensitive = sensitive(&entry.path)
+            || entry.from.as_deref().is_some_and(sensitive)
+            || adds_exec(entry);
     }
     entries.sort_by(|a, b| (a.path.as_bytes(), a.change).cmp(&(b.path.as_bytes(), b.change)));
     Ok(Diff { entries })
@@ -450,6 +452,11 @@ const SENSITIVE_DIRS: &[&str] = &[
     ".circleci",
     ".buildkite",
     ".husky",
+    ".cargo",
+    ".vscode",
+    ".devcontainer",
+    ".claude",
+    ".gemini",
 ];
 const SENSITIVE_NAMES: &[&str] = &[
     ".gitlab-ci.yml",
@@ -476,9 +483,41 @@ const SENSITIVE_NAMES: &[&str] = &[
     "pyproject.toml",
     "Cargo.toml",
     "build.rs",
+    "rust-toolchain",
+    "rust-toolchain.toml",
+    "conftest.py",
+    "noxfile.py",
+    "tox.ini",
+    ".yarnrc.yml",
+    ".pnpmfile.cjs",
+    "mise.toml",
+    ".mise.toml",
+    ".tool-versions",
+    ".mcp.json",
+    "Gemfile",
+    "Rakefile",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "settings.gradle",
+    "settings.gradle.kts",
+    "gradlew",
+    "mvnw",
+    "CMakeLists.txt",
+    "meson.build",
+    "flake.nix",
+    "shell.nix",
+    "default.nix",
+    ".bazelrc",
 ];
 const SENSITIVE_SUFFIXES: &[&str] = &[".mk", ".tf", ".tfvars", ".hcl"];
 const SENSITIVE_PREFIXES: &[&str] = &["Dockerfile", "docker-compose"];
+
+/// A file that becomes executable can be run on the host whatever its name.
+fn adds_exec(entry: &Entry) -> bool {
+    let exec = |mode: u32| mode & 0o111 != 0;
+    entry.kind == Kind::File && entry.mode.is_some_and(exec) && !entry.base_mode.is_some_and(exec)
+}
 
 /// Paths that run on the host or in CI once merged: `always` holds them for approval.
 pub fn sensitive(path: &str) -> bool {

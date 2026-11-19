@@ -141,7 +141,7 @@ fn changes_are_created_modified_deleted_and_renamed() {
         entries(&diff),
         json!([
             {"path": "added.txt", "change": "created", "kind": "file", "size": 6, "mode": 0o644},
-            {"path": "mode.txt", "change": "modified", "kind": "file", "size": 5, "mode": 0o755, "base_mode": 0o644},
+            {"path": "mode.txt", "change": "modified", "kind": "file", "size": 5, "mode": 0o755, "base_mode": 0o644, "sensitive": true},
             {"path": "newdir", "change": "created", "kind": "dir"},
             {"path": "notes.txt", "change": "modified", "kind": "file", "size": 5, "mode": 0o644, "base_mode": 0o644},
             {"path": "old.txt", "change": "deleted", "kind": "file", "size": 4, "mode": 0o644},
@@ -914,4 +914,35 @@ fn a_symlink_target_cannot_climb_back_through_a_name() {
     assert!(escapes(0, "a/b/l1/../.."));
     assert!(escapes(2, "x/.."));
     assert!(escapes(0, ".."));
+}
+
+#[test]
+fn files_that_run_tools_or_agents_on_the_host_are_sensitive() {
+    for path in [
+        ".cargo/config.toml",
+        "rust-toolchain.toml",
+        "tests/conftest.py",
+        "tox.ini",
+        ".vscode/tasks.json",
+        ".devcontainer/devcontainer.json",
+        ".claude/settings.json",
+        ".mcp.json",
+        ".tool-versions",
+    ] {
+        assert!(sensitive(path), "{path}");
+    }
+}
+
+#[test]
+fn a_file_made_executable_is_sensitive() {
+    let file = |mode: Option<u32>, base: Option<u32>| Entry {
+        mode,
+        base_mode: base,
+        ..Entry::new("notes.txt".into(), Change::Modified, Kind::File)
+    };
+
+    assert!(adds_exec(&file(Some(0o755), Some(0o644))));
+    assert!(adds_exec(&file(Some(0o744), None)));
+    assert!(!adds_exec(&file(Some(0o755), Some(0o755))));
+    assert!(!adds_exec(&file(Some(0o644), Some(0o755))));
 }
