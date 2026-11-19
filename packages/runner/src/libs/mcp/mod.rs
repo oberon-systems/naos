@@ -24,6 +24,7 @@ use upstream::{Failure, Policy, Upstream};
 
 const MAX_LINE: usize = 1024 * 1024;
 const MAX_IDS: usize = 65536;
+const MAX_ID_LEN: usize = 128;
 const CALL_TIMEOUT: Duration = Duration::from_secs(45);
 const PROTOCOL_VERSIONS: &[&str] = &["2025-06-18", "2025-03-26", "2024-11-05"];
 const METHODS: &[&str] = &["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
@@ -194,6 +195,14 @@ impl<'a> Session<'a> {
         let Some(id) = message.get("id").cloned() else {
             return Ok(None);
         };
+        if !usable_id(&id) {
+            audit::mcp_rejected(self.run_id, "unusable request id");
+            return Ok(Some(error(
+                Value::Null,
+                INVALID_REQUEST,
+                "invalid request id",
+            )));
+        }
         if self.seen.len() >= MAX_IDS {
             audit::mcp_rejected(self.run_id, "too many requests");
             return Err(AgentError::Runtime("mcp: too many requests".into()));
@@ -686,6 +695,15 @@ fn notification(method: &str) -> Vec<u8> {
         .into_bytes();
     line.push(b'\n');
     line
+}
+
+// Every id is kept for the session, so only short strings and integers are taken.
+fn usable_id(id: &Value) -> bool {
+    match id {
+        Value::String(text) => text.len() <= MAX_ID_LEN,
+        Value::Number(number) => number.is_i64() || number.is_u64(),
+        _ => false,
+    }
 }
 
 fn error(id: Value, code: i64, message: &str) -> Value {

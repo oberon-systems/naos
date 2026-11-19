@@ -159,6 +159,40 @@ async fn a_client_can_initialize_and_sees_no_tools() {
 }
 
 #[tokio::test]
+async fn only_short_string_and_integer_ids_are_taken() {
+    let long = "a".repeat(MAX_ID_LEN + 1);
+    let ids = [
+        json!(long),
+        json!({"a": 1}),
+        json!([1]),
+        json!(1.5),
+        json!(true),
+        Value::Null,
+    ];
+    let mut input = String::new();
+    for id in &ids {
+        input.push_str(&format!(
+            "{}\n",
+            json!({"jsonrpc": "2.0", "id": id, "method": "ping"})
+        ));
+    }
+    input.push_str(&format!(
+        "{}\n",
+        json!({"jsonrpc": "2.0", "id": "a".repeat(MAX_ID_LEN), "method": "ping"})
+    ));
+
+    let (outcome, replies) = exchange(&no_gates(), input.as_bytes()).await;
+
+    assert!(outcome.is_ok());
+    assert_eq!(replies.len(), ids.len() + 1);
+    for reply in &replies[..ids.len()] {
+        assert_eq!(error_code(reply), INVALID_REQUEST);
+        assert_eq!(reply["id"], Value::Null);
+    }
+    assert_eq!(replies[ids.len()]["result"], json!({}));
+}
+
+#[tokio::test]
 async fn an_unknown_protocol_version_gets_the_latest() {
     let input = br#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"1999-01-01"}}
 "#;
