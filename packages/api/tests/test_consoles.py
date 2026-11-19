@@ -18,6 +18,7 @@ from naos_api import consoles
 from naos_api.auth import require_operator_connection
 from naos_api.console_hub import Output
 from naos_api.models import AuditEvent, ConsoleChunk
+from naos_api.routes import console as console_routes
 from naos_api.settings import Settings
 
 Register = Callable[..., dict[str, str]]
@@ -109,7 +110,7 @@ def test_the_log_stamps_each_line_with_the_time_it_arrived(
 ) -> None:
     runner, run_id = _leased(client, register, create_run)
     _ship(client, runner, run_id, 0, b"naos login: naos\r\nWelcome")
-    advance(61)
+    advance(59)
     _ship(client, runner, run_id, 25, b" to Alpine!\r\n\x1b[K\r\n$ ")
 
     log = client.get(f"/api/v1/runs/{run_id}/console").content.decode()
@@ -118,7 +119,7 @@ def test_the_log_stamps_each_line_with_the_time_it_arrived(
     assert log.splitlines() == [
         "2026-01-01T00:00:00Z  naos login: naos",
         "2026-01-01T00:00:00Z  Welcome to Alpine!",
-        "2026-01-01T00:01:01Z  $",
+        "2026-01-01T00:00:59Z  $",
     ]
 
 
@@ -417,3 +418,31 @@ def test_the_downloaded_log_reads_every_page(
 
     assert len(log.splitlines()) == consoles.READ_CHUNKS + 5
     assert log.splitlines()[-1].endswith(f"line {consoles.READ_CHUNKS + 4}")
+
+
+def test_a_lapsed_lease_writes_no_console(
+    client: TestClient, register: Register, create_run: CreateRun, advance: Callable[[int], None]
+) -> None:
+    runner, run_id = _leased(client, register, create_run)
+    advance(61)
+
+    assert _ship(client, runner, run_id, 0, b"late").status_code == 409
+
+
+def test_an_open_runner_socket_ends_when_its_lease_lapses(
+    client: TestClient,
+    register: Register,
+    create_run: CreateRun,
+    advance: Callable[[int], None],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(console_routes, "RECHECK_SECONDS", 0.05)
+    runner, run_id = _leased(client, register, create_run)
+
+    with _runner_socket(client, runner, run_id) as shipped:
+        advance(61)
+        with pytest.raises(WebSocketDisconnect) as closed:
+            while True:
+                shipped.receive_text()
+
+    assert closed.value.code == 1008

@@ -8,13 +8,15 @@ from typing import Annotated
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, WebSocketException, status
+from fastapi.security.utils import get_authorization_scheme_param
 from sqlmodel import Session
 
-from naos_api import consoles
+from naos_api import consoles, runners
 from naos_api.auth import require_operator_connection, require_runner_connection
+from naos_api.clock import clock_of
 from naos_api.console_hub import ConsoleHub
 from naos_api.db import Database
-from naos_api.errors import DomainError, NotFoundError
+from naos_api.errors import DomainError, LeaseError, NotFoundError
 from naos_api.models import ConsoleSize
 from naos_api.routes.deps import ConsoleLimitDep
 from naos_api.runners import RunnerPrincipal
@@ -25,6 +27,7 @@ FRAME_BYTES = 32 * 1024
 OFFSET_BYTES = 8
 MAX_FRAME = OFFSET_BYTES + 64 * 1024
 STORE_FRAMES = 64
+RECHECK_SECONDS = 5.0
 # How long a viewer waits for the store to catch up with a frame ahead of it.
 GAP_TRIES = 10
 GAP_WAIT = 0.05
@@ -183,6 +186,7 @@ async def _keep(
     run_id: str,
     limit: int,
     store: "asyncio.Queue[tuple[int, bytes] | None]",
+    clock: Callable[[], int],
 ) -> None:
     while (item := await store.get()) is not None:
         offset, data = item
@@ -195,9 +199,24 @@ async def _keep(
                 offset=offset,
                 data=data,
                 limit=limit,
-                now=int(time.time()),
+                now=clock(),
             ),
         )
+
+
+def _still_held(session: Session, runner_id: str, run_id: str, token: str, now: int) -> None:
+    principal = runners.authenticate(session, token, now)
+    if principal is None or principal.runner_id != runner_id:
+        raise LeaseError(f"runner {runner_id} no longer holds credentials")
+    consoles.hold(session, runner_id, run_id, now)
+
+
+# The lease and the token are checked again while the socket stays open, so a lapse or a
+# revocation ends it even when the runner has gone quiet.
+async def _watch(db: Database, still: Callable[..., None], clock: Callable[[], int]) -> None:
+    while True:
+        await asyncio.sleep(RECHECK_SECONDS)
+        await _in_session(db, partial(still, now=clock()))
 
 
 async def _to_runner(websocket: WebSocket, outbox: "asyncio.Queue[bytes | str]") -> None:
@@ -221,24 +240,30 @@ async def runner_console(
 ) -> None:
     db: Database = websocket.app.state.db
     hub: ConsoleHub = websocket.app.state.console_hub
+    clock = clock_of(websocket.app)
+    token = get_authorization_scheme_param(websocket.headers.get("authorization"))[1]
+    still = partial(_still_held, runner_id=principal.runner_id, run_id=run_id, token=token)
     # checked before a byte is let through: from here on the output reaches the
     # terminals ahead of the store, and so ahead of its own lease check
     try:
-        await _in_session(db, partial(consoles.hold, runner_id=principal.runner_id, run_id=run_id))
+        await _in_session(db, partial(still, now=clock()))
     except DomainError as err:
         raise WebSocketException(status.WS_1008_POLICY_VIOLATION, str(err)[:120]) from err
     await websocket.accept()
     store: asyncio.Queue[tuple[int, bytes] | None] = asyncio.Queue(STORE_FRAMES)
     with hub.runner(run_id) as outbox:
         sender = asyncio.create_task(_to_runner(websocket, outbox))
-        keeper = asyncio.create_task(_keep(db, principal.runner_id, run_id, limit, store))
+        keeper = asyncio.create_task(_keep(db, principal.runner_id, run_id, limit, store, clock))
+        watcher = asyncio.create_task(_watch(db, still, clock))
         try:
             if (size := await _in_session(db, partial(consoles.size, run_id=run_id))) is not None:
                 await websocket.send_text(_size_frame(size))
             while True:
                 # a store that refuses ends the socket at once, not on the next frame
                 receiving = asyncio.create_task(websocket.receive())
-                await asyncio.wait({receiving, keeper, sender}, return_when=asyncio.FIRST_COMPLETED)
+                await asyncio.wait(
+                    {receiving, keeper, sender, watcher}, return_when=asyncio.FIRST_COMPLETED
+                )
                 if not receiving.done():
                     receiving.cancel()
                     break
@@ -261,12 +286,15 @@ async def runner_console(
                 hub.publish(run_id, offset, data)
                 await store.put((offset, data))
                 await websocket.send_text(json.dumps({"offset": offset + len(data)}))
-            if keeper.done() and isinstance(refused := keeper.exception(), DomainError):
-                await websocket.close(status.WS_1008_POLICY_VIOLATION, str(refused)[:120])
+            for task in (keeper, watcher):
+                if task.done() and isinstance(refused := task.exception(), DomainError):
+                    await websocket.close(status.WS_1008_POLICY_VIOLATION, str(refused)[:120])
+                    break
         except WebSocketDisconnect:
             return
         finally:
             sender.cancel()
+            watcher.cancel()
             # what already arrived still reaches the store
             if not keeper.done():
                 await store.put(None)

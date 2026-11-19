@@ -50,10 +50,11 @@ def held(session: Session, run_id: str) -> int:
     return end or 0
 
 
-def hold(session: Session, runner_id: str, run_id: str) -> None:
+def hold(session: Session, runner_id: str, run_id: str, now: int) -> None:
     run = session.get(Run, run_id)
     lease = session.get(Lease, run.lease_id) if run is not None and run.lease_id else None
-    if lease is None or lease.runner_id != runner_id:
+    live = lease is not None and lease.expired_at is None and lease.expires_at > now
+    if lease is None or lease.runner_id != runner_id or not live:
         raise LeaseError(f"run {run_id} is not held by runner {runner_id}")
 
 
@@ -62,7 +63,7 @@ def hold(session: Session, runner_id: str, run_id: str) -> None:
 def append(
     session: Session, runner_id: str, run_id: str, offset: int, data: bytes, limit: int, now: int
 ) -> tuple[int, bytes]:
-    hold(session, runner_id, run_id)
+    hold(session, runner_id, run_id, now)
     start = held(session, run_id)
     fresh = data[start - offset :] if offset <= start else b""
     if not fresh:

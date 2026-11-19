@@ -201,13 +201,18 @@ def transitioned(
     )
 
 
-def _held(session: Session, runner_id: str, run_ids: set[str]) -> set[str]:
+def _held(session: Session, runner_id: str, run_ids: set[str], now: int) -> set[str]:
     if not run_ids:
         return set()
     statement = (
         select(Run.id)
         .join(Lease, col(Run.lease_id) == col(Lease.id))
-        .where(col(Lease.runner_id) == runner_id, col(Run.id).in_(run_ids))
+        .where(
+            col(Lease.runner_id) == runner_id,
+            col(Lease.expired_at).is_(None),
+            col(Lease.expires_at) > now,
+            col(Run.id).in_(run_ids),
+        )
     )
     return set(session.exec(statement).all())
 
@@ -217,9 +222,10 @@ def _stored(session: Session, ids: list[str]) -> set[str]:
 
 
 def ingest(
-    session: Session, runner_id: str, events: Sequence[RunnerEventIn]
+    session: Session, runner_id: str, events: Sequence[RunnerEventIn], now: int
 ) -> tuple[int, list[str]]:
-    held = _held(session, runner_id, {e.fields["run_id"] for e in events if "run_id" in e.fields})
+    run_ids = {e.fields["run_id"] for e in events if "run_id" in e.fields}
+    held = _held(session, runner_id, run_ids, now)
     refused = [e.id for e in events if "run_id" in e.fields and e.fields["run_id"] not in held]
     for attempt in range(2):
         seen = _stored(session, [event.id for event in events]) | set(refused)

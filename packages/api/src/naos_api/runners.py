@@ -97,17 +97,19 @@ class DesiredRun:
     merge: dict[str, Any] | None
 
 
-def _live_lease(session: Session, runner_id: str) -> Lease | None:
+def _live_lease(session: Session, runner_id: str, now: int | None = None) -> Lease | None:
     statement = select(Lease).where(
         col(Lease.runner_id) == runner_id, col(Lease.expired_at).is_(None)
     )
+    if now is not None:
+        statement = statement.where(col(Lease.expires_at) > now)
     return session.exec(statement).first()
 
 
 # A runner answers for the changes it keeps only while it holds a lease; the sweep
 # is what ends a lapsed one.
-def serving(session: Session, runner_id: str) -> None:
-    if _live_lease(session, runner_id) is None:
+def serving(session: Session, runner_id: str, now: int) -> None:
+    if _live_lease(session, runner_id, now) is None:
         raise LeaseError(f"runner {runner_id} holds no live lease")
 
 

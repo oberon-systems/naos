@@ -320,8 +320,10 @@ def report_merge(
 
 
 @router.post("/{runner_id}/events")
-def report_events(body: EventsIn, principal: PrincipalDep, session: SessionDep) -> EventsOut:
-    accepted, refused = audit.ingest(session, principal.runner_id, body.events)
+def report_events(
+    body: EventsIn, principal: PrincipalDep, session: SessionDep, now: NowDep
+) -> EventsOut:
+    accepted, refused = audit.ingest(session, principal.runner_id, body.events, now)
     return EventsOut(accepted=accepted, refused=refused)
 
 

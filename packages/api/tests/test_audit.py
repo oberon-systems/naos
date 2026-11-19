@@ -434,3 +434,17 @@ def test_no_credential_reaches_the_audit_table(
     assert "credentials_issued" in dump and "token_rotated" in dump
     for value in [*tokens, ENROLLMENT_TOKEN, ALPHA_VALUE]:
         assert value not in dump
+
+
+def test_events_for_a_run_of_a_lapsed_lease_are_refused(
+    client: TestClient, register: Register, create_run: CreateRun, advance: Advance
+) -> None:
+    run_id = create_run("key-1")
+    runner = register()
+    _heartbeat(client, runner)
+    advance(LEASE_TTL + 1)
+    event = _event("run_claimed", run_id=run_id)
+
+    answer = _post_events(client, runner, [event])
+
+    assert answer.json() == {"accepted": 0, "refused": [event["id"]]}

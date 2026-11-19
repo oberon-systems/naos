@@ -9,6 +9,7 @@ from sqlmodel import Session
 
 from naos_api import merges, runners
 from naos_api.auth import require_operator_connection, require_runner_connection
+from naos_api.clock import clock_of
 from naos_api.content_hub import Absent, ContentHub, Piece
 from naos_api.db import Database
 from naos_api.errors import ContentUnavailableError, DomainError
@@ -66,7 +67,9 @@ async def content(websocket: WebSocket, run_id: str, index: int) -> None:
             side, offset, length = asked
             ask = {"run_id": run_id, "index": index, "side": side, "offset": offset}
             try:
-                await _in_session(db, partial(runners.serving, runner_id=runner_id))
+                await _in_session(
+                    db, partial(runners.serving, runner_id=runner_id, now=clock_of(websocket.app)())
+                )
                 answer = await hub.ask(runner_id, {**ask, "length": length}, ANSWER_SECONDS)
             except DomainError as err:
                 failed = {"side": side, "offset": offset, "error": str(err)[:REASON_CHARS]}
@@ -116,7 +119,9 @@ async def runner_content(
     hub: ContentHub = websocket.app.state.content_hub
     runner_id = principal.runner_id
     try:
-        await _in_session(db, partial(runners.serving, runner_id=runner_id))
+        await _in_session(
+            db, partial(runners.serving, runner_id=runner_id, now=clock_of(websocket.app)())
+        )
     except DomainError as err:
         raise WebSocketException(status.WS_1008_POLICY_VIOLATION, str(err)[:120]) from err
     # registered before the accept, so an ask that follows it at once finds the socket
