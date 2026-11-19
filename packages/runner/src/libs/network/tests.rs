@@ -227,6 +227,39 @@ async fn the_pin_answers_only_the_authorized_name() {
     assert!(pinned.resolve(name("other.example.com")).await.is_err());
 }
 
+#[test]
+fn an_address_rule_narrows_the_pin_to_that_address() {
+    let other = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 20));
+    let gate = gate(json!({"allow": [{"ip": "203.0.113.10"}]}));
+
+    let reachable = gate
+        .authorize("https", "example.com", &[other, PUBLIC])
+        .expect("allowed");
+
+    assert_eq!(reachable, vec![PUBLIC]);
+}
+
+#[tokio::test]
+async fn an_address_rule_never_reaches_another_resolved_address() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&server)
+        .await;
+    let address = server.address();
+    let gate = NetworkGate::local(
+        &json!({"allow": [{"protocol": "http", "ip": "127.0.0.2"}]}),
+        vec![IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2)), address.ip()],
+    )
+    .expect("policy");
+
+    let refused = gate
+        .send(get(&format!("http://example.com:{}/", address.port())))
+        .await;
+
+    assert!(refused.is_err(), "the unlisted address was reached");
+}
+
 #[tokio::test]
 async fn a_forbidden_destination_is_not_reached() {
     let server = MockServer::start().await;

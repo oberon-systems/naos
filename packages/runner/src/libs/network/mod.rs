@@ -266,11 +266,18 @@ impl NetworkGate {
         Ok(body)
     }
 
-    fn authorize(&self, protocol: &str, host: &str, ips: &[IpAddr]) -> Result<(), AgentError> {
+    /// The addresses the request may connect to: an allow rule naming an address narrows the
+    /// resolution to that one address.
+    fn authorize(
+        &self,
+        protocol: &str,
+        host: &str,
+        ips: &[IpAddr],
+    ) -> Result<Vec<IpAddr>, AgentError> {
         match self.decide(protocol, host, ips) {
-            Ok(rule) => {
+            Ok((rule, reachable)) => {
                 audit::network_allowed(&self.run_id, protocol, host, &rule);
-                Ok(())
+                Ok(reachable)
             }
             Err((rule, reason)) => {
                 audit::network_denied(&self.run_id, protocol, host, &rule, reason);
@@ -284,7 +291,7 @@ impl NetworkGate {
         protocol: &str,
         host: &str,
         ips: &[IpAddr],
-    ) -> Result<String, (String, &'static str)> {
+    ) -> Result<(String, Vec<IpAddr>), (String, &'static str)> {
         let Some(host) = normalize_host(host) else {
             return Err((NO_RULE.to_owned(), "invalid hostname"));
         };
@@ -316,7 +323,12 @@ impl NetworkGate {
             .allow
             .iter()
             .position(|rule| rule.matches(protocol, &host, ips))
-            .map(|at| format!("allow[{at}]"))
+            .map(|at| {
+                let reachable = rules.allow[at]
+                    .ip
+                    .map_or_else(|| ips.to_vec(), |ip| vec![ip]);
+                (format!("allow[{at}]"), reachable)
+            })
             .ok_or_else(|| (NO_RULE.to_owned(), "no matching allow rule"))
     }
 
@@ -330,7 +342,7 @@ impl NetworkGate {
             .port_or_known_default()
             .ok_or_else(|| AgentError::Runtime("network deny: unsupported port".into()))?;
         let ips = self.lookup(host, port).await?;
-        self.authorize(url.scheme(), host, &ips)?;
+        let ips = self.authorize(url.scheme(), host, &ips)?;
 
         let host = normalize_host(host).expect("authorized hostname");
         let pinned: Vec<SocketAddr> = ips.iter().map(|ip| SocketAddr::new(*ip, port)).collect();
