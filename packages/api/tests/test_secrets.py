@@ -304,3 +304,27 @@ def test_a_granted_secret_cannot_be_deleted(client: TestClient, mcp_body: dict[s
     assert refused.status_code == 409
     assert f"{policy_id} (granted to agents)" in refused.json()["detail"]
     assert _names(client, q=policy_id) == ["agent-key"]
+
+
+def _get(name: str) -> dict[str, Any]:
+    return {
+        "server": "secrets",
+        "tool": "get",
+        "effect": "allow",
+        "arguments": {"name": {"equals": name}},
+    }
+
+
+@pytest.mark.parametrize("name", ["alpha-token", "gamma-key"])
+def test_a_run_cannot_grant_a_credential_naos_uses_itself(
+    client: TestClient, spec_body: dict[str, Any], mcp_body: dict[str, Any], name: str
+) -> None:
+    _secret(client, "alpha-token")
+    _secret(client, "gamma-key")
+    rules = [{"server": "alpha", "tool": "search", "effect": "allow"}, _get(name)]
+    spec_body["mcp"] = {"policy": _mcp_policy(client, {"rules": rules})}
+
+    refused = client.post("/api/v1/runs", json=spec_body, headers={"Idempotency-Key": "key-1"})
+
+    assert refused.status_code == 422
+    assert name in refused.json()["detail"]

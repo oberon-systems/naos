@@ -521,13 +521,6 @@ def _policies(session: Session, run: Run) -> dict[PolicyKind, dict[str, Any] | N
     }
 
 
-def _credential_names(policies: dict[PolicyKind, dict[str, Any] | None]) -> set[str]:
-    mcp = policies[PolicyKind.MCP] or {"servers": []}
-    model = policies[PolicyKind.MODEL] or {"providers": []}
-    names = {server["credential"] for server in mcp["servers"] if server["credential"]}
-    return names | {provider["credential"] for provider in model["providers"]}
-
-
 # What naos uses itself and what the policy grants to the agent leave in two maps of one issue.
 def _credentials(
     session: Session,
@@ -539,8 +532,8 @@ def _credentials(
 ) -> tuple[dict[str, IssuedCredential], dict[str, IssuedCredential]]:
     if run.status not in CREDENTIAL_BOUND:
         return {}, {}
-    names = _credential_names(policies)
-    granted = set((policies[PolicyKind.MCP] or {}).get("secrets", []))
+    names = runs.credential_names(policies[PolicyKind.MCP], policies[PolicyKind.MODEL])
+    granted = set((policies[PolicyKind.MCP] or {}).get("secrets", [])) - names
     issued = issue_credentials(session, names | granted, now, ttl)
     if issued:
         audit.record(

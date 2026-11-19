@@ -126,6 +126,20 @@ def _waiting(session: Session, pinned: str | None) -> int:
     return int(session.exec(statement).one())
 
 
+def credential_names(mcp: dict[str, Any] | None, model: dict[str, Any] | None) -> set[str]:
+    names = {
+        server["credential"] for server in (mcp or {}).get("servers", []) if server["credential"]
+    }
+    return names | {provider["credential"] for provider in (model or {}).get("providers", [])}
+
+
+def check_grants(mcp: dict[str, Any] | None, model: dict[str, Any] | None) -> None:
+    """A secret naos uses itself is never also handed to the agent."""
+    shared = sorted(set((mcp or {}).get("secrets", [])) & credential_names(mcp, model))
+    if shared:
+        raise PolicyError(f"the mcp policy grants {shared[0]}, a credential naos uses itself")
+
+
 def create_run(
     session: Session,
     spec: RunSpec,
@@ -147,6 +161,8 @@ def create_run(
     refs = spec.policy_refs()
     mcp = session.get(Policy, refs[PolicyKind.MCP]) if refs[PolicyKind.MCP] else None
     mcp_document = mcp_servers.snapshot(session, mcp.document) if mcp else None
+    model = session.get(Policy, refs[PolicyKind.MODEL])
+    check_grants(mcp_document, model.document if model else None)
     profile = session.get(Profile, profile_id) if profile_id else None
     created = {
         "workspace": _workspace(session, refs[PolicyKind.MOUNT]),
@@ -471,9 +487,12 @@ def change_policy(
         document = mcp_servers.snapshot(session, rules)
         current = run.mcp_document
         values["mcp_document"] = document
+        check_grants(document, held_document(session, run, PolicyKind.MODEL))
     else:
         document = rules
         current = held_document(session, run, kind)
+        if kind is PolicyKind.MODEL:
+            check_grants(run.mcp_document, document)
     previous = getattr(run, f"{kind}_policy_id")
     if edited is not None and save:
         policy_id = values[f"{kind}_policy_id"] = _saved(session, edited, save_as)

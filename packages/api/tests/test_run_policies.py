@@ -385,3 +385,22 @@ def test_a_started_run_takes_another_model_policy(
     ):
         assert client.post(path, json=refused).status_code == 422, refused
     assert len(client.get(f"/api/v1/runs/{run_id}").json()["policy_history"]) == 3
+
+
+def test_a_change_cannot_grant_a_credential_naos_uses_itself(
+    client: TestClient, register: Register, spec_body: dict[str, Any]
+) -> None:
+    _server(client, "alpha")
+    client.post("/api/v1/secrets", json={"name": "gamma-key", "value": VALUE})
+    run_id = _started(client, register(), spec_body, _policy(client, "alpha"))
+    grant = {"server": "secrets", "tool": "get", "effect": "allow"}
+    for name in ("alpha-token", "gamma-key"):
+        search = {"server": "alpha", "tool": "search", "effect": "allow"}
+        rules = [search, grant | {"arguments": {"name": {"equals": name}}}]
+        body = {"kind": "mcp", "document": {"rules": rules}}
+        policy_id = client.post("/api/v1/policies", json=body).json()["id"]
+
+        refused = _change(client, run_id, policy_id)
+
+        assert refused.status_code == 422
+        assert name in refused.json()["detail"]
