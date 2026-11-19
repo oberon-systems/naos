@@ -1,6 +1,7 @@
 //! Host-side HTTP(S) capability. Only the MCP broker calls it.
 use crate::libs::audit;
 use crate::libs::error::AgentError;
+use reqwest::dns::{Addrs, Name, Resolve, Resolving};
 use reqwest::header::HeaderMap;
 use reqwest::{Client, Method, Response, StatusCode, Url};
 use serde::Deserialize;
@@ -332,18 +333,17 @@ impl NetworkGate {
         self.authorize(url.scheme(), host, &ips)?;
 
         let host = normalize_host(host).expect("authorized hostname");
-        let mut builder = Client::builder()
+        let pinned: Vec<SocketAddr> = ips.iter().map(|ip| SocketAddr::new(*ip, port)).collect();
+        let builder = Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .no_proxy()
+            .dns_resolver(Pinned {
+                host,
+                addrs: pinned,
+            })
             .timeout(timeout);
         #[cfg(any(test, feature = "smoke-stubs"))]
-        {
-            builder = builder.tls_certs_merge(self.roots.clone());
-        }
-        // One call per address would overwrite the pin instead of adding to it, leaving the last
-        // address as the only one the request can reach.
-        let pinned: Vec<SocketAddr> = ips.iter().map(|ip| SocketAddr::new(*ip, port)).collect();
-        builder = builder.resolve_to_addrs(&host, &pinned);
+        let builder = builder.tls_certs_merge(self.roots.clone());
         builder
             .build()
             .map_err(|err| AgentError::Runtime(format!("network deny: client setup: {err}")))
@@ -385,6 +385,27 @@ impl NetworkGate {
         gate.resolved = Some(ips);
         gate.roots = roots;
         Ok(gate)
+    }
+}
+
+/// The only resolver a gate client has: it answers the authorized host from the checked
+/// addresses and fails every other name, so no lookup falls through to the system resolver.
+struct Pinned {
+    host: String,
+    addrs: Vec<SocketAddr>,
+}
+
+impl Resolve for Pinned {
+    fn resolve(&self, name: Name) -> Resolving {
+        let found = normalize_host(name.as_str())
+            .filter(|host| *host == self.host)
+            .map(|_| self.addrs.clone());
+        Box::pin(async move {
+            match found {
+                Some(addrs) => Ok(Box::new(addrs.into_iter()) as Addrs),
+                None => Err("network deny: name is not pinned".into()),
+            }
+        })
     }
 }
 

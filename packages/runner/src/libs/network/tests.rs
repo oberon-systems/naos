@@ -185,6 +185,48 @@ async fn every_resolved_address_is_pinned() {
     assert_eq!(response.body, b"beta");
 }
 
+// The name is unresolvable, so reaching the stub with or without the trailing dot proves the pin
+// answered and the system resolver was never asked.
+#[tokio::test]
+async fn a_trailing_dot_keeps_the_pin() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/ok"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("beta"))
+        .mount(&server)
+        .await;
+    let address = server.address();
+    let gate = NetworkGate::local(
+        &json!({"allow": [{"protocol": "http", "host": "unresolvable.test"}]}),
+        vec![address.ip()],
+    )
+    .expect("policy");
+
+    for host in [
+        "unresolvable.test",
+        "unresolvable.test.",
+        "UNRESOLVABLE.test.",
+    ] {
+        let response = gate
+            .send(get(&format!("http://{host}:{}/ok", address.port())))
+            .await
+            .expect("response");
+        assert_eq!(response.body, b"beta");
+    }
+}
+
+#[tokio::test]
+async fn the_pin_answers_only_the_authorized_name() {
+    let pinned = Pinned {
+        host: "example.com".to_owned(),
+        addrs: vec![SocketAddr::new(PUBLIC, 443)],
+    };
+
+    let name = |raw: &str| raw.parse::<Name>().expect("name");
+    assert!(pinned.resolve(name("example.com.")).await.is_ok());
+    assert!(pinned.resolve(name("other.example.com")).await.is_err());
+}
+
 #[tokio::test]
 async fn a_forbidden_destination_is_not_reached() {
     let server = MockServer::start().await;
