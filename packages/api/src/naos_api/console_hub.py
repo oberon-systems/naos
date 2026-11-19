@@ -3,8 +3,38 @@ from collections.abc import Iterator
 from contextlib import contextmanager, suppress
 
 Outbox = asyncio.Queue[bytes | str]
-# Raw console bytes and the offset they start at, as the runner read them.
-Output = asyncio.Queue[tuple[int, bytes]]
+VIEWER_BYTES = 4 * 1024 * 1024
+
+
+class Output:
+    """Raw console bytes and their offsets, capped: a viewer that falls behind loses what it
+    held and gets None, its cue to resync from the store."""
+
+    def __init__(self, limit: int = VIEWER_BYTES) -> None:
+        self._queue: asyncio.Queue[tuple[int, bytes] | None] = asyncio.Queue()
+        self._limit = limit
+        self._held = 0
+        self._behind = False
+
+    def put(self, item: tuple[int, bytes]) -> None:
+        if self._behind:
+            return
+        if self._held + len(item[1]) > self._limit:
+            while not self._queue.empty():
+                self._queue.get_nowait()
+            self._held, self._behind = 0, True
+            self._queue.put_nowait(None)
+            return
+        self._held += len(item[1])
+        self._queue.put_nowait(item)
+
+    async def get(self) -> tuple[int, bytes] | None:
+        item = await self._queue.get()
+        if item is None:
+            self._behind = False
+            return None
+        self._held -= len(item[1])
+        return item
 
 
 # The live terminal is fed from here and not from the store: the store keeps the
@@ -48,7 +78,7 @@ class ConsoleHub:
     def publish(self, run_id: str, offset: int, data: bytes) -> None:
         for loop, output in list(self._viewers.get(run_id, set())):
             with suppress(RuntimeError):
-                loop.call_soon_threadsafe(output.put_nowait, (offset, data))
+                loop.call_soon_threadsafe(output.put, (offset, data))
 
     def to_runner(self, run_id: str, frame: bytes | str) -> bool:
         entry = self._runners.get(run_id)

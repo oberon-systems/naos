@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import json
 import re
@@ -15,6 +16,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from naos_api import consoles
 from naos_api.auth import require_operator_connection
+from naos_api.console_hub import Output
 from naos_api.models import AuditEvent, ConsoleChunk
 from naos_api.settings import Settings
 
@@ -361,3 +363,57 @@ def test_attach_to_an_unknown_run_is_refused(client: TestClient) -> None:
         pass
 
     assert refused.value.code == 1008
+
+
+@pytest.mark.parametrize(
+    ("frame", "code"),
+    [
+        ((0).to_bytes(8, "big") + b"x" * (64 * 1024 + 1), 1009),
+        ((4096).to_bytes(8, "big") + b"x", 1008),
+    ],
+)
+def test_the_runner_socket_refuses_an_oversized_frame_or_a_full_log(
+    client: TestClient,
+    register: Register,
+    create_run: CreateRun,
+    configure: Callable[..., Settings],
+    frame: bytes,
+    code: int,
+) -> None:
+    configure(console_limit_bytes=4096)
+    runner, run_id = _leased(client, register, create_run)
+
+    with _runner_socket(client, runner, run_id) as shipped:
+        shipped.send_bytes(frame)
+        with pytest.raises(WebSocketDisconnect) as closed:
+            shipped.receive_text()
+
+    assert closed.value.code == code
+
+
+def test_a_viewer_that_falls_behind_is_told_to_resync() -> None:
+    output = Output(limit=10)
+
+    async def drain() -> list[tuple[int, bytes] | None]:
+        output.put((0, b"x" * 6))
+        output.put((6, b"y" * 6))
+        output.put((12, b"z"))
+        first = await output.get()
+        output.put((13, b"w"))
+        return [first, await output.get()]
+
+    assert asyncio.run(drain()) == [None, (13, b"w")]
+
+
+def test_the_downloaded_log_reads_every_page(
+    client: TestClient, register: Register, create_run: CreateRun
+) -> None:
+    runner, run_id = _leased(client, register, create_run)
+    offset = 0
+    for line in range(consoles.READ_CHUNKS + 5):
+        offset = _ship(client, runner, run_id, offset, f"line {line}\n".encode()).json()["offset"]
+
+    log = client.get(f"/api/v1/runs/{run_id}/console").content.decode()
+
+    assert len(log.splitlines()) == consoles.READ_CHUNKS + 5
+    assert log.splitlines()[-1].endswith(f"line {consoles.READ_CHUNKS + 4}")

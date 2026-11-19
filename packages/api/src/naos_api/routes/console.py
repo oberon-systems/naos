@@ -23,6 +23,8 @@ POLL_SECONDS = 0.5
 FRAME_BYTES = 32 * 1024
 # Every frame the runner sends begins with the offset its bytes start at.
 OFFSET_BYTES = 8
+MAX_FRAME = OFFSET_BYTES + 64 * 1024
+STORE_FRAMES = 64
 # How long a viewer waits for the store to catch up with a frame ahead of it.
 GAP_TRIES = 10
 GAP_WAIT = 0.05
@@ -135,8 +137,10 @@ async def attach(websocket: WebSocket, run_id: str) -> None:
             # store only covers what reached another worker, or the run's end.
             while not listener.done():
                 try:
-                    start, data = await asyncio.wait_for(live.get(), timeout=POLL_SECONDS)
+                    got = await asyncio.wait_for(live.get(), timeout=POLL_SECONDS)
                 except TimeoutError:
+                    got = None
+                if got is None:
                     tail = await _in_session(
                         db, partial(consoles.tail, run_id=run_id, after=offset)
                     )
@@ -147,6 +151,7 @@ async def attach(websocket: WebSocket, run_id: str) -> None:
                         await websocket.close()
                         return
                     continue
+                start, data = got
                 # the frames before this one may still be on their way into the store
                 for _ in range(GAP_TRIES):
                     if start <= offset:
@@ -223,7 +228,7 @@ async def runner_console(
     except DomainError as err:
         raise WebSocketException(status.WS_1008_POLICY_VIOLATION, str(err)[:120]) from err
     await websocket.accept()
-    store: asyncio.Queue[tuple[int, bytes] | None] = asyncio.Queue()
+    store: asyncio.Queue[tuple[int, bytes] | None] = asyncio.Queue(STORE_FRAMES)
     with hub.runner(run_id) as outbox:
         sender = asyncio.create_task(_to_runner(websocket, outbox))
         keeper = asyncio.create_task(_keep(db, principal.runner_id, run_id, limit, store))
@@ -243,11 +248,18 @@ async def runner_console(
                 frame = message.get("bytes")
                 if frame is None or len(frame) < OFFSET_BYTES:
                     continue
+                if len(frame) > MAX_FRAME:
+                    await websocket.close(status.WS_1009_MESSAGE_TOO_BIG, "frame too large")
+                    return
                 offset, data = int.from_bytes(frame[:OFFSET_BYTES], "big"), frame[OFFSET_BYTES:]
+                if offset >= limit:
+                    await websocket.close(status.WS_1008_POLICY_VIOLATION, "console log full")
+                    return
+                data = data[: limit - offset]
                 # an echo reaches the terminal and the runner moves on before any commit;
                 # viewers cut what they already have by offset
                 hub.publish(run_id, offset, data)
-                store.put_nowait((offset, data))
+                await store.put((offset, data))
                 await websocket.send_text(json.dumps({"offset": offset + len(data)}))
             if keeper.done() and isinstance(refused := keeper.exception(), DomainError):
                 await websocket.close(status.WS_1008_POLICY_VIOLATION, str(refused)[:120])
@@ -256,6 +268,7 @@ async def runner_console(
         finally:
             sender.cancel()
             # what already arrived still reaches the store
-            store.put_nowait(None)
+            if not keeper.done():
+                await store.put(None)
             with suppress(Exception):
                 await keeper

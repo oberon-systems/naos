@@ -80,7 +80,7 @@ def append(
     return start, fresh
 
 
-def _chunks(session: Session, run_id: str, after: int, chunks: int | None) -> list[ConsoleChunk]:
+def _chunks(session: Session, run_id: str, after: int, chunks: int) -> list[ConsoleChunk]:
     return list(
         session.exec(
             select(ConsoleChunk)
@@ -102,11 +102,14 @@ def timed(session: Session, run_id: str) -> bytes:
     starts: list[int] = []
     times: list[int] = []
     raw = bytearray()
-    for row in _chunks(session, run_id, 0, None):
-        if row.data:
-            starts.append(len(raw))
-            times.append(row.at)
-            raw += row.data
+    after = 0
+    while rows := _chunks(session, run_id, after, READ_CHUNKS):
+        for row in rows:
+            if row.data:
+                starts.append(len(raw))
+                times.append(row.at)
+                raw += row.data
+        after = rows[-1].end
     stamped = bytearray()
     for match in LINE.finditer(bytes(raw)):
         text = ESCAPES.sub(b"", match.group(1)).rstrip()
