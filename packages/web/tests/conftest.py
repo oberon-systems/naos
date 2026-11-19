@@ -10,10 +10,19 @@ from fastapi.testclient import TestClient
 from naos_web.app import create_app
 from naos_web.client import ApiClient
 from naos_web.clock import get_now
+from naos_web.settings import get_settings
 
 sys.path.insert(0, str(Path(__file__).parent))
 
 from stub_api import MERGES, NOW, RUNNERS, RUNS, stub  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def test_host(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    monkeypatch.setenv("NAOS_WEB_ALLOWED_HOSTS", '["testserver"]')
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 # The stub's writes edit its rows in place; each test starts from the rows the board draws.

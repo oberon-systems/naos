@@ -46,6 +46,7 @@ services:
       NAOS_WEB_API_BASE_URL: ${NAOS_WEB_API_BASE_URL:-http://127.0.0.1:8080}
       NAOS_WEB_API_URL: ${NAOS_WEB_API_URL:-http://api:8000}
       NAOS_WEB_OPERATOR_TOKEN_FILE: /run/secrets/operator
+      NAOS_WEB_ALLOWED_HOSTS: ${NAOS_WEB_ALLOWED_HOSTS:-["127.0.0.1", "localhost"]}
     volumes:
       # No file named, no token: the api then refuses the web ui like any other caller.
       - ${NAOS_WEB_OPERATOR_TOKEN_FILE:-/dev/null}:/run/secrets/operator:ro

@@ -14,6 +14,7 @@ from starlette.types import Scope
 
 from naos_web import format
 from naos_web.client import ApiClient, read_token
+from naos_web.guard import Guard
 from naos_web.routes import router
 from naos_web.settings import get_settings
 
@@ -91,4 +92,5 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(router)
+    app.add_middleware(Guard, hosts=settings.allowed_hosts)
     return app

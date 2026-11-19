@@ -30,10 +30,16 @@ docker pull ghcr.io/oberon-systems/naos-web
 | `NAOS_WEB_API_URL` | `http://127.0.0.1:8080` | The API this process calls, which may be a private address |
 | `NAOS_WEB_OPERATOR_TOKEN_FILE` | unset | File holding the operator token; unset leaves every page unauthorized |
 | `NAOS_WEB_API_TIMEOUT_SECONDS` | `10` | How long a page waits for the API |
+| `NAOS_WEB_ALLOWED_HOSTS` | `["127.0.0.1", "localhost"]` | Host names the UI answers, as a JSON list; any other `Host` gets 400 |
 
 The token is read once at startup and lives only in the HTTP client. It is
 never rendered, and the UI is never the authorization boundary: every action
 is authorized by the API, which refuses the same calls to anyone else.
+
+Every request the UI accepts acts with the operator's authority. It answers
+only the hosts in `NAOS_WEB_ALLOWED_HOSTS`, and refuses a form post or a
+socket that the browser marks as coming from another origin. Binding it beyond
+loopback needs an authenticating reverse proxy in front.
 
 The screens and what each one shows are in
 [docs/10-web-ui.md](https://github.com/oberon-systems/naos/blob/main/docs/10-web-ui.md).

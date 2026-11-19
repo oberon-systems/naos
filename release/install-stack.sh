@@ -20,6 +20,7 @@ asked on the terminal; --yes, or no terminal, takes the defaults.
   --release X.Y.Z             naos release to install (default: the latest)
   --layout xdg|system         xdg: your home, no sudo; system: /opt/naos
   --bind ADDRESS              address both ports are published on (default 127.0.0.1)
+  --expose                    accept a non-loopback --bind: the web ui acts as the operator
   --api-port PORT             api port (default 8080)
   --web-port PORT             web ui port (default 8000)
   --mount-roots DIR[,DIR...]  host directories a Run may mount (default: none)
@@ -84,6 +85,7 @@ target="${wanted:-$(latest_release)}"
 command=install
 layout=''
 bind=''
+expose=''
 api_port=''
 web_port=''
 mount_roots=''
@@ -98,6 +100,7 @@ while [ $# -gt 0 ]; do
     --release) need_value "$1" $# && shift ;;
     --layout) need_value "$1" $# && layout="$2" && shift ;;
     --bind) need_value "$1" $# && bind="$2" && shift ;;
+    --expose) expose=yes ;;
     --api-port) need_value "$1" $# && api_port="$2" && shift ;;
     --web-port) need_value "$1" $# && web_port="$2" && shift ;;
     --mount-roots) need_value "$1" $# && mount_roots="$2" && mount_roots_given=1 && shift ;;
@@ -489,6 +492,18 @@ web_port="${web_port:-$(setting NAOS_WEB_PORT)}"
 ask bind "address to publish the ports on" 127.0.0.1
 ask api_port "api port" 8080
 ask web_port "web ui port" 8000
+case "$bind" in
+127.* | ::1 | localhost) ;;
+*)
+    if [ -z "$expose" ] && interactive; then
+        printf '%s [y/N]: ' "the web ui acts as the operator; publish it on $bind behind an authenticating proxy?" >/dev/tty
+        read -r answer </dev/tty || answer=
+        case "$answer" in [yY]*) expose=yes ;; esac
+    fi
+    [ -n "$expose" ] || fail "--bind $bind publishes the web ui, which acts as the operator, beyond this host; pass --expose once a proxy authenticates it"
+    say "set NAOS_WEB_ALLOWED_HOSTS in $env_file to the proxy's host name"
+    ;;
+esac
 roots_json="$(setting NAOS_ALLOWED_MOUNT_ROOTS)"
 if [ -z "$mount_roots_given" ] && [ "${roots_json:-[]}" = "[]" ]; then
     ask mount_roots "host directories a Run may mount, comma-separated" ""

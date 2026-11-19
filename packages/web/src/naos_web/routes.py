@@ -4,10 +4,10 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, replace
 from http import HTTPStatus
 from typing import Annotated, Literal
-from urllib.parse import parse_qsl, urlsplit
+from urllib.parse import parse_qsl
 from uuid import uuid4
 
-from fastapi import APIRouter, Path, Query, Request, WebSocket, WebSocketException, status
+from fastapi import APIRouter, Path, Query, Request, WebSocket, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
@@ -823,16 +823,8 @@ async def _relay(websocket: WebSocket, frames: AsyncIterator[bytes | str]) -> No
     await websocket.close()
 
 
-def _same_origin(websocket: WebSocket) -> None:
-    origin = urlsplit(websocket.headers.get("origin", "")).netloc
-    if origin and origin != websocket.headers.get("host"):
-        raise WebSocketException(status.WS_1008_POLICY_VIOLATION, "foreign origin")
-
-
-# The page has no login of its own, so a socket opened from another origin is refused.
 @router.websocket("/runs/{run_id}/terminal/ws")
 async def run_terminal_stream(websocket: WebSocket, run_id: str) -> None:
-    _same_origin(websocket)
     await websocket.accept()
     outbox: asyncio.Queue[bytes | str] = asyncio.Queue()
     await _pipe(websocket, websocket.app.state.api.attach(run_id, outbox), outbox)
@@ -857,7 +849,6 @@ async def _pipe(
 # The ranges the pane asks for, relayed to the api under the operator token the page never sees.
 @router.websocket("/runs/{run_id}/changes/{index}/content/ws")
 async def run_content_stream(websocket: WebSocket, run_id: str, index: int) -> None:
-    _same_origin(websocket)
     await websocket.accept()
     outbox: asyncio.Queue[bytes | str] = asyncio.Queue()
     await _pipe(websocket, websocket.app.state.api.content(run_id, index, outbox), outbox)

@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     api_url: str = "http://127.0.0.1:8080"
     operator_token_file: Path | None = None
     api_timeout_seconds: float = 10.0
+    allowed_hosts: list[str] = ["127.0.0.1", "localhost"]
 
 
 @cache

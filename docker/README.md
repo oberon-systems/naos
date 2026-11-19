@@ -52,7 +52,10 @@ For a deployment, take `compose.yaml` from a naos release, which pins both
 images by digest, set `NAOS_ALLOWED_MOUNT_ROOTS` to the directories a Run may mount
 (`install-stack.sh` asks for them, or takes `--mount-roots`), and point `NAOS_WEB_API_BASE_URL` at the api as an operator's browser reaches
 it. `NAOS_BIND` stays on `127.0.0.1` unless a reverse proxy terminating TLS
-sits in front.
+and authenticating the operator sits in front: the web ui acts as the
+operator for every request it accepts. `install-stack.sh` refuses any other
+bind without `--expose`, and `NAOS_WEB_ALLOWED_HOSTS` then has to name the
+proxy's host.
 
 ## Run
 
