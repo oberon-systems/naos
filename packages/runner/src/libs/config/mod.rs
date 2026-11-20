@@ -220,11 +220,16 @@ fn checked_path(key: &str, path: PathBuf) -> Result<PathBuf, AgentError> {
 pub fn prepare_private_dir(path: &Path) -> Result<(), AgentError> {
     DirBuilder::new().recursive(true).mode(0o700).create(path)?;
     let meta = fs::symlink_metadata(path)?;
-    if !meta.file_type().is_dir() || meta.permissions().mode() & 0o022 != 0 {
+    let mode = meta.permissions().mode();
+    if !meta.file_type().is_dir() || mode & 0o022 != 0 {
         return Err(AgentError::Config(format!(
             "{} must be a directory, not a symlink, and not writable by group or others",
             path.display()
         )));
+    }
+    // An existing directory keeps its mode through create, so one others can read is closed here.
+    if mode & 0o077 != 0 {
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700))?;
     }
     Ok(())
 }

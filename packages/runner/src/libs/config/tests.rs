@@ -148,6 +148,19 @@ fn private_dirs_are_created_and_shared_ones_refused() {
 }
 
 #[test]
+fn an_existing_readable_dir_is_made_private() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let readable = dir.path().join("vms");
+    fs::create_dir(&readable).expect("mkdir");
+    fs::set_permissions(&readable, fs::Permissions::from_mode(0o755)).expect("chmod");
+
+    prepare_private_dir(&readable).expect("prepared");
+
+    let mode = fs::metadata(&readable).expect("meta").permissions().mode() & 0o777;
+    assert_eq!(mode, 0o700);
+}
+
+#[test]
 fn the_state_directory_is_prepared_at_start() {
     let dir = tempfile::tempdir().expect("tempdir");
     let state = dir.path().join("agent/state");
