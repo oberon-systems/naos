@@ -1,12 +1,15 @@
 import copy
 import html
 import re
+import time
 from collections.abc import Iterator
 from urllib.parse import parse_qsl, urlencode
 
 import pytest
 from fastapi.testclient import TestClient
 from stub_api import MERGES, WRITES
+
+from naos_web.changes import Asked, selection
 
 WAITING = "run_5be317"
 MERGED = "run_0d4492"
@@ -306,3 +309,28 @@ def test_the_selection_survives_a_filter(client: TestClient) -> None:
     assert dict(parse_qsl(toggle.group(1).partition("?")[2].replace("&amp;", "&")))["change"] == (
         "deleted"
     )
+
+
+def _dir(path: str, change: str, **extra: object) -> dict[str, object]:
+    return {"path": path, "change": change, "kind": "dir", **extra}
+
+
+def test_the_default_selection_stays_linear_in_the_diff() -> None:
+    chain = [".github"]
+    for level in range(254):
+        chain.append(f"{chain[-1]}/d{level}")
+    entries = [_dir(chain[0], "created", sensitive=True)]
+    entries += [_dir(path, "created") for path in chain[1:]]
+    entries += [
+        {"path": f"{chain[-1]}/f{n}", "change": "created", "kind": "file"} for n in range(50_000)
+    ]
+    entries += [_dir(f"gone/{n}", "deleted") for n in range(5_000)]
+    entries += [{"path": f"gone/{n}/x", "change": "deleted", "kind": "file"} for n in range(5_000)]
+    merge = {"decision": None, "entries": entries}
+
+    started = time.monotonic()
+    chosen = selection(merge, Asked()).paths
+
+    assert time.monotonic() - started < 2
+    assert not any(path.startswith(".github") for path in chosen)
+    assert "gone/7" in chosen and "gone/7/x" in chosen

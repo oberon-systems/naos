@@ -1,3 +1,4 @@
+from bisect import bisect_left
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from typing import Literal
@@ -422,11 +423,12 @@ def _graph(entries: list[Row]) -> _Graph:
     created_dirs = {
         entry["path"] for entry in live if entry["change"] == "created" and entry["kind"] == "dir"
     }
-    removed = [
+    removed = sorted(
         (entry["from"] if entry["change"] == "renamed" else entry["path"], entry["path"])
         for entry in live
         if entry["change"] in ("deleted", "renamed")
-    ]
+    )
+    hosts = [host for host, _ in removed]
     needs: dict[str, frozenset[str]] = {}
     needed_by: dict[str, set[str]] = {}
     for entry in live:
@@ -437,7 +439,10 @@ def _graph(entries: list[Row]) -> _Graph:
             wanted.add(parent)
         if entry["change"] == "deleted" and entry["kind"] == "dir":
             prefix = f"{path}/"
-            wanted.update(owner for host, owner in removed if host.startswith(prefix))
+            at = bisect_left(hosts, prefix)
+            while at < len(hosts) and hosts[at].startswith(prefix):
+                wanted.add(removed[at][1])
+                at += 1
         needs[path] = frozenset(wanted)
         for other in wanted:
             needed_by.setdefault(other, set()).add(path)
@@ -474,11 +479,16 @@ def _without(graph: _Graph, chosen: set[str], path: str) -> set[str]:
     return chosen - dropped
 
 
+# Whatever an unchosen entry is needed by cannot be chosen either, followed once through the graph.
 def _closed(graph: _Graph, candidates: set[str]) -> set[str]:
-    chosen = set(candidates)
-    while broken := {path for path in chosen if not graph.needs[path] <= chosen}:
-        chosen -= broken
-    return chosen
+    stack = list(graph.live - candidates)
+    dropped: set[str] = set()
+    while stack:
+        for path in graph.needed_by.get(stack.pop(), ()):
+            if path in candidates and path not in dropped:
+                dropped.add(path)
+                stack.append(path)
+    return candidates - dropped
 
 
 # A sent decision locks the selection; before that the form carries it, or the default does.
@@ -514,7 +524,7 @@ def resolved(resolutions: dict[str, Resolution]) -> str:
     )
 
 
-def _outcome(entry: Row, report: Row) -> tuple[str, Tone]:
+def _outcome(entry: Row, report: dict[str, set[str]]) -> tuple[str, Tone]:
     path = entry["path"]
     if entry["change"] == "rejected":
         return "rejected", "grey"
@@ -523,7 +533,7 @@ def _outcome(entry: Row, report: Row) -> tuple[str, Tone]:
     if path in report["skipped"]:
         return "skipped", "grey"
     if path in report["applied"]:
-        backed = {path, entry.get("from")} & set(report["backed_up"])
+        backed = {path, entry.get("from")} & report["backed_up"]
         return ("applied · backed up" if backed else "applied"), "green"
     return "left out", "grey"
 
@@ -651,12 +661,17 @@ def changes(
     sel = selection(merge, ask or Asked())
     reasons = {row["path"]: row["reason"] for row in merge["conflicts"] or []}
     report = merge["report"]
+    looked_up = (
+        {key: set(report[key]) for key in ("exported", "skipped", "applied", "backed_up")}
+        if report is not None
+        else None
+    )
     rows = []
     for index, entry in enumerate(entries):
         row = _row(index, entry)
         outcome: tuple[str | None, Tone] = (None, "grey")
-        if report is not None:
-            outcome = _outcome(entry, report)
+        if looked_up is not None:
+            outcome = _outcome(entry, looked_up)
         rows.append(
             replace(
                 row,
