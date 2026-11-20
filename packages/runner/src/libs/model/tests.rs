@@ -944,3 +944,51 @@ async fn an_unreadable_policy_grants_nothing_and_holds_no_key() {
     assert!(gate.served().is_empty());
     assert!(!gate.holds("alpha-key") && !gate.holds("beta-key"));
 }
+
+#[tokio::test]
+async fn a_request_holds_its_ceiling_against_the_budget_until_it_ends() {
+    let server = MockServer::start().await;
+    Mock::given(path(CHAT))
+        .respond_with(openai_answer(1, 1).set_delay(Duration::from_millis(300)))
+        .mount(&server)
+        .await;
+    let gate = gate_for(&server, (1_000_000, 100), 60);
+    let asking = |tokens: u64| {
+        request(
+            CHAT,
+            json!({ "model": "alpha-mini", "max_tokens": tokens, "messages": [] }),
+        )
+    };
+
+    let (first, second) = tokio::join!(answer(&gate, asking(60)), async {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        answer(&gate, asking(60)).await
+    });
+    let (third, _) = answer(&gate, asking(1000)).await;
+
+    assert_eq!((first.0, second.0, third), (200, 200, 200));
+    let sent: Vec<Value> = server
+        .received_requests()
+        .await
+        .expect("requests")
+        .iter()
+        .map(|request| serde_json::from_slice(&request.body).expect("json"))
+        .collect();
+    let ceilings: Vec<&Value> = sent.iter().map(|body| &body["max_tokens"]).collect();
+    assert_eq!(ceilings, [&json!(60), &json!(40), &json!(98)]);
+}
+
+#[tokio::test]
+async fn a_provider_that_refuses_connections_is_unreachable() {
+    let closed = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+    let address = closed.local_addr().expect("addr");
+    drop(closed);
+    let gate =
+        ModelGate::local(&document(address, (1000, 1000), 60), vec![address.ip()]).expect("policy");
+    grant(&gate, u64::MAX);
+
+    let (status, body) = answer(&gate, chat("alpha-mini")).await;
+
+    assert_eq!(status, 502);
+    assert_eq!(body["error"]["message"], "provider unreachable");
+}

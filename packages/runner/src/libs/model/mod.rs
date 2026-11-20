@@ -36,6 +36,8 @@ const MODELS: &str = "/v1/models";
 const MESSAGES: &str = "/v1/messages";
 const RESPONSES: &str = "/v1/responses";
 
+const IMPLICIT_RESERVE: u64 = 4096;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Dialect {
@@ -143,6 +145,7 @@ pub struct Relay {
     event_stream: bool,
     read: usize,
     done: bool,
+    reserved: u64,
 }
 
 struct Call {
@@ -292,6 +295,7 @@ pub struct ModelGate {
     run_id: String,
     policy: Mutex<Arc<Policy>>,
     spent: Mutex<Usage>,
+    reserved: Mutex<u64>,
     credentials: Mutex<BTreeMap<String, RunCredential>>,
 }
 
@@ -316,6 +320,7 @@ impl ModelGate {
                 &[],
             )?)),
             spent: Mutex::new(Usage::default()),
+            reserved: Mutex::new(0),
             credentials: Mutex::new(BTreeMap::new()),
         })
     }
@@ -443,6 +448,7 @@ impl ModelGate {
     /// Books what the provider reported against the Run and writes the call's audit line.
     pub fn finish(&self, relay: &Relay, outcome: Result<(), &str>) {
         let usage = relay.meter.usage();
+        self.release(relay.reserved);
         {
             let mut spent = self.spent.lock().expect("spent");
             spent.input = spent.input.saturating_add(usage.input);
@@ -543,17 +549,18 @@ impl ModelGate {
             .secret(&provider.credential)
             .map_err(|reason| refuse(502, reason, "credential"))?;
 
+        let reserved = self
+            .reserve(&mut body, policy.budget.output)
+            .map_err(|()| refuse(429, "the Run's token budget is spent", "budget"))?;
         let stream = body.get("stream") == Some(&Value::Bool(true));
         // Without it an OpenAI stream carries no usage, and the budget could not be booked.
-        let forwarded = if request.path == CHAT && stream {
+        if request.path == CHAT && stream {
             if !body.get("stream_options").is_some_and(Value::is_object) {
                 body["stream_options"] = json!({});
             }
             body["stream_options"]["include_usage"] = json!(true);
-            body.to_string().into_bytes()
-        } else {
-            request.body
-        };
+        }
+        let forwarded = body.to_string().into_bytes();
         let mut headers = HeaderMap::new();
         for (name, value) in &request.headers {
             let name = name.to_ascii_lowercase();
@@ -604,11 +611,12 @@ impl ModelGate {
                 reason if reason.contains("timed out") => {
                     refuse(504, "provider timed out", "timeout")
                 }
-                reason if reason.contains("network deny") && !reason.contains("request failed") => {
+                reason if reason.contains("network deny") && !reason.contains("request_failed") => {
                     refuse(502, "provider refused by the network gate", "denied")
                 }
                 _ => refuse(502, "provider unreachable", "provider"),
-            })?;
+            })
+            .inspect_err(|_| self.release(reserved))?;
         let status = response.status();
         let returned: Vec<(String, String)> = response
             .headers()
@@ -642,7 +650,37 @@ impl ModelGate {
             event_stream,
             read: 0,
             done: false,
+            reserved,
         })
+    }
+
+    /// Holds the request's output ceiling against the budget until `finish` books what it used;
+    /// a ceiling past what is left is cut to it, and a request naming none holds an estimate.
+    fn reserve(&self, body: &mut Value, budget: u64) -> Result<u64, ()> {
+        let spent = self.spent.lock().expect("spent").output;
+        let mut reserved = self.reserved.lock().expect("reserved");
+        let left = budget.saturating_sub(spent).saturating_sub(*reserved);
+        if left == 0 {
+            return Err(());
+        }
+        let field = ["max_completion_tokens", "max_output_tokens", "max_tokens"]
+            .into_iter()
+            .find(|name| body.get(*name).is_some());
+        let ceiling = match field.map(|name| (name, body[name].as_u64())) {
+            Some((name, Some(wanted))) if wanted > left => {
+                body[name] = json!(left);
+                left
+            }
+            Some((_, Some(wanted))) => wanted,
+            _ => IMPLICIT_RESERVE.min(left),
+        };
+        *reserved += ceiling;
+        Ok(ceiling)
+    }
+
+    fn release(&self, ceiling: u64) {
+        let mut reserved = self.reserved.lock().expect("reserved");
+        *reserved = reserved.saturating_sub(ceiling);
     }
 
     fn secret(&self, name: &str) -> Result<String, &'static str> {
