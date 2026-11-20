@@ -43,13 +43,6 @@ jobs:
       - name: Check the tag against .cz.yaml
         run: |
           test "$GITHUB_REF_NAME" = "image-$(sed -n 's/^  version: //p' packer/.cz.yaml)"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: |
-            ~/.config/packer/plugins
-            packer/base/packer_cache
-          key: image-${{ hashFiles('packer/*/pins.auto.pkrvars.hcl', 'packer/*/*.pkr.hcl') }}
-          restore-keys: image-
       - name: Install QEMU and gh
         run: apk add --no-cache qemu-system-x86_64 qemu-img github-cli
       - name: Build images
