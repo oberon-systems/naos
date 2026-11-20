@@ -322,6 +322,16 @@ fetch() {
 
 # The web container reads the operator token as nobody, so that one file is 0644
 # and the 0700 directory around it keeps it off other accounts.
+# The password is written by shell builtins, so it never sits on a command line.
+with_password() {
+    while IFS= read -r line; do
+        case "$line" in
+        NAOS_DB_PASSWORD=*) printf 'NAOS_DB_PASSWORD=%s\n' "$1" ;;
+        *) printf '%s\n' "$line" ;;
+        esac
+    done
+}
+
 write_env() {
     [ ! -f "$env_file" ] || return 0
     secrets="$dir/secrets"
@@ -331,14 +341,13 @@ write_env() {
     sed -e "s|^NAOS_BIND=.*|NAOS_BIND=$bind|" \
         -e "s|^NAOS_API_PORT=.*|NAOS_API_PORT=$api_port|" \
         -e "s|^NAOS_WEB_PORT=.*|NAOS_WEB_PORT=$web_port|" \
-        -e "s|^NAOS_DB_PASSWORD=.*|NAOS_DB_PASSWORD=$(token)|" \
         -e "s|^NAOS_DB_DATA=.*|NAOS_DB_DATA=$db|" \
         -e "s|^NAOS_DATABASE_AUTO_MIGRATE=.*|NAOS_DATABASE_AUTO_MIGRATE=true|" \
         -e "s|^NAOS_OPERATOR_TOKEN_SHA256=.*|NAOS_OPERATOR_TOKEN_SHA256=$(digest "$secrets/operator")|" \
         -e "s|^NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256=.*|NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256=$(digest "$secrets/enrollment")|" \
         -e "s|^NAOS_WEB_API_BASE_URL=.*|NAOS_WEB_API_BASE_URL=http://$host:$api_port|" \
         -e "s|^NAOS_WEB_OPERATOR_TOKEN_FILE=.*|NAOS_WEB_OPERATOR_TOKEN_FILE=$secrets/operator|" \
-        "$dir/.env.example" >"$env_file.new"
+        "$dir/.env.example" | with_password "$(token)" >"$env_file.new"
     chmod 0600 "$env_file.new"
     mv "$env_file.new" "$env_file"
     say "wrote $env_file and the tokens in $secrets"
@@ -400,8 +409,14 @@ start() {
     fi
 }
 
+# curl reads the header from a file: on its command line the token would show in ps.
 operator() {
-    curl -fsS -H "Authorization: Bearer $(cat "$dir/secrets/operator")" "$@"
+    header="$dir/secrets/.operator.header"
+    (umask 077 && printf 'Authorization: Bearer %s\n' "$(cat "$dir/secrets/operator")" >"$header")
+    status=0
+    curl -fsS -H @"$header" "$@" || status=$?
+    rm -f "$header"
+    return "$status"
 }
 
 # Every install and upgrade registers the image of its release; the id carries the
