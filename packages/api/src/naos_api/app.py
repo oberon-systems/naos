@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import APIRouter, Depends, FastAPI
+from fastapi.exceptions import RequestValidationError
 from sqlmodel import Session
 
 from naos_api import schema
@@ -21,6 +22,7 @@ from naos_api.routes import (
     runner_console_router,
     runner_content_router,
     runner_router,
+    validation_error_handler,
 )
 from naos_api.runners import expire_leases
 from naos_api.settings import get_settings
@@ -72,6 +74,7 @@ def create_app() -> FastAPI:
     app.state.content_hub = ContentHub()
     schema.ensure(app.state.db.engine, settings.database_auto_migrate)
     app.add_exception_handler(DomainError, domain_error_handler)
+    app.add_exception_handler(RequestValidationError, validation_error_handler)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

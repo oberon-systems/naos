@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastapi import Depends, Header, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlmodel import Session
 
@@ -76,3 +77,12 @@ _ERROR_STATUS: dict[type[Exception], int] = {
 
 def domain_error_handler(_: Request, exc: Exception) -> JSONResponse:
     return JSONResponse({"detail": str(exc)}, status_code=_ERROR_STATUS.get(type(exc), 400))
+
+
+# FastAPI's own 422 echoes every failing field's input, and for a secret that is its value.
+def validation_error_handler(_: Request, exc: Exception) -> JSONResponse:
+    errors = exc.errors() if isinstance(exc, RequestValidationError) else []
+    detail = [
+        {"loc": list(error["loc"]), "msg": error["msg"], "type": error["type"]} for error in errors
+    ]
+    return JSONResponse({"detail": detail}, status_code=422)

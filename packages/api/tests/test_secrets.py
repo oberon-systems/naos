@@ -328,3 +328,15 @@ def test_a_run_cannot_grant_a_credential_naos_uses_itself(
 
     assert refused.status_code == 422
     assert name in refused.json()["detail"]
+
+
+@pytest.mark.parametrize("value", ["canary-alpha\u0001", "canary-alpha-" + "x" * 8192])
+def test_a_refused_value_is_never_echoed(client: TestClient, value: str) -> None:
+    created = client.post("/api/v1/secrets", json={"name": "alpha-token", "value": value})
+    _secret(client, "beta-token")
+    rotated = client.post("/api/v1/secrets/beta-token/rotate", json={"value": value})
+
+    for answer in (created, rotated):
+        assert answer.status_code == 422
+        assert "canary" not in answer.text
+        assert answer.json()["detail"][0]["loc"][-1] == "value"
