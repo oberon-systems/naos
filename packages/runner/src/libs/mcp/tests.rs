@@ -871,6 +871,27 @@ async fn the_call_budget_is_enforced() {
 }
 
 #[tokio::test]
+async fn a_listing_is_charged_to_the_call_budget() {
+    let server = upstream(answers, false).await;
+    let input = [
+        format!(
+            "{}\n",
+            json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+        ),
+        call(2, "alpha__search", json!({})),
+    ]
+    .concat();
+
+    let (_, replies) = exchange(
+        &upstream_gates(*server.address(), json!({"max_calls_per_minute": 1})),
+        input.as_bytes(),
+    )
+    .await;
+
+    assert_eq!(tool_text(&replies[1]), (true, "rate limit".to_owned()));
+}
+
+#[tokio::test]
 async fn an_expired_session_is_opened_again() {
     let server = upstream(answers, false).await;
     Mock::given(body_partial_json(json!({"method": "tools/call"})))

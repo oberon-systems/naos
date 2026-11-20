@@ -421,7 +421,6 @@ impl McpGate {
         tool: &str,
         arguments: Value,
     ) -> Result<Value, Failure> {
-        upstream.spend()?;
         let result = self
             .rpc(
                 upstream,
@@ -455,7 +454,6 @@ impl McpGate {
     }
 
     pub async fn read_resource(&self, upstream: &Upstream, uri: &str) -> Result<Value, Failure> {
-        upstream.spend()?;
         self.rpc(upstream, "resources/read", json!({ "uri": uri }))
             .await
     }
@@ -493,6 +491,8 @@ impl McpGate {
         method: &str,
         params: Value,
     ) -> Result<Value, Failure> {
+        // Each request is charged, every page of a listing included; the cached handshake is not.
+        upstream.spend()?;
         let bearer = self.bearer(upstream)?;
         let outcome = self
             .exchange(upstream, bearer.as_deref(), method, params)
