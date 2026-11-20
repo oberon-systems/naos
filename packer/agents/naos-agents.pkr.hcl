@@ -31,6 +31,15 @@ variable "disk_size" {
   default = "3G"
 }
 
+# Read from the base build's SHA256SUMS; no default, so a build that skips it fails.
+variable "base_sha256" {
+  type = string
+  validation {
+    condition     = can(regex("^[0-9a-f]{64}$", var.base_sha256))
+    error_message = "The base_sha256 variable must be 64 lowercase hex characters."
+  }
+}
+
 variable "memory" {
   type    = number
   default = 2048
@@ -49,7 +58,7 @@ locals {
 
 source "qemu" "agents" {
   iso_url          = local.base_image
-  iso_checksum     = "none"
+  iso_checksum     = "sha256:${var.base_sha256}"
   disk_image       = true
   use_backing_file = false
 

@@ -108,4 +108,9 @@ build {
     output     = "${local.output_directory}/manifest.json"
     strip_path = true
   }
+
+  # The agents build checks the base against this sum and refuses one it does not match.
+  post-processor "shell-local" {
+    inline = ["cd ${local.output_directory} && sha256sum naos-base-${local.version}.qcow2 > SHA256SUMS"]
+  }
 }

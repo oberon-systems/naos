@@ -22,6 +22,7 @@ install:
 
 
 # image
+validate: export PKR_VAR_base_sha256 := 0000000000000000000000000000000000000000000000000000000000000000
 validate:
 	@for image in base agents; do \
 		(cd $$image && packer init . && packer fmt -check . \
@@ -31,9 +32,9 @@ validate:
 # The password only lets packer log in while it builds; the agents image locks root and drops sshd.
 build:
 	export PKR_VAR_build_password="$$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"; \
-	for image in base agents; do \
-		(cd $$image && packer init . && packer build -force .) || exit 1; \
-	done
+	(cd base && packer init . && packer build -force .) && \
+	export PKR_VAR_base_sha256="$$(cut -d' ' -f1 $(BUILD)/base/SHA256SUMS)" && \
+	(cd agents && packer init . && packer build -force .)
 
 # Boots a throwaway agents VM the way the runner does: no network, console here, probes in a log.
 run:
