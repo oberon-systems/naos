@@ -5,12 +5,12 @@ from pydantic import Field, StrictInt
 
 from naos_api import secrets
 from naos_api.clock import NowDep
-from naos_api.models import Secret
+from naos_api.models import MAX_INT, Secret
 from naos_api.routes.deps import SessionDep
 from naos_api.secrets import SecretDetail, SecretName, SecretState, SecretValue, SecretView
 from naos_api.spec import StrictModel
 
-Expiry = Annotated[StrictInt, Field(ge=0)] | None
+Expiry = Annotated[StrictInt, Field(ge=0, le=MAX_INT)] | None
 
 
 class SecretCreate(StrictModel):

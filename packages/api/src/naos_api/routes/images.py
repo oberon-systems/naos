@@ -4,7 +4,7 @@ from fastapi import APIRouter, Response
 from pydantic import AnyUrl, BaseModel, Field, UrlConstraints, field_validator
 
 from naos_api.images import service as images
-from naos_api.models import Image
+from naos_api.models import MAX_INT, Image
 from naos_api.routes.deps import SessionDep
 from naos_api.spec import Digest, ImageId, StrictModel
 
@@ -19,8 +19,8 @@ class ImageCreate(StrictModel):
     digest: Digest
     url: SourceUrl
     name: Name | None = None
-    size_bytes: Annotated[int, Field(ge=1)] | None = None
-    built_at: Annotated[int, Field(ge=0)] | None = None
+    size_bytes: Annotated[int, Field(ge=1, le=2**63 - 1)] | None = None
+    built_at: Annotated[int, Field(ge=0, le=MAX_INT)] | None = None
 
     @field_validator("url")
     @classmethod

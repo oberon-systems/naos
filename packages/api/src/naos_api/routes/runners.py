@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from naos_api import runners
 from naos_api.clock import NowDep
 from naos_api.lifecycle import RunStatus
-from naos_api.models import Runner
+from naos_api.models import MAX_INT, Runner
 from naos_api.routes.deps import SessionDep, TokenTtlDep
 
 RunnerStatus = Literal["live", "stale", "revoked"]
@@ -101,7 +101,7 @@ def list_runners(
     now: NowDep,
     token_ttl: TokenTtlDep,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    offset: Annotated[int, Query(ge=0, le=MAX_INT)] = 0,
 ) -> list[RunnerRead]:
     return [
         RunnerRead.of(state, now, token_ttl)

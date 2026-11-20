@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from naos_api import profiles
 from naos_api.clock import NowDep
 from naos_api.lifecycle import RunStatus
-from naos_api.models import Profile
+from naos_api.models import MAX_INT, Profile
 from naos_api.routes.deps import IdempotencyKey, SessionDep
 from naos_api.routes.runs import RunRead
 from naos_api.spec import ImageRef, ProfileSpec, RunnerId, StrictModel
@@ -78,7 +78,7 @@ def list_profiles(
     now: NowDep,
     q: Annotated[str | None, Query(max_length=128)] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 100,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    offset: Annotated[int, Query(ge=0, le=MAX_INT)] = 0,
     policy: str | None = None,
 ) -> list[ProfileRead]:
     page = profiles.list_profiles(session, q, limit, offset, policy)

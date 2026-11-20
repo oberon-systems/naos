@@ -74,3 +74,15 @@ def test_a_body_past_the_limit_is_refused_before_a_route_reads_it(client: TestCl
     )
 
     assert (declared.status_code, streamed.status_code) == (413, 413)
+
+
+def test_integers_past_the_column_range_are_refused_as_invalid(client: TestClient) -> None:
+    huge = 2**31
+    answers = [
+        client.get("/api/v1/profiles", params={"offset": huge}),
+        client.get("/api/v1/runs", params={"offset": huge}),
+        client.get("/api/v1/audit", params={"since": huge}),
+        client.post("/api/v1/secrets", json={"name": "alpha", "value": "v", "expires_at": huge}),
+    ]
+
+    assert [answer.status_code for answer in answers] == [422] * len(answers)

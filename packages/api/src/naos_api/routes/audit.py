@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from naos_api import audit, runs
 from naos_api.clock import NowDep
-from naos_api.models import AuditEvent
+from naos_api.models import MAX_INT, AuditEvent
 from naos_api.routes.deps import SessionDep
 
 
@@ -51,8 +51,8 @@ def search_events(
     decision: Literal["allow", "deny"] | None = None,
     server: Annotated[str | None, Query(max_length=256)] = None,
     event: Annotated[list[str] | None, Query(max_length=100)] = None,
-    since: Annotated[int | None, Query(ge=0)] = None,
-    after: Annotated[int | None, Query(ge=0)] = None,
+    since: Annotated[int | None, Query(ge=0, le=MAX_INT)] = None,
+    after: Annotated[int | None, Query(ge=0, le=MAX_INT)] = None,
     limit: Annotated[int, Query(ge=1, le=1000)] = 100,
     order: Literal["asc", "desc"] = "asc",
 ) -> list[AuditEventRead]:

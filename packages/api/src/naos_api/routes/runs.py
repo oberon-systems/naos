@@ -7,7 +7,7 @@ from sqlmodel import Session
 from naos_api import consoles, gates, merges, runs
 from naos_api.clock import NowDep
 from naos_api.lifecycle import RunStatus
-from naos_api.models import Merge, Run, RunPolicy
+from naos_api.models import MAX_INT, Merge, Run, RunPolicy
 from naos_api.routes.deps import IdempotencyKey, SessionDep
 from naos_api.spec import PolicyId, PolicyKind, PolicyName, RunSpec, StrictModel
 
@@ -178,7 +178,7 @@ def list_runs(
     profile: str | None = None,
     policy: str | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    offset: Annotated[int, Query(ge=0, le=MAX_INT)] = 0,
 ) -> list[RunRead]:
     page = runs.list_runs(session, run_status, state, limit, offset, runner, image, profile, policy)
     return [RunRead.viewed(view) for view in runs.view_runs(session, page)]

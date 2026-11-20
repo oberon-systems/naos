@@ -6,6 +6,9 @@ from naos_api.clock import now_ts
 from naos_api.lifecycle import RunStatus
 from naos_api.spec import PolicyKind
 
+# Every integer column is a 32-bit integer, so no input past this reaches one.
+MAX_INT = 2**31 - 1
+
 
 class Policy(SQLModel, table=True):
     __tablename__ = "policies"

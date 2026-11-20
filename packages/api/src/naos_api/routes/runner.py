@@ -8,7 +8,7 @@ from naos_api.audit import RunnerEventIn
 from naos_api.auth import require_enrollment, require_runner
 from naos_api.clock import NowDep
 from naos_api.lifecycle import RunStatus
-from naos_api.models import Lease
+from naos_api.models import MAX_INT, Lease
 from naos_api.routes.deps import (
     ConsoleLimitDep,
     CredentialTtlDep,
@@ -331,7 +331,7 @@ def report_events(
 def report_console(
     request: Request,
     run_id: str,
-    offset: Annotated[int, Query(ge=0)],
+    offset: Annotated[int, Query(ge=0, le=MAX_INT)],
     principal: PrincipalDep,
     session: SessionDep,
     limit: ConsoleLimitDep,

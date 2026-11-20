@@ -8,7 +8,7 @@ from sqlmodel import Session, and_, col, func, or_, select
 from naos_api.clock import now_ts
 from naos_api.errors import NotFoundError
 from naos_api.lifecycle import RunStatus
-from naos_api.models import AuditEvent, Lease, Run
+from naos_api.models import MAX_INT, AuditEvent, Lease, Run
 
 Actor = Literal["operator", "runner", "system"]
 EventId = Annotated[str, Field(pattern=r"^evt_[0-9a-f]{32}$")]
@@ -16,7 +16,7 @@ Id = Annotated[str, Field(pattern=r"^[A-Za-z0-9_]{1,64}$")]
 Name = Annotated[str, Field(max_length=256)]
 Text = Annotated[str, Field(max_length=500)]
 GuestPath = Annotated[str, Field(max_length=4096)]
-Count = Annotated[StrictInt, Field(ge=0)]
+Count = Annotated[StrictInt, Field(ge=0, le=MAX_INT)]
 
 API_EVENTS: dict[str, frozenset[str]] = {
     "run_created": frozenset({"workspace", "profile"}),
