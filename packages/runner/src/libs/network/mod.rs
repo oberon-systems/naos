@@ -1,6 +1,7 @@
 //! Host-side HTTP(S) capability. Only the MCP broker calls it.
 use crate::libs::audit;
 use crate::libs::error::AgentError;
+use crate::libs::ids::random_hex;
 use reqwest::dns::{Addrs, Name, Resolve, Resolving};
 use reqwest::header::HeaderMap;
 use reqwest::{Client, Method, Response, StatusCode, Url};
@@ -209,8 +210,7 @@ impl NetworkGate {
         request: GateRequest,
         timeout: Duration,
     ) -> Result<Response, AgentError> {
-        let url = Url::parse(&request.url)
-            .map_err(|err| AgentError::Runtime(format!("network deny: invalid URL: {err}")))?;
+        let url = Url::parse(&request.url).map_err(|err| failure("invalid_url", err))?;
         let (protocol, host) = destination(url.as_str())?;
         self.spend(&protocol, &host)?;
 
@@ -223,7 +223,7 @@ impl NetworkGate {
             if err.is_timeout() {
                 AgentError::Runtime("network deny: request timed out".into())
             } else {
-                AgentError::Runtime(format!("network deny: request failed: {err}"))
+                failure("request_failed", err)
             }
         })
     }
@@ -253,7 +253,7 @@ impl NetworkGate {
         while let Some(chunk) = response
             .chunk()
             .await
-            .map_err(|err| AgentError::Runtime(format!("network deny: response failed: {err}")))?
+            .map_err(|err| failure("response_failed", err))?
         {
             if body.len() + chunk.len() > MAX_BODY {
                 audit::network_denied(&self.run_id, protocol, host, NO_RULE, "response too large");
@@ -358,7 +358,7 @@ impl NetworkGate {
         let builder = builder.tls_certs_merge(self.roots.clone());
         builder
             .build()
-            .map_err(|err| AgentError::Runtime(format!("network deny: client setup: {err}")))
+            .map_err(|err| failure("client_setup_failed", err))
     }
 
     async fn lookup(&self, host: &str, port: u16) -> Result<Vec<IpAddr>, AgentError> {
@@ -368,7 +368,7 @@ impl NetworkGate {
         }
         Ok(tokio::net::lookup_host((host, port))
             .await
-            .map_err(|err| AgentError::Runtime(format!("network deny: DNS failure: {err}")))?
+            .map_err(|err| failure("dns_failed", err))?
             .map(|address| address.ip())
             .collect())
     }
@@ -422,10 +422,16 @@ impl Resolve for Pinned {
 }
 
 fn destination(raw: &str) -> Result<(String, String), AgentError> {
-    let url = Url::parse(raw)
-        .map_err(|err| AgentError::Runtime(format!("network deny: invalid URL: {err}")))?;
+    let url = Url::parse(raw).map_err(|err| failure("invalid_url", err))?;
     let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
     Ok((url.scheme().to_owned(), host))
+}
+
+// The guest reads this, so the library's text goes to the log under an id it can quote.
+fn failure(code: &str, err: impl std::fmt::Display) -> AgentError {
+    let error_id = random_hex(8).unwrap_or_default();
+    tracing::warn!(error_id, code, error = %err, "network request failed");
+    AgentError::Runtime(format!("network deny: {code} (error {error_id})"))
 }
 
 fn invalid(reason: &str) -> AgentError {

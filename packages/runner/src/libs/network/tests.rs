@@ -444,3 +444,30 @@ async fn a_request_in_flight_ends_under_the_policy_it_started_with() {
     assert_eq!(answer.expect("response").body, b"beta");
     gate.send(get(&url)).await.expect_err("denied");
 }
+
+#[tokio::test]
+async fn a_failed_request_names_a_code_and_an_id_not_the_library_text() {
+    let closed = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+    let port = closed.local_addr().expect("addr").port();
+    drop(closed);
+    let gate = NetworkGate::local(
+        &json!({"allow": [{"protocol": "http", "host": "example.com"}]}),
+        vec![IpAddr::V4(Ipv4Addr::LOCALHOST)],
+    )
+    .expect("policy");
+
+    let err = gate
+        .send(get(&format!("http://example.com:{port}/")))
+        .await
+        .expect_err("refused");
+
+    let text = err.to_string();
+    assert!(
+        text.contains("network deny: request_failed (error "),
+        "{text}"
+    );
+    assert!(
+        !text.to_lowercase().contains("connection refused"),
+        "{text}"
+    );
+}

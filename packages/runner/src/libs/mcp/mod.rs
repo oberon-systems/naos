@@ -12,6 +12,7 @@ use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWrite
 
 use crate::libs::audit;
 use crate::libs::error::AgentError;
+use crate::libs::ids::random_hex;
 use crate::libs::network::{GateRequest, GateResponse};
 use crate::libs::runtime::RunGates;
 use crate::libs::shell::{ShellRequest, ShellResponse};
@@ -612,7 +613,11 @@ fn parse_call(name: &str, arguments: Value) -> Result<Call, String> {
 }
 
 fn args<T: DeserializeOwned>(arguments: Value) -> Result<T, String> {
-    serde_json::from_value(arguments).map_err(|err| format!("invalid arguments: {err}"))
+    serde_json::from_value(arguments).map_err(|err| {
+        let error_id = random_hex(8).unwrap_or_default();
+        tracing::warn!(error_id, error = %err, "mcp tool arguments refused");
+        format!("invalid arguments (error {error_id})")
+    })
 }
 
 fn http_request(args: HttpArgs) -> Result<GateRequest, String> {
