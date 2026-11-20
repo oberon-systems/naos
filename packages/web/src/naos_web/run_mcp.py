@@ -256,7 +256,8 @@ def edit_form(document: Row) -> PolicyForm:
 
 def read_dialog(fields: dict[str, str]) -> tuple[PolicyForm, int, Keep, str]:
     form = read_form(fields | {"kind": "mcp"})
-    held = int(fields.get("held", "0") or 0)
+    raw = fields.get("held", "")
+    held = int(raw) if raw.isascii() and raw.isdigit() and len(raw) <= 6 else 0
     folded = 0 if fields.get("unfolded") or fields.get("step") == "unfold" else held
     keep: Keep = "save" if fields.get("keep") == "save" else "temporary"
     return form, folded, keep, fields.get("save_name", "").strip()

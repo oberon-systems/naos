@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 UNITS = {"": 1 << 30, "gib": 1 << 30, "gb": 10**9, "mib": 1 << 20, "mb": 10**6}
-SIZE = re.compile(r"^(\d+(?:\.\d+)?)\s*([a-z]*)$")
+SIZE = re.compile(r"^(\d{1,12}(?:\.\d{1,6})?)\s*([a-z]*)$", re.ASCII)
 
 
 @dataclass(frozen=True)

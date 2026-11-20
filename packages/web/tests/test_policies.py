@@ -518,3 +518,27 @@ def test_a_named_policy_shows_its_name_not_its_id(
     assert '<h2 class="panel__name">network_alpha</h2>' in panel
     assert "network policy network_alpha \u00b7" in deleting
     assert "The API answered 200 with shell_alpha" in exists
+
+
+ARABIC_TWO = chr(0x662)
+
+
+def test_malformed_form_input_is_refused_without_a_server_error(client: TestClient) -> None:
+    raw = {"Content-Type": "application/x-www-form-urlencoded"} | HX
+    not_utf8 = client.post("/policies/new", content=b"kind=network&name=\xff", headers=raw)
+    too_large = client.post(
+        "/policies/new", content=b"name=" + b"a" * (1024 * 1024 + 1), headers=raw
+    )
+    many = {f"allow.{n}.host": "example.com" for n in range(500)} | {"kind": "network"}
+    listed = client.post("/policies/new", data=many | {"step": "add:allow"}, headers=HX)
+    digits = {
+        "kind": "mcp",
+        "rules." + ARABIC_TWO + ".server": "alpha",
+        "step": "drop:rules:" + ARABIC_TWO,
+    }
+    unicode_index = client.post("/policies/new", data=digits, headers=HX)
+
+    assert (not_utf8.status_code, too_large.status_code) == (400, 413)
+    assert listed.status_code == 200
+    assert listed.text.count('name="allow.') <= 64 * 3
+    assert unicode_index.status_code == 200

@@ -9,7 +9,7 @@ from typing import Annotated, Literal
 from urllib.parse import parse_qsl
 from uuid import uuid4
 
-from fastapi import APIRouter, Path, Query, Request, WebSocket, status
+from fastapi import APIRouter, HTTPException, Path, Query, Request, WebSocket, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
@@ -110,6 +110,10 @@ from naos_web.rows import (
 )
 
 log = logging.getLogger(__name__)
+MAX_FORM_BYTES = 1024 * 1024
+MAX_DECISION_BYTES = 32 * 1024 * 1024
+MAX_FIELDS = 200_000
+OUTBOX_FRAMES = 256
 
 
 # The id comes from the page's own path, so the download name keeps only characters a header can.
@@ -280,8 +284,20 @@ def _dialog(
 
 
 # The dialog posts urlencoded forms only, so the stdlib parser spares a multipart dependency.
+async def _body(request: Request, limit: int) -> list[tuple[str, str]]:
+    body = bytearray()
+    async for chunk in request.stream():
+        body += chunk
+        if len(body) > limit:
+            raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "the form is too large")
+    try:
+        return parse_qsl(body.decode(), keep_blank_values=True, max_num_fields=MAX_FIELDS)
+    except (UnicodeDecodeError, ValueError) as err:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "the form is malformed") from err
+
+
 async def _form(request: Request) -> dict[str, str]:
-    return dict(parse_qsl((await request.body()).decode(), keep_blank_values=True))
+    return dict(await _body(request, MAX_FORM_BYTES))
 
 
 async def _profile(api: ApiClient, draft: new_run.Draft) -> Row | None:
@@ -769,8 +785,7 @@ async def _decided(
 @router.post("/runs/{run_id}/merge", response_class=HTMLResponse)
 async def merge_run(request: Request, run_id: str, now: NowDep) -> Response:
     api: ApiClient = request.app.state.api
-    body = (await request.body()).decode()
-    ask = replace(changes.asked(parse_qsl(body, keep_blank_values=True)), touched=True)
+    ask = replace(changes.asked(await _body(request, MAX_DECISION_BYTES)), touched=True)
     try:
         await api.decide_merge(run_id, list(ask.paths), dict(ask.resolutions))
     except ApiError as err:
@@ -822,6 +837,9 @@ async def _until_disconnect(websocket: WebSocket, outbox: "asyncio.Queue[bytes |
         if frame is None:
             frame = message.get("bytes")
         if frame is not None:
+            if outbox.full():
+                await websocket.close(status.WS_1008_POLICY_VIOLATION, "the browser sends too fast")
+                return
             outbox.put_nowait(frame)
 
 
@@ -837,7 +855,7 @@ async def _relay(websocket: WebSocket, frames: AsyncIterator[bytes | str]) -> No
 @router.websocket("/runs/{run_id}/terminal/ws")
 async def run_terminal_stream(websocket: WebSocket, run_id: str) -> None:
     await websocket.accept()
-    outbox: asyncio.Queue[bytes | str] = asyncio.Queue()
+    outbox: asyncio.Queue[bytes | str] = asyncio.Queue(OUTBOX_FRAMES)
     await _pipe(websocket, websocket.app.state.api.attach(run_id, outbox), outbox)
 
 
@@ -863,7 +881,7 @@ async def _pipe(
 @router.websocket("/runs/{run_id}/changes/{index}/content/ws")
 async def run_content_stream(websocket: WebSocket, run_id: str, index: int) -> None:
     await websocket.accept()
-    outbox: asyncio.Queue[bytes | str] = asyncio.Queue()
+    outbox: asyncio.Queue[bytes | str] = asyncio.Queue(OUTBOX_FRAMES)
     await _pipe(websocket, websocket.app.state.api.content(run_id, index, outbox), outbox)
 
 

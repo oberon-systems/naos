@@ -383,7 +383,8 @@ class ServerForm:
 
 
 def _whole(value: str, label: str) -> int:
-    if not value.strip().isdigit():
+    value = value.strip()
+    if not (value.isascii() and value.isdigit()) or len(value) > 18:
         raise FormError(f"{label} must be a whole number")
     return int(value)
 

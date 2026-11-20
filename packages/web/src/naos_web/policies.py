@@ -30,6 +30,7 @@ TAGS: dict[Kind, str] = {
 }
 GUEST_HOME = "/home/naos/"
 MAX_RULES = 64
+MAX_DIGITS = 18
 MAX_HOME = 32
 MAX_MCP_RULES = 256
 MAX_GRANTS = 64
@@ -703,7 +704,7 @@ BLANK: dict[str, dict[str, str]] = {
         "requests": "60",
     },
 }
-_ITEM = re.compile(r"^(\w+)\.(\d+)\.(\w+)$")
+_ITEM = re.compile(r"^(\w+)\.(\d{1,4})\.(\w+)$", re.ASCII)
 
 
 @dataclass(frozen=True)
@@ -751,11 +752,11 @@ class PolicyForm:
         items = list(self.items(name))
         if verb == "add" and not self.full(name):
             items.append(_blank(name, items))
-        elif verb == "drop" and index.isdigit() and int(index) < len(items):
+        elif verb == "drop" and _index(index, items):
             del items[int(index)]
-        elif verb == "dialect" and index.isdigit() and int(index) < len(items):
+        elif verb == "dialect" and _index(index, items):
             items[int(index)] = _dialect_defaults(items[int(index)])
-        elif verb == "model" and index.isdigit() and int(index) < len(items) and model:
+        elif verb == "model" and _index(index, items) and model:
             item = items[int(index)]
             models = _split(item["models"])
             if model not in models:
@@ -803,9 +804,16 @@ def _split(value: str) -> list[str]:
 
 
 def _whole(value: str, label: str) -> int:
-    if not value.strip().isdigit():
+    value = value.strip()
+    if not (value.isascii() and value.isdigit()) or len(value) > MAX_DIGITS:
         raise FormError(f"{label} must be a whole number")
     return int(value)
+
+
+def _index(index: str, items: list[dict[str, str]]) -> bool:
+    return (
+        index.isascii() and index.isdigit() and len(index) <= MAX_DIGITS and int(index) < len(items)
+    )
 
 
 # A tool name never holds a colon, so a target with a scheme is a resource prefix.
@@ -930,6 +938,7 @@ def read_form(fields: dict[str, str]) -> PolicyForm:
         ]
         for name, keys in LISTS[kind].items()
     }
+    lists = {name: items[: LIMITS.get(name, MAX_MCP_RULES)] for name, items in lists.items()}
     return PolicyForm(
         kind,
         lists,
