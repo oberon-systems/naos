@@ -100,20 +100,27 @@ start() {
     # Disks (2) and serial ports (3), plus the workspace share (0x1a) and the model
     # gateway's vsock (0x13) when the Run has them.
     model_port=$(sed -n 's/.*"model_port": *\([0-9][0-9]*\).*/\1/p' "$session_config" 2> /dev/null)
-    vsock=0
+    # Each class is counted, so a second host-backed device of an allowed kind still fails.
+    serials=0 shares=0 vsock=0
     for device in /sys/bus/virtio/devices/*/device; do
         [ -e "$device" ] || continue
         case "$(cat "$device")" in
-            0x0002 | 0x0003) ;;
-            0x001a) [ -n "$workspace" ] || failures="$failures virtio=0x001a" ;;
-            0x0013)
-                vsock=1
-                [ -n "$model_port" ] || failures="$failures virtio=0x0013"
-                ;;
+            0x0002) ;;
+            0x0003) serials=$((serials + 1)) ;;
+            0x001a) shares=$((shares + 1)) ;;
+            0x0013) vsock=$((vsock + 1)) ;;
             *) failures="$failures virtio=$(cat "$device")" ;;
         esac
     done
-    [ -z "$model_port" ] || [ "$vsock" = 1 ] || failures="$failures model-vsock"
+    [ "$serials" -eq 1 ] || failures="$failures serials=$serials"
+    expected_shares=0
+    [ -z "$workspace" ] || expected_shares=1
+    [ "$shares" -eq "$expected_shares" ] || failures="$failures shares=$shares"
+    expected_vsock=0
+    [ -z "$model_port" ] || expected_vsock=1
+    [ "$vsock" -eq "$expected_vsock" ] || failures="$failures vsock=$vsock"
+    ports=$(cat /sys/class/virtio-ports/*/name 2> /dev/null | sort | tr '\n' ' ')
+    [ "$ports" = "naos.ctl naos.mcp " ] || failures="$failures ports=$ports"
 
     if port=$(virtio_port naos.mcp); then
         mcp_ping "$port" || failures="$failures mcp-ping"

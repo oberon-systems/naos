@@ -45,8 +45,13 @@ check() {
     [ "$status" = 124 ] || fail "qemu did not start with a vhost-vsock device (exit $status):
 $output"
     ok "qemu starts a VM with a vhost-vsock device"
-    local foreign
-    foreign="$(ss --vsock -lnpH | grep -v '"naos-runner"' || true)"
+    # The runner is told apart by its unit's PID, not by a process name anyone can take.
+    local foreign listeners runner
+    runner="$(systemctl --user show -p MainPID --value naos-runner.service 2>/dev/null || true)"
+    [ -n "$runner" ] && [ "$runner" != 0 ] ||
+        runner="$(systemctl show -p MainPID --value naos-runner.service 2>/dev/null || echo 0)"
+    listeners="$(ss --vsock -lnpH)" || fail "ss could not list the vsock listeners"
+    foreign="$(printf '%s\n' "$listeners" | grep -v "pid=$runner," | grep -v '^$' || true)"
     [ -z "$foreign" ] || fail "vsock listeners other than the runner are reachable from guests:
 $foreign"
     ok "no vsock listener but the runner's"
