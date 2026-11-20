@@ -370,8 +370,12 @@ EOF
     linger_on && return 0
     ask_yes linger "keep the runner running after you log out (loginctl enable-linger)?"
     [ "$linger" = yes ] || return 0
-    loginctl enable-linger "$(id -un)" 2>/dev/null || as_root loginctl enable-linger "$(id -un)" ||
+    if loginctl enable-linger "$(id -un)" 2>/dev/null || as_root loginctl enable-linger "$(id -un)"; then
+        # Linger is per user, so uninstall mentions it only when this script turned it on.
+        : >"$conf_dir/linger-enabled"
+    else
         say "could not enable linger, run: sudo loginctl enable-linger $(id -un)"
+    fi
 }
 
 confirm() {
@@ -395,7 +399,9 @@ the settings and the enrollment token in $conf_dir and the state in $state_dir."
         systemctl_unit daemon-reload
     fi
     put rm -f "$link"
-    put rm -rf "$bin_dir" "$env_file" "$conf_dir/enrollment"
+    enabled_linger=
+    [ ! -f "$conf_dir/linger-enabled" ] || enabled_linger=yes
+    put rm -rf "$bin_dir" "$env_file" "$conf_dir/enrollment" "$conf_dir/linger-enabled"
     put rm -rf "$state_dir" 2>/dev/null || as_root rm -rf "$state_dir"
     if [ "$layout" = system ]; then
         as_root rm -rf "$conf_dir"
@@ -404,7 +410,8 @@ the settings and the enrollment token in $conf_dir and the state in $state_dir."
         rmdir "$conf_dir" "${bin_dir%/*}" "${state_dir%/*}" 2>/dev/null || true
     fi
     say "removed the runner"
-    [ "$layout" = system ] || ! linger_on || say "linger stays on, turn it off with: loginctl disable-linger"
+    [ -z "$enabled_linger" ] || ! linger_on ||
+        say "the installer turned linger on and it stays on; turn it off with: loginctl disable-linger"
 }
 
 if [ "$command" = doctor ]; then
