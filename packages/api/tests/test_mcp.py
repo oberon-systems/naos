@@ -157,6 +157,15 @@ def test_a_rule_that_is_malformed_or_never_matches_is_refused(rule: dict[str, An
         resolve_mcp_policy(_rules(rule))
 
 
+def test_a_broad_schema_is_refused_by_size_before_it_is_walked() -> None:
+    broad = {f"p{n}": {"pattern": "(a"} for n in range(500)}
+
+    with pytest.raises(PolicyError) as refused:
+        resolve_mcp_policy(_rules(_rule(arguments={"a": {"schema": {"properties": broad}}})))
+
+    assert str(refused.value).endswith("is too large")
+
+
 def test_an_invalid_regex_is_refused_without_the_compiler_text() -> None:
     with pytest.raises(PolicyError) as refused:
         resolve_mcp_policy(_rules(_rule(arguments={"a": {"regex": "(a"}})))

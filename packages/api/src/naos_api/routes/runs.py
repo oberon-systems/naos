@@ -146,7 +146,9 @@ class MergeRead(BaseModel):
 
 class MergeDecisionIn(StrictModel):
     paths: Annotated[list[MergePath], Field(max_length=100_000)]
-    resolutions: dict[MergePath, Literal["skip", "take", "export"]] = {}
+    resolutions: Annotated[
+        dict[MergePath, Literal["skip", "take", "export"]], Field(max_length=100_000)
+    ] = {}
 
 
 router = APIRouter()

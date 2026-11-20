@@ -165,13 +165,14 @@ def _constraint(constraint: ConstraintIn, what: str) -> dict[str, Any]:
     value = getattr(constraint, kind)
     if value is None and kind != "equals":
         raise PolicyError(f"{what} has an empty {kind.rstrip('_')}")
+    resolved = {kind.rstrip("_"): value}
+    # Measured before the walk, so a broad schema is refused before any of it is compiled.
+    if len(json.dumps(resolved)) > MAX_CONSTRAINT:
+        raise PolicyError(f"{what} is too large")
     if kind == "regex":
         _shared_regex(value, what)
     if kind == "schema_":
         _schema(value, what)
-    resolved = {kind.rstrip("_"): value}
-    if len(json.dumps(resolved)) > MAX_CONSTRAINT:
-        raise PolicyError(f"{what} is too large")
     return resolved
 
 

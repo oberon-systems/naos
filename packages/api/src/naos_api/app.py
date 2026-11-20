@@ -9,6 +9,7 @@ from sqlmodel import Session
 
 from naos_api import schema
 from naos_api.auth import require_principal
+from naos_api.body_limit import BodyLimit
 from naos_api.clock import now_ts
 from naos_api.console_hub import ConsoleHub
 from naos_api.content_hub import ContentHub
@@ -77,6 +78,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(DomainError, domain_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(Exception, internal_error_handler)
+    app.add_middleware(BodyLimit)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

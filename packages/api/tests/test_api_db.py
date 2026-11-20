@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from typing import Annotated
 
 import pytest
@@ -55,3 +56,21 @@ def test_an_internal_error_answers_an_id_the_log_holds(
     logged = [record for record in caplog.records if body["error_id"] in record.getMessage()]
     assert logged
     assert "secret-gamma-value" in str(logged[0].exc_info)
+
+
+def test_a_body_past_the_limit_is_refused_before_a_route_reads_it(client: TestClient) -> None:
+    declared = client.post(
+        "/api/v1/secrets",
+        content=b"{}",
+        headers={"Content-Type": "application/json", "Content-Length": str(64 * 1024 * 1024)},
+    )
+
+    def chunks() -> Iterator[bytes]:
+        for _ in range(40):
+            yield b" " * (1024 * 1024)
+
+    streamed = client.post(
+        "/api/v1/secrets", content=chunks(), headers={"Content-Type": "application/json"}
+    )
+
+    assert (declared.status_code, streamed.status_code) == (413, 413)
