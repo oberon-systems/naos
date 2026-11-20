@@ -231,9 +231,10 @@ agent's tmux session. From the runner host:
 naos-runner console run_0123456789abcdef0123456789abcdef
 ```
 
-The command reads only the runtime settings above, connects to
-`console.sock`, puts the terminal in raw mode and detaches on `Ctrl-]`. It
-writes a `console_attached` audit event. The socket sits in a 0700 directory,
+The command reads the runner's full settings, connects to `console.sock`,
+puts the terminal in raw mode and detaches on `Ctrl-]`. It writes a
+`console_attached` audit event to the runner's spool, and refuses to attach
+when the settings do not load, since the event would then be lost. The socket sits in a 0700 directory,
 so only the runner's user can open it.
 
 QEMU also appends everything the guest writes to `ttyS0` to `console.log`.

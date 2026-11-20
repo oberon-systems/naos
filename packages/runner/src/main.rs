@@ -48,11 +48,11 @@ fn run() -> Result<(), AgentError> {
                 .block_on(serve(config))
         }
         Some("console") => match (args.next(), args.next()) {
+            // Without the full config there is no spool, and an attach nobody audits is refused.
             (Some(run_id), None) => {
-                if let Ok(config) = config::load() {
-                    audit::install(Spool::new(&config.state_dir));
-                }
-                console::attach(&config::load_runtime()?.vm_dir, &run_id)
+                let config = config::load()?;
+                audit::install(Spool::new(&config.state_dir));
+                console::attach(&config.runtime.vm_dir, &run_id)
             }
             _ => Err(AgentError::Config(USAGE.into())),
         },

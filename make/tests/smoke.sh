@@ -165,7 +165,11 @@ guest() {
             sleep 1
         done
         sleep 25
-    } | NAOS_AGENT_VM_DIR="$TEMP_DIR/runs" \
+    } | NAOS_AGENT_API_URL="$api" \
+        NAOS_AGENT_NAME=alpha \
+        NAOS_AGENT_STATE_DIR="$TEMP_DIR/state" \
+        NAOS_AGENT_ENROLLMENT_TOKEN_FILE="$TEMP_DIR/enrollment" \
+        NAOS_AGENT_VM_DIR="$TEMP_DIR/runs" \
         cargo run -q -p naos-runner --features smoke-stubs -- console "$run" >>"${console_log:-$TEMP_DIR/console.log}" 2>&1
 }
 

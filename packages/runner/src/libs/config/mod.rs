@@ -162,11 +162,6 @@ pub fn load() -> Result<Config, AgentError> {
     Config::parse(raw, runtime_from_env)
 }
 
-pub fn load_runtime() -> Result<RuntimeConfig, AgentError> {
-    load_env_file()?;
-    runtime_from_env()
-}
-
 // A .env file is read only when NAOS_AGENT_ENV_FILE names it: one picked up from the working
 // directory could redirect the API URL the agent trusts.
 fn load_env_file() -> Result<(), AgentError> {
