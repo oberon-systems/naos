@@ -695,7 +695,8 @@ fn write_checked(
     if Some(hex(&digest.finalize())) != entry.sha256 {
         return Err(corrupt(format!("{} changed since collection", entry.path)));
     }
-    file.set_permissions(Permissions::from_mode(entry.mode.unwrap_or(0o600) & 0o777))?;
+    // The mode comes from the guest, so a merged file is never writable by group or others.
+    file.set_permissions(Permissions::from_mode(entry.mode.unwrap_or(0o600) & 0o755))?;
     file.sync_all()?;
     Ok(())
 }

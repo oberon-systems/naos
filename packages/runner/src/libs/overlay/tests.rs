@@ -1005,3 +1005,25 @@ fn a_large_selection_plans_without_rescanning_the_diff() {
     assert!(planned.is_ok());
     assert!(started.elapsed() < std::time::Duration::from_secs(2));
 }
+
+#[test]
+fn a_merged_file_is_never_writable_by_group_or_others() {
+    let fixture = Fixture::new();
+    fixture.source("x", "x\n");
+    let upper = fixture.upper(
+        "write x open.txt\nset_inode_field open.txt mode 0100666\n\
+         write x tool.sh\nset_inode_field tool.sh mode 0100777\n",
+    );
+    let diff = collect(&upper, &fixture.host).expect("collect");
+
+    applied(fixture.merge(&upper, &diff, &everything(&diff)));
+
+    let mode = |name: &str| {
+        fs::metadata(fixture.host.join(name))
+            .expect("merged")
+            .permissions()
+            .mode()
+            & 0o777
+    };
+    assert_eq!((mode("open.txt"), mode("tool.sh")), (0o644, 0o755));
+}
