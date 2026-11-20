@@ -160,3 +160,20 @@ def test_a_conflicted_merge_carries_no_counts_and_is_an_error() -> None:
     row = events.log_row(_event("merge_reported", {"outcome": "conflict", "conflicts": 1}), {})
 
     assert (row.refused, row.error, row.detail) == (False, True, "conflict · 1 conflict")
+
+
+def test_an_id_that_would_reach_another_api_path_is_refused(client: TestClient) -> None:
+    for crafted in ("run_9f21c4%23", "run_9f21c4%3Fsecret=1", "..%2Fsecrets"):
+        response = client.get(f"/runs/{crafted}/logs/export")
+
+        assert response.status_code != 200 or "attachment" not in response.headers.get(
+            "content-disposition", ""
+        ), crafted
+
+
+def test_a_download_name_keeps_only_safe_characters() -> None:
+    from naos_web.routes import attachment
+
+    header = attachment('run_a";x=1-events.json')["Content-Disposition"]
+
+    assert header == 'attachment; filename="run_a__x_1-events.json"'

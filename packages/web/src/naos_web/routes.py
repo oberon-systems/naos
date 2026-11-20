@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, replace
 from http import HTTPStatus
@@ -109,6 +110,13 @@ from naos_web.rows import (
 )
 
 log = logging.getLogger(__name__)
+
+
+# The id comes from the page's own path, so the download name keeps only characters a header can.
+def attachment(name: str) -> dict[str, str]:
+    safe = re.sub(r"[^A-Za-z0-9._-]", "_", name)
+    return {"Content-Disposition": f'attachment; filename="{safe}"'}
+
 
 State = Literal["all", "active", "queued", "waiting_merge", "failed"]
 Tab = Literal["overview", "terminal", "logs", "changes", "gates"]
@@ -790,7 +798,7 @@ async def run_logs_export(request: Request, run_id: str) -> Response:
     return Response(
         json.dumps(rows, indent=2),
         media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="{run_id}-events.json"'},
+        headers=attachment(f"{run_id}-events.json"),
     )
 
 
@@ -804,7 +812,7 @@ async def run_terminal_log(request: Request, run_id: str) -> Response:
     return Response(
         log,
         media_type="text/plain",
-        headers={"Content-Disposition": f'attachment; filename="{run_id}-console.log"'},
+        headers=attachment(f"{run_id}-console.log"),
     )
 
 
@@ -1165,7 +1173,7 @@ async def runner_audit_export(request: Request, runner_id: str) -> Response:
     return Response(
         json.dumps(rows, indent=2),
         media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="{runner_id}-audit.json"'},
+        headers=attachment(f"{runner_id}-audit.json"),
     )
 
 
@@ -1392,7 +1400,7 @@ async def image_audit_export(request: Request, image_id: str) -> Response:
     return Response(
         json.dumps(rows, indent=2),
         media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="{image_id}-audit.json"'},
+        headers=attachment(f"{image_id}-audit.json"),
     )
 
 
@@ -1537,7 +1545,7 @@ async def profile_audit_export(request: Request, profile_id: str) -> Response:
     return Response(
         json.dumps(rows, indent=2),
         media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="{profile_id}-audit.json"'},
+        headers=attachment(f"{profile_id}-audit.json"),
     )
 
 
@@ -2020,7 +2028,7 @@ async def secret_events_export(request: Request, name: SecretName) -> Response:
     return Response(
         json.dumps(rows, indent=2),
         media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="{name}-events.json"'},
+        headers=attachment(f"{name}-events.json"),
     )
 
 

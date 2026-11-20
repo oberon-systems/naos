@@ -1,4 +1,5 @@
 import asyncio
+import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,6 +27,16 @@ class ApiError(Exception):
     def __init__(self, message: str, status: int | None = None) -> None:
         super().__init__(message)
         self.status = status
+
+
+SEGMENT = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9._-]*")
+
+
+# Ids come from the page's own path, so one carrying ?, # or / would point the operator token
+# at another api path; every segment is checked before a request is made.
+def checked(path: str) -> None:
+    if not all(SEGMENT.fullmatch(part) for part in path.split("/")[1:]):
+        raise ApiError("the address names no valid id", 404)
 
 
 # A domain refusal carries a sentence meant for the operator; a validation error does not.
@@ -138,6 +149,7 @@ class ApiClient:
         await self._http.aclose()
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
+        checked(path)
         try:
             response = await self._http.request(method, path, **kwargs)
             response.raise_for_status()
@@ -270,6 +282,7 @@ class ApiClient:
     async def _socket(
         self, path: str, outbox: "asyncio.Queue[bytes | str] | None"
     ) -> AsyncIterator[bytes | str]:
+        checked(path)
         try:
             async with aconnect_ws(path, self._http, session_class=AsyncWebSocketSession) as ws:
                 sender = asyncio.create_task(_send(ws, outbox)) if outbox is not None else None
