@@ -31,9 +31,13 @@ class ApiError(Exception):
 # A domain refusal carries a sentence meant for the operator; a validation error does not.
 def detail_of(response: httpx.Response) -> str:
     try:
-        detail = response.json().get("detail")
-    except ValueError:
+        body = response.json()
+        detail = body.get("detail")
+    except (ValueError, AttributeError):
         return ""
+    error_id = body.get("error_id")
+    if isinstance(error_id, str) and error_id.isalnum():
+        return f" (error {error_id[:32]})"
     if isinstance(detail, list):
         # A validation error: its location and message, never the input it refused.
         found = [
@@ -139,11 +143,9 @@ class ApiClient:
             response.raise_for_status()
         except httpx.HTTPStatusError as err:
             status = err.response.status_code
-            raise ApiError(
-                f"the api answered {status} for {path}{detail_of(err.response)}", status
-            ) from err
+            raise ApiError(f"the api answered {status}{detail_of(err.response)}", status) from err
         except httpx.HTTPError as err:
-            raise ApiError(f"the api did not answer {path}") from err
+            raise ApiError("the api did not answer") from err
         return response
 
     async def _call(self, method: str, path: str, **kwargs: Any) -> Any:
@@ -282,7 +284,7 @@ class ApiClient:
         except WebSocketDisconnect:
             return
         except (HTTPXWSException, httpx.HTTPError) as err:
-            raise ApiError(f"the api refused {path}") from err
+            raise ApiError("the api refused the connection") from err
 
     async def mcp_servers(self) -> list[Row]:
         rows: list[Row] = await self._call("GET", "/mcp-servers")

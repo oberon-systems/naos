@@ -136,7 +136,7 @@ def test_a_refused_attach_closes_the_stream_with_the_reason(
         websocket.receive_bytes()
 
     assert refused.value.code == 1011
-    assert refused.value.reason == f"the api refused /runs/{STARTED}/attach"
+    assert re.fullmatch(r"relay failed \(error [0-9a-f]{32}\)", refused.value.reason)
 
 
 def test_a_socket_from_another_origin_is_refused(client: TestClient) -> None:

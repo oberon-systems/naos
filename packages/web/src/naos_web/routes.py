@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, replace
 from http import HTTPStatus
@@ -106,6 +107,8 @@ from naos_web.rows import (
     runner_detail,
     runner_rows,
 )
+
+log = logging.getLogger(__name__)
 
 State = Literal["all", "active", "queued", "waiting_merge", "failed"]
 Tab = Literal["overview", "terminal", "logs", "changes", "gates"]
@@ -840,7 +843,9 @@ async def _pipe(
     try:
         await asyncio.wait({relay, listener}, return_when=asyncio.FIRST_COMPLETED)
         if relay.done() and (err := relay.exception()) is not None:
-            await websocket.close(status.WS_1011_INTERNAL_ERROR, str(err)[:120])
+            error_id = uuid4().hex
+            log.warning("socket relay failed %s", error_id, exc_info=err)
+            await websocket.close(status.WS_1011_INTERNAL_ERROR, f"relay failed (error {error_id})")
     finally:
         relay.cancel()
         listener.cancel()
@@ -1272,8 +1277,12 @@ async def register_image(request: Request, now: NowDep) -> Response:
     api: ApiClient = request.app.state.api
     entry = register.draft(await _form(request))
     try:
-        created = await api.register_image(register.body(entry))
-    except (ApiError, ValueError) as err:
+        body = register.body(entry)
+    except ValueError as err:
+        return await _register_dialog(request, now, entry, str(err))
+    try:
+        created = await api.register_image(body)
+    except ApiError as err:
         return await _register_dialog(request, now, entry, str(err))
     target = f"/images/{created['id']}"
     if wants_fragment(request):

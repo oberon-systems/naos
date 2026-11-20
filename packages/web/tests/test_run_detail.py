@@ -1,10 +1,13 @@
 import re
 from collections.abc import Iterator
 
+import httpx
 import pytest
 import stub_api
 from fastapi.testclient import TestClient
 from stub_api import MCPPOL, MODELPOL, POLICIES, RUNS, WRITES, policy_row
+
+from naos_web.client import detail_of
 
 STARTED = "run_9f21c4"
 PENDING = "run_3a90f8"
@@ -292,6 +295,16 @@ def test_an_unknown_run_answers_in_the_overlay(client: TestClient) -> None:
     assert response.status_code == 200
     assert "<!DOCTYPE html>" not in response.text
     assert "the api answered 404" in response.text
+
+
+def test_an_api_failure_names_its_error_id_and_no_path() -> None:
+    answer = httpx.Response(
+        500,
+        json={"error": "internal", "error_id": "ab12cd"},
+        request=httpx.Request("GET", "http://api.example.com/api/v1/runs/run_alpha"),
+    )
+
+    assert detail_of(answer) == " (error ab12cd)"
 
 
 def test_the_overlay_never_renders_a_secret(client: TestClient) -> None:

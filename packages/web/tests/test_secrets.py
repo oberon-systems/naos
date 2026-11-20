@@ -242,7 +242,7 @@ def test_a_secret_in_use_is_refused_by_the_api(client: TestClient, writes: list[
     body = flat(client.post("/secrets/alpha-token/delete", headers=HX).text)
 
     assert "alpha-token cannot be deleted" in body and ">Yes</button>" not in body
-    assert "the api answered 409 for /secrets/alpha-token" in body
+    assert "the api answered 409: " in body
     assert f"named by {MCPSRV} (server alpha). Drop it from them" in body
     assert writes == [("DELETE", "/secrets/alpha-token", {}, None)]
 
