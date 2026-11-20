@@ -225,6 +225,8 @@ def _plural(count: int, noun: str) -> str:
 
 # Only a Run that has not finished holds its policy; a finished one keeps the bare id.
 def delete_policy(session: Session, policy_id: str) -> None:
+    # Held to the commit, so a profile or Run naming the policy meanwhile is seen below or waits.
+    session.exec(select(Policy).where(col(Policy.id) == policy_id).with_for_update()).first()
     policy = get_policy(session, policy_id)
     parts = []
     profiles = profiles_naming(session, policy_id)
@@ -258,6 +260,7 @@ def check_refs(session: Session, spec: ProfileSpec) -> None:
     for kind, policy_id in spec.policy_refs().items():
         if policy_id is None:
             continue
-        policy = session.get(Policy, policy_id)
+        locked = select(Policy).where(col(Policy.id) == policy_id).with_for_update(key_share=True)
+        policy = session.exec(locked).first()
         if policy is None or policy.kind != kind:
             raise PolicyError(f"{kind} policy {policy_id} does not exist")

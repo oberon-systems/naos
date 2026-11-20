@@ -1,8 +1,15 @@
 import re
 from collections.abc import Callable
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, cast
 
+import pytest
 from fastapi.testclient import TestClient
+from sqlmodel import Session
+
+from naos_api import policies
+from naos_api.shell import ShellPolicyIn
+from naos_api.spec import PolicyKind
 
 SHELL = {"allow": ["read_file"]}
 WIDER = {"allow": ["read_file", "grep"]}
@@ -103,3 +110,26 @@ def test_a_policy_goes_once_its_runs_have_ended(
     assert client.delete(path).status_code == 204
     assert client.get(path).status_code == 404
     assert client.get(f"/api/v1/runs/{run_id}").status_code == 200
+
+
+def test_a_delete_and_a_reference_check_lock_the_policy_row(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    created, _ = policies.create_shell_policy(session, ShellPolicyIn(allow=["read_file"]))
+    seen: list[Any] = []
+    original = Session.exec
+
+    def recording(self: Session, statement: Any, *args: Any, **kwargs: Any) -> Any:
+        seen.append(getattr(statement, "_for_update_arg", None))
+        return original(self, statement, *args, **kwargs)
+
+    monkeypatch.setattr(Session, "exec", recording)
+    spec = SimpleNamespace(policy_refs=lambda: {PolicyKind.SHELL: created.id})
+    policies.check_refs(session, cast(Any, spec))
+    referenced = [lock for lock in seen if lock is not None]
+    seen.clear()
+    policies.delete_policy(session, created.id)
+    deleted = [lock for lock in seen if lock is not None]
+
+    assert [lock.key_share for lock in referenced] == [True]
+    assert [lock.key_share for lock in deleted] == [False]
