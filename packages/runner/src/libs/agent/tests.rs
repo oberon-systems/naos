@@ -151,6 +151,25 @@ async fn slow_start_keeps_the_lease_alive() {
 }
 
 #[tokio::test]
+async fn a_lease_lost_during_reconcile_fences_before_the_pass_ends() {
+    let runtime = FakeRuntime::default();
+    runtime.delay_ensure(Duration::from_secs(5));
+    let (_dir, mut agent) = setup(runtime);
+    agent.api.grant_lease_ttl(3);
+    agent.api.reject_heartbeats_after(1);
+    agent
+        .api
+        .serve(desired(vec![desired_run("run_a", RunStatus::Pending)]));
+
+    let started = Instant::now();
+    let outcome = agent.cycle().await;
+
+    assert!(matches!(outcome, Err(AgentError::Unauthorized)));
+    assert!(started.elapsed() < Duration::from_secs(4));
+    assert_eq!(agent.runtime.revoked(), 1);
+}
+
+#[tokio::test]
 async fn expired_lease_fences_every_vm() {
     let (_dir, mut agent) = setup(FakeRuntime::with_vms(vec![vm("run_a"), vm("run_b")]));
     agent.lease = LeaseClock::starting(Instant::now(), Duration::ZERO);

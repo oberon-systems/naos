@@ -70,8 +70,13 @@ impl Sessions {
         vm_dir: &Path,
         running: &[LocalVm],
     ) {
+        // A dropped JoinHandle detaches its task, so one whose VM left is aborted.
         self.live.retain(|vm_id, task| {
-            !task.is_finished() && running.iter().any(|vm| &vm.vm_id == vm_id)
+            let keep = !task.is_finished() && running.iter().any(|vm| &vm.vm_id == vm_id);
+            if !keep {
+                task.abort();
+            }
+            keep
         });
         self.failed
             .retain(|vm_id, _| running.iter().any(|vm| &vm.vm_id == vm_id));

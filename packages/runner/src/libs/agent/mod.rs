@@ -89,41 +89,60 @@ impl<A: Api + Sync, R: Runtime> Agent<A, R> {
         let actual = actual?;
         let desired = self.api.desired(&credentials).await?;
         let interval = self.interval();
-        let mut reconciling = std::pin::pin!(reconcile(
-            &self.api,
-            &self.runtime,
-            self.images.as_ref(),
-            &credentials,
-            &desired,
-            &actual,
-        ));
-        // Image downloads and VM boots outlast the lease, so it is renewed while they run.
+        // Image downloads and VM boots outlast the lease, so it is renewed while they run; a
+        // lease lost meanwhile drops the pass and fences at once.
         let mut current = credentials.clone();
-        let failures = loop {
-            tokio::select! {
-                failures = &mut reconciling => break failures,
-                () = tokio::time::sleep(interval) => {
-                    let beat = Beat {
-                        capacity: self.capacity,
-                        interval_seconds: interval.as_secs(),
-                        placement: &self.placement,
-                    };
-                    let beat = heartbeat(
-                        &self.api,
-                        &mut self.lease,
-                        &self.store,
-                        &mut self.credentials,
-                        &current,
-                        &beat,
-                    )
-                    .await;
-                    match beat {
-                        Ok(renewed) => current = renewed,
-                        Err(err) => tracing::warn!(error = %err, "heartbeat during reconcile failed"),
+        let mut lost = None;
+        let failures = {
+            let mut reconciling = std::pin::pin!(reconcile(
+                &self.api,
+                &self.runtime,
+                self.images.as_ref(),
+                &credentials,
+                &desired,
+                &actual,
+            ));
+            loop {
+                tokio::select! {
+                    failures = &mut reconciling => break failures,
+                    () = tokio::time::sleep(interval) => {
+                        let beat = Beat {
+                            capacity: self.capacity,
+                            interval_seconds: interval.as_secs(),
+                            placement: &self.placement,
+                        };
+                        let beat = heartbeat(
+                            &self.api,
+                            &mut self.lease,
+                            &self.store,
+                            &mut self.credentials,
+                            &current,
+                            &beat,
+                        )
+                        .await;
+                        match beat {
+                            Ok(renewed) => current = renewed,
+                            Err(AgentError::Unauthorized) => {
+                                lost = Some(AgentError::Unauthorized);
+                                break 0;
+                            }
+                            Err(err) => tracing::warn!(error = %err, "heartbeat during reconcile failed"),
+                        }
+                        if self.lease.expired(Instant::now()) {
+                            lost = Some(AgentError::Runtime("lease lapsed during reconcile".into()));
+                            break 0;
+                        }
                     }
                 }
             }
         };
+        if let Some(err) = lost {
+            self.fence().await;
+            if matches!(err, AgentError::Unauthorized) {
+                self.drop_credentials(&current)?;
+            }
+            return Err(err);
+        }
         self.report_events(&current).await;
         Ok(failures)
     }

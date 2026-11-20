@@ -138,6 +138,7 @@ pub struct FakeApi {
     desired: Mutex<Option<DesiredState>>,
     rotated_token: Mutex<Option<String>>,
     reject_heartbeats: AtomicUsize,
+    accept_heartbeats: Mutex<Option<usize>>,
     events: Mutex<Vec<Event>>,
     events_down: AtomicBool,
     consoles: Mutex<BTreeMap<String, Vec<u8>>>,
@@ -174,6 +175,10 @@ impl FakeApi {
 
     pub fn rotate_to(&self, token: &str) {
         *lock(&self.rotated_token) = Some(token.into());
+    }
+
+    pub fn reject_heartbeats_after(&self, accepted: usize) {
+        *lock(&self.accept_heartbeats) = Some(accepted);
     }
 
     pub fn reject_next_heartbeats(&self, count: usize) {
@@ -247,6 +252,9 @@ impl Api for FakeApi {
     ) -> Result<HeartbeatReply, AgentError> {
         lock(&self.capacities).push(beat.capacity);
         lock(&self.placements).push(beat.placement.clone());
+        if lock(&self.accept_heartbeats).is_some_and(|n| lock(&self.capacities).len() > n) {
+            return Err(AgentError::Unauthorized);
+        }
         let rejects = &self.reject_heartbeats;
         let mut left = rejects.load(Ordering::SeqCst);
         let rejected = loop {
