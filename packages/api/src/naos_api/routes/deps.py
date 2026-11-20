@@ -1,4 +1,6 @@
+import logging
 from typing import Annotated
+from uuid import uuid4
 
 from fastapi import Depends, Header, Request
 from fastapi.exceptions import RequestValidationError
@@ -25,6 +27,8 @@ from naos_api.errors import (
     ServerConflictError,
 )
 from naos_api.settings import get_settings
+
+log = logging.getLogger(__name__)
 
 
 def _lease_ttl() -> int:
@@ -77,6 +81,13 @@ _ERROR_STATUS: dict[type[Exception], int] = {
 
 def domain_error_handler(_: Request, exc: Exception) -> JSONResponse:
     return JSONResponse({"detail": str(exc)}, status_code=_ERROR_STATUS.get(type(exc), 400))
+
+
+# The answer names an id the log holds with the real error, never the error's own text.
+def internal_error_handler(_: Request, exc: Exception) -> JSONResponse:
+    error_id = uuid4().hex
+    log.error("internal error %s", error_id, exc_info=exc)
+    return JSONResponse({"error": "internal", "error_id": error_id}, status_code=500)
 
 
 # FastAPI's own 422 echoes every failing field's input, and for a secret that is its value.

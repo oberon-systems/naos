@@ -90,8 +90,8 @@ def https_url(raw: str, what: str = "server") -> str:
 def _shared_regex(pattern: str, what: str) -> None:
     try:
         re.compile(pattern)
-    except re.error as err:
-        raise PolicyError(f"{what} has an invalid pattern: {err}") from None
+    except re.error:
+        raise PolicyError(f"{what} has an invalid pattern") from None
     index, in_class = 0, False
     while index < len(pattern):
         char = pattern[index]

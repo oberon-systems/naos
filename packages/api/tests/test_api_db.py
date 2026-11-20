@@ -35,3 +35,23 @@ def test_a_failed_statement_carries_no_bound_value(session: Session) -> None:
 
     assert "INSERT" in failed
     assert "secret-beta-value" not in failed
+
+
+def test_an_internal_error_answers_an_id_the_log_holds(
+    settings: Settings, caplog: pytest.LogCaptureFixture
+) -> None:
+    app = create_app()
+
+    @app.get("/boom")
+    def boom() -> None:
+        raise RuntimeError("driver said secret-gamma-value")
+
+    answer = TestClient(app, raise_server_exceptions=False).get("/boom")
+
+    assert answer.status_code == 500
+    body = answer.json()
+    assert body["error"] == "internal"
+    assert "secret-gamma-value" not in answer.text
+    logged = [record for record in caplog.records if body["error_id"] in record.getMessage()]
+    assert logged
+    assert "secret-gamma-value" in str(logged[0].exc_info)

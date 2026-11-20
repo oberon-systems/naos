@@ -157,6 +157,13 @@ def test_a_rule_that_is_malformed_or_never_matches_is_refused(rule: dict[str, An
         resolve_mcp_policy(_rules(rule))
 
 
+def test_an_invalid_regex_is_refused_without_the_compiler_text() -> None:
+    with pytest.raises(PolicyError) as refused:
+        resolve_mcp_policy(_rules(_rule(arguments={"a": {"regex": "(a"}})))
+
+    assert str(refused.value).endswith("has an invalid pattern")
+
+
 @pytest.mark.parametrize(
     "rules",
     [

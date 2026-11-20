@@ -19,6 +19,7 @@ from naos_api.routes import (
     console_router,
     content_router,
     domain_error_handler,
+    internal_error_handler,
     runner_console_router,
     runner_content_router,
     runner_router,
@@ -75,6 +76,7 @@ def create_app() -> FastAPI:
     schema.ensure(app.state.db.engine, settings.database_auto_migrate)
     app.add_exception_handler(DomainError, domain_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
+    app.add_exception_handler(Exception, internal_error_handler)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
