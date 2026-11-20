@@ -12,3 +12,15 @@ fn deadline_follows_the_last_renewal() {
     assert!(clock.expired(start + Duration::from_secs(80)));
     assert_eq!(clock.ttl(), Some(Duration::from_secs(30)));
 }
+
+#[test]
+fn a_ttl_outside_the_range_is_clamped() {
+    let now = Instant::now();
+    let mut clock = LeaseClock::starting(now, Duration::ZERO);
+
+    clock.renewed(now, Duration::ZERO);
+    assert!(!clock.expired(now + Duration::from_secs(2)));
+
+    clock.renewed(now, Duration::from_secs(u64::MAX));
+    assert!(clock.expired(now + Duration::from_secs(3601)));
+}

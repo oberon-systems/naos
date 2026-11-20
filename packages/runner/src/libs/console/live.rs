@@ -13,6 +13,7 @@ use tokio_tungstenite::tungstenite::http::header::AUTHORIZATION;
 use tokio_tungstenite::tungstenite::Message;
 use url::Url;
 
+use crate::libs::api::safe_segment;
 use crate::libs::console::ship::read_at;
 use crate::libs::credentials::Credentials;
 use crate::libs::error::AgentError;
@@ -87,7 +88,10 @@ impl Sessions {
             if self.waiting(&vm.vm_id) {
                 continue;
             }
-            let url = socket_url(api_url, &credentials.runner_id, &vm.run_id);
+            let Some(url) = socket_url(api_url, &credentials.runner_id, &vm.run_id) else {
+                tracing::warn!(vm_id = %vm.vm_id, "the VM's run id is not a safe path segment");
+                continue;
+            };
             let paths = VmPaths::new(vm_dir.join(&vm.vm_id));
             let credentials = credentials.clone();
             let run_id = vm.run_id.clone();
@@ -119,9 +123,10 @@ pub fn socket_base(api_url: &Url) -> String {
     }
 }
 
-fn socket_url(api_url: &Url, runner_id: &str, run_id: &str) -> String {
+fn socket_url(api_url: &Url, runner_id: &str, run_id: &str) -> Option<String> {
     let base = socket_base(api_url);
-    format!("{base}/api/v1/runners/{runner_id}/runs/{run_id}/console")
+    (safe_segment(runner_id) && safe_segment(run_id))
+        .then(|| format!("{base}/api/v1/runners/{runner_id}/runs/{run_id}/console"))
 }
 
 /// Ships the log as it grows and writes back whatever the driver types. The VM's

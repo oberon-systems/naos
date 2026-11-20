@@ -1,4 +1,4 @@
-use crate::libs::api::{Api, Beat, HttpApi, RunStatus, Transition};
+use crate::libs::api::{safe_segment, Api, Beat, HttpApi, RunStatus, Transition};
 use crate::libs::audit::Event;
 use crate::libs::config::parse_api_url;
 use crate::libs::credentials::Credentials;
@@ -320,4 +320,12 @@ async fn console_output_is_posted_raw_at_its_offset() {
         .expect("reported");
 
     assert_eq!(reply.offset, 13);
+}
+
+#[test]
+fn only_api_ids_are_safe_path_segments() {
+    assert!(safe_segment("run_0123abc"));
+    for unsafe_segment in ["", "../runs", "a/b", "run?x=1", "run%2f"] {
+        assert!(!safe_segment(unsafe_segment), "{unsafe_segment}");
+    }
 }

@@ -11,6 +11,7 @@ use tokio_tungstenite::tungstenite::http::header::AUTHORIZATION;
 use tokio_tungstenite::tungstenite::Message;
 use url::Url;
 
+use crate::libs::api::safe_segment;
 use crate::libs::console::live::socket_base;
 use crate::libs::credentials::{CredentialStore, Credentials};
 use crate::libs::error::AgentError;
@@ -67,6 +68,11 @@ async fn session(
     credentials: &Credentials,
     vm_dir: &Path,
 ) -> Result<(), AgentError> {
+    if !safe_segment(&credentials.runner_id) {
+        return Err(AgentError::Runtime(
+            "the runner id is not a safe path segment".into(),
+        ));
+    }
     let url = format!(
         "{}/api/v1/runners/{}/content",
         socket_base(api_url),

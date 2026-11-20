@@ -250,10 +250,19 @@ fn transport(err: reqwest::Error) -> AgentError {
     AgentError::Transport(err.without_url().to_string())
 }
 
+/// An id the API handed out, fit to sit in a URL path as one segment.
+pub fn safe_segment(segment: &str) -> bool {
+    !segment.is_empty()
+        && segment
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
 impl HttpApi {
     pub fn new(base: Url) -> Result<Self, AgentError> {
         let client = Client::builder()
             .redirect(redirect::Policy::none())
+            .no_proxy()
             .https_only(base.scheme() == "https")
             .user_agent(concat!("naos-runner/", env!("CARGO_PKG_VERSION")))
             .timeout(REQUEST_TIMEOUT)
@@ -264,11 +273,7 @@ impl HttpApi {
 
     fn url(&self, segments: &[&str]) -> Result<Url, AgentError> {
         for segment in segments {
-            if segment.is_empty()
-                || !segment
-                    .chars()
-                    .all(|c| c.is_ascii_alphanumeric() || c == '_')
-            {
+            if !safe_segment(segment) {
                 return Err(AgentError::Api {
                     status: 0,
                     detail: format!("refusing unsafe path segment {segment:?}"),
