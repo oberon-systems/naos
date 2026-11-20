@@ -460,6 +460,17 @@ fn normalize_host(host: &str) -> Option<String> {
     }
 }
 
+/// NAT64, 6to4, Teredo and IPv4-compatible addresses reach an IPv4 host the checks above never
+/// saw; site-local, documentation and discard ranges are never a public destination.
+fn carries_v4_or_reserved(segments: [u16; 8]) -> bool {
+    match segments {
+        [0, 0, 0, 0, 0, 0, ..] => true,
+        [0x64, 0xff9b, ..] | [0x2002, ..] | [0x2001, 0, ..] | [0x2001, 0xdb8, ..] => true,
+        [0x100, 0, 0, 0, ..] => true,
+        [first, ..] => first & 0xffc0 == 0xfec0,
+    }
+}
+
 fn forbidden(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(v) => {
@@ -486,6 +497,7 @@ fn forbidden(ip: IpAddr) -> bool {
                     .unwrap_or(false)
                 || (v.segments()[0] & 0xfe00) == 0xfc00
                 || (v.segments()[0] & 0xffc0) == 0xfe80
+                || carries_v4_or_reserved(v.segments())
         }
     }
 }

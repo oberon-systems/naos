@@ -471,3 +471,21 @@ async fn a_failed_request_names_a_code_and_an_id_not_the_library_text() {
         "{text}"
     );
 }
+
+#[test]
+fn ipv6_ranges_that_carry_ipv4_are_reserved() {
+    for raw in [
+        "64:ff9b::7f00:1",
+        "64:ff9b:1::a00:1",
+        "2002:7f00:1::1",
+        "::7f00:1",
+        "::a9fe:a9fe",
+        "fec0::1",
+        "2001::1",
+        "2001:db8::1",
+        "100::1",
+    ] {
+        assert!(forbidden(raw.parse().expect("ip")), "{raw}");
+    }
+    assert!(!forbidden("2606:4700::1111".parse().expect("ip")));
+}
