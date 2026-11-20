@@ -19,7 +19,10 @@ apk add --no-cache bash git libgcc libstdc++ nodejs npm ripgrep socat tmux
 agents=/usr/local/lib/naos-agents
 install -d -m 0755 "$agents"
 install -m 0644 "$files/npm/package.json" "$files/npm/package-lock.json" "$agents/"
-(cd "$agents" && npm ci --omit=dev --no-audit --no-fund)
+(cd "$agents" && npm ci --omit=dev --no-audit --no-fund --ignore-scripts)
+# No install script runs; claude-code's only copies its locked musl binary over the stub.
+install -m 0755 "$agents/node_modules/@anthropic-ai/claude-code-linux-x64-musl/claude" \
+    "$agents/node_modules/@anthropic-ai/claude-code/bin/claude.exe"
 ln -sf "$agents/node_modules/.bin/claude" /usr/local/bin/claude
 ln -sf "$agents/node_modules/.bin/gemini" /usr/local/bin/gemini
 claude --version
