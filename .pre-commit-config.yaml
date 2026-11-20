@@ -120,10 +120,10 @@ repos:
         files: ^packer/.*\.pkr\.hcl$
         pass_filenames: false
 
-  - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.50.0
+  - repo: https://github.com/jackdewinter/pymarkdown
+    rev: v0.9.42
     hooks:
-      - id: markdownlint
+      - id: pymarkdown
 
   - repo: https://github.com/jumanjihouse/pre-commit-hooks
     rev: 3.0.0

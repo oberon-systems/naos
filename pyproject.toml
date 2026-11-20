@@ -26,6 +26,14 @@ plugins = ["pydantic.mypy"]
 mypy_path = "packages/api/src:packages/web/src"
 explicit_package_bases = true
 
+# Docs use long prose lines, inline HTML and no leading H1; changelogs repeat headings per release.
+[tool.pymarkdown]
+plugins.md013.enabled = false
+plugins.md033.enabled = false
+plugins.md041.enabled = false
+plugins.md024.siblings_only = true
+extensions.front-matter.enabled = true
+
 [tool.pytest.ini_options]
 testpaths = ["packages", "dev/stack"]
 addopts = "--import-mode=importlib"
