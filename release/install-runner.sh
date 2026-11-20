@@ -296,7 +296,6 @@ download() {
     if [ "$layout" = system ]; then
         as_root ln -sfn "$bin_dir/runner-$stamped_runner" "$bin_dir/runner"
         as_root ln -sfn "$bin_dir/runner" "$link"
-        [ ! -d /opt/naos/runner/bin ] || as_root rm -r /opt/naos/runner/bin
     else
         ln -sfn "$bin_dir/runner-$stamped_runner" "$link"
     fi
