@@ -1021,3 +1021,20 @@ fn a_base_image_naming_a_host_file_is_refused() {
     assert!(base_size(&backed).is_err());
     assert!(base_size(&external).is_err());
 }
+
+#[tokio::test]
+async fn a_policy_the_runner_cannot_enforce_drops_the_kept_mcp_grants() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let runtime =
+        QemuRuntime::new(&config(&dir, "/bin/false", fake_qemu_img(&dir))).expect("runtime");
+    let (mut run, vm) = secret_run("run_a", "value-alpha");
+    runtime.sync(&run, &vm).await.expect("sync");
+    assert_eq!(secret_of(&runtime, "run_a").as_deref(), Some("value-alpha"));
+    let held = runtime.gates("run_a").expect("gates");
+
+    run.policies.insert("printer".into(), Some(json!({})));
+    assert!(runtime.sync(&run, &vm).await.is_err());
+
+    assert_eq!(secret_of(&runtime, "run_a"), None);
+    assert!(held.mcp.secret_names().is_empty());
+}

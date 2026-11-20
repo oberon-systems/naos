@@ -181,14 +181,8 @@ impl QemuRuntime {
 
     /// Admission check and gate registration: an unusable policy fails the run before an image is
     /// ever fetched, and every call hands the kept MCP gate the latest credentials.
-    fn register(&self, run: &DesiredRun) -> Result<(), AgentError> {
+    fn admit(&self, run: &DesiredRun) -> Result<RunGates, AgentError> {
         let policy = |kind: &str| run.policies.get(kind).and_then(Option::as_ref);
-        // Before the admission below, so a document it refuses is not left granting.
-        if let Some(kept) = self.gates(&run.id) {
-            kept.network.replace(policy("network"));
-            kept.shell.replace(policy("shell"));
-            kept.model.replace(policy("model"));
-        }
         let gates = RunGates {
             network: NetworkGate::from_snapshot(&run.id, policy("network"))?,
             shell: ShellGate::from_snapshot(
@@ -212,6 +206,28 @@ impl QemuRuntime {
                 granted.join(", ")
             )));
         }
+        Ok(gates)
+    }
+
+    fn register(&self, run: &DesiredRun) -> Result<(), AgentError> {
+        let policy = |kind: &str| run.policies.get(kind).and_then(Option::as_ref);
+        // Before the admission below, so a document it refuses is not left granting.
+        let held = self.gates(&run.id);
+        if let Some(kept) = &held {
+            kept.network.replace(policy("network"));
+            kept.shell.replace(policy("shell"));
+            kept.model.replace(policy("model"));
+            kept.mcp.replace(policy("mcp"));
+        }
+        let gates = match self.admit(run) {
+            Ok(gates) => gates,
+            Err(err) => {
+                if let Some(kept) = &held {
+                    kept.mcp.refresh(&BTreeMap::new(), &BTreeMap::new());
+                }
+                return Err(err);
+            }
+        };
         // A reconcile keeps the gate it registered, so budgets survive a tick; every policy but
         // mount can change under a running VM, and its gate swaps it in place.
         let kept = self
