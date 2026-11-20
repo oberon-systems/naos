@@ -521,6 +521,12 @@ fn host_root(raw: &str) -> Result<PathBuf, AgentError> {
     }
     let root = fs::canonicalize(raw)
         .map_err(|err| bad_mount(&format!("host path {raw:?} is unusable: {err}")))?;
+    // As for the workspace: a symlink on the path would root the gate where the policy never named.
+    if root != Path::new(raw) {
+        return Err(bad_mount(&format!(
+            "host path {raw:?} passes through a symlink"
+        )));
+    }
     if !root.is_dir() {
         return Err(bad_mount(&format!("host path {raw:?} is not a directory")));
     }

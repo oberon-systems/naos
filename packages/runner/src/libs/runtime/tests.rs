@@ -511,7 +511,7 @@ async fn a_workspace_reached_through_a_symlink_is_refused() {
     let outcome = runtime.ensure(&run, &source).await;
 
     assert!(
-        matches!(outcome, Err(AgentError::Runtime(message)) if message.contains("without symlinks"))
+        matches!(outcome, Err(AgentError::Runtime(message) | AgentError::Config(message)) if message.contains("symlink"))
     );
     assert_eq!(source.calls(), 0);
     assert!(vm_dirs(&dir).is_empty());

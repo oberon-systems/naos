@@ -676,3 +676,20 @@ async fn a_call_in_flight_ends_under_the_policy_it_started_with() {
     let next = gate.call(status()).await.expect_err("denied");
     assert!(next.to_string().contains("capability not granted"));
 }
+
+#[test]
+fn a_home_mount_through_a_symlink_is_refused() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let elsewhere = tempfile::tempdir().expect("tempdir");
+    let link = dir.path().join("home");
+    std::os::unix::fs::symlink(elsewhere.path(), &link).expect("symlink");
+
+    let refused = ShellGate::from_snapshot(
+        "run_a",
+        Some(&json!({ "allow": ["read_file"] })),
+        Some(&mounts(&link)),
+        &git_binary(),
+    );
+
+    assert!(refused.is_err());
+}
