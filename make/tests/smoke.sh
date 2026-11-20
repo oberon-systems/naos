@@ -41,7 +41,7 @@ field() {
 }
 
 run_status() {
-    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run" | field status
+    acurl -fsS "$api/api/v1/runs/$run" | field status
 }
 
 booted() {
@@ -55,7 +55,7 @@ booted() {
 }
 
 enrolled() {
-    curl -fsS "${auth[@]}" "$api/api/v1/runners" | "$VENV/bin/python" -c '
+    acurl -fsS "$api/api/v1/runners" | "$VENV/bin/python" -c '
 import json, sys
 rows = json.load(sys.stdin)
 sys.exit(0 if [(row["name"], row["status"]) for row in rows] == [("alpha", "live")] else 1)
@@ -73,7 +73,7 @@ collected() {
 }
 
 merge_state() {
-    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/merge"
+    acurl -fsS "$api/api/v1/runs/$run/merge"
 }
 
 # Selects every mergeable path with the given resolutions, the way the operator does: through
@@ -151,6 +151,48 @@ fail() {
     exit 1
 }
 
+# An operator call is signed for its own method, target and body, so each one goes through
+# naos-api sign; the body is written to a file first so the signature covers the exact bytes.
+acurl() {
+    local args=() method="" url="" data=0 body line headers=()
+    body="$(mktemp "$TEMP_DIR/acurl.XXXXXX")"
+    while [ $# -gt 0 ]; do
+        case "$1" in
+        -X)
+            method="$2"
+            args+=(-X "$2")
+            shift 2
+            ;;
+        -d | --data | --data-binary)
+            data=1
+            if [ "$2" = @- ]; then cat >"$body"; else printf '%s' "$2" >"$body"; fi
+            shift 2
+            ;;
+        "$api"/*)
+            url="$1"
+            args+=("$1")
+            shift
+            ;;
+        *)
+            args+=("$1")
+            shift
+            ;;
+        esac
+    done
+    if [ -z "$method" ]; then
+        if [ "$data" = 1 ]; then method=POST; else method=GET; fi
+    fi
+    while IFS= read -r line; do headers+=(-H "$line"); done < <(
+        "$VENV/bin/naos-api" sign "$method" "${url#"$api"}" --body "$body" \
+            --api "$api" --token-file "$TEMP_DIR/operator"
+    )
+    [ "$data" = 0 ] || args+=(--data-binary @"$body")
+    local status=0
+    curl "${headers[@]}" -H "Content-Type: application/json" "${args[@]}" || status=$?
+    rm -f -- "$body"
+    return "$status"
+}
+
 # A second tmux window gets a shell next to the agent, and the lines are typed into it.
 guest() {
     {
@@ -219,7 +261,7 @@ check_model_card() {
 
 # The read model the operator screens render, rather than the raw row.
 check_run_view() {
-    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run" | "$VENV/bin/python" -c '
+    acurl -fsS "$api/api/v1/runs/$run" | "$VENV/bin/python" -c '
 import json, sys
 status, finished = sys.argv[1], sys.argv[2] == "finished"
 row = json.load(sys.stdin)
@@ -237,7 +279,7 @@ if (row["finished_at"] is not None) != finished:
 }
 
 check_merge_summary() {
-    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run" | "$VENV/bin/python" -c '
+    acurl -fsS "$api/api/v1/runs/$run" | "$VENV/bin/python" -c '
 import json, sys
 merge = json.load(sys.stdin)["merge"]
 if not merge or merge["changed"] < 1:
@@ -246,7 +288,7 @@ if not merge or merge["changed"] < 1:
 }
 
 listed() {
-    curl -fsS "${auth[@]}" "$api/api/v1/runs?state=$1" | "$VENV/bin/python" -c '
+    acurl -fsS "$api/api/v1/runs?state=$1" | "$VENV/bin/python" -c '
 import json, sys
 sys.exit(0 if sys.argv[1] in [row["id"] for row in json.load(sys.stdin)] else 1)
 ' "$run"
@@ -262,7 +304,7 @@ check_states() {
 }
 
 check_summary() {
-    curl -fsS "${auth[@]}" "$api/api/v1/runs/summary" | "$VENV/bin/python" -c '
+    acurl -fsS "$api/api/v1/runs/summary" | "$VENV/bin/python" -c '
 import json, sys
 status, opened = sys.argv[1], int(sys.argv[2])
 body = json.load(sys.stdin)
@@ -275,7 +317,7 @@ if body["open"] != opened:
 
 # capacity outlives a lease, so it is stored rather than counted per request.
 check_runner_slots() {
-    curl -fsS "${auth[@]}" "$api/api/v1/runners" | "$VENV/bin/python" -c '
+    acurl -fsS "$api/api/v1/runners" | "$VENV/bin/python" -c '
 import json, sys
 (row,) = json.load(sys.stdin)
 if row["capacity"] is None:
@@ -315,7 +357,7 @@ if "Bearer" in body or "Authorization" in body:
 # The fleet as the runners page shows it, then the runner popup with its placement and the run.
 check_runners_page() {
     local runner
-    runner="$(curl -fsS "${auth[@]}" "$api/api/v1/runners" | "$VENV/bin/python" -c '
+    runner="$(acurl -fsS "$api/api/v1/runners" | "$VENV/bin/python" -c '
 import json, sys
 print(json.load(sys.stdin)[0]["id"])
 ')"
@@ -408,7 +450,7 @@ policy_applied() {
 
 change_policy() {
     configured="$(events "$1_policy_configured")"
-    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/policies" -o /dev/null -d "$2"
+    acurl -fsS "$api/api/v1/runs/$run/policies" -o /dev/null -d "$2"
     wait_for 60 policy_applied "$1"
 }
 
@@ -469,7 +511,7 @@ check_mcp_page() {
         --data-urlencode "name=epsilon" --data-urlencode "url=https://example.com/epsilon" \
         --data-urlencode "credential=" --data-urlencode "timeout=20" --data-urlencode "calls=30")" = \
         "$web/mcp/epsilon" ] || fail "registering a server through the web did not open it"
-    curl -fsS "${auth[@]}" "$api/api/v1/mcp-servers/epsilon" | "$VENV/bin/python" -c '
+    acurl -fsS "$api/api/v1/mcp-servers/epsilon" | "$VENV/bin/python" -c '
 import json, sys
 row = json.load(sys.stdin)
 if (row["url"], row["timeout_seconds"], row["max_calls_per_minute"]) != ("https://example.com/epsilon", 20, 30):
@@ -506,7 +548,7 @@ check_live_policy() {
     grep -q NAOS-SMOKE-DETACHED "$TEMP_DIR/console.log" || fail "the guest did not call the removed server"
     [ "$(mcp_calls unknown unknown deny)" -ge 1 ] ||
         fail "a server taken away from the run still answered"
-    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run" | "$VENV/bin/python" -c '
+    acurl -fsS "$api/api/v1/runs/$run" | "$VENV/bin/python" -c '
 import json, sys
 
 rows = json.load(sys.stdin)["policy_history"]
@@ -519,7 +561,7 @@ kept += [("model", model, None), ("model", None, model)]
 if held != kept:
     sys.exit(f"the run did not keep the policies it held: {held}")
 ' "$mcp_policy" "$network_policy" "$shell_policy" "$model_policy"
-    curl -fsS "${auth[@]}" "$api/api/v1/audit?event=policy_changed&run_id=$run" | "$VENV/bin/python" -c '
+    acurl -fsS "$api/api/v1/audit?event=policy_changed&run_id=$run" | "$VENV/bin/python" -c '
 import json, sys
 
 if len(json.load(sys.stdin)) != 8:
@@ -757,7 +799,7 @@ async def main() -> None:
 
 anyio.run(main)
 CONTENT
-    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/events?limit=10000" | "$VENV/bin/python" -c '
+    acurl -fsS "$api/api/v1/runs/$run/events?limit=10000" | "$VENV/bin/python" -c '
 import json, sys
 rows = [row for row in json.load(sys.stdin) if row["event"] == "merge_content_viewed"]
 if not rows or {(row["actor"], row["data"]["path"]) for row in rows} != {("operator", "notes.txt")}:
@@ -767,7 +809,7 @@ if not rows or {(row["actor"], row["data"]["path"]) for row in rows} != {("opera
 
 # The runner posts its events after each cycle, so the timeline fills in shortly after the log.
 audited() {
-    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/events?limit=10000" |
+    acurl -fsS "$api/api/v1/runs/$run/events?limit=10000" |
         "$VENV/bin/python" -c '
 import json, sys
 rows = json.load(sys.stdin)
@@ -788,12 +830,14 @@ sys.exit(0 if expected <= seen else f"not in the timeline yet: {sorted(map(str, 
 }
 
 check_secrets() {
-    local after=0 page spool="$TEMP_DIR/state/audit.jsonl"
+    local after=0 count page spool="$TEMP_DIR/state/audit.jsonl"
     : >"$TEMP_DIR/audit.json"
-    while page="$(curl -fsS "${auth[@]}" "$api/api/v1/audit?limit=1000&after=$after")" &&
-        [ "$page" != "[]" ]; do
+    # Every signed call logs in and adds a row, so a short page is the end, not an empty one.
+    while page="$(acurl -fsS "$api/api/v1/audit?limit=1000&after=$after")"; do
         printf '%s\n' "$page" >>"$TEMP_DIR/audit.json"
-        after="$(printf '%s' "$page" | "$VENV/bin/python" -c 'import json, sys; print(json.load(sys.stdin)[-1]["seq"])')"
+        read -r count after < <(printf '%s' "$page" |
+            "$VENV/bin/python" -c 'import json, sys; p = json.load(sys.stdin); print(len(p), p[-1]["seq"] if p else 0)')
+        [ "$count" -ge 1000 ] || break
     done
     [ "$(stat -c %a "$spool")" = 600 ] || fail "$spool is not 0600"
     for value in "$operator" "$(cat "$TEMP_DIR/enrollment")" "$secret" "$agent_secret" "$openai_key" \
@@ -808,7 +852,7 @@ check_secrets() {
 # The audit page counts the gate denials; a denial's popup names its policy and run timeline.
 check_audit_page() {
     local denied
-    denied="$(curl -fsS "${auth[@]}" "$api/api/v1/audit?event=network_denied&run_id=$run" |
+    denied="$(acurl -fsS "$api/api/v1/audit?event=network_denied&run_id=$run" |
         "$VENV/bin/python" -c '
 import json, sys
 row = json.load(sys.stdin)[0]
@@ -816,7 +860,7 @@ if row["received_at"] < row["at"]:
     sys.exit("a runner event reached the api before it was written")
 print(row["id"])
 ')"
-    curl -fsS "${auth[@]}" "$api/api/v1/audit/summary" | "$VENV/bin/python" -c '
+    acurl -fsS "$api/api/v1/audit/summary" | "$VENV/bin/python" -c '
 import json, sys
 summary = json.load(sys.stdin)
 if min(summary["denials"].values()) < 1 or summary["spool_lag"] is None:
@@ -846,7 +890,7 @@ PY
 
 # The Logs & Audit tab renders every event the run carries, refuses none, and exports them all.
 check_run_logs() {
-    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/events?limit=10000" >"$TEMP_DIR/events.json"
+    acurl -fsS "$api/api/v1/runs/$run/events?limit=10000" >"$TEMP_DIR/events.json"
     curl -fsS "$web/runs/$run/logs" >"$TEMP_DIR/logs.html"
     curl -fsS "$web/runs/$run/logs?kind=errors" >"$TEMP_DIR/errors.html"
     curl -fsS "$web/runs/$run/logs/export" >"$TEMP_DIR/export.json"
@@ -968,7 +1012,7 @@ print(profiles[0]["id"])
 # The api, not only the form, refuses to change a profile while its run is active.
 check_profile_locked() {
     local code
-    code="$(curl -sS "${auth[@]}" -o /dev/null -w '%{http_code}' -X PUT \
+    code="$(acurl -sS -o /dev/null -w '%{http_code}' -X PUT \
         "$api/api/v1/profiles/$profile" \
         -d '{"spec": {"runtime": {"cpu": 4, "memory_mib": 2048, "disk_gib": 8}, "timeout": 3600}}')"
     [ "$code" = 409 ] || fail "a profile with an active run was updated ($code)"
@@ -977,7 +1021,7 @@ check_profile_locked() {
 # A policy is found by its digest, reads who uses it, and an equivalent document keeps its id.
 check_policies_page() {
     local digest
-    digest="$(curl -fsS "${auth[@]}" "$api/api/v1/policies/$network_policy" |
+    digest="$(acurl -fsS "$api/api/v1/policies/$network_policy" |
         "$VENV/bin/python" -c '
 import json, sys
 row = json.load(sys.stdin)
@@ -985,7 +1029,7 @@ if sys.argv[1] not in row["profiles"] or row["runs_open"] < 1:
     sys.exit(f"the network policy misses its profile or run: {row}")
 print(row["digest"])
 ' "$profile")"
-    curl -fsS "${auth[@]}" "$api/api/v1/runs?policy=$network_policy" | "$VENV/bin/python" -c '
+    acurl -fsS "$api/api/v1/runs?policy=$network_policy" | "$VENV/bin/python" -c '
 import json, sys
 if [row["id"] for row in json.load(sys.stdin)] != [sys.argv[1]]:
     sys.exit("the runs of the network policy are wrong")
@@ -1037,7 +1081,7 @@ check_secrets_page() {
         "$web/secrets/beta-token" ] || fail "the web did not create the secret"
     [ "$(secret_post beta-token/rotate "$second")" = "$web/secrets/beta-token" ] ||
         fail "the web did not rotate the secret"
-    curl -fsS "${auth[@]}" "$api/api/v1/secrets/beta-token" | "$VENV/bin/python" -c '
+    acurl -fsS "$api/api/v1/secrets/beta-token" | "$VENV/bin/python" -c '
 import json, sys
 row = json.load(sys.stdin)
 if row["rotated_at"] is None or row["expires_at"] is None or "value" in row:
@@ -1047,7 +1091,7 @@ if row["rotated_at"] is None or row["expires_at"] is None or "value" in row:
     curl -fsS "$web/secrets/beta-token/events" >"$TEMP_DIR/secrets-events.html"
     curl -fsS "$web/secrets/alpha-token/used" >"$TEMP_DIR/secrets-used.html"
     curl -fsS -X POST "$web/secrets/alpha-token/delete" >"$TEMP_DIR/secrets-refused.html"
-    curl -fsS "${auth[@]}" "$api/api/v1/audit?secret=beta-token" >"$TEMP_DIR/secrets-audit.html"
+    acurl -fsS "$api/api/v1/audit?secret=beta-token" >"$TEMP_DIR/secrets-audit.html"
     [ "$(curl -fsS -o /dev/null -w '%{redirect_url}' -X POST "$web/secrets/beta-token/delete")" = \
         "$web/secrets" ] || fail "the web did not delete the unused secret"
     "$VENV/bin/python" - "$TEMP_DIR" "$run" "$first" "$second" "$secret" "$operator" <<'PY' || fail "the secrets page is wrong"
@@ -1074,9 +1118,9 @@ PY
 # names the registry server the first Run names too. Prints the id of the Run.
 side_run() {
     local policy
-    curl -fsS "${auth[@]}" "$api/api/v1/secrets" -o /dev/null -d "{\"name\": \"$1\", \"value\": \"$2\"}"
+    acurl -fsS "$api/api/v1/secrets" -o /dev/null -d "{\"name\": \"$1\", \"value\": \"$2\"}"
     policy="$(
-        curl -fsS "${auth[@]}" "$api/api/v1/policies" -d @- <<EOF | field id
+        acurl -fsS "$api/api/v1/policies" -d @- <<EOF | field id
 {"kind": "mcp", "document": {"rules": [
   {"server": "alpha", "tool": "search", "effect": "allow"},
   {"server": "secrets", "tool": "list", "effect": "allow"},
@@ -1084,7 +1128,7 @@ side_run() {
 ]}}
 EOF
     )"
-    curl -fsS "${auth[@]}" -H "Idempotency-Key: $1" "$api/api/v1/runs" -d @- <<EOF | field id
+    acurl -fsS -H "Idempotency-Key: $1" "$api/api/v1/runs" -d @- <<EOF | field id
 {"image": {"id": "naos-agents", "digest": "$digest"}, "timeout": 3600,
  "runtime": {"cpu": 2, "memory_mib": 2048, "disk_gib": 8}, "mcp": {"policy": "$policy"},
  "model": {"policy": "$model_policy"}}
@@ -1237,7 +1281,7 @@ check_image_source() {
 }
 
 image_status() {
-    curl -s -o /dev/null -w '%{http_code}' "${auth[@]}" "$@"
+    acurl -s -o /dev/null -w '%{http_code}' "$@"
 }
 
 # An image a run still boots stays; one nothing boots goes, and the audit says so.
@@ -1245,20 +1289,20 @@ check_image_delete() {
     local spare="$api/api/v1/images/naos-spare"
     [ "$(image_status -X DELETE "$api/api/v1/images/naos-agents")" = 409 ] ||
         fail "an image in use was deleted"
-    curl -fsS "${auth[@]}" "$api/api/v1/images" -o /dev/null -d @- <<EOF
+    acurl -fsS "$api/api/v1/images" -o /dev/null -d @- <<EOF
 {"id": "naos-spare", "version": "0.0.0", "digest": "sha256:$(printf 'spare' | sha256sum | cut -d' ' -f1)",
  "url": "https://images.example.com/naos-spare.qcow2"}
 EOF
     [ "$(image_status -X DELETE "$spare")" = 204 ] || fail "an unused image was not deleted"
     [ "$(image_status "$spare")" = 404 ] || fail "a deleted image is still in the catalog"
-    curl -fsS "${auth[@]}" "$api/api/v1/audit?event=image_deleted" | grep -q '"image_id": *"naos-spare"' ||
+    acurl -fsS "$api/api/v1/audit?event=image_deleted" | grep -q '"image_id": *"naos-spare"' ||
         fail "deleting an image left no audit entry"
 }
 
 # A policy nothing names goes; one a run took stays, and the audit says which went.
 check_policy_delete() {
     local spare
-    spare="$(curl -fsS "${auth[@]}" "$api/api/v1/policies" \
+    spare="$(acurl -fsS "$api/api/v1/policies" \
         -d '{"kind": "shell", "document": {"allow": ["list_dir"]}}' | field id)"
     [ "$(image_status -X DELETE "$api/api/v1/policies/$model_policy")" = 409 ] ||
         fail "a policy a run took was deleted"
@@ -1267,7 +1311,7 @@ check_policy_delete() {
     [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$web/policies/$spare/delete")" = 303 ] ||
         fail "the web did not delete an unused policy"
     [ "$(image_status "$api/api/v1/policies/$spare")" = 404 ] || fail "a deleted policy is still listed"
-    curl -fsS "${auth[@]}" "$api/api/v1/audit?event=policy_deleted" | grep -q "\"policy_id\": *\"$spare\"" ||
+    acurl -fsS "$api/api/v1/audit?event=policy_deleted" | grep -q "\"policy_id\": *\"$spare\"" ||
         fail "deleting a policy left no audit entry"
 }
 
@@ -1307,7 +1351,9 @@ fi
 operator="$(token)"
 token >"$TEMP_DIR/enrollment"
 chmod 600 "$TEMP_DIR/enrollment"
-auth=(-H "Authorization: Bearer $operator" -H "Content-Type: application/json")
+master_key="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
+printf '%s' "$operator" >"$TEMP_DIR/operator"
+chmod 600 "$TEMP_DIR/operator"
 touch "$TEMP_DIR/api.log" "$TEMP_DIR/web.log" "$TEMP_DIR/agent.log" "$TEMP_DIR/console.log"
 tail -f "$TEMP_DIR/api.log" "$TEMP_DIR/web.log" "$TEMP_DIR/agent.log" &
 logs=$!
@@ -1332,6 +1378,8 @@ stub=$!
 
 echo "starting api..."
 NAOS_OPERATOR_TOKEN_SHA256="$(printf '%s' "$operator" | sha256sum | cut -d' ' -f1)" \
+NAOS_MASTER_KEYS="{\"s1\": \"$master_key\"}" \
+NAOS_MASTER_KID=s1 \
 NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256="$(sha256sum "$TEMP_DIR/enrollment" | cut -d' ' -f1)" \
 NAOS_DATABASE_URL="sqlite:///$TEMP_DIR/naos.db" \
 NAOS_DATABASE_AUTO_MIGRATE=true \
@@ -1341,8 +1389,6 @@ server=$!
 wait_for 30 curl -fs -o /dev/null "$api/healthz"
 
 echo "starting web..."
-printf '%s' "$operator" >"$TEMP_DIR/operator"
-chmod 600 "$TEMP_DIR/operator"
 NAOS_WEB_API_URL="$api" \
     NAOS_WEB_OPERATOR_TOKEN_FILE="$TEMP_DIR/operator" \
     setsid "$MAKE" -C "$ROOT" run-web >"$TEMP_DIR/web.log" 2>&1 &
@@ -1351,7 +1397,7 @@ wait_for 30 curl -fs -o /dev/null "$web/healthz"
 
 # The guest's console output travels runner -> api -> web without a port on the runner.
 console_shipped() {
-    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/console" | grep -q NAOS-SMOKE-DONE
+    acurl -fsS "$api/api/v1/runs/$run/console" | grep -q NAOS-SMOKE-DONE
 }
 
 check_terminal() {
@@ -1359,7 +1405,10 @@ check_terminal() {
         fail "the terminal tab does not attach"
     curl -fsS "$web/runs/$run/terminal/log" | grep -q NAOS-SMOKE-DONE ||
         fail "the terminal log misses the console output"
-    NAOS_TOKEN="$operator" "$VENV/bin/python" - "$api" "$run" <<'PY' || fail "the api attach did not stream the console"
+    local signed
+    signed="$("$VENV/bin/naos-api" sign GET "/api/v1/runs/$run/attach" --api "$api" \
+        --token-file "$TEMP_DIR/operator")"
+    NAOS_SIGNED="$signed" "$VENV/bin/python" - "$api" "$run" <<'PY' || fail "the api attach did not stream the console"
 import os
 import sys
 
@@ -1369,7 +1418,7 @@ from httpx_ws import aconnect_ws
 
 
 async def main() -> None:
-    headers = {"Authorization": f"Bearer {os.environ['NAOS_TOKEN']}"}
+    headers = dict(line.split(": ", 1) for line in os.environ["NAOS_SIGNED"].splitlines())
     async with httpx.AsyncClient(headers=headers) as client:
         async with aconnect_ws(f"{sys.argv[1]}/api/v1/runs/{sys.argv[2]}/attach", client) as ws:
             seen = b""
@@ -1379,7 +1428,7 @@ async def main() -> None:
 
 anyio.run(main)
 PY
-    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/events?limit=10000" | "$VENV/bin/python" -c '
+    acurl -fsS "$api/api/v1/runs/$run/events?limit=10000" | "$VENV/bin/python" -c '
 import json, sys
 rows = [row for row in json.load(sys.stdin) if row["event"] == "console_attached" and row["source"] == "api"]
 if not rows or {row["actor"] for row in rows} != {"operator"}:
@@ -1444,7 +1493,7 @@ async def main() -> None:
 
 anyio.run(main)
 INPUT
-    curl -fsS "${auth[@]}" "$api/api/v1/runs/$run/events?limit=10000" | "$VENV/bin/python" -c '
+    acurl -fsS "$api/api/v1/runs/$run/events?limit=10000" | "$VENV/bin/python" -c '
 import json, sys
 rows = [row for row in json.load(sys.stdin) if row["event"] == "console_typing"]
 if not rows or {row["actor"] for row in rows} != {"operator"}:
@@ -1455,36 +1504,36 @@ if any(set(row["data"]) - {"view"} for row in rows):
 }
 
 echo "registering the image and creating a run..."
-curl -fsS "${auth[@]}" "$api/api/v1/images" -o /dev/null -d @- <<EOF
+acurl -fsS "$api/api/v1/images" -o /dev/null -d @- <<EOF
 {"id": "naos-agents", "version": "$version", "digest": "$digest", "url": "$release/$image"}
 EOF
 network_policy="$(
-    curl -fsS "${auth[@]}" "$api/api/v1/policies" -d @- <<EOF | field id
+    acurl -fsS "$api/api/v1/policies" -d @- <<EOF | field id
 {"kind": "network", "document": {"allow": [{"protocol": "https", "host": "www.google.com"}]}}
 EOF
 )"
 shell_policy="$(
-    curl -fsS "${auth[@]}" "$api/api/v1/policies" -d @- <<EOF | field id
+    acurl -fsS "$api/api/v1/policies" -d @- <<EOF | field id
 {"kind": "shell", "document": {"allow": ["read_file", "list_dir", "grep"]}}
 EOF
 )"
 mount_policy="$(
-    curl -fsS "${auth[@]}" "$api/api/v1/policies" -d @- <<EOF | field id
+    acurl -fsS "$api/api/v1/policies" -d @- <<EOF | field id
 {"kind": "mount", "document": {"workspace": {"host_path": "$TEMP_DIR/workspaces/alpha", "mode": "rw"}}}
 EOF
 )"
 secret="$(token)"
-curl -fsS "${auth[@]}" "$api/api/v1/secrets" -o /dev/null -d @- <<EOF
+acurl -fsS "$api/api/v1/secrets" -o /dev/null -d @- <<EOF
 {"name": "alpha-token", "value": "$secret"}
 EOF
 agent_secret="$(token)"
-curl -fsS "${auth[@]}" "$api/api/v1/secrets" -o /dev/null -d @- <<EOF
+acurl -fsS "$api/api/v1/secrets" -o /dev/null -d @- <<EOF
 {"name": "agent-key", "value": "$agent_secret"}
 EOF
-curl -fsS "${auth[@]}" "$api/api/v1/mcp-servers" -o /dev/null -d @- <<EOF
+acurl -fsS "$api/api/v1/mcp-servers" -o /dev/null -d @- <<EOF
 {"name": "alpha", "url": "https://example.com/mcp", "credential": "alpha-token"}
 EOF
-curl -fsS "${auth[@]}" "$api/api/v1/mcp-servers" -o /dev/null \
+acurl -fsS "$api/api/v1/mcp-servers" -o /dev/null \
     -d '{"name": "delta", "url": "https://example.com/delta"}'
 mcp_rules="$(
     cat <<'EOF'
@@ -1504,7 +1553,7 @@ mcp_rules="$(
 EOF
 )"
 mcp_policy="$(
-    curl -fsS "${auth[@]}" "$api/api/v1/policies" \
+    acurl -fsS "$api/api/v1/policies" \
         -d "{\"kind\": \"mcp\", \"document\": {\"rules\": [$mcp_rules]}}" | field id
 )"
 # A policy names registered servers only, and a rule that can never match is refused.
@@ -1514,13 +1563,13 @@ for rule in '{"server": "beta", "tool": "search", "effect": "allow"}' \
     '{"server": "alpha", "tool": "search", "effect": "allow", "arguments": {"q": {"regex": "(?=a)b"}}}' \
     '{"server": "secrets", "tool": "*", "effect": "allow"}' \
     '{"server": "secrets", "tool": "get", "effect": "allow", "arguments": {"name": {"prefix": "a"}}}'; do
-    [ "$(curl -s -o /dev/null -w '%{http_code}' "${auth[@]}" "$api/api/v1/policies" \
+    [ "$(acurl -s -o /dev/null -w '%{http_code}' "$api/api/v1/policies" \
         -d "{\"kind\": \"mcp\", \"document\": {\"rules\": [$rule]}}")" = 422 ] ||
         fail "an mcp rule that cannot hold was accepted: $rule"
 done
 for name in openai anthropic; do
     key_var="${name}_key"
-    curl -fsS "${auth[@]}" "$api/api/v1/secrets" -o /dev/null -d @- <<EOF
+    acurl -fsS "$api/api/v1/secrets" -o /dev/null -d @- <<EOF
 {"name": "$name-key", "value": "${!key_var}"}
 EOF
 done
@@ -1551,7 +1600,7 @@ model_policy="${model_policy##*/}"
 [ "${model_policy#modelpol_}" != "$model_policy" ] || fail "the web did not create the model policy"
 # The profile names no model policy; the dialog picks it and saves it into the profile.
 smoke_profile="$(
-    curl -fsS "${auth[@]}" "$api/api/v1/profiles" -d @- <<EOF | field id
+    acurl -fsS "$api/api/v1/profiles" -d @- <<EOF | field id
 {"name": "smoke", "spec": {
   "runtime": {"cpu": 2, "memory_mib": 2048, "disk_gib": 8}, "timeout": 3600, "merge": {"policy": "ask"},
   "mounts": {"policy": "$mount_policy"}, "network": {"policy": "$network_policy"},
@@ -1562,8 +1611,8 @@ EOF
 echo "creating the run from the new run dialog..."
 new_run
 new_run
-run="$(curl -fsS "${auth[@]}" "$api/api/v1/runs" | only_run "$model_policy")"
-profile="$(curl -fsS "${auth[@]}" "$api/api/v1/profiles?q=smoke" | only_profile)"
+run="$(acurl -fsS "$api/api/v1/runs" | only_run "$model_policy")"
+profile="$(acurl -fsS "$api/api/v1/profiles?q=smoke" | only_profile)"
 
 echo "starting agent..."
 start_agent

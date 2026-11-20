@@ -1,12 +1,13 @@
 import hmac
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import Depends, HTTPException, WebSocket, WebSocketException, status
+from fastapi import Depends, HTTPException, Request, WebSocket, WebSocketException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.security.utils import get_authorization_scheme_param
 from sqlmodel import Session
+from starlette.datastructures import URL, Headers
 
-from naos_api import runners
+from naos_api import credentials, runners
 from naos_api.clock import NowDep
 from naos_api.db import get_session, get_socket_session
 from naos_api.runners import RunnerPrincipal, hash_token
@@ -36,23 +37,56 @@ def _operator_hash() -> str | None:
     return get_settings().operator_token_sha256
 
 
-def require_principal(
-    credentials: BearerDep, expected: Annotated[str | None, Depends(_operator_hash)]
+# The operator token only logs in; it is refused on every other route.
+def operator_login(token: str) -> bool:
+    expected = _operator_hash()
+    return expected is not None and hmac.compare_digest(hash_token(token), expected)
+
+
+def _target(url: URL) -> str:
+    return f"{url.path}?{url.query}" if url.query else url.path
+
+
+def _signed(headers: Headers) -> credentials.Signed | None:
+    names = ("x-credential", "x-timestamp", "x-nonce", "x-signature")
+    values = [headers.get(name) for name in names]
+    if any(value is None for value in values):
+        return None
+    return credentials.Signed(*(str(value) for value in values))
+
+
+def _verified(
+    session: Session,
+    app_state: Any,
+    headers: Headers,
+    method: str,
+    target: str,
+    body: bytes,
+    now: int,
+) -> bool:
+    signed = _signed(headers)
+    settings = get_settings()
+    return signed is not None and credentials.verify(
+        session, settings.master_keys, app_state.nonces, signed, method, target, body, now
+    )
+
+
+async def require_principal(
+    request: Request, session: Annotated[Session, Depends(get_session)], now: NowDep
 ) -> None:
-    if not _matches(credentials, expected):
-        raise _unauthorized("operator is not authorized")
+    body = await request.body()
+    method, target = request.method, _target(request.url)
+    if not _verified(session, request.app.state, request.headers, method, target, body, now):
+        raise _unauthorized("operator request is not signed")
 
 
 def require_operator_connection(
-    websocket: WebSocket, expected: Annotated[str | None, Depends(_operator_hash)]
+    websocket: WebSocket,
+    session: Annotated[Session, Depends(get_socket_session)],
+    now: NowDep,
 ) -> None:
-    scheme, token = get_authorization_scheme_param(websocket.headers.get("authorization"))
-    credentials = (
-        HTTPAuthorizationCredentials(scheme=scheme, credentials=token)
-        if scheme.lower() == "bearer" and token
-        else None
-    )
-    if not _matches(credentials, expected):
+    target = _target(websocket.url)
+    if not _verified(session, websocket.app.state, websocket.headers, "GET", target, b"", now):
         raise WebSocketException(status.WS_1008_POLICY_VIOLATION, "operator is not authorized")
 
 

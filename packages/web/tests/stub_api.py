@@ -335,6 +335,13 @@ STATES = {
 }
 
 stub = FastAPI()
+
+
+@stub.post("/api/v1/auth/credential")
+def credential() -> dict[str, Any]:
+    return {"credential": "k1.0.4102444800." + "a" * 32, "key": "b" * 64, "expires_at": 4102444800}
+
+
 RUN_SEQS = [row["seq"] for row in RUNS]
 
 

@@ -121,7 +121,8 @@ available, with `audit.lock` next to it serialising both processes.
 
 ## Reading the trail
 
-Both endpoints need the operator token.
+Both endpoints take signed operator requests
+([03](03-api-design.md#operator-credentials)).
 
 - `GET /api/v1/runs/{run_id}/events` is the timeline of one Run, ordered by
   `at` and then `seq`, up to `limit` rows (1000 by default, at most 10000).
@@ -138,8 +139,10 @@ Both endpoints need the operator token.
   runner's log to the API.
 
 ```bash
-curl -fsS -H "Authorization: Bearer $operator" "$api/api/v1/runs/$run/events"
-curl -fsS -H "Authorization: Bearer $operator" "$api/api/v1/audit?event=network_denied&limit=100"
+sign() { naos-api sign GET "$1" --api "$api" --token-file "$operator_file"; }
+curl -fsS -H @<(sign "/api/v1/runs/$run/events") "$api/api/v1/runs/$run/events"
+curl -fsS -H @<(sign "/api/v1/audit?event=network_denied&limit=100") \
+  "$api/api/v1/audit?event=network_denied&limit=100"
 ```
 
 Runner events are posted after the cycle that wrote them, so the timeline

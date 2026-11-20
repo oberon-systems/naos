@@ -17,7 +17,7 @@ CURL = r"""#!/bin/bash
 url=""; posted=""
 while [ $# -gt 0 ]; do
     case "$1" in
-    -d) posted=yes; shift ;;
+    --data-binary) posted="$2"; shift ;;
     -o | -H | -w | -X) shift ;;
     http*) url="$1" ;;
     esac
@@ -26,11 +26,14 @@ done
 case "$url" in
 */releases\?*) cat "$FAKE/releases" ;;
 */image-2.0.0/SHA256SUMS) cat "$FAKE/sums" ;;
-*/api/v1/images) if [ -n "$posted" ]; then cat >"$FAKE/posted"; else cat "$FAKE/images"; fi ;;
+*/api/v1/images)
+    if [ -n "$posted" ]; then printf '%s' "$posted" >"$FAKE/posted"; else cat "$FAKE/images"; fi
+    ;;
 *) echo "unexpected $url" >&2; exit 22 ;;
 esac
 """
 GIT = "#!/bin/bash\necho git@github.com:alpha/beta.git\n"
+SIGN = "#!/bin/bash\necho 'X-Signature: 00'\n"
 
 
 @pytest.fixture
@@ -42,6 +45,8 @@ def stand(tmp_path: Path) -> Path:
     (tmp_path / "local/operator").write_text("operator-token")
     (tmp_path / "root/docker/.env").write_text("NAOS_BIND=127.0.0.1\nNAOS_API_PORT=8080\n")
     (tmp_path / "root/.venv/bin/python").symlink_to(sys.executable)
+    (tmp_path / "root/.venv/bin/naos-api").write_text(SIGN)
+    (tmp_path / "root/.venv/bin/naos-api").chmod(0o755)
     for name, body in (("curl", CURL), ("git", GIT)):
         (tmp_path / "bin" / name).write_text(body)
         (tmp_path / "bin" / name).chmod(0o755)

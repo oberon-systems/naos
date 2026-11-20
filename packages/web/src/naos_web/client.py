@@ -1,6 +1,10 @@
 import asyncio
+import hashlib
+import hmac
 import re
-from collections.abc import AsyncIterator
+import secrets
+import time
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -129,6 +133,68 @@ def read_token(path: Path | None) -> str | None:
     return token or None
 
 
+RENEW_BEFORE = 300
+
+
+@dataclass(frozen=True)
+class Credential:
+    credential: str
+    key: str
+    expires_at: int
+
+
+def signed_headers(
+    credential: Credential, method: str, target: str, body: bytes, now: int
+) -> dict[str, str]:
+    timestamp, nonce = str(now), secrets.token_hex(16)
+    message = "\n".join(
+        [method.upper(), target, timestamp, nonce, hashlib.sha256(body).hexdigest()]
+    )
+    signature = hmac.new(credential.key.encode(), message.encode(), hashlib.sha256).hexdigest()
+    return {
+        "X-Credential": credential.credential,
+        "X-Timestamp": timestamp,
+        "X-Nonce": nonce,
+        "X-Signature": signature,
+    }
+
+
+class OperatorAuth(httpx.Auth):
+    """Signs every call with a short-lived credential the operator token logs in for.
+
+    The token only ever travels to the login route; the credential and its key stay in memory."""
+
+    requires_request_body = True
+
+    def __init__(self, token: str | None, login: Callable[[str], Awaitable[Credential]]) -> None:
+        self._token = token
+        self._login = login
+        self._credential: Credential | None = None
+
+    async def _current(self, renew: bool) -> Credential | None:
+        if self._token is None:
+            return None
+        held = self._credential
+        if renew or held is None or held.expires_at - int(time.time()) < RENEW_BEFORE:
+            self._credential = held = await self._login(self._token)
+        return held
+
+    async def async_auth_flow(
+        self, request: httpx.Request
+    ) -> AsyncGenerator[httpx.Request, httpx.Response]:
+        for renew in (False, True):
+            credential = await self._current(renew)
+            if credential is not None:
+                target = request.url.raw_path.decode("ascii")
+                headers = signed_headers(
+                    credential, request.method, target, request.content, int(time.time())
+                )
+                request.headers.update(headers)
+            response = yield request
+            if response.status_code != 401 or credential is None:
+                return
+
+
 class ApiClient:
     def __init__(
         self,
@@ -137,16 +203,30 @@ class ApiClient:
         timeout: float,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
-        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        base_url = f"{api_url.rstrip('/')}/api/v1"
+        self._login_http = httpx.AsyncClient(
+            base_url=base_url, timeout=timeout, transport=transport
+        )
         self._http = httpx.AsyncClient(
-            base_url=f"{api_url.rstrip('/')}/api/v1",
-            headers=headers,
+            base_url=base_url,
+            auth=OperatorAuth(token, self._log_in),
             timeout=timeout,
             transport=transport,
         )
 
+    async def _log_in(self, token: str) -> Credential:
+        try:
+            response = await self._login_http.post(
+                "/auth/credential", headers={"Authorization": f"Bearer {token}"}
+            )
+            response.raise_for_status()
+            return Credential(**response.json())
+        except (httpx.HTTPError, ValueError, TypeError) as err:
+            raise ApiError("the api refused the operator login", 401) from err
+
     async def aclose(self) -> None:
         await self._http.aclose()
+        await self._login_http.aclose()
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         checked(path)

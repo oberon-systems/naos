@@ -206,3 +206,12 @@ class Image(SQLModel, table=True):
     size_bytes: int | None = Field(default=None, sa_type=BigInteger)
     built_at: int | None = None
     created_at: int = Field(default_factory=now_ts)
+
+
+# The operator's credential generation: one row, bumped by a logout to end every credential.
+class OperatorCredential(SQLModel, table=True):
+    __tablename__ = "operator_credentials"
+
+    id: str = Field(primary_key=True)
+    generation: int
+    updated_at: int

@@ -59,6 +59,8 @@ API_EVENTS: dict[str, frozenset[str]] = {
     "profile_deleted": frozenset({"profile_id", "name"}),
     "console_attached": frozenset(),
     "console_typing": frozenset({"view"}),
+    "operator_credential_issued": frozenset({"expires_at"}),
+    "operator_logged_out": frozenset(),
     "runner_events_refused": frozenset({"count"}),
 }
 

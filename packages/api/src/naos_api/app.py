@@ -16,6 +16,7 @@ from naos_api.console_hub import ConsoleHub
 from naos_api.content_hub import ContentHub
 from naos_api.db import Database
 from naos_api.errors import DomainError
+from naos_api.nonces import Nonces
 from naos_api.routes import (
     api_router,
     console_router,
@@ -27,6 +28,7 @@ from naos_api.routes import (
     runner_router,
     validation_error_handler,
 )
+from naos_api.routes.auth import router as auth_router
 from naos_api.runners import expire_leases
 from naos_api.settings import get_settings
 
@@ -100,6 +102,7 @@ def create_app() -> FastAPI:
     app.state.db = Database(settings.database_url)
     app.state.console_hub = ConsoleHub()
     app.state.content_hub = ContentHub()
+    app.state.nonces = Nonces(settings.cache_url)
     schema.ensure(app.state.db.engine, settings.database_auto_migrate)
     app.add_exception_handler(DomainError, domain_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
@@ -111,6 +114,7 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(build_v1_router(api_router))
+    app.include_router(auth_router, prefix="/api/v1")
     app.include_router(runner_router, prefix="/api/v1")
     # A websocket cannot pass the HTTP bearer check of the v1 router, so it carries its own.
     app.include_router(console_router, prefix="/api/v1")

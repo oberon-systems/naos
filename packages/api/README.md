@@ -36,7 +36,10 @@ behind it answer 401.
 | `NAOS_DATABASE_URL` | required | For example `postgresql+psycopg://naos@db.example.com/naos` |
 | `NAOS_DATABASE_AUTO_MIGRATE` | `false` | Bring an empty database to the schema on start |
 | `NAOS_ALLOWED_MOUNT_ROOTS` | `[]` | Host directories a mount policy may name |
-| `NAOS_OPERATOR_TOKEN_SHA256` | unset | SHA-256 of the operator token |
+| `NAOS_OPERATOR_TOKEN_SHA256` | unset | SHA-256 of the operator token, which only logs in |
+| `NAOS_MASTER_KEYS` | `{}` | Keys operator credentials derive from, by id, as JSON |
+| `NAOS_MASTER_KID` | unset | The key that issues new credentials |
+| `NAOS_CACHE_URL` | unset | Redis URL for used nonces; unset keeps them in the process |
 | `NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256` | unset | SHA-256 of the enrollment token |
 | `NAOS_LEASE_TTL_SECONDS` | `60` | Lease extension per heartbeat, 5 to 3600 |
 

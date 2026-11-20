@@ -46,6 +46,10 @@ wait_for() {
     done
 }
 
+master_key() {
+    od -An -N32 -tx1 /dev/urandom | tr -d ' \n'
+}
+
 check_hash() {
     grep -qx "$1=$(digest "$LOCAL/$2")" "$env_file" ||
         fail "$env_file holds another $1: put its token in $LOCAL/$2, or run make clean"
@@ -89,6 +93,8 @@ write_env() {
         -e "s|^NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256=.*|NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256=$(digest "$LOCAL/enrollment")|" \
         -e "s|^NAOS_WEB_OPERATOR_TOKEN_FILE=.*|NAOS_WEB_OPERATOR_TOKEN_FILE=$LOCAL/operator|" \
         "$env_file.example" >"$env_file"
+    sed -i -e "/^NAOS_MASTER_KEYS=/d" -e "/^NAOS_MASTER_KID=/d" "$env_file"
+    printf 'NAOS_MASTER_KEYS={"k1":"%s"}\nNAOS_MASTER_KID=k1\n' "$(master_key)" >>"$env_file"
     chmod 600 "$env_file"
     echo "wrote $env_file"
 }
@@ -105,8 +111,13 @@ settings() {
     name="${NAOS_AGENT_NAME:-alpha}"
 }
 
+# The operator token only logs in, so every call carries headers naos-api signs for it.
+signed() {
+    "$ROOT/.venv/bin/naos-api" sign "$@" --api "$api" --token-file "$LOCAL/operator"
+}
+
 has_digest() {
-    curl -fsS -H "Authorization: Bearer $(cat "$LOCAL/operator")" "$api/api/v1/images" |
+    curl -fsS -H @<(signed GET /api/v1/images) "$api/api/v1/images" |
         "$python" -c "import json, sys; sys.exit(sys.argv[1] not in [i['digest'] for i in json.load(sys.stdin)])" "$1"
 }
 
@@ -125,10 +136,9 @@ register_image() {
     sum="$(curl -fsSL "$release/SHA256SUMS" | awk -v name="$image" '$2 == name { print $1 }')"
     [ -n "$sum" ] || fail "$image is not listed in $release/SHA256SUMS"
     if has_digest "sha256:$sum"; then return; fi
-    curl -fsS -o /dev/null -H "Authorization: Bearer $(cat "$LOCAL/operator")" \
-        -H "Content-Type: application/json" "$api/api/v1/images" -d @- <<EOF
-{"id": "naos-agents-$version", "version": "$version", "digest": "sha256:$sum", "url": "$release/$image"}
-EOF
+    local body="{\"id\": \"naos-agents-$version\", \"version\": \"$version\", \"digest\": \"sha256:$sum\", \"url\": \"$release/$image\"}"
+    curl -fsS -o /dev/null -H @<(signed POST /api/v1/images --data "$body") \
+        -H "Content-Type: application/json" --data-binary "$body" "$api/api/v1/images"
     echo "registered $image from $release"
 }
 
@@ -200,7 +210,8 @@ api   $api
 web   $web
 agent $name, log in $LOCAL/agent.log
 
-curl -fsS -H "Authorization: Bearer \$(cat $LOCAL/operator)" $api/api/v1/audit
+curl -fsS -H @<(.venv/bin/naos-api sign GET /api/v1/audit --api $api --token-file $LOCAL/operator) \
+    $api/api/v1/audit
 REPORT
 }
 

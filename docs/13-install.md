@@ -44,8 +44,9 @@ changes them.
 | `system` | `/opt/naos` | `/opt/naos/db` | `naos-stack.service`, system unit |
 
 The installer runs the doctor first and stops on any problem. Then it downloads
-the release files, checks them against `SHA256SUMS`, writes `.env` and the two
-tokens under `secrets/` when they do not exist yet, pulls the images, starts the
+the release files, checks them against `SHA256SUMS`, writes `.env`, with the
+master key that signs operator credentials, and the two tokens under `secrets/`
+when they do not exist yet, pulls the images, starts the
 unit and registers the VM image of the release. It prints the web and api urls,
 the token files and the command that installs a runner. A user unit needs
 linger to outlive your login, and the installer asks for it.

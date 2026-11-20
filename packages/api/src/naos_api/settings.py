@@ -5,6 +5,8 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 TokenHash = Annotated[str | None, Field(pattern=r"^[0-9a-f]{64}$")]
+MasterKey = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
+Kid = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,32}$")]
 
 
 class Settings(BaseSettings):
@@ -15,6 +17,10 @@ class Settings(BaseSettings):
     allowed_mount_roots: list[str] = []
     operator_token_sha256: TokenHash = None
     runner_enrollment_token_sha256: TokenHash = None
+    # Keys that sign operator credentials, by id; the one named by master_kid issues new ones.
+    master_keys: dict[Kid, MasterKey] = {}
+    master_kid: Kid | None = None
+    cache_url: str | None = None
     lease_ttl_seconds: Annotated[int, Field(ge=5, le=3600)] = 60
     runner_token_ttl_seconds: Annotated[int, Field(ge=60, le=604800)] = 86400
     run_credential_ttl_seconds: Annotated[int, Field(ge=60, le=3600)] = 300

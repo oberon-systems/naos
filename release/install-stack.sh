@@ -235,6 +235,9 @@ store_mount_roots() {
     say "set NAOS_ALLOWED_MOUNT_ROOTS=$roots_json in $env_file"
 }
 
+master_key() {
+    od -An -N32 -tx1 /dev/urandom | tr -d ' \n'
+}
 token() {
     head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n'
 }
@@ -327,6 +330,8 @@ with_password() {
     while IFS= read -r line; do
         case "$line" in
         NAOS_DB_PASSWORD=*) printf 'NAOS_DB_PASSWORD=%s\n' "$1" ;;
+        NAOS_MASTER_KEYS=*) printf 'NAOS_MASTER_KEYS={"k1":"%s"}\n' "$2" ;;
+        NAOS_MASTER_KID=*) printf 'NAOS_MASTER_KID=k1\n' ;;
         *) printf '%s\n' "$line" ;;
         esac
     done
@@ -347,7 +352,7 @@ write_env() {
         -e "s|^NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256=.*|NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256=$(digest "$secrets/enrollment")|" \
         -e "s|^NAOS_WEB_API_BASE_URL=.*|NAOS_WEB_API_BASE_URL=http://$host:$api_port|" \
         -e "s|^NAOS_WEB_OPERATOR_TOKEN_FILE=.*|NAOS_WEB_OPERATOR_TOKEN_FILE=$secrets/operator|" \
-        "$dir/.env.example" | with_password "$(token)" >"$env_file.new"
+        "$dir/.env.example" | with_password "$(token)" "$(master_key)" >"$env_file.new"
     chmod 0600 "$env_file.new"
     mv "$env_file.new" "$env_file"
     say "wrote $env_file and the tokens in $secrets"
@@ -409,27 +414,32 @@ start() {
     fi
 }
 
-# curl reads the header from a file: on its command line the token would show in ps.
+# operator METHOD PATH [BODY]: naos-api in the api container signs the call; the token reaches it
+# on stdin, and only one-time signature headers, from a 0600 file, reach curl.
 operator() {
     header="$dir/secrets/.operator.header"
-    (umask 077 && printf 'Authorization: Bearer %s\n' "$(cat "$dir/secrets/operator")" >"$header")
+    (umask 077 && compose exec -T api naos-api sign "$1" "/api/v1$2" --data "${3:-}" \
+        --api http://127.0.0.1:8000 --token-file - <"$dir/secrets/operator" >"$header") || {
+        rm -f "$header"
+        return 1
+    }
     status=0
-    curl -fsS -H @"$header" "$@" || status=$?
+    if [ -n "${3:-}" ]; then
+        printf '%s' "$3" | curl -fsS -H @"$header" -H "Content-Type: application/json" \
+            -X "$1" --data-binary @- "$api/api/v1$2" || status=$?
+    else
+        curl -fsS -H @"$header" -X "$1" "$api/api/v1$2" || status=$?
+    fi
     rm -f "$header"
     return "$status"
 }
-
-# Every install and upgrade registers the image of its release; the id carries the
-# version because the catalog keeps one image per id.
 register_image() {
-    if operator "$api/api/v1/images" | grep -q "\"sha256:$stamped_image_sha256\""; then
+    if operator GET /images | grep -q "\"sha256:$stamped_image_sha256\""; then
         return
     fi
     url="https://github.com/$repo/releases/download/image-$stamped_image/naos-agents-$stamped_image.qcow2"
-    operator -o /dev/null -H "Content-Type: application/json" "$api/api/v1/images" -d @- <<EOF ||
-{"id": "naos-agents-$stamped_image", "version": "$stamped_image", "digest": "sha256:$stamped_image_sha256", "url": "$url"}
-EOF
-        fail "could not register image $stamped_image"
+    body="{\"id\": \"naos-agents-$stamped_image\", \"version\": \"$stamped_image\", \"digest\": \"sha256:$stamped_image_sha256\", \"url\": \"$url\"}"
+    operator POST /images "$body" >/dev/null || fail "could not register image $stamped_image"
     say "registered image naos-agents-$stamped_image"
 }
 

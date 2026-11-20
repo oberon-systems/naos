@@ -119,11 +119,15 @@ Expected output:
 200
 ```
 
-The api answers 401 to everything under `/api/v1` without the operator token:
+The api answers 401 to everything under `/api/v1` that is not signed with an
+operator credential; the operator token itself only logs in
+([03](https://github.com/oberon-systems/naos/blob/main/docs/03-api-design.md#operator-credentials)).
+`naos-api sign` in the api container prints the headers for one call:
 
 ```bash
-curl -fsS -H "Authorization: Bearer $NAOS_OPERATOR_TOKEN" \
-    http://127.0.0.1:8080/api/v1/runs
+headers="$(docker compose exec -T api naos-api sign GET /api/v1/runs \
+    --api http://127.0.0.1:8000 --token-file - <"$NAOS_OPERATOR_TOKEN_FILE")"
+curl -fsS -H @<(printf '%s\n' "$headers") http://127.0.0.1:8080/api/v1/runs
 ```
 
 ## Operate
@@ -150,8 +154,9 @@ A registered runner shows up in three places: its own log, the
 `runner_registered` record in the audit trail.
 
 ```bash
-curl -fsS -H "Authorization: Bearer $NAOS_OPERATOR_TOKEN" \
-    http://127.0.0.1:8080/api/v1/audit
+headers="$(docker compose exec -T api naos-api sign GET /api/v1/audit \
+    --api http://127.0.0.1:8000 --token-file - <"$NAOS_OPERATOR_TOKEN_FILE")"
+curl -fsS -H @<(printf '%s\n' "$headers") http://127.0.0.1:8080/api/v1/audit
 ```
 
 There is no operator route listing runners yet, and the web ui is still a shell

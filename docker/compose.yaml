@@ -18,6 +18,17 @@ services:
       timeout: 3s
       retries: 30
 
+  # Signed operator requests leave their nonce here, so none is taken twice.
+  cache:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    command: ["valkey-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: valkey-cli ping
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
   api:
     image: ${NAOS_API_IMAGE:-ghcr.io/oberon-systems/naos-api:latest}
     restart: unless-stopped
@@ -26,12 +37,17 @@ services:
       NAOS_DATABASE_AUTO_MIGRATE: ${NAOS_DATABASE_AUTO_MIGRATE:-false}
       NAOS_OPERATOR_TOKEN_SHA256: ${NAOS_OPERATOR_TOKEN_SHA256:?sha256 of the operator token}
       NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256: ${NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256:?sha256 of the runner enrollment token}
+      NAOS_MASTER_KEYS: '${NAOS_MASTER_KEYS:?the keys that sign operator credentials}'
+      NAOS_MASTER_KID: ${NAOS_MASTER_KID:?the master key that issues credentials}
+      NAOS_CACHE_URL: ${NAOS_CACHE_URL:-redis://cache:6379/0}
       # Host paths as the runner sees them; the api only validates the strings.
       NAOS_ALLOWED_MOUNT_ROOTS: '${NAOS_ALLOWED_MOUNT_ROOTS:-[]}'
     ports:
       - "${NAOS_BIND:-127.0.0.1}:${NAOS_API_PORT:-8080}:8000"
     depends_on:
       db:
+        condition: service_healthy
+      cache:
         condition: service_healthy
     healthcheck:
       test: python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')"

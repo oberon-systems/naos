@@ -30,13 +30,41 @@ process. List values are JSON. Every route depends only on the values it uses.
 | `NAOS_DATABASE_URL` | required | Database URL, for example `postgresql+psycopg://naos@db.example.com/naos` |
 | `NAOS_DATABASE_AUTO_MIGRATE` | `false` | Bring an empty database to head on start ([Schema](#schema)) |
 | `NAOS_ALLOWED_MOUNT_ROOTS` | `[]` | Host directories a mount policy may name |
-| `NAOS_OPERATOR_TOKEN_SHA256` | unset | SHA-256 of the operator token; unset closes every operator route |
+| `NAOS_OPERATOR_TOKEN_SHA256` | unset | SHA-256 of the operator token, which only logs in; unset closes every operator route |
+| `NAOS_MASTER_KEYS` | `{}` | JSON object of key id to 64 hex characters; the keys operator credentials derive from |
+| `NAOS_MASTER_KID` | unset | The key that issues new credentials; unset answers 503 to a login |
+| `NAOS_CACHE_URL` | unset | Redis URL where used nonces are kept; unset keeps them in the process |
 | `NAOS_RUNNER_ENROLLMENT_TOKEN_SHA256` | unset | SHA-256 of the enrollment token; unset closes registration |
 | `NAOS_RUNNER_TOKEN_TTL_SECONDS` | `86400` | Runner token lifetime, 60 to 604800 |
 | `NAOS_LEASE_TTL_SECONDS` | `60` | Lease extension per heartbeat, 5 to 3600 |
 | `NAOS_LEASE_SWEEP_INTERVAL_SECONDS` | `15` | Background lease sweep period, 1 to 3600 |
 | `NAOS_RUN_CREDENTIAL_TTL_SECONDS` | `300` | Lifetime of a credential issued to a runner, 60 to 3600 |
 | `NAOS_CONSOLE_LIMIT_BYTES` | `8388608` | Console output kept per Run, 4096 to 1073741824 |
+
+## Operator credentials
+
+The operator token logs in and does nothing else: every other operator route
+refuses it. `POST /auth/credential` with `Authorization: Bearer <token>`
+answers `{credential, key, expires_at}`, a credential that lasts an hour. The
+key is derived from the credential with the master key its id names, so the API
+stores nothing per credential, and it never travels again.
+
+Every operator request carries four headers: `X-Credential`, `X-Timestamp`
+(seconds), `X-Nonce` (32 hex characters) and `X-Signature`, the hex HMAC-SHA256
+under the key of the method, the path with its query, the timestamp, the nonce
+and the SHA-256 of the body, joined by newlines. The API answers 401 when the
+timestamp is more than 300 seconds off, the credential has expired or belongs to
+an earlier generation, the signature differs, or the nonce was seen before; a
+socket upgrade is signed as a `GET` with an empty body.
+
+The same route, signed with a live credential, issues a new one, and
+`POST /auth/logout` ends every credential issued so far. `naos-api sign METHOD PATH`
+logs in with the token file and prints the headers for one request:
+
+```bash
+curl -fsS -H @<(naos-api sign GET /api/v1/runs --token-file "$NAOS_OPERATOR_TOKEN_FILE") \
+  http://127.0.0.1:8080/api/v1/runs
+```
 
 ## Schema
 
@@ -85,13 +113,15 @@ autogenerate finds a difference between head and the models. The `migrations`
 pre-commit hook runs the same test whenever the models or the migrations
 change.
 
-## Operator credentials
+## Operator routes
 
 Every route under `/api/v1` except the runner's own routes
-([Runner credentials](#runner-credentials)) takes the operator token as a Bearer
-credential. `GET /runners` and the revoke and drain routes are operator routes. The API holds only its SHA-256 in
-`NAOS_OPERATOR_TOKEN_SHA256`; while that is unset, or the token does not
-match, every such route answers 401 before its handler runs.
+([Runner credentials](#runner-credentials)) and `/auth/credential` takes a
+request signed with an operator credential ([Operator credentials](#operator-credentials)).
+`GET /runners` and the revoke and drain routes are operator routes. The API holds
+only the SHA-256 of the operator token in `NAOS_OPERATOR_TOKEN_SHA256`; while that
+is unset no credential is issued, and every unsigned or wrongly signed request
+answers 401 before its handler runs.
 
 ## Responsibilities
 
@@ -269,8 +299,8 @@ screen is never stored in the first place. The serial stream keeps no time, so
 each line starts with the UTC time the API received the chunk the line began
 in, as `2026-01-01T00:00:00Z  naos login: naos`.
 
-`WS /runs/{run_id}/attach` is the live view. It takes the operator token in the
-`Authorization` header, writes a `console_attached` audit event with actor
+`WS /runs/{run_id}/attach` is the live view. Its upgrade is signed like any
+operator request, writes a `console_attached` audit event with actor
 `operator`, sends the stored log so far as binary frames, and then every byte
 the runner reads, raw - redraws and lone echoed spaces included, since a
 terminal needs all of them and only the store is normalised. Nothing is held
@@ -299,8 +329,9 @@ console report of [04](04-runner-design.md#console) stays the fallback for a
 runner whose socket is down; both carry offsets, so neither loses a byte.
 
 ```bash
-wscat -c ws://api.example.com/api/v1/runs/run_0123456789abcdef0123456789abcdef/attach \
-  -H "Authorization: Bearer $NAOS_TOKEN"
+path=/api/v1/runs/run_0123456789abcdef0123456789abcdef/attach
+wscat -c "ws://api.example.com$path" \
+  $(naos-api sign GET "$path" --api http://api.example.com | sed 's/^/-H /')
 ```
 
 ## Listing runners
