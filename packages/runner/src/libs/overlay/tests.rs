@@ -946,3 +946,57 @@ fn a_file_made_executable_is_sensitive() {
     assert!(!adds_exec(&file(Some(0o755), Some(0o755))));
     assert!(!adds_exec(&file(Some(0o644), Some(0o755))));
 }
+
+#[test]
+fn sparse_files_cannot_outgrow_the_hashing_budget() {
+    let fixture = Fixture::new();
+    fixture.source("x", "x\n");
+    let mut script = String::new();
+    for name in ["s1", "s2", "s3"] {
+        script.push_str(&format!(
+            "write x {name}\nset_inode_field {name} size 30000000\n"
+        ));
+    }
+
+    let diff = fixture.collect(&script).expect("collect");
+
+    let outcome: Vec<(&str, Change)> = diff
+        .entries
+        .iter()
+        .map(|entry| (entry.path.as_str(), entry.change))
+        .collect();
+    assert_eq!(
+        outcome,
+        vec![
+            ("s1", Change::Created),
+            ("s2", Change::Created),
+            ("s3", Change::Rejected),
+        ]
+    );
+}
+
+#[test]
+fn a_large_selection_plans_without_rescanning_the_diff() {
+    let mut entries = vec![Entry::new("top".into(), Change::Created, Kind::Dir)];
+    for n in 0..20_000 {
+        entries.push(Entry {
+            size: Some(1),
+            sha256: Some("0".repeat(64)),
+            mode: Some(0o644),
+            ..Entry::new(format!("top/f{n}"), Change::Created, Kind::File)
+        });
+    }
+    let diff = Diff { entries };
+    let selected: Vec<String> = diff
+        .entries
+        .iter()
+        .map(|entry| entry.path.clone())
+        .collect();
+    let decision = decide(&selected.iter().map(String::as_str).collect::<Vec<_>>());
+
+    let started = std::time::Instant::now();
+    let planned = merge::plan(&diff, &decision);
+
+    assert!(planned.is_ok());
+    assert!(started.elapsed() < std::time::Duration::from_secs(2));
+}

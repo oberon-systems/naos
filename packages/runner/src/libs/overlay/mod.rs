@@ -111,6 +111,7 @@ pub fn collect(upper: &Path, workspace: &Path) -> Result<Diff, AgentError> {
         entries: Vec::new(),
         dirs: HashSet::new(),
         visited: 0,
+        hashed: 0,
     };
     let opaque = opaque(&fs, &data)?;
     walker.dir(&data, &[], 0, opaque)?;
@@ -150,6 +151,7 @@ struct Walker<'a> {
     entries: Vec<Entry>,
     dirs: HashSet<u32>,
     visited: usize,
+    hashed: u64,
 }
 
 impl Walker<'_> {
@@ -231,7 +233,13 @@ impl Walker<'_> {
                 self.reject(display, kind, "larger than the upper disk");
                 Ok(())
             }
+            // Holes read as zeros, so sparse files could make the hashing far outgrow the disk.
+            S_IFREG if self.hashed + inode.size > HASH_BUDGET * self.fs.image_len() => {
+                self.reject(display, kind, "the diff outgrows the upper disk");
+                Ok(())
+            }
             S_IFREG => {
+                self.hashed += inode.size;
                 let mut digest = Sha256::new();
                 self.fs.read_data(&inode, |chunk| {
                     digest.update(chunk);
@@ -444,6 +452,8 @@ fn escapes(depth: usize, target: &str) -> bool {
     }
     false
 }
+
+const HASH_BUDGET: u64 = 2;
 
 const SENSITIVE_DIRS: &[&str] = &[
     ".git",

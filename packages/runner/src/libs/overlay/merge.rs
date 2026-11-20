@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ffi::OsString;
 use std::fs::{self, File, OpenOptions, Permissions};
 use std::io::{BufRead, BufReader, ErrorKind, Write};
@@ -113,7 +113,7 @@ enum Action {
 }
 
 #[derive(Debug, Clone)]
-struct Op<'a> {
+pub(super) struct Op<'a> {
     path: &'a str,
     owner: &'a str,
     action: Action,
@@ -225,15 +225,34 @@ fn rank(op: &Op<'_>) -> u8 {
     }
 }
 
-fn plan<'a>(
+pub(super) fn plan<'a>(
     diff: &'a Diff,
     decision: &'a Decision,
 ) -> Result<(Vec<Op<'a>>, Report), Vec<Conflict>> {
     let selected: BTreeSet<&str> = decision.paths.iter().map(String::as_str).collect();
     let live = |entry: &&Entry| entry.change != Change::Rejected;
+    let by_path: HashMap<&str, &Entry> = diff
+        .entries
+        .iter()
+        .filter(live)
+        .map(|entry| (entry.path.as_str(), entry))
+        .collect();
+    let removed: BTreeSet<(&str, &str)> = diff
+        .entries
+        .iter()
+        .filter(live)
+        .filter_map(|entry| match entry.change {
+            Change::Deleted => Some((entry.path.as_str(), entry.path.as_str())),
+            Change::Renamed => entry
+                .from
+                .as_deref()
+                .map(|from| (from, entry.path.as_str())),
+            _ => None,
+        })
+        .collect();
     let mut conflicts = Vec::new();
     for path in &selected {
-        if parts(path).is_none() || !diff.entries.iter().filter(live).any(|e| e.path == *path) {
+        if parts(path).is_none() || !by_path.contains_key(path) {
             conflicts.push(conflict(path, "not in the diff"));
         }
     }
@@ -241,25 +260,20 @@ fn plan<'a>(
         if !selected.contains(entry.path.as_str()) {
             continue;
         }
-        let prefix = format!("{}/", entry.path);
-        let under = |path: &str| path.starts_with(&prefix);
         if entry.change == Change::Deleted && entry.kind == Kind::Dir {
-            let missing = diff.entries.iter().filter(live).find(|other| {
-                let removes = match other.change {
-                    Change::Deleted => Some(other.path.as_str()),
-                    Change::Renamed => other.from.as_deref(),
-                    _ => None,
-                };
-                removes.is_some_and(under) && !selected.contains(other.path.as_str())
-            });
-            if let Some(other) = missing {
-                conflicts.push(conflict(&entry.path, &format!("needs {} too", other.path)));
+            let prefix = format!("{}/", entry.path);
+            let missing = removed
+                .range((prefix.as_str(), "")..)
+                .take_while(|(host, _)| host.starts_with(&prefix))
+                .find(|(_, owner)| !selected.contains(owner));
+            if let Some((_, owner)) = missing {
+                conflicts.push(conflict(&entry.path, &format!("needs {owner} too")));
             }
         }
         if let Some((parent, _)) = entry.path.rsplit_once('/') {
-            let created = diff.entries.iter().filter(live).any(|other| {
-                other.path == parent && other.kind == Kind::Dir && other.change == Change::Created
-            });
+            let created = by_path
+                .get(parent)
+                .is_some_and(|other| other.kind == Kind::Dir && other.change == Change::Created);
             if created && !selected.contains(parent) {
                 conflicts.push(conflict(&entry.path, &format!("needs {parent} too")));
             }
