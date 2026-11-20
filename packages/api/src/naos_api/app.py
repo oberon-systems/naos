@@ -2,6 +2,7 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
+from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
@@ -32,8 +33,33 @@ from naos_api.settings import get_settings
 log = logging.getLogger(__name__)
 
 
+# A domain refusal answers 422 with a sentence, a request that fails validation with a list.
+UNPROCESSABLE: dict[int | str, dict[str, Any]] = {
+    422: {
+        "description": "The request failed validation, or the API refused it",
+        "content": {
+            "application/json": {
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "detail": {
+                            "anyOf": [
+                                {"type": "string"},
+                                {"type": "array", "items": {"type": "object"}},
+                            ]
+                        }
+                    },
+                }
+            }
+        },
+    }
+}
+
+
 def build_v1_router(*routers: APIRouter) -> APIRouter:
-    v1 = APIRouter(prefix="/api/v1", dependencies=[Depends(require_principal)])
+    v1 = APIRouter(
+        prefix="/api/v1", dependencies=[Depends(require_principal)], responses=UNPROCESSABLE
+    )
     for router in routers:
         v1.include_router(router)
     return v1

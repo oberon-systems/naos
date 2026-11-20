@@ -86,3 +86,11 @@ def test_integers_past_the_column_range_are_refused_as_invalid(client: TestClien
     ]
 
     assert [answer.status_code for answer in answers] == [422] * len(answers)
+
+
+def test_a_422_is_documented_as_a_sentence_or_a_validation_list(settings: Settings) -> None:
+    schema = create_app().openapi()
+    answer = schema["paths"]["/api/v1/policies"]["post"]["responses"]["422"]
+
+    detail = answer["content"]["application/json"]["schema"]["properties"]["detail"]
+    assert {"type": "string"} in detail["anyOf"]
