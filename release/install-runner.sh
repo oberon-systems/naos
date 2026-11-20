@@ -170,7 +170,8 @@ paths() {
         unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
         ;;
     system)
-        bin_dir=/opt/naos/runner/bin
+        # Apart from conf_dir, which the runner user owns and could swap a bin/ inside of.
+        bin_dir=/opt/naos/runner-bin
         conf_dir=/opt/naos/runner
         state_dir=/opt/naos/runner/state
         link=/usr/local/bin/runner
@@ -195,7 +196,7 @@ choose_layout() {
 Where should the runner live?
   xdg     ${XDG_DATA_HOME:-$HOME/.local/share}/naos/bin, ${XDG_CONFIG_HOME:-$HOME/.config}/naos,
           ${XDG_STATE_HOME:-$HOME/.local/state}/naos/agent, a systemd user unit; no sudo
-  system  /opt/naos/runner/{bin,state}, /usr/local/bin/runner, a system unit
+  system  /opt/naos/runner-bin, /opt/naos/runner/state, /usr/local/bin/runner, a system unit
           that runs as $(id -un); needs sudo
 EOF
     ask layout "layout" xdg --layout
@@ -295,6 +296,7 @@ download() {
     if [ "$layout" = system ]; then
         as_root ln -sfn "$bin_dir/runner-$stamped_runner" "$bin_dir/runner"
         as_root ln -sfn "$bin_dir/runner" "$link"
+        [ ! -d /opt/naos/runner/bin ] || as_root rm -r /opt/naos/runner/bin
     else
         ln -sfn "$bin_dir/runner-$stamped_runner" "$link"
     fi

@@ -72,7 +72,7 @@ it. The token never goes on the command line.
 | Layout | Binaries | Settings and token | State | Unit |
 |---|---|---|---|---|
 | `xdg` | `~/.local/share/naos/bin` | `~/.config/naos` | `~/.local/state/naos/agent` | user unit |
-| `system` | `/opt/naos/runner/bin`, `/usr/local/bin/runner` | `/opt/naos/runner` | `/opt/naos/runner/state` | system unit, `User=` you |
+| `system` | `/opt/naos/runner-bin`, `/usr/local/bin/runner` | `/opt/naos/runner` | `/opt/naos/runner/state` | system unit, `User=` you |
 
 The other flags are `--name`, `--capacity`, `--zone`, `--labels`,
 `--systemd`/`--no-systemd`, `--linger`/`--no-linger`, `--release` and `--yes`;
