@@ -11,7 +11,7 @@ services:
       POSTGRES_USER: ${NAOS_DB_USER:-naos}
       POSTGRES_PASSWORD: ${NAOS_DB_PASSWORD:?set NAOS_DB_PASSWORD in .env}
     volumes:
-      - ${NAOS_DB_DATA:-./data/db}:/var/lib/postgresql/data
+      - ${NAOS_DB_DATA:-db}:/var/lib/postgresql/data
     healthcheck:
       test: pg_isready -U ${NAOS_DB_USER:-naos} -d ${NAOS_DB_NAME:-naos}
       interval: 2s
@@ -55,3 +55,7 @@ services:
     depends_on:
       api:
         condition: service_healthy
+
+# Without NAOS_DB_DATA the cluster lives here, outside the checkout it would lock its user out of.
+volumes:
+  db:

@@ -53,8 +53,8 @@ keeps every line you edited. `local/operator` is 0644 because the web container
 reads it as `nobody`; `local/` is 0700, and that is what keeps it off other
 accounts on this machine.
 
-For the same reason it refuses to write a new `docker/.env` while
-`docker/data/db` still holds a cluster: postgres keeps the password of its first
+For the same reason it refuses to write a new `docker/.env` while the docker
+volume `naos_db` still holds a cluster: postgres keeps the password of its first
 start, and a generated one would never match it. `make -C dev/stack clean`
 empties both, or bring back the `.env` that cluster was created with.
 
@@ -78,9 +78,9 @@ printed urls follow `NAOS_BIND`, `NAOS_API_PORT` and `NAOS_WEB_PORT`.
 use it when you want its output live instead of tailing the log. Stop the
 background one with `down` first.
 
-`down` stops the runner and compose and then empties the database from inside a
-container, because the cluster belongs to root: `docker/data/db` stays as an
-empty directory. Tokens and `docker/.env` are left alone, so the next
+`down` stops the runner and compose, empties the database from inside a
+container and removes the `naos_db` volume, so nothing of the cluster stays in
+the checkout. Tokens and `docker/.env` are left alone, so the next
 `kickstart` comes back on the same credentials and an empty database the api
 migrates again.
 

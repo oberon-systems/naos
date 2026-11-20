@@ -171,12 +171,15 @@ A database the api built before migrations existed has tables but no
 revision. `migrate` checks that its tables match the first revision and stamps
 it there; when they differ it names them and changes nothing.
 
-The directory `NAOS_DB_DATA` names is the only state the stack keeps. Back it
-up with the database stopped, or with `pg_dump` while it runs:
+The cluster is the only state the stack keeps: in the directory `NAOS_DB_DATA`
+names, or in the docker volume `naos_db` when it is empty, so it never sits in
+the checkout. Back it up with the database stopped, or with `pg_dump` while it
+runs:
 
 ```bash
 docker compose exec db pg_dump -U naos naos > naos.sql
 ```
 
-`docker compose down` keeps that directory; `down -v` does not touch it either,
-since the data lives in a bind mount rather than a volume.
+`docker compose down` keeps either. `down -v` removes the `naos_db` volume and
+with it the cluster, but leaves a `NAOS_DB_DATA` directory alone. The installer
+always names a directory.

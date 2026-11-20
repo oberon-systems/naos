@@ -78,9 +78,9 @@ write_env() {
         fill_key NAOS_WEB_IMAGE "$web_image"
         return
     fi
-    if [ -n "$(ls -A "$compose/data/db" 2>/dev/null)" ]; then
-        fail "$compose/data/db is a cluster of an older $env_file:" \
-            "remove that directory, or write the .env it belongs to yourself"
+    if docker volume inspect naos_db >/dev/null 2>&1; then
+        fail "the docker volume naos_db is a cluster of an older $env_file:" \
+            "make -C dev/stack down removes it, or write the .env it belongs to yourself"
     fi
     sed -e "s|^# NAOS_API_IMAGE=.*|NAOS_API_IMAGE=$api_image|" \
         -e "s|^# NAOS_WEB_IMAGE=.*|NAOS_WEB_IMAGE=$web_image|" \
@@ -218,7 +218,7 @@ wipe_db() {
     docker compose down
     docker compose run --rm --no-deps -T --entrypoint sh db \
         -c 'find /var/lib/postgresql/data -mindepth 1 -maxdepth 1 -exec rm -rf {} +'
-    docker compose down
+    docker compose down --volumes
 }
 
 down() {
