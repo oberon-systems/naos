@@ -2,9 +2,11 @@ from collections.abc import Callable
 from typing import Any
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
+from naos_api import gates
 from naos_api.models import AuditEvent, RunPolicy
 from naos_api.spec import PolicyKind
 
@@ -388,6 +390,25 @@ BUDGETED = [
     {"server": "alpha", "tool": "search", "effect": "allow", "max_calls": 5},
     {"server": "alpha", "tool": "fetch", "effect": "allow", "max_calls_per_minute": 2},
 ]
+
+
+def test_a_long_run_counts_every_call_but_reads_only_the_latest_minutes(
+    client: TestClient,
+    session: Session,
+    spec_body: dict[str, Any],
+    mcp_body: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(gates, "MINUTES", 3)
+    run = _mcp_run(client, spec_body, BUDGETED)
+    for minute in range(10):
+        _mcp_call(session, run["id"], 60 * minute, "fetch", rule="1")
+    _mcp_call(session, run["id"], 1, "fetch", rule="1")
+
+    gate = _mcp(client, run["id"])
+
+    assert gate["budgets"][1]["spent"] == 11
+    assert gate["budgets"][1]["peak"] == 1
 
 
 def test_a_rule_budget_counts_what_its_rule_charged(

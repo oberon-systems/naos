@@ -360,39 +360,47 @@ def _budgets(session: Session, run: Run) -> list[McpBudget]:
     refused = data["category"].as_string() == "denied"
     rule = data["rule"].as_string()
     minute = at - at % 60
-    keys = (rule, minute) if segment is None else (segment, rule, minute)
-    per_minute: Select[*tuple[Any, ...]] = Select(
-        *keys, func.sum(case((refused, 0), else_=1)), func.sum(case((refused, 1), else_=0))
+    mine = (col(AuditEvent.run_id) == run.id, col(AuditEvent.event) == "mcp_call", rule != "none")
+    charged = func.sum(case((refused, 0), else_=1))
+    rules = (rule,) if segment is None else (segment, rule)
+    per_rule: Select[*tuple[Any, ...]] = Select(
+        *rules, charged, func.sum(case((refused, 1), else_=0))
     )
+    totals: dict[tuple[int, str], tuple[int, int]] = {}
+    for row in session.exec(per_rule.where(*mine).group_by(*rules)).all():
+        key = tuple(row) if segment is not None else (0, *row)
+        totals[(key[0], key[1])] = (key[2], key[3])
+    # The totals are exact; the peak reads only the latest minutes, so a long Run stays bounded.
+    keys = (*rules, minute)
+    per_minute: Select[*tuple[Any, ...]] = Select(*keys, charged)
     found = session.exec(
-        per_minute.where(
-            col(AuditEvent.run_id) == run.id, col(AuditEvent.event) == "mcp_call", rule != "none"
-        ).group_by(*keys)
+        per_minute.where(*mine).group_by(*keys).order_by(minute.desc()).limit(MINUTES)
     ).all()
     rows = [tuple(row) if segment is not None else (0, *row) for row in found]
-    counted: dict[tuple[int, str], list[tuple[int, int, int]]] = {}
+    counted: dict[tuple[int, str], list[tuple[int, int]]] = {}
     for row in rows:
-        counted.setdefault((row[0], row[1]), []).append((row[2], row[3], row[4]))
+        counted.setdefault((row[0], row[1]), []).append((row[2], row[3]))
     last = len(held) - 1
     budgets = []
     for index, kept in enumerate(held[last][1]):
         limited = kept.get("max_calls") or kept.get("max_calls_per_minute")
         if kept["effect"] != "allow" or not limited:
             continue
-        spent: dict[int, int] = {}
-        refusals = 0
+        per: dict[int, int] = {}
+        spent = refusals = 0
         first = last
         while first >= 0 and kept in held[first][1]:
             position = str(held[first][1].index(kept))
-            for at_minute, charged, denied in counted.get((first, position), []):
-                spent[at_minute] = spent.get(at_minute, 0) + charged
-                refusals += denied
+            total, denied = totals.get((first, position), (0, 0))
+            spent, refusals = spent + total, refusals + denied
+            for at_minute, used in counted.get((first, position), []):
+                per[at_minute] = per.get(at_minute, 0) + used
             first -= 1
         budgets.append(
             McpBudget(
                 rule=index,
-                spent=sum(spent.values()),
-                peak=max(spent.values(), default=0),
+                spent=spent,
+                peak=max(per.values(), default=0),
                 refused=refusals,
                 since=held[first + 1][0],
             )
