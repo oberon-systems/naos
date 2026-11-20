@@ -1,6 +1,6 @@
 from typing import Any
 
-from sqlmodel import JSON, Column, Field, LargeBinary, SQLModel, UniqueConstraint
+from sqlmodel import JSON, BigInteger, Column, Field, LargeBinary, SQLModel, UniqueConstraint
 
 from naos_api.clock import now_ts
 from naos_api.lifecycle import RunStatus
@@ -203,6 +203,6 @@ class Image(SQLModel, table=True):
     digest: str = Field(unique=True)
     url: str
     name: str | None = None
-    size_bytes: int | None = None
+    size_bytes: int | None = Field(default=None, sa_type=BigInteger)
     built_at: int | None = None
     created_at: int = Field(default_factory=now_ts)

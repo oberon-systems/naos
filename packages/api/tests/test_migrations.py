@@ -22,8 +22,8 @@ PROBE_REVISION = """
 from alembic import op
 from sqlmodel import Column, Integer
 
-revision = "0002"
-down_revision = "0001"
+revision = "ffe0"
+down_revision = "{head}"
 branch_labels = None
 depends_on = None
 
@@ -93,14 +93,15 @@ def test_a_database_behind_head_is_refused_until_migrate(
 ) -> None:
     migrations = tmp_path / "migrations"
     shutil.copytree(schema.MIGRATIONS, migrations, ignore=shutil.ignore_patterns("__pycache__"))
-    (migrations / "versions" / "0002_probe.py").write_text(PROBE_REVISION)
-    upgrade_to(engine, "0001")
+    head = schema.head()
+    (migrations / "versions" / "ffe0_probe.py").write_text(PROBE_REVISION.format(head=head))
+    upgrade_to(engine, head)
     monkeypatch.setattr(schema, "MIGRATIONS", migrations)
 
-    with pytest.raises(schema.SchemaError, match="at revision 0001, behind head 0002"):
+    with pytest.raises(schema.SchemaError, match=f"at revision {head}, behind head ffe0"):
         create_app()
     assert main(["migrate"]) == 0
-    assert revision_of(create_app().state.db.engine) == "0002"
+    assert revision_of(create_app().state.db.engine) == "ffe0"
 
 
 def test_an_unknown_revision_is_refused(settings: Settings, engine: Engine) -> None:
