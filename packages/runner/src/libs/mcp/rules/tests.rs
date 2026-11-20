@@ -212,3 +212,27 @@ fn a_rule_that_stays_keeps_what_it_spent() {
         }
     );
 }
+
+#[test]
+fn a_dot_segment_after_an_allowed_prefix_never_matches() {
+    let prefix = constrained(json!({"prefix": "/workspace/"}));
+    let resources = rules(json!([
+        {"server": "alpha", "resource": "docs://alpha/", "effect": "allow"},
+    ]));
+
+    assert!(!allowed(
+        &prefix,
+        json!({"query": "/workspace/../etc/passwd"})
+    ));
+    assert!(!allowed(&prefix, json!({"query": "/workspace/./a"})));
+    assert!(!allowed(&prefix, json!({"query": "/workspace/%2e%2E/etc"})));
+    assert!(allowed(&prefix, json!({"query": "/workspace/a..b/c"})));
+    assert_eq!(
+        resources.resource("alpha", "docs://alpha/../beta/key"),
+        Err(None)
+    );
+    assert_eq!(
+        resources.resource("alpha", "docs://alpha/guide"),
+        Ok(("docs://alpha/", 0))
+    );
+}

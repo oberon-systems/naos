@@ -71,7 +71,7 @@ impl Constraint {
     fn matches(&self, value: &Value) -> bool {
         match self {
             Self::Equals(wanted) => wanted == value,
-            Self::Prefix(prefix) => value.as_str().is_some_and(|text| text.starts_with(prefix)),
+            Self::Prefix(prefix) => value.as_str().is_some_and(|text| under(text, prefix)),
             Self::Regex(regex) => value.as_str().is_some_and(|text| regex.is_match(text)),
             Self::Schema(schema) => schema.matches(value),
         }
@@ -296,9 +296,7 @@ impl Rule {
 
     fn prefix(&self, server: &str, uri: &str) -> Option<&str> {
         match &self.target {
-            Target::Resource(prefix) if self.server == server && uri.starts_with(prefix) => {
-                Some(prefix)
-            }
+            Target::Resource(prefix) if self.server == server && under(uri, prefix) => Some(prefix),
             _ => None,
         }
     }
@@ -424,6 +422,15 @@ impl Rules {
             (None, None) => Err(None),
         }
     }
+}
+
+// A prefix says nothing about where a `.` or `..` segment after it leads, so such text never matches.
+fn under(text: &str, prefix: &str) -> bool {
+    let decoded = text.replace("%2e", ".").replace("%2E", ".");
+    text.starts_with(prefix)
+        && !decoded
+            .split(['/', '\\', '?', '#'])
+            .any(|segment| segment == "." || segment == "..")
 }
 
 #[cfg(test)]
