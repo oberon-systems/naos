@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 from collections.abc import Callable, Mapping
 from functools import partial
 from typing import Annotated, Any
@@ -21,6 +22,7 @@ ANSWER_SECONDS = 10.0
 # The runner's answer starts with the ask it answers and the side's whole size.
 ID_BYTES = 8
 SIZE_BYTES = 8
+RUNNER_ERRORS = {"read_failed": "the runner could not read this range"}
 REASON_CHARS = 200
 
 router = APIRouter(dependencies=[Depends(require_operator_connection)])
@@ -100,8 +102,16 @@ def _answered(hub: ContentHub, runner_id: str, message: Mapping[str, Any]) -> No
     if reply.get("absent") is True:
         hub.answer(runner_id, ask_id, Absent())
     else:
-        failed = ContentUnavailableError(str(reply.get("error"))[:REASON_CHARS])
-        hub.answer(runner_id, ask_id, failed)
+        hub.answer(runner_id, ask_id, _failed(reply))
+
+
+# The runner's own error text stays in its log; the viewer gets a fixed text and the id to find it.
+def _failed(reply: Mapping[str, Any]) -> ContentUnavailableError:
+    error_id = str(reply.get("error_id", ""))
+    if not re.fullmatch(r"[0-9a-f]{1,32}", error_id):
+        error_id = "none"
+    text = RUNNER_ERRORS.get(str(reply.get("error")), "the runner could not answer")
+    return ContentUnavailableError(f"{text} (error {error_id})")
 
 
 async def _to_runner(websocket: WebSocket, outbox: "asyncio.Queue[str]") -> None:

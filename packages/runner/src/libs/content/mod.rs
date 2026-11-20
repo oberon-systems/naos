@@ -14,6 +14,7 @@ use url::Url;
 use crate::libs::console::live::socket_base;
 use crate::libs::credentials::{CredentialStore, Credentials};
 use crate::libs::error::AgentError;
+use crate::libs::ids::random_hex;
 use crate::libs::overlay::content::{self, Piece, Side};
 use crate::libs::overlay::Diff;
 use crate::libs::qemu::VmPaths;
@@ -104,8 +105,10 @@ async fn session(
             Err(err) => {
                 // the VM may have moved to the archive since its changes were found
                 kept = None;
+                let error_id = random_hex(8).unwrap_or_default();
+                tracing::warn!(error_id, run_id = ask.run_id, error = %err, "content ask failed");
                 Message::Text(
-                    json!({"id": ask.id, "error": err.to_string()})
+                    json!({"id": ask.id, "error": "read_failed", "error_id": error_id})
                         .to_string()
                         .into(),
                 )

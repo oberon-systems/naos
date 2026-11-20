@@ -712,7 +712,12 @@ fn a_failure_midway_rolls_back_what_was_applied() {
     fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).expect("chmod");
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].0, "locked/b.txt");
-    assert!(found[0].1.contains("Permission denied"), "{}", found[0].1);
+    assert!(
+        found[0].1.starts_with("write_failed (error "),
+        "{}",
+        found[0].1
+    );
+    assert!(!found[0].1.contains("Permission denied"), "{}", found[0].1);
     assert_eq!(fixture.host_text("a.txt"), "a\n");
     assert!(!fixture.has("locked/b.txt"));
     assert!(!fixture.left_behind());

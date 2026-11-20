@@ -465,8 +465,12 @@ impl Applier {
         steps: &mut Vec<Step>,
         report: &mut Report,
     ) -> Result<(), String> {
-        self.try_apply(op, steps, report)
-            .map_err(|err| err.to_string())?
+        self.try_apply(op, steps, report).map_err(|err| {
+            // The reason reaches the operator, so it names an id the log holds, not the io error.
+            let error_id = random_hex(8).unwrap_or_default();
+            tracing::warn!(error_id, path = op.path, error = %err, "merge step failed");
+            format!("write_failed (error {error_id})")
+        })?
     }
 
     fn try_apply(

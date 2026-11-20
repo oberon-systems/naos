@@ -370,7 +370,7 @@ def test_an_entry_is_read_in_ranges_through_the_runner_socket(
         gone = json.loads(viewer.receive_text())
         _ask(viewer, "host", 64, 64)
         failed = json.loads(held.receive_text())
-        held.send_text(json.dumps({"id": failed["id"], "error": "the upper disk is gone"}))
+        held.send_text(json.dumps({"id": failed["id"], "error": "read_failed", "error_id": "ab12"}))
         refused = json.loads(viewer.receive_text())
 
     assert ask == {
@@ -383,7 +383,11 @@ def test_an_entry_is_read_in_ranges_through_the_runner_socket(
     }
     assert piece == bytes([1]) + (2).to_bytes(8, "big") + (5).to_bytes(8, "big") + b"ta\n"
     assert gone == {"side": "host", "offset": 0, "absent": True}
-    assert refused == {"side": "host", "offset": 64, "error": "the upper disk is gone"}
+    assert refused == {
+        "side": "host",
+        "offset": 64,
+        "error": "the runner could not read this range (error ab12)",
+    }
     viewed = session.exec(select(AuditEvent).where(AuditEvent.event == "merge_content_viewed"))
     assert [(row.actor, row.run_id, row.data) for row in viewed] == [
         ("operator", run_id, {"path": "notes.txt", "index": NOTES})
