@@ -439,7 +439,7 @@
     socket.onmessage = (event) => {
       if (typeof event.data === "string") {
         const reply = JSON.parse(event.data);
-        const side = sides[reply.side];
+        const side = SIDES.includes(reply.side) ? sides[reply.side] : null;
         if (!side) {
           return;
         }
