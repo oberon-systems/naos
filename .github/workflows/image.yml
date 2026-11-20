@@ -16,7 +16,7 @@ jobs:
   validate:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
-    container: hashicorp/packer:1.16.0
+    container: hashicorp/packer:1.16.0@sha256:9253cde2b9fa493d87e49c06b93d53dc6bb238d423956a0fbdb967608981e7c1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -32,7 +32,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/image-')
     runs-on: ubuntu-24.04
     container:
-      image: hashicorp/packer:1.16.0
+      image: hashicorp/packer:1.16.0@sha256:9253cde2b9fa493d87e49c06b93d53dc6bb238d423956a0fbdb967608981e7c1
       options: --device /dev/kvm
     permissions:
       contents: write

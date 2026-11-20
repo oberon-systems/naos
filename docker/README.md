@@ -6,7 +6,7 @@ control plane from the published images: the
 the [web ui](https://github.com/oberon-systems/naos/blob/main/packages/web/README.md)
 and a [PostgreSQL](https://www.postgresql.org/) database. The same file serves a
 local test stack and a real deployment; only `.env` differs between them. A
-naos release publishes this file with both images pinned, and its
+naos release publishes this file with all three images pinned by digest, and its
 `install-stack.sh` sets it up, updates it when run again and, with
 `uninstall`, removes it with its data; see
 [docs/13-install.md](https://github.com/oberon-systems/naos/blob/main/docs/13-install.md).
@@ -14,7 +14,19 @@ naos release publishes this file with both images pinned, and its
 The runner is not part of the stack. It needs KVM, virtiofsd and the host
 workspace, so it runs on the host as a user unit and reaches the api over the
 published port. `docker/api/Dockerfile` and `docker/web/Dockerfile` build the
-two images the compose file pulls.
+two images the compose file pulls, each from the hashed lock next to it and
+nothing else. A lock takes its versions from the root `requirements.txt`;
+regenerate it after that file changes:
+
+```bash
+grep -v '^-e ' requirements.txt > /tmp/constraints.txt
+echo 'setuptools==80.9.0' > /tmp/build.in
+uv pip compile packages/api/pyproject.toml /tmp/build.in --extra server \
+  -c /tmp/constraints.txt --generate-hashes --python-version 3.12 \
+  --python-platform x86_64-unknown-linux-gnu --no-header -o docker/api/requirements.txt
+```
+
+The same command with `web` in place of `api` writes the web image's lock.
 
 ## Configure
 

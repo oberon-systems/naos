@@ -5,6 +5,7 @@ set -eu
 
 stamped_release=
 stamped_runner=
+stamped_runner_sha256=
 
 repo="${NAOS_REPO:-oberon-systems/naos}"
 docs="https://github.com/$repo/blob/main/docs/host"
@@ -283,10 +284,11 @@ download() {
     asset="naos-runner-$stamped_runner-x86_64-linux-gnu"
     url="https://github.com/$repo/releases/download/runner-$stamped_runner"
     tmp="$(mktemp -d)"
+    # The checksum travels in this script, not next to the asset, so replacing both takes two releases.
+    [ -n "$stamped_runner_sha256" ] || fail "this install-runner.sh carries no runner checksum"
     curl -fsSL -o "$tmp/$asset" "$url/$asset" || fail "cannot download $asset"
-    curl -fsSL -o "$tmp/SHA256SUMS" "$url/SHA256SUMS" || fail "cannot download SHA256SUMS"
-    (cd "$tmp" && grep " $asset\$" SHA256SUMS | sha256sum -c - >/dev/null) ||
-        fail "$asset does not match its SHA256SUMS"
+    (cd "$tmp" && printf '%s  %s\n' "$stamped_runner_sha256" "$asset" | sha256sum -c - >/dev/null) ||
+        fail "$asset does not match the checksum of release $stamped_release"
     put install -d -m 0755 "$bin_dir"
     put install -m 0755 "$tmp/$asset" "$bin_dir/runner-$stamped_runner"
     rm -rf "$tmp"

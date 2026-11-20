@@ -48,7 +48,11 @@ jobs:
           gh release download "image-$image" -p SHA256SUMS -O image.sums
           image_sha256="$(awk -v name="naos-agents-$image.qcow2" '$2 == name { print $1 }' image.sums)"
           test -n "$image_sha256"
-          gh release view "runner-$runner" >/dev/null
+          gh release download "runner-$runner" -p SHA256SUMS -O runner.sums
+          runner_sha256="$(awk -v name="naos-runner-$runner-x86_64-linux-gnu" '$2 == name { print $1 }' runner.sums)"
+          test -n "$runner_sha256"
+          db_ref="$(sed -n 's/^ *image: \(postgres:[^ ]*\)$/\1/p' docker/compose.yaml)"
+          test -n "$db_ref"
           api_ref="ghcr.io/$OWNER/naos-api:$api"
           web_ref="ghcr.io/$OWNER/naos-web:$web"
           {
@@ -57,6 +61,8 @@ jobs:
             echo "RUNNER=$runner"
             echo "IMAGE=$image"
             echo "IMAGE_SHA256=$image_sha256"
+            echo "RUNNER_SHA256=$runner_sha256"
+            echo "DB_REF=$db_ref@$(digest "$db_ref")"
             echo "API_REF=$api_ref@$(digest "$api_ref")"
             echo "WEB_REF=$web_ref@$(digest "$web_ref")"
           } >> "$GITHUB_ENV"
@@ -64,17 +70,21 @@ jobs:
         run: |
           mkdir dist
           sed -e "s|\${NAOS_API_IMAGE[^}]*}|$API_REF|" -e "s|\${NAOS_WEB_IMAGE[^}]*}|$WEB_REF|" \
+            -e "s|^\( *image: \)postgres:[^ ]*\$|\1$DB_REF|" \
             docker/compose.yaml > dist/compose.yaml
           grep -q "$API_REF" dist/compose.yaml && grep -q "$WEB_REF" dist/compose.yaml
+          grep -q "image: $DB_REF\$" dist/compose.yaml
           cp docker/.env.example dist/env.example
           sed -e "s/^stamped_release=\$/stamped_release=$GITHUB_REF_NAME/" \
             -e "s/^stamped_runner=\$/stamped_runner=$RUNNER/" \
+            -e "s/^stamped_runner_sha256=\$/stamped_runner_sha256=$RUNNER_SHA256/" \
             release/install-runner.sh > dist/install-runner.sh
           sed -e "s/^stamped_release=\$/stamped_release=$GITHUB_REF_NAME/" \
             -e "s/^stamped_image=\$/stamped_image=$IMAGE/" \
             -e "s/^stamped_image_sha256=\$/stamped_image_sha256=$IMAGE_SHA256/" \
             release/install-stack.sh > dist/install-stack.sh
           grep -q "^stamped_runner=$RUNNER\$" dist/install-runner.sh
+          grep -q "^stamped_runner_sha256=$RUNNER_SHA256\$" dist/install-runner.sh
           grep -q "^stamped_image_sha256=$IMAGE_SHA256\$" dist/install-stack.sh
           cd dist && sha256sum compose.yaml env.example install-runner.sh install-stack.sh > SHA256SUMS
       - name: Publish release
