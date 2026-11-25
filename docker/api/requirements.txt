@@ -4,9 +4,9 @@ alembic==1.20.1 \
     # via
     #   -c /tmp/claude-1000/-home-zombig-oberon-naos/7cc91b64-2d4a-4f18-b49d-cddc76ccb676/scratchpad/constraints.txt
     #   naos-api (packages/api/pyproject.toml)
-annotated-doc==0.0.5 \
-    --hash=sha256:117bac03a25ede5df5440e855b32d556049ca169ead221505badf432fed4b101 \
-    --hash=sha256:c7e58ce09192557605d8bbd92836d7e1d520ac9580096042c0bfd197efacf1bb
+annotated-doc==0.0.6 \
+    --hash=sha256:361ca0950cc7082f53fa69e9328409f40a62c61e57e0a47e1825a08078a58a53 \
+    --hash=sha256:7969bb69912085b2285849c0dcac0b4b374fd180c13cf10a87f284ffcf347bbf
     # via
     #   -c /tmp/claude-1000/-home-zombig-oberon-naos/7cc91b64-2d4a-4f18-b49d-cddc76ccb676/scratchpad/constraints.txt
     #   fastapi
@@ -23,9 +23,9 @@ anyio==4.16.0 \
     #   -c /tmp/claude-1000/-home-zombig-oberon-naos/7cc91b64-2d4a-4f18-b49d-cddc76ccb676/scratchpad/constraints.txt
     #   starlette
     #   watchfiles
-click==8.5.0 \
-    --hash=sha256:255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360 \
-    --hash=sha256:ba0d2089de75ea0310e2dde03160e6ca10009947fb95a182f9b54021bb272e34
+click==8.5.1 \
+    --hash=sha256:8bb5376d2006950386f8c6427613334a2acadc5f559cb80e638d00b4df957e37 \
+    --hash=sha256:9bbfada76703fd1d784b83eea012e3e8c6a001a876543ef104fa56aaaeb072b4
     # via
     #   -c /tmp/claude-1000/-home-zombig-oberon-naos/7cc91b64-2d4a-4f18-b49d-cddc76ccb676/scratchpad/constraints.txt
     #   uvicorn
@@ -35,9 +35,9 @@ fakeredis==2.40.0 \
     # via
     #   -c /tmp/claude-1000/-home-zombig-oberon-naos/7cc91b64-2d4a-4f18-b49d-cddc76ccb676/scratchpad/constraints.txt
     #   naos-api (packages/api/pyproject.toml)
-fastapi==0.162.0 \
-    --hash=sha256:3785963de305dd09912426cb81f2d230fce98ab3521cdfe97265c8d14983128c \
-    --hash=sha256:6a22c1e2e6e32e0633ee7e170f00009a29b8228b16feb219ee42f32fd8d88a8f
+fastapi==0.162.4 \
+    --hash=sha256:4abdb1ef367090678d8bc664631df432ae7a1bfe7709c37547d3606e667650e3 \
+    --hash=sha256:f093bc306d3958278d30ffd14f3834ca3d9b144fbb898ab5c9b652cf6e75f869
     # via
     #   -c /tmp/claude-1000/-home-zombig-oberon-naos/7cc91b64-2d4a-4f18-b49d-cddc76ccb676/scratchpad/constraints.txt
     #   naos-api (packages/api/pyproject.toml)
